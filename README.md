@@ -21,6 +21,12 @@ Without flags, `init` asks for cell name, purpose, systems, adapters, evidence p
 ./install.sh doctor --dest /path/to/cell-vault
 ```
 
+An existing vault that already has `00-Home.md` and `10-Sistemas/` (no lock) is adopted, not initialized. Write `instance.yaml` first; Home and notes are never rewritten:
+
+```bash
+./install.sh adopt --dest /path/to/existing-vault
+```
+
 With no arguments, the script looks at the current directory: a `.knowledge-os.lock.yaml` selects `update`; an empty destination selects `init`. Knowledge Markdown without a lock is refused.
 
 A future published tag can be installed with:

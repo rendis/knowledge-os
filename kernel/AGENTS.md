@@ -2,7 +2,7 @@
 
 This vault is an evidence-backed map of one cell's systems. Load skills by name; do not restate them here.
 
-Before any vault operation, read `90-Meta/Convenciones.md` (schema), `90-Meta/Auditoria - Framework.md` (evidence and gates), and `instance.yaml` (cell identity). Then select one skill.
+Classify the request, then select one skill. For orientation or interrogation, first hop is `90-Meta/graph-query.py` (JSON stems and edges, no note bodies). Open `instance.yaml` and `00-Home.md` for cell identity. Open a section of `90-Meta/Convenciones.md` or `90-Meta/Auditoria - Framework.md` only when schema, node type, or an evidence gate is required. Do not load those Meta files before classifying.
 
 ## Skills
 
