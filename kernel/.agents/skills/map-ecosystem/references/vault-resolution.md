@@ -66,7 +66,7 @@ Resolve again after a new user-supplied vault path, configuration change, clone,
 
 `SOURCE_ROOTS` are discovery inputs; a successful semantic response is the only checkout binding. Before reading a source repository or assigning it to a worker, obtain its expected Git remote and run `python3 -B 90-Meta/workspace-config.py --vault-root "<VAULT_ROOT>" locate-repository "<GIT_REMOTE>" --format json`. Use only the `path` returned by that command, and repeat the resolution for every required repository. A configured discovery root represents itself when it is a Git repository; otherwise only its immediate child directories are candidates. The semantic API normalizes SSH and HTTPS remotes, performs no recursive scan, and rejects zero or multiple matches without writing configuration.
 
-When `source_context.status` is `unavailable` or `invalid`, a vault-only task may continue with that limitation. A task that needs source evidence must load `configure-knowledge-os-workspace`, complete onboarding or repair, rerun the resolver, and then resume. No consumer may write the YAML directly.
+When `source_context.status` is `unavailable` or `invalid`, a vault-only task may continue with that limitation. A task that needs source evidence must load `configure-workspace`, complete onboarding or repair, rerun the resolver, and then resume. No consumer may write the YAML directly.
 
 The order of `SOURCE_ROOTS` is the configured order and every record has `origin: config`. A root whose exact resolved path is also `CLONE_ROOT` is marked `managed: true`; parent/child overlap does not transfer authority. Duplicate or inconsistent candidates require the configuration workflow and an explicit user choice; consumers must not invent a preference.
 
@@ -78,7 +78,7 @@ A valid configured `CLONE_ROOT` authorizes shallow clones and `git fetch` only i
 
 When a managed clone is missing, determine the production branch using the inventory rule, then create its shallow clone under `CLONE_ROOT`. When it exists and current remote evidence is required, fetch the required remote refs without changing any existing checkout. Materialize the selected remote commit in a detached temporary worktree created with the host's safe temporary-directory API (`mktemp -d` on POSIX or the platform equivalent), pass that exact worktree through `--source-repo`, and remove that exact worktree in guaranteed cleanup on success or failure. If interrupted cleanup leaves metadata, report the exact path and retry only `git worktree remove --force <exact-temporary-path>` against that managed clone. Never use broad `git worktree prune`: it may remove unrelated stale registrations.
 
-If `clone_authorized=false`, never clone. Ask for explicit approval and an exact existing root, then hand off to `configure-knowledge-os-workspace` to record managed-clone authority before acquisition. If the user does not want persistent clone authority, require them to provide an already available checkout under a configured read-only root.
+If `clone_authorized=false`, never clone. Ask for explicit approval and an exact existing root, then hand off to `configure-workspace` to record managed-clone authority before acquisition. If the user does not want persistent clone authority, require them to provide an already available checkout under a configured read-only root.
 
 ## Interaction protocol
 

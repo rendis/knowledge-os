@@ -127,8 +127,36 @@ def load_lock(path: Path) -> dict[str, Any]:
     }
 
 
+KERNEL_META_REPLACE = frozenset(
+    {
+        "instance.py",
+        "test_instance.py",
+        "graph-query.py",
+        "workspace-config.py",
+        "test_workspace_config.py",
+        "workspace-contract.yaml",
+    }
+)
+
+
 def copy_union_files(src: Path, dst: Path) -> None:
-    """Copy files from src onto dst without deleting dest-only paths."""
+    """Copy kernel Meta files. Dest-only paths stay. Colliding tools stay unless replace-listed."""
+    dst.mkdir(parents=True, exist_ok=True)
+    for path in src.rglob("*"):
+        if not path.is_file():
+            continue
+        rel = path.relative_to(src)
+        if any(part == "__pycache__" or part.endswith(".pyc") for part in rel.parts):
+            continue
+        target = dst / rel
+        if target.exists() and rel.as_posix() not in KERNEL_META_REPLACE:
+            continue
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(path, target)
+
+
+def copy_tree_union(src: Path, dst: Path) -> None:
+    """Overwrite kernel files onto dest without deleting dest-only paths."""
     dst.mkdir(parents=True, exist_ok=True)
     for path in src.rglob("*"):
         if not path.is_file():
@@ -142,25 +170,29 @@ def copy_union_files(src: Path, dst: Path) -> None:
 
 
 def copy_kernel_skills(dest: Path) -> None:
-    """Replace kernel skill directories; leave cell-only skills in place."""
+    """Refresh kernel skill files; leave cell-only skills and extra files in place."""
     skills_src = DIST / "kernel" / ".agents" / "skills"
     skills_dst = dest / ".agents" / "skills"
     skills_dst.mkdir(parents=True, exist_ok=True)
     for skill_dir in skills_src.iterdir():
         if skill_dir.is_dir():
-            _copytree(skill_dir, skills_dst / skill_dir.name)
+            copy_tree_union(skill_dir, skills_dst / skill_dir.name)
 
 
 def copy_kernel(dest: Path) -> None:
     kernel = DIST / "kernel"
-    shutil.copy2(kernel / "AGENTS.md", dest / "AGENTS.md")
+    agents = dest / "AGENTS.md"
+    if not agents.is_file():
+        shutil.copy2(kernel / "AGENTS.md", agents)
     target_claude = dest / "CLAUDE.md"
     if target_claude.exists() or target_claude.is_symlink():
         target_claude.unlink()
     os.symlink("AGENTS.md", target_claude)
     shutil.copy2(DIST / "VERSION", dest / "VERSION")
     for name in ("Arquitectura.base", "Auditoria.base", "Operacion.base", "Repos.base"):
-        shutil.copy2(kernel / name, dest / name)
+        target = dest / name
+        if not target.is_file():
+            shutil.copy2(kernel / name, target)
     copy_union_files(kernel / "90-Meta", dest / "90-Meta")
     copy_kernel_skills(dest)
     claude_skills = dest / ".claude" / "skills"
@@ -204,7 +236,7 @@ def copy_adapters(dest: Path, adapters: list[str]) -> None:
             raise SystemExit(f"unknown adapter: {name}")
         for skill_dir in src.iterdir():
             if skill_dir.is_dir():
-                _copytree(skill_dir, skills / skill_dir.name)
+                copy_tree_union(skill_dir, skills / skill_dir.name)
 
 
 def seed_skeleton(dest: Path, enabled_types: list[str] | None = None) -> None:

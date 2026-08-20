@@ -7,7 +7,7 @@ Classify the request, then select one skill. For orientation or interrogation, f
 ## Skills
 
 - `map-ecosystem` — query, document, synchronize, confirm tooling readiness, or answer where a fact belongs. First step is **orientation** when bootstrap is incomplete.
-- `configure-workspace` — sole writer of local `.knowledge-os-config.yaml`.
+- `configure-workspace` — sole writer of local `.knowledge-os-config.yaml`. Onboarding is demand-triggered when a skill cannot resolve repositories or the user asks whether the workspace is initialized or configured.
 - `manage-investigation` — local case files under `.investigations/`.
 - `manage-investigation-derived-learning` — assess and publish `70-Aprendizajes/` notes.
 - `manage-development-handoff` — persistent Jira worktrees and handoff files.

@@ -11,7 +11,7 @@ Resolve the destination only through:
   --vault-root <vault-root> development-worktree-root --format json
 ```
 
-If the view returns `worktree_root_not_configured` or `worktree_root_unavailable`, invoke `configure-knowledge-os-workspace`, let it own the repair, and resume only after the semantic view succeeds. Never parse `.knowledge-os-config.yaml`.
+If the view returns `worktree_root_not_configured` or `worktree_root_unavailable`, invoke `configure-workspace`, let it own the repair, and resume only after the semantic view succeeds. Never parse `.knowledge-os-config.yaml`.
 
 The helper derives:
 
