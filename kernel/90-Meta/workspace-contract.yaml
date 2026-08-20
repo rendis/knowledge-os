@@ -1,0 +1,17 @@
+# Closed local workspace contract (version 1)
+
+The writer is `configure-workspace`. Consumers call `90-Meta/workspace-config.py`.
+
+```yaml
+version: 1
+workspace:
+  repository_roots: []
+  managed_clone:
+    enabled: false
+    root: ""
+skills:
+  manage-development-handoff:
+    worktree_root: ""
+```
+
+Secret-bearing keys are prohibited. Discovery roots are read-only unless a development-handoff plan is authorized.

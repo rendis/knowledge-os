@@ -1,0 +1,42 @@
+filters:
+  and:
+    - file.inFolder("20-Repos")
+properties:
+  file.name:
+    displayName: Repo
+  note.cobertura-entradas:
+    displayName: Inputs
+  note.cobertura-salidas:
+    displayName: Outputs
+  note.cobertura-datos:
+    displayName: Data
+  note.cobertura-infra:
+    displayName: Infra
+  note.cobertura-flujos:
+    displayName: Flows
+views:
+  - type: table
+    name: Coverage
+    order:
+      - file.name
+      - cobertura-entradas
+      - cobertura-salidas
+      - cobertura-datos
+      - cobertura-infra
+      - cobertura-flujos
+  - type: table
+    name: Coverage unconfirmed
+    filters:
+      or:
+        - note.cobertura-entradas == "por-confirmar"
+        - note.cobertura-salidas == "por-confirmar"
+        - note.cobertura-datos == "por-confirmar"
+        - note.cobertura-infra == "por-confirmar"
+        - note.cobertura-flujos == "por-confirmar"
+    order:
+      - file.name
+      - cobertura-entradas
+      - cobertura-salidas
+      - cobertura-datos
+      - cobertura-infra
+      - cobertura-flujos

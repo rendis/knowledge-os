@@ -1,0 +1,43 @@
+# Resolve deployment by environment
+
+Load this supporting reference whenever a repository analysis or synchronization covers a deployable unit. The file inventory from `static-evidence-scan.py` is a lead; completion requires interpreting the deployment chain.
+
+## Evidence sequence
+
+1. Inspect `.github/workflows/`, including called reusable workflows, event filters, branch or tag conditions, matrices, environments, inputs, and job dependencies.
+2. Follow referenced Cloud Build files, deployment scripts, Dockerfiles, Helm values, Kubernetes or Kustomize overlays, Cloud Run or Functions descriptors, and infrastructure-as-code modules.
+3. Resolve versioned variables that identify project, platform, resource, region or zone, namespace, workload, artifact, and environment. Record secret names only as unresolved indirection; never infer their values.
+4. Inspect an accessible pinned reusable action or cross-repository deployment definition when the local workflow delegates target selection to it. Otherwise record the external definition as an exact unresolved indirection, answer dependent fields as “no observado en fuentes estáticas revisadas”, and withhold only claims that require the unavailable body. The unresolved indirection does not make the repository analysis or synchronization incomplete.
+5. Use bounded GCP `list` or `describe` metadata only to reconcile a concrete static target, never to search blindly for a deployment.
+
+## Per-environment chain
+
+For every environment observed in versioned evidence, trace:
+
+```text
+event or manual input
+→ workflow and job
+→ environment condition
+→ build artifact
+→ deploy action or command
+→ GCP project
+→ platform and resource
+→ location
+→ namespace or workload, when applicable
+→ manifest, overlay, or values source
+```
+
+Apply the deployment table contract from **Infraestructura y scheduling** in `90-Meta/Convenciones.md`. Keep multiple deployables in separate rows. Use `no observado en fuentes estáticas revisadas` for a missing field after following every versioned indirection, and `#por-confirmar` only when the gap affects understanding of the runtime or production baseline.
+
+## Interpretation rules
+
+- A workflow filename, environment label, branch name, or manifest template alone does not prove a deployed destination.
+- A configured target in a workflow proves deployment intent at the analyzed commit; current runtime existence requires reconciled control-plane metadata.
+- A secret or organization variable name proves only that indirection exists.
+- A reusable workflow pinned by SHA or tag remains external evidence until its relevant versioned body is inspected.
+- Contradictory projects, branches, overlays, or runtime names remain separate evidence; do not choose one by naming convention.
+- The matrix records stable deployment topology. Logs, pod health, rollout state, and current metrics remain ephemeral operational evidence.
+
+## Completion criterion
+
+Deployment analysis is complete when every environment and deployable observed in versioned sources has one row, every row traces the trigger through its deployment artifact to the target or an exact unresolved indirection, contradictions are visible, and the repository note preserves the resulting matrix for future inspections.

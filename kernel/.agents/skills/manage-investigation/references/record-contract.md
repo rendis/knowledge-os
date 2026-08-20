@@ -1,0 +1,165 @@
+# Case-file contract
+
+Load this reference before creating or changing an investigation.
+
+## Identity and layout
+
+Generate an immutable ID as `YYYYMMDD-HHmmss-<slug>` in local time. Normalize the slug to lowercase ASCII words separated by hyphens. If the directory exists, append `-02`, `-03`, and the first available two-digit suffix.
+
+```text
+.investigations/
+└── <investigation-id>/
+    ├── investigation.md
+    ├── artifacts/
+    ├── exports/
+    └── handoffs/
+```
+
+Do not maintain a separate index. Resume by searching `investigation.md` frontmatter and content in this order: exact `id`, exact entry in `consolidated-from`, exact `source-ref`, then title or keywords. Require user selection only for multiple matches.
+
+Use `handoffs/` only for repository-specific development input packages that conform to the `manage-development-handoff` input contract. Create one package per target repository; the consumer receives the package directory, never authority to read or mutate the investigation case.
+
+Development reconciliation creates no reverse package under `handoffs/` or elsewhere. `reconcile-development-handoff` returns normalized context in memory, and `manage-investigation` applies it directly to the canonical case through [development-reconciliation.md](development-reconciliation.md).
+
+## Frontmatter
+
+Required fields:
+
+```yaml
+id: 20260717-163245-weekly-tags-filter
+title: Weekly TAGS reporting filter
+dedupe-key: weekly-tags-filter
+status: investigating
+created-at: 2026-07-17T16:32:45-04:00
+updated-at: 2026-07-17T16:45:00-04:00
+source-type: message
+source-ref: customer conversation
+requester-role: product-owner
+export-intent: user-stories
+purpose: development
+vault-outcome: deferred-until-production
+learning-outcome: not-evaluated
+```
+
+`dedupe-key` is required for newly created cases. Derive it from the stable problem or outcome, not from incidental wording. Existing records without it remain valid legacy records; treat them as possible matches that require semantic review rather than mutating them automatically.
+
+`purpose` classifies the intended outcome:
+
+- `knowledge`: answer or understand without defining a software delivery.
+- `development`: define, validate, or export a future change.
+- `mixed`: investigate current behavior and define a future change; keep both states separate.
+- `undecided`: allowed only during `intake`.
+
+`vault-outcome` records the independent documentation path for the case's current durable candidate, if one exists:
+
+- `not-evaluated`: evidence is not yet sufficient to assess a current-state candidate; allowed during `intake` and `investigating`, but not when entering `validating`.
+- `none`: no durable technical fact is a candidate.
+- `deferred-until-production`: the only candidate describes a future or undeployed state.
+- `candidate-for-audit`: a current/productive fact may qualify, but `map-ecosystem` has not independently applied its production-evidence gate.
+- `documented`: `map-ecosystem` independently verified the productive fact and confirmed that the canonical vault already represented it correctly or updated and verified the affected notes. Record the canonical notes, lifecycle result, evidence boundary, and observed checks in Readiness and History.
+
+For `purpose: mixed`, the field follows the current-state candidate when one exists; every future-state portion remains explicitly deferred and outside the vault regardless of that value. Purpose never proves eligibility for the vault. Existing cases without these fields remain valid legacy records, but the next material Resume must classify them and, for development or mixed work, separate current productive state from future/proposed state before changing status, evidence, decisions, exports, or publication.
+
+`learning-outcome` records the latest explicit assessment by `manage-investigation-derived-learning`; it is independent of `purpose`, investigation status, story export, and `vault-outcome`:
+
+- `not-evaluated`: no current assessment exists, or material new evidence invalidated the previous snapshot.
+- `no-learning`: the reviewed evidence was sufficient but contained no reusable learning.
+- `already-covered`: an existing canonical note already covered the teaching and context.
+- `insufficient-evidence`: a named source, context, or reproducible result was missing; this is retryable.
+- `candidate`: the assessment was `extractable`, but no durable publication was completed.
+- `documented`: the skill created, enriched, challenged, superseded, or revalidated the canonical note and the vault gates passed.
+
+The assessment itself is read-only. `manage-investigation` may record its returned outcome, target note, evidence boundary, case snapshot, and observed checks in Readiness and History after the assessment completes. When a later material input could change that result, preserve the prior event in History and reset the field to `not-evaluated`. Existing cases without `learning-outcome` remain valid legacy records; classify the field before a learning handoff or the next material case update.
+
+Use `unknown` only when the value cannot be derived and does not justify a question. Add these fields only while blocked:
+
+```yaml
+blocked-on: A-002 cannot be read
+resume-to: investigating
+```
+
+Allowed statuses are defined only in [readiness-and-lifecycle.md](readiness-and-lifecycle.md).
+
+A canonical case that absorbed duplicate cases records their IDs:
+
+```yaml
+consolidated-from:
+  - 20260717-163300-equivalent-case
+```
+
+After its exact snapshot, unique artifacts, drafts, and register mapping are preserved in the canonical case, remove the retired directory authorized for consolidation. Resolve its old ID by matching `consolidated-from`. Lineage never authorizes using another case file as evidence.
+
+## Required sections
+
+Keep these sections in this order, translated to the user's working language when instantiated:
+
+1. Original request
+2. Current state
+   - Objective
+   - Scope
+   - Out of scope
+   - Current productive state
+   - Future/proposed state
+3. References and attachments
+4. Evidence
+   - Facts
+   - Inferences
+   - Contradictions
+5. Affected surfaces
+6. Open questions
+7. Decisions
+8. Acceptance criteria
+9. Readiness
+10. History
+
+**Current state** is the consumable snapshot. Update it in place. A development or mixed case must keep **Current productive state** and **Future/proposed state** as separate subsections; a future proposal may cite current facts for context but must not blur their status. **History** is append-only and records material inputs, findings, state changes, decision changes, attachment outcomes, exports, and publications with timestamps.
+
+## Registers and traceability
+
+Assign stable identifiers:
+
+- Evidence: `E-001`, `E-002`, ...
+- Attachments or source summaries: `A-001`, `A-002`, ...
+- Questions: `Q-001`, `Q-002`, ...
+- Decisions: `D-001`, `D-002`, ...
+- Acceptance criteria: `AC-001`, `AC-002`, ...
+- Exports: `S-001`, `S-002`, ...
+
+An identifier is immutable after assignment. Never renumber, recycle, delete, or change the meaning of an existing identifier. A materially different claim, question, decision, criterion, attachment, or export receives the next available identifier. Preserve inactive entries with their state and replacement or resolution links so older History events and exports remain interpretable.
+
+Each question records `open`, `resolved`, or `superseded` state. Keep open questions first. Retain resolved and superseded questions in a clearly labeled subsection of **Open questions**, with the resolving decision or evidence; a replacement question receives a new ID and reciprocal `supersedes`/`superseded-by` links.
+
+Each evidence entry states its claim, category (`fact`, `inference`, `contradiction`, or `limitation`), source, and relevant location such as file, section, page, line, URL, or revision. Link decisions and acceptance criteria to supporting identifiers when available.
+
+For a reconciled implementation, keep one source implementation card and one card per directly dependent Jira story in **Affected surfaces**. Each dependent card names the exact typed-link direction, consumer contracts, what can start, remaining gaps, repository/branch/PR observations, and `ready`, `partial`, `still-blocked`, or `not-applicable` readiness. These cards are case context, not Jira status changes or production evidence.
+
+Persistent memory, another case file, and a neighboring local project are discovery aids, not evidence. Register a claim only after inspecting an explicitly in-scope source directly. Cite that observed source rather than memory, and omit any unscoped project, component, or claim from the case and its exports.
+
+## Decisions
+
+Treat decision statements as immutable. A decision records date, state (`active` or `superseded`), statement, reason, and evidence. Replacing `D-001` creates a new decision with `supersedes: D-001` and updates the old entry with `superseded-by: <new-id>`; preserve both statements and append the replacement event to History.
+
+## Attachments
+
+Prefer an exact byte-for-byte copy in `artifacts/`, named `A-<number>-<safe-original-name>`. Record original name, origin, capture time, copied path, and SHA-256 when the environment can calculate it.
+
+If copying fails but reading succeeds, offer a source summary created from [../assets/source-summary-template.md](../assets/source-summary-template.md). Mark it explicitly as a summary and record:
+
+- Original source and name
+- Copy failure
+- Coverage: `complete`, `partial`, or `selected`
+- Reviewed and omitted sections or ranges
+- Selection basis
+- Fidelity limitations
+
+For a large source, summarize the material relevant to the investigation objective rather than an arbitrary percentage. If omitted material could change a conclusion, keep the conclusion provisional and fail the applicable readiness gate.
+
+If reading fails, record only observable metadata and the access failure, move to `blocked`, and ask the user to grant access, upload again, replace, remove, or explicitly continue without the source. Do not infer or summarize unread content.
+
+## Sensitive material
+
+Inspect before persisting. When a source exposes credentials, tokens, private keys, cookies, or equivalent secrets, record only their redacted existence, location, and behavioral relevance. Keep the value out of case files, artifacts, summaries, exports, logs, and responses.
+
+## Completion criterion
+
+The record conforms when identity and register meanings are immutable, the current snapshot matches the latest material evidence and decisions, registers are traceable without reused IDs, History preserves chronology, attachment and consolidation handling is explicit, affected exports have an explicit synchronization state, and no secret value is persisted.

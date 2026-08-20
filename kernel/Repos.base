@@ -1,0 +1,40 @@
+filters:
+  and:
+    - file.inFolder("20-Repos")
+properties:
+  file.name:
+    displayName: Repo
+  note.sistema:
+    displayName: System
+  note.tipo:
+    displayName: Type
+  note.commit-analizado:
+    displayName: Analyzed commit
+  note.fecha-analisis:
+    displayName: Analyzed on
+  note.rama-analizada:
+    displayName: Branch
+views:
+  - type: table
+    name: All
+    order:
+      - file.name
+      - sistema
+      - tipo
+      - fecha-analisis
+  - type: table
+    name: Update
+    order:
+      - file.name
+      - commit-analizado
+      - fecha-analisis
+      - rama-analizada
+  - type: table
+    name: Missing analyzed commit
+    filters:
+      and:
+        - note.commit-analizado.isEmpty()
+    order:
+      - file.name
+      - commit-analizado
+      - fecha-analisis
