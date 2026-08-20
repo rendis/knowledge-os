@@ -165,6 +165,79 @@ class BootstrapEval(unittest.TestCase):
             self.assertTrue((dest / ".agents" / "skills" / "inspect-gcp-runtime" / "SKILL.md").is_file())
             self.assertTrue((dest / ".agents" / "skills" / "gcloud" / "SKILL.md").is_file())
 
+    def test_adopt_preserves_knowledge_and_extras(self) -> None:
+        sys.path.insert(0, str(DIST / "kernel" / "90-Meta"))
+        from instance import dump_instance, validate_instance
+
+        with tempfile.TemporaryDirectory() as tmp:
+            dest = Path(tmp) / "existing"
+            dest.mkdir()
+            home_text = "# Keep Home\n"
+            (dest / "00-Home.md").write_text(home_text, encoding="utf-8")
+            (dest / "10-Sistemas").mkdir()
+            (dest / "10-Sistemas" / "Payments.md").write_text("# Payments\n", encoding="utf-8")
+            (dest / "90-Meta").mkdir()
+            (dest / "90-Meta" / "Alcance.md").write_text("# Cell scope\nKeep extra.\n", encoding="utf-8")
+            extra = dest / ".agents" / "skills" / "cell-local-tool"
+            extra.mkdir(parents=True)
+            (extra / "SKILL.md").write_text("# cell-local-tool\n", encoding="utf-8")
+            (dest / ".gitignore").write_text(".DS_Store\n/custom-ignore\n", encoding="utf-8")
+            refused = run(
+                [
+                    "sh",
+                    str(INSTALL),
+                    "init",
+                    "--dest",
+                    str(dest),
+                    "--cell-name",
+                    "Payments",
+                    "--purpose",
+                    "Card-present checkout",
+                    "--system",
+                    "payments:Payments",
+                    "--yes",
+                ]
+            )
+            self.assertNotEqual(refused.returncode, 0)
+            missing = run(["sh", str(INSTALL), "adopt", "--dest", str(dest)])
+            self.assertNotEqual(missing.returncode, 0)
+            (dest / "instance.yaml").write_text(
+                dump_instance(
+                    validate_instance(
+                        {
+                            "cell": {"name": "Payments", "purpose": "Card-present checkout"},
+                            "systems": [{"id": "payments", "name": "Payments", "aliases": ["pay"]}],
+                            "evidence": {"profile": "production-gate"},
+                            "locale": {"notes": "en"},
+                            "adapters": [],
+                        }
+                    )
+                ),
+                encoding="utf-8",
+            )
+            adopted = run(["sh", str(INSTALL), "adopt", "--dest", str(dest)])
+            self.assertEqual(adopted.returncode, 0, adopted.stderr)
+            payload = json.loads(adopted.stdout)
+            self.assertEqual(payload["status"], "adopted")
+            self.assertEqual((dest / "00-Home.md").read_text(encoding="utf-8"), home_text)
+            self.assertEqual((dest / "90-Meta" / "Alcance.md").read_text(encoding="utf-8"), "# Cell scope\nKeep extra.\n")
+            self.assertTrue((dest / ".agents" / "skills" / "cell-local-tool" / "SKILL.md").is_file())
+            self.assertTrue((dest / "90-Meta" / "graph-query.py").is_file())
+            self.assertTrue((dest / ".knowledge-os.lock.yaml").is_file())
+            gitignore = (dest / ".gitignore").read_text(encoding="utf-8")
+            self.assertIn("/custom-ignore", gitignore)
+            self.assertIn(".knowledge-os.lock.yaml", gitignore)
+            doctor = run(["sh", str(INSTALL), "doctor", "--dest", str(dest)])
+            self.assertEqual(doctor.returncode, 0, doctor.stderr)
+            info = json.loads(doctor.stdout)
+            self.assertEqual(info["state"], "installed")
+            self.assertTrue(info["orientation"]["ready"])
+            updated = run(["sh", str(INSTALL), "update", "--dest", str(dest)])
+            self.assertEqual(updated.returncode, 0, updated.stderr)
+            self.assertTrue((dest / ".agents" / "skills" / "cell-local-tool" / "SKILL.md").is_file())
+            self.assertTrue((dest / "90-Meta" / "Alcance.md").is_file())
+            self.assertEqual((dest / "00-Home.md").read_text(encoding="utf-8"), home_text)
+
 
 if __name__ == "__main__":
     unittest.main()

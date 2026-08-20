@@ -127,6 +127,30 @@ def load_lock(path: Path) -> dict[str, Any]:
     }
 
 
+def copy_union_files(src: Path, dst: Path) -> None:
+    """Copy files from src onto dst without deleting dest-only paths."""
+    dst.mkdir(parents=True, exist_ok=True)
+    for path in src.rglob("*"):
+        if not path.is_file():
+            continue
+        rel = path.relative_to(src)
+        if any(part == "__pycache__" or part.endswith(".pyc") for part in rel.parts):
+            continue
+        target = dst / rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(path, target)
+
+
+def copy_kernel_skills(dest: Path) -> None:
+    """Replace kernel skill directories; leave cell-only skills in place."""
+    skills_src = DIST / "kernel" / ".agents" / "skills"
+    skills_dst = dest / ".agents" / "skills"
+    skills_dst.mkdir(parents=True, exist_ok=True)
+    for skill_dir in skills_src.iterdir():
+        if skill_dir.is_dir():
+            _copytree(skill_dir, skills_dst / skill_dir.name)
+
+
 def copy_kernel(dest: Path) -> None:
     kernel = DIST / "kernel"
     shutil.copy2(kernel / "AGENTS.md", dest / "AGENTS.md")
@@ -137,11 +161,8 @@ def copy_kernel(dest: Path) -> None:
     shutil.copy2(DIST / "VERSION", dest / "VERSION")
     for name in ("Arquitectura.base", "Auditoria.base", "Operacion.base", "Repos.base"):
         shutil.copy2(kernel / name, dest / name)
-    _copytree(kernel / "90-Meta", dest / "90-Meta")
-    skills_src = kernel / ".agents" / "skills"
-    skills_dst = dest / ".agents" / "skills"
-    skills_dst.parent.mkdir(parents=True, exist_ok=True)
-    _copytree(skills_src, skills_dst)
+    copy_union_files(kernel / "90-Meta", dest / "90-Meta")
+    copy_kernel_skills(dest)
     claude_skills = dest / ".claude" / "skills"
     claude_skills.parent.mkdir(parents=True, exist_ok=True)
     if claude_skills.exists() or claude_skills.is_symlink():
@@ -156,6 +177,23 @@ def _copytree(src: Path, dst: Path) -> None:
     if dst.exists():
         shutil.rmtree(dst)
     shutil.copytree(src, dst, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+
+
+def ensure_gitignore_lines(dest: Path) -> None:
+    required = (
+        ".knowledge-os.lock.yaml",
+        "/.knowledge-os-config.yaml",
+        "/.knowledge-os-config.*.tmp",
+    )
+    path = dest / ".gitignore"
+    lines = path.read_text(encoding="utf-8").splitlines() if path.is_file() else []
+    changed = not path.is_file()
+    for item in required:
+        if item not in lines:
+            lines.append(item)
+            changed = True
+    if changed:
+        path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
 
 
 def copy_adapters(dest: Path, adapters: list[str]) -> None:
@@ -391,6 +429,42 @@ def cmd_init(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_adopt(args: argparse.Namespace) -> int:
+    dest = Path(args.dest).expanduser().resolve()
+    state = dest_state(dest)
+    if state == "installed":
+        print(f"already installed: {dest} (use update)", file=sys.stderr)
+        return 2
+    if state != "knowledge-without-lock":
+        print(
+            f"adopt requires an existing knowledge vault without a lock (state={state})",
+            file=sys.stderr,
+        )
+        return 2
+    if not (dest / "00-Home.md").is_file():
+        print("00-Home.md is required for adopt", file=sys.stderr)
+        return 2
+    systems_dir = dest / "10-Sistemas"
+    if not systems_dir.is_dir() or not any(systems_dir.glob("*.md")):
+        print("10-Sistemas/*.md is required for adopt", file=sys.stderr)
+        return 2
+    instance_path = dest / "instance.yaml"
+    if not instance_path.is_file():
+        print("write instance.yaml (cell identity) before adopt; Home is never rewritten", file=sys.stderr)
+        return 2
+    try:
+        instance = load_instance(instance_path)
+    except InstanceError as error:
+        print(str(error), file=sys.stderr)
+        return 2
+    copy_kernel(dest)
+    copy_adapters(dest, instance["adapters"])
+    ensure_gitignore_lines(dest)
+    write_lock(dest, instance["adapters"])
+    print(json.dumps({"status": "adopted", "dest": str(dest), "cell": instance["cell"]}, indent=2))
+    return 0
+
+
 def overlay_covers(overlays: Path, vault: Path, rel: str) -> bool:
     """True when a local overlay exists for this managed relative path."""
     parts = Path(rel).parts
@@ -474,7 +548,7 @@ def detect_command(args: argparse.Namespace) -> str:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", nargs="?", choices=["init", "update", "doctor"])
+    parser.add_argument("command", nargs="?", choices=["init", "update", "doctor", "adopt"])
     parser.add_argument("--dest", default="")
     parser.add_argument("--cell-name", default="")
     parser.add_argument("--purpose", default="")
@@ -495,6 +569,8 @@ def main() -> int:
     command = detect_command(args)
     if command == "init":
         return cmd_init(args)
+    if command == "adopt":
+        return cmd_adopt(args)
     if command == "update":
         return cmd_update(args)
     return cmd_doctor(args)
