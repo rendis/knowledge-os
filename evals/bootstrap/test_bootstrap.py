@@ -174,10 +174,12 @@ class BootstrapEval(unittest.TestCase):
             dest.mkdir()
             home_text = "# Keep Home\n"
             (dest / "00-Home.md").write_text(home_text, encoding="utf-8")
+            (dest / "AGENTS.md").write_text("# cell-agents-keep\n", encoding="utf-8")
             (dest / "10-Sistemas").mkdir()
             (dest / "10-Sistemas" / "Payments.md").write_text("# Payments\n", encoding="utf-8")
             (dest / "90-Meta").mkdir()
             (dest / "90-Meta" / "Alcance.md").write_text("# Cell scope\nKeep extra.\n", encoding="utf-8")
+            (dest / "90-Meta" / "audit-vault.py").write_text("# cell-audit-keep\n", encoding="utf-8")
             extra = dest / ".agents" / "skills" / "cell-local-tool"
             extra.mkdir(parents=True)
             (extra / "SKILL.md").write_text("# cell-local-tool\n", encoding="utf-8")
@@ -220,7 +222,9 @@ class BootstrapEval(unittest.TestCase):
             payload = json.loads(adopted.stdout)
             self.assertEqual(payload["status"], "adopted")
             self.assertEqual((dest / "00-Home.md").read_text(encoding="utf-8"), home_text)
+            self.assertEqual((dest / "AGENTS.md").read_text(encoding="utf-8"), "# cell-agents-keep\n")
             self.assertEqual((dest / "90-Meta" / "Alcance.md").read_text(encoding="utf-8"), "# Cell scope\nKeep extra.\n")
+            self.assertEqual((dest / "90-Meta" / "audit-vault.py").read_text(encoding="utf-8"), "# cell-audit-keep\n")
             self.assertTrue((dest / ".agents" / "skills" / "cell-local-tool" / "SKILL.md").is_file())
             self.assertTrue((dest / "90-Meta" / "graph-query.py").is_file())
             self.assertTrue((dest / ".knowledge-os.lock.yaml").is_file())
@@ -236,6 +240,8 @@ class BootstrapEval(unittest.TestCase):
             self.assertEqual(updated.returncode, 0, updated.stderr)
             self.assertTrue((dest / ".agents" / "skills" / "cell-local-tool" / "SKILL.md").is_file())
             self.assertTrue((dest / "90-Meta" / "Alcance.md").is_file())
+            self.assertEqual((dest / "90-Meta" / "audit-vault.py").read_text(encoding="utf-8"), "# cell-audit-keep\n")
+            self.assertEqual((dest / "AGENTS.md").read_text(encoding="utf-8"), "# cell-agents-keep\n")
             self.assertEqual((dest / "00-Home.md").read_text(encoding="utf-8"), home_text)
 
 

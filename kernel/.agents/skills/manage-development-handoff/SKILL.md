@@ -11,7 +11,7 @@ Treat one persistent worktree as the implementation boundary for one Jira story 
 
 1. Resolve the canonical vault and source context through `map-ecosystem`; keep its interrogation branch read-only.
 2. For every route that materializes or activates content, load [the input-bundle contract](references/input-bundle.md) and complete its intake protocol until every target is `exact-package`. Resolve `producer-required` through `manage-investigation` and resume this workflow with the returned directories; stop `invalid-package` at the producer with its exact failure. Never inspect or change the source investigation or Jira. Validation and deactivation use an exact repository remote and worktree path and do not require a package.
-3. Resolve the development worktree root through the configuration API. If it is missing or unavailable, invoke `configure-knowledge-os-workspace`; resume only after `development-worktree-root --format json` succeeds.
+3. Resolve the development worktree root through the configuration API. If it is missing or unavailable, invoke `configure-workspace`; resume only after `development-worktree-root --format json` succeeds.
 4. Resolve `scripts/development-handoff.py` and bundled assets relative to this skill. Use the helper for every worktree and handoff operation.
 
 Complete preflight only when the vault, every input required by the selected route, source repositories, and worktree root resolve semantically and no target or Git write has occurred.

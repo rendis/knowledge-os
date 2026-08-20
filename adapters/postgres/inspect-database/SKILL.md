@@ -20,7 +20,7 @@ Completion criterion: one remote-verified `VAULT_ROOT` is bound, `interrogation`
 From `VAULT_ROOT`, run exactly:
 
 ```text
-<python> -B 90-Meta/workspace-config.py --vault-root "<VAULT_ROOT>" repository schema-repository
+<python> -B 90-Meta/workspace-config.py --vault-root "<VAULT_ROOT>" repository
 ```
 
 Use only the path returned by this view. When the command reports missing, uninitialized, ambiguous, stale, or inconsistent configuration, load `configure-workspace`, complete its applicable status, initialize, repair, or refresh branch, and rerun the same command. This skill never edits `.knowledge-os-config.yaml`, scans alternate roots, or substitutes an environment variable or manually supplied repository path.
