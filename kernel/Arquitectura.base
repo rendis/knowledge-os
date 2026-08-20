@@ -1,0 +1,17 @@
+filters:
+  and:
+    - file.inFolder("15-Arquitectura")
+properties:
+  file.name:
+    displayName: Node
+  note.tipo:
+    displayName: Type
+  note.sistema:
+    displayName: System
+views:
+  - type: table
+    name: All
+    order:
+      - file.name
+      - tipo
+      - sistema

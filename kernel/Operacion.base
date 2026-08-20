@@ -1,0 +1,20 @@
+filters:
+  and:
+    - file.inFolder("60-Operacion")
+properties:
+  file.name:
+    displayName: Note
+  note.tipo:
+    displayName: Type
+  note.clase:
+    displayName: Class
+  note.estado:
+    displayName: Status
+views:
+  - type: table
+    name: All
+    order:
+      - file.name
+      - tipo
+      - clase
+      - estado

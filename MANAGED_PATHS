@@ -1,0 +1,14 @@
+# Paths relative to an installed cell vault. Update overwrites these when
+# the installed hash matches the last lock, or when --force is passed.
+# Overlays live under .agents/overlays/<skill>/ and always win.
+# Lines starting with # and blank lines are ignored.
+
+AGENTS.md
+CLAUDE.md
+VERSION
+90-Meta/
+.agents/skills/
+Arquitectura.base
+Auditoria.base
+Operacion.base
+Repos.base

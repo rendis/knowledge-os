@@ -1,0 +1,80 @@
+# Instance identity for a cell vault. Written once by install.sh init.
+# Never overwritten by update. Agents read this before expanding the graph.
+
+version: 1
+
+required:
+  - cell.name
+  - cell.purpose
+  - systems
+  - evidence.profile
+  - locale.notes
+
+fields:
+  cell.name:
+    type: string
+    min_length: 1
+  cell.purpose:
+    type: string
+    min_length: 1
+  systems:
+    type: list
+    min_items: 1
+    item:
+      id: string
+      name: string
+      aliases: list
+  vault.remote:
+    type: string
+    optional: true
+    description: Git remote of this cell vault once published. Used by resolve-vault.
+  sources.github_org:
+    type: string
+    optional: true
+  sources.repo_prefixes:
+    type: list
+    optional: true
+  sources.discovery_roots:
+    type: list
+    optional: true
+  sources.schema_repository:
+    type: object
+    optional: true
+    fields:
+      remote: string
+      note: string
+  graph.enabled_types:
+    type: list
+    default:
+      - sistema
+      - servicio
+      - componente
+      - recurso-runtime
+      - repositorio
+      - topic
+      - flujo
+      - integracion-externa
+      - glosario
+      - operacional
+      - aprendizaje
+      - indice
+  evidence.profile:
+    type: enum
+    values:
+      - production-gate
+      - documented-source
+      - mixed
+    default: production-gate
+  adapters:
+    type: list
+    default: []
+    values:
+      - gcp
+      - postgres
+      - reports
+  locale.notes:
+    type: enum
+    values:
+      - es
+      - en
+    default: es
