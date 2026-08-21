@@ -1,4 +1,4 @@
-"""Minimal, dependency-free frontmatter reader."""
+"""Minimal, dependency-free reader for this vault's frontmatter subset."""
 from __future__ import annotations
 
 import csv

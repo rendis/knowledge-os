@@ -27,7 +27,7 @@ An existing vault that already has `00-Home.md` and `10-Sistemas/` (no lock) is 
 ./install.sh adopt --dest /path/to/existing-vault
 ```
 
-With no arguments, the script looks at the current directory: a `.knowledge-os.lock.yaml` selects `update`; an empty destination selects `init`. Knowledge Markdown without a lock is refused.
+With no arguments, the script looks at the current directory: a `.knowledge-os.lock.yaml` selects `update`; an empty destination selects `init`. Knowledge Markdown without a lock is refused. The lock is portable, contains no local paths or secrets, and must be committed with the cell so a clean clone remains an installed consumer.
 
 A future published tag can be installed with:
 
@@ -35,7 +35,7 @@ A future published tag can be installed with:
 curl -fsSL <raw-tag>/install.sh | bash -s -- init --dest /path/to/cell-vault
 ```
 
-v1 is local-only. The script is written so that one-liner can clone a tag into cache and re-enter the same verbs.
+The current distribution channel is local-only. The script is written so that one-liner can clone a tag into cache and re-enter the same verbs.
 
 ## After init: where to start
 
@@ -46,7 +46,9 @@ The cell vault owns:
 - `10-Sistemas/` — one stub note per declared system
 - `10/`–`70/` — the cell's knowledge graph
 
-Kernel files (`AGENTS.md`, `.agents/skills/`, `90-Meta/`) update in place. Knowledge does not.
+The distribution owns the thin `AGENTS.md` router, every generic file it ships under `90-Meta/`, kernel skills, selected adapter skills, `VERSION`, and the `CLAUDE.md` / `.claude/skills` symlink topology. `update` refreshes matching distribution files without deleting cell-only Meta files, skills, recipes, or overlays. The cell owns `instance.yaml`, `00-Home.md`, the root Bases, `90-Meta/Alcance.md`, and notes under `10/`–`70/`; those files are seeded or authored locally and never rewritten by `update`.
+
+When adopting or upgrading a vault, a pre-existing file that becomes distribution-owned must already match the distribution or be explicitly authorized with an overlay or `--force`. This prevents a newly managed runtime file from being overwritten silently.
 
 A minimal sync starts at `00-Home.md` and `instance.yaml`. If bootstrap is incomplete, `map-ecosystem` takes its **orientation** branch instead of walking an empty graph.
 

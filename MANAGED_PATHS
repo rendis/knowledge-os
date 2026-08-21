@@ -1,14 +1,9 @@
-# Paths relative to an installed cell vault. Update overwrites these when
-# the installed hash matches the last lock, or when --force is passed.
-# Overlays live under .agents/overlays/<skill>/ and always win.
+# Distribution-owned paths relative to an installed cell vault. Directory
+# entries expand only to files shipped by the kernel and selected adapters;
+# matching files update in place while cell-only files beside them remain.
 # Lines starting with # and blank lines are ignored.
 
 AGENTS.md
-CLAUDE.md
 VERSION
 90-Meta/
 .agents/skills/
-Arquitectura.base
-Auditoria.base
-Operacion.base
-Repos.base
