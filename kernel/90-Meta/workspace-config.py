@@ -226,7 +226,7 @@ def locate_repository(vault_root: Path, remote: str) -> dict[str, Any]:
             if not candidate.is_dir():
                 continue
             result = subprocess.run(
-                ["git", "-C", str(candidate), "remote", "get-url", "origin"],
+                ["git", "-C", str(candidate), "config", "--get", "remote.origin.url"],
                 capture_output=True,
                 text=True,
                 check=False,
@@ -234,10 +234,10 @@ def locate_repository(vault_root: Path, remote: str) -> dict[str, Any]:
             if result.returncode == 0 and normalize(result.stdout) == wanted:
                 matches.append(str(candidate.resolve()))
     if len(matches) == 1:
-        return {"status": "ok", "path": matches[0], "remote": remote}
+        return {"status": "ok", "path": matches[0], "remote": wanted}
     if not matches:
-        return {"status": "not_found", "remote": remote}
-    return {"status": "ambiguous", "matches": matches, "remote": remote}
+        return {"status": "not_found", "remote": wanted}
+    return {"status": "ambiguous", "matches": matches, "remote": wanted}
 
 
 def schema_repository(vault_root: Path) -> dict[str, Any]:

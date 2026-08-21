@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -19,6 +20,38 @@ def load_module():
 
 
 class WorkspaceConfigTests(unittest.TestCase):
+    def test_locate_repository_uses_configured_remote_before_url_rewrite(self) -> None:
+        wc = load_module()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            repositories = root / "repositories"
+            repository = repositories / "example"
+            repository.mkdir(parents=True)
+            subprocess.run(["git", "init", "-q", str(repository)], check=True)
+            remote = "https://example.test/acme/APP00001-example.git"
+            subprocess.run(
+                ["git", "-C", str(repository), "remote", "add", "origin", remote],
+                check=True,
+            )
+            subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(repository),
+                    "config",
+                    "url.file:///tmp/rewrite.git.insteadOf",
+                    remote,
+                ],
+                check=True,
+            )
+            wc.apply_config(root, roots=[str(repositories)], replace=True)
+
+            located = wc.locate_repository(root, remote)
+
+            self.assertEqual(located["status"], "ok")
+            self.assertEqual(located["path"], str(repository.resolve()))
+            self.assertEqual(located["remote"], "example.test/acme/app00001-example")
+
     def test_update_keeps_ports(self) -> None:
         wc = load_module()
         with tempfile.TemporaryDirectory() as tmp:

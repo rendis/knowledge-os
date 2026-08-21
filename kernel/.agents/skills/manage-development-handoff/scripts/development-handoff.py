@@ -751,11 +751,13 @@ def resolve_repository(
     if result.returncode != 0:
         cause = "configuration_error"
         try:
-            payload = json.loads(result.stderr)
+            payload = json.loads(result.stderr or result.stdout)
             if isinstance(payload, dict):
                 error = payload.get("error")
                 if isinstance(error, dict) and isinstance(error.get("code"), str):
                     cause = error["code"]
+                elif isinstance(payload.get("status"), str):
+                    cause = f"repository_{payload['status']}"
         except json.JSONDecodeError:
             pass
         raise HandoffError(
@@ -829,11 +831,13 @@ def resolve_worktree_root(vault_root: Path) -> Path:
     if result.returncode != 0:
         cause = "configuration_error"
         try:
-            payload = json.loads(result.stderr)
+            payload = json.loads(result.stderr or result.stdout)
             if isinstance(payload, dict):
                 error = payload.get("error")
                 if isinstance(error, dict) and isinstance(error.get("code"), str):
                     cause = error["code"]
+                elif payload.get("worktree_root") is None:
+                    cause = "worktree_root_not_configured"
         except json.JSONDecodeError:
             pass
         raise HandoffError(
