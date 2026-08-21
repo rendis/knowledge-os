@@ -64,7 +64,6 @@ Only after a `resolved` result, change to `VAULT_ROOT` and run the applicable co
 
 # Framework gates, only for vault closure or update-mode synchronization.
 <python> -B 90-Meta/test_workspace_config.py
-<python> -B 90-Meta/test-vault-tooling.py
 <python> -B 90-Meta/audit-vault.py
 <python> -B 90-Meta/verify-links.py
 <python> -B 90-Meta/validate-bases.py

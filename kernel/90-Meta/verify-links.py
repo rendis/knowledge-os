@@ -1,86 +1,150 @@
 #!/usr/bin/env python3
-"""Detect broken wikilinks, alias targets, and unexpected orphans."""
+"""Check broken, alias-targeted and orphan Obsidian notes."""
 from __future__ import annotations
 
 import argparse
+import collections
 import re
 import sys
 from pathlib import Path
 
-from vault_frontmatter import read_frontmatter
+from vault_frontmatter import split_frontmatter
 
-WIKILINK = re.compile(r"\[\[([^\]|#]+)(?:#[^\]|]*)?(?:\|[^\]]*)?\]\]")
+EXPECTED_ORPHANS = {"00-Home", "README"}
+EXCLUDED_ROOT_FILES = {"AGENTS.md", "CLAUDE.md"}
+EXCLUDED_ROOT_DIRS = {"plan"}
 
 
-def note_index(root: Path) -> tuple[dict[str, Path], dict[str, str], set[str]]:
-    skip = {".git", ".agents", ".obsidian", ".investigations", ".operations", "plan"}
-    by_stem: dict[str, Path] = {}
-    alias_to_stem: dict[str, str] = {}
-    for path in root.rglob("*.md"):
-        if any(part in skip or part.startswith(".") for part in path.relative_to(root).parts[:-1]):
+def visible_files(root: Path, pattern: str) -> list[Path]:
+    files: list[Path] = []
+    for path in root.rglob(pattern):
+        relative = path.relative_to(root)
+        if any(part.startswith(".") for part in relative.parts):
             continue
-        stem = path.stem
-        by_stem[stem] = path
-        aliases = read_frontmatter(path).get("aliases") or []
-        if isinstance(aliases, str):
-            aliases = [aliases]
-        for alias in aliases:
-            alias_to_stem[str(alias)] = stem
-    return by_stem, alias_to_stem, set(by_stem)
+        if relative.parts and relative.parts[0] in EXCLUDED_ROOT_DIRS:
+            continue
+        if relative.as_posix() in EXCLUDED_ROOT_FILES:
+            continue
+        files.append(path)
+    return sorted(files)
+
+
+def strip_code(text: str) -> str:
+    text = re.sub(r"```.*?```", "", text, flags=re.DOTALL)
+    return re.sub(r"`[^`\n]*`", "", text)
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
+    return parser.parse_args()
 
 
 def verify(root: Path) -> dict[str, list[str]]:
-    by_stem, alias_to_stem, stems = note_index(root)
-    broken: list[str] = []
-    alias_targets: list[str] = []
-    hidden: list[str] = []
-    mentioned: set[str] = set()
-    skip = {".git", ".agents", ".obsidian", ".investigations", ".operations", "plan"}
-    for path in root.rglob("*.md"):
-        rel_parts = path.relative_to(root).parts
-        if any(part in skip or part.startswith(".") for part in rel_parts[:-1]):
-            continue
-        text = path.read_text(encoding="utf-8")
-        for match in WIKILINK.finditer(text):
-            target = match.group(1).strip()
-            if ".agents/" in target:
-                hidden.append(f"{path.relative_to(root)} -> {target}")
+    root = root.resolve()
+    note_paths = visible_files(root, "*.md")
+    notes: dict[str, Path] = {}
+    aliases: dict[str, str] = {}
+    duplicates: dict[str, list[str]] = collections.defaultdict(list)
+
+    for path in note_paths:
+        base = path.stem
+        if base in notes:
+            duplicates[base].extend([str(notes[base].relative_to(root)), str(path.relative_to(root))])
+        else:
+            notes[base] = path
+        values = split_frontmatter(path.read_text(encoding="utf-8"))[0].get("aliases", [])
+        if isinstance(values, str):
+            values = [values]
+        for alias in values:
+            if alias:
+                aliases[str(alias)] = base
+
+    base_files = {path.name for path in visible_files(root, "*.base")}
+    inbound: set[str] = set()
+    broken: dict[str, set[str]] = collections.defaultdict(set)
+    alias_links: dict[str, set[str]] = collections.defaultdict(set)
+    hidden_agent_links: dict[str, set[str]] = collections.defaultdict(set)
+
+    for path in note_paths:
+        source = str(path.relative_to(root))
+        text = strip_code(path.read_text(encoding="utf-8"))
+        for target in re.findall(r"\[[^\]]*\]\(([^)\s]+)(?:\s+[^)]*)?\)", text):
+            normalized_target = target.replace("\\", "/")
+            if re.search(r"(^|/)\.agents(?:/|$)", normalized_target):
+                hidden_agent_links[target].add(source)
+        for target in re.findall(r"\[\[([^\]|#]+)", text):
+            target = target.strip()
+            if target in notes:
+                inbound.add(target)
+            elif target in base_files:
                 continue
-            mentioned.add(target)
-            if target in stems:
-                continue
-            if target in alias_to_stem:
-                alias_targets.append(f"{path.relative_to(root)} -> alias {target} (use {alias_to_stem[target]})")
-                continue
-            broken.append(f"{path.relative_to(root)} -> {target}")
-    protected = {"00-Home", "AGENTS", "CLAUDE", "README"}
-    orphans = sorted(
-        stem
-        for stem in stems
-        if stem not in mentioned
-        and stem not in protected
-        and by_stem[stem].parent.name not in {"90-Meta"}
-        and stem not in {"Convenciones", "Auditoria - Framework", "Flujos", "Operacion", "Aprendizajes"}
+            elif target in aliases:
+                alias_links[target].add(source)
+            else:
+                broken[target].add(source)
+
+    expected = sorted(
+        notes[name].relative_to(root).as_posix()
+        for name in EXPECTED_ORPHANS
+        if name in notes and name not in inbound
+    )
+    orphan_paths = sorted(
+        path.relative_to(root).as_posix()
+        for name, path in notes.items()
+        if name not in inbound and name not in EXPECTED_ORPHANS
+    )
+    orphan_stems = sorted(Path(path).stem for path in orphan_paths)
+    broken_rows = sorted(
+        f"{source} -> {target}"
+        for target, sources in broken.items()
+        for source in sources
+    )
+    alias_rows = sorted(
+        f"{source} -> alias {target} (use {aliases[target]})"
+        for target, sources in alias_links.items()
+        for source in sources
+    )
+    hidden_rows = sorted(
+        f"{source} -> {target}"
+        for target, sources in hidden_agent_links.items()
+        for source in sources
+    )
+    duplicate_rows = sorted(
+        f"{base}: {sorted(set(paths))}"
+        for base, paths in duplicates.items()
     )
     return {
-        "broken": broken,
-        "alias_targets": alias_targets,
-        "hidden": hidden,
-        "orphans": orphans,
+        "broken": broken_rows,
+        "alias_targets": alias_rows,
+        "hidden": hidden_rows,
+        "duplicates": duplicate_rows,
+        "orphans": orphan_stems,
+        "orphan_paths": orphan_paths,
+        "expected_orphans": expected,
     }
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--root", type=Path, default=Path.cwd())
-    args = parser.parse_args()
-    result = verify(args.root.resolve())
-    failed = bool(result["broken"] or result["alias_targets"] or result["hidden"])
-    for key, rows in result.items():
-        print(f"{key}: {len(rows)}")
+    result = verify(parse_args().root)
+
+    for label, key in (
+        ("BROKEN LINKS", "broken"),
+        ("ALIAS LINKS", "alias_targets"),
+        ("HIDDEN AGENT LINKS", "hidden"),
+        ("DUPLICATE BASENAMES", "duplicates"),
+        ("ORPHANS", "orphan_paths"),
+        ("EXPECTED ORPHANS", "expected_orphans"),
+    ):
+        rows = result[key]
+        print(f"{label}: {len(rows)}")
         for row in rows:
             print(f"  {row}")
-    return 1 if failed else 0
+
+    return 1 if any(
+        result[key]
+        for key in ("broken", "alias_targets", "hidden", "duplicates", "orphans")
+    ) else 0
 
 
 if __name__ == "__main__":

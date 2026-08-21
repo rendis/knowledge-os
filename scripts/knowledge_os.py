@@ -7,7 +7,6 @@ import hashlib
 import json
 import os
 import shutil
-import stat
 import subprocess
 import sys
 from pathlib import Path
@@ -45,6 +44,24 @@ def dist_version() -> str:
     return (DIST / "VERSION").read_text(encoding="utf-8").strip()
 
 
+def distribution_provenance() -> tuple[str, bool]:
+    revision = subprocess.run(
+        ["git", "-C", str(DIST), "rev-parse", "HEAD"],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    if revision.returncode != 0:
+        return "unversioned", True
+    dirty = subprocess.run(
+        ["git", "-C", str(DIST), "status", "--porcelain", "--untracked-files=no"],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    return revision.stdout.strip(), dirty.returncode != 0 or bool(dirty.stdout.strip())
+
+
 def managed_paths() -> list[str]:
     rows: list[str] = []
     for line in (DIST / "MANAGED_PATHS").read_text(encoding="utf-8").splitlines():
@@ -60,29 +77,65 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
-def iter_managed_files(vault: Path) -> list[Path]:
-    files: list[Path] = []
+def _source_files(root: Path, target_root: str) -> dict[str, Path]:
+    files: dict[str, Path] = {}
+    for path in root.rglob("*"):
+        if not path.is_file():
+            continue
+        rel = path.relative_to(root)
+        if any(part == "__pycache__" or part.endswith(".pyc") for part in rel.parts):
+            continue
+        files[(Path(target_root) / rel).as_posix()] = path
+    return files
+
+
+def managed_sources(adapters: list[str]) -> dict[str, Path]:
+    """Return the exact distribution-owned files for an installed cell."""
+    sources: dict[str, Path] = {}
     for entry in managed_paths():
-        target = vault / entry
-        if target.is_file():
-            files.append(target)
-        elif target.is_dir():
-            files.extend(path for path in target.rglob("*") if path.is_file())
-    return sorted(files)
+        source = DIST / "kernel" / entry
+        if not source.exists():
+            source = DIST / entry
+        if entry.endswith("/"):
+            if not source.is_dir():
+                raise RuntimeError(f"managed source directory is missing: {entry}")
+            sources.update(_source_files(source, entry))
+        else:
+            if not source.is_file():
+                raise RuntimeError(f"managed source is missing: {entry}")
+            sources[entry] = source
+        if entry == ".agents/skills/":
+            for name in adapters:
+                adapter = DIST / "adapters" / name
+                if not adapter.is_dir():
+                    raise SystemExit(f"unknown adapter: {name}")
+                for skill_dir in adapter.iterdir():
+                    if skill_dir.is_dir():
+                        sources.update(
+                            _source_files(skill_dir, f".agents/skills/{skill_dir.name}")
+                        )
+    return dict(sorted(sources.items()))
 
 
-def tree_hashes(vault: Path) -> dict[str, str]:
+def tree_hashes(vault: Path, adapters: list[str]) -> dict[str, str]:
     hashes: dict[str, str] = {}
-    for path in iter_managed_files(vault):
-        rel = path.relative_to(vault).as_posix()
-        hashes[rel] = sha256_file(path)
+    for rel in managed_sources(adapters):
+        path = vault / rel
+        if path.is_file() and not path.is_symlink():
+            hashes[rel] = sha256_file(path)
     return hashes
+
+
+def distribution_hashes(adapters: list[str]) -> dict[str, str]:
+    return {rel: sha256_file(path) for rel, path in managed_sources(adapters).items()}
 
 
 def dump_lock(data: dict[str, Any]) -> str:
     lines = [
         f'version: "{data["version"]}"',
         f'kernel_version: "{data["kernel_version"]}"',
+        f'distribution_revision: "{data["distribution_revision"]}"',
+        f'distribution_dirty: {str(bool(data["distribution_dirty"])).lower()}',
         "adapters:",
     ]
     adapters = data.get("adapters") or []
@@ -101,6 +154,8 @@ def dump_lock(data: dict[str, Any]) -> str:
 def load_lock(path: Path) -> dict[str, Any]:
     version = ""
     kernel_version = ""
+    distribution_revision = "unknown"
+    distribution_dirty = True
     adapters: list[str] = []
     hashes: dict[str, str] = {}
     section = ""
@@ -110,6 +165,10 @@ def load_lock(path: Path) -> dict[str, Any]:
             version = line.split(":", 1)[1].strip().strip('"')
         elif line.startswith("kernel_version:"):
             kernel_version = line.split(":", 1)[1].strip().strip('"')
+        elif line.startswith("distribution_revision:"):
+            distribution_revision = line.split(":", 1)[1].strip().strip('"')
+        elif line.startswith("distribution_dirty:"):
+            distribution_dirty = line.split(":", 1)[1].strip().casefold() == "true"
         elif line.startswith("adapters:"):
             section = "adapters"
         elif line.startswith("managed_hashes:"):
@@ -122,79 +181,31 @@ def load_lock(path: Path) -> dict[str, Any]:
     return {
         "version": version,
         "kernel_version": kernel_version,
+        "distribution_revision": distribution_revision,
+        "distribution_dirty": distribution_dirty,
         "adapters": adapters,
         "managed_hashes": hashes,
     }
 
 
-KERNEL_META_REPLACE = frozenset(
-    {
-        "instance.py",
-        "test_instance.py",
-        "graph-query.py",
-        "workspace-config.py",
-        "test_workspace_config.py",
-        "workspace-contract.yaml",
-    }
-)
-
-
-def copy_union_files(src: Path, dst: Path) -> None:
-    """Copy kernel Meta files. Dest-only paths stay. Colliding tools stay unless replace-listed."""
-    dst.mkdir(parents=True, exist_ok=True)
-    for path in src.rglob("*"):
-        if not path.is_file():
-            continue
-        rel = path.relative_to(src)
-        if any(part == "__pycache__" or part.endswith(".pyc") for part in rel.parts):
-            continue
-        target = dst / rel
-        if target.exists() and rel.as_posix() not in KERNEL_META_REPLACE:
-            continue
-        target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(path, target)
-
-
-def copy_tree_union(src: Path, dst: Path) -> None:
-    """Overwrite kernel files onto dest without deleting dest-only paths."""
-    dst.mkdir(parents=True, exist_ok=True)
-    for path in src.rglob("*"):
-        if not path.is_file():
-            continue
-        rel = path.relative_to(src)
-        if any(part == "__pycache__" or part.endswith(".pyc") for part in rel.parts):
-            continue
-        target = dst / rel
-        target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(path, target)
-
-
-def copy_kernel_skills(dest: Path) -> None:
-    """Refresh kernel skill files; leave cell-only skills and extra files in place."""
-    skills_src = DIST / "kernel" / ".agents" / "skills"
-    skills_dst = dest / ".agents" / "skills"
-    skills_dst.mkdir(parents=True, exist_ok=True)
-    for skill_dir in skills_src.iterdir():
-        if skill_dir.is_dir():
-            copy_tree_union(skill_dir, skills_dst / skill_dir.name)
-
-
-def copy_kernel(dest: Path) -> None:
+def copy_kernel(dest: Path, adapters: list[str]) -> None:
     kernel = DIST / "kernel"
-    agents = dest / "AGENTS.md"
-    if not agents.is_file():
-        shutil.copy2(kernel / "AGENTS.md", agents)
+    for rel, source in managed_sources(adapters).items():
+        target = dest / rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if target.is_symlink():
+            target.unlink()
+        elif target.exists() and not target.is_file():
+            raise RuntimeError(f"managed target is not a file: {rel}")
+        shutil.copy2(source, target)
     target_claude = dest / "CLAUDE.md"
     if target_claude.exists() or target_claude.is_symlink():
         target_claude.unlink()
     os.symlink("AGENTS.md", target_claude)
-    shutil.copy2(DIST / "VERSION", dest / "VERSION")
     for name in ("Arquitectura.base", "Auditoria.base", "Operacion.base", "Repos.base"):
         target = dest / name
         if not target.is_file():
             shutil.copy2(kernel / name, target)
-    copy_union_files(kernel / "90-Meta", dest / "90-Meta")
-    copy_kernel_skills(dest)
     claude_skills = dest / ".claude" / "skills"
     claude_skills.parent.mkdir(parents=True, exist_ok=True)
     if claude_skills.exists() or claude_skills.is_symlink():
@@ -213,30 +224,24 @@ def _copytree(src: Path, dst: Path) -> None:
 
 def ensure_gitignore_lines(dest: Path) -> None:
     required = (
-        ".knowledge-os.lock.yaml",
         "/.knowledge-os-config.yaml",
         "/.knowledge-os-config.*.tmp",
     )
     path = dest / ".gitignore"
     lines = path.read_text(encoding="utf-8").splitlines() if path.is_file() else []
-    changed = not path.is_file()
+    portable_lines = [
+        line
+        for line in lines
+        if line.strip() not in {".knowledge-os.lock.yaml", "/.knowledge-os.lock.yaml"}
+    ]
+    changed = not path.is_file() or portable_lines != lines
+    lines = portable_lines
     for item in required:
         if item not in lines:
             lines.append(item)
             changed = True
     if changed:
         path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
-
-
-def copy_adapters(dest: Path, adapters: list[str]) -> None:
-    skills = dest / ".agents" / "skills"
-    for name in adapters:
-        src = DIST / "adapters" / name
-        if not src.is_dir():
-            raise SystemExit(f"unknown adapter: {name}")
-        for skill_dir in src.iterdir():
-            if skill_dir.is_dir():
-                copy_tree_union(skill_dir, skills / skill_dir.name)
 
 
 def seed_skeleton(dest: Path, enabled_types: list[str] | None = None) -> None:
@@ -338,7 +343,6 @@ def write_bootstrap(dest: Path, instance: dict[str, Any]) -> None:
                 "/.operations/",
                 "/.knowledge-os-config.yaml",
                 "/.knowledge-os-config.*.tmp",
-                ".knowledge-os.lock.yaml",
                 "/plan/",
                 "/output/",
                 "__pycache__/",
@@ -350,15 +354,18 @@ def write_bootstrap(dest: Path, instance: dict[str, Any]) -> None:
 
 
 def write_lock(dest: Path, adapters: list[str]) -> None:
+    revision, dirty = distribution_provenance()
     payload = {
-        "version": "1",
+        "version": "3",
         "kernel_version": dist_version(),
+        "distribution_revision": revision,
+        "distribution_dirty": dirty,
         "adapters": adapters,
-        "managed_hashes": tree_hashes(dest),
+        "managed_hashes": tree_hashes(dest, adapters),
     }
     path = dest / LOCK_NAME
     path.write_text(dump_lock(payload), encoding="utf-8")
-    path.chmod(stat.S_IRUSR | stat.S_IWUSR)
+    path.chmod(0o644)
 
 
 def dest_state(dest: Path) -> str:
@@ -453,9 +460,9 @@ def cmd_init(args: argparse.Namespace) -> int:
     dest.mkdir(parents=True, exist_ok=True)
     instance = build_instance_from_args(args)
     seed_skeleton(dest, instance["graph"]["enabled_types"])
-    copy_kernel(dest)
-    copy_adapters(dest, instance["adapters"])
+    copy_kernel(dest, instance["adapters"])
     write_bootstrap(dest, instance)
+    ensure_gitignore_lines(dest)
     write_lock(dest, instance["adapters"])
     print(json.dumps({"status": "initialized", "dest": str(dest), "cell": instance["cell"]}, indent=2))
     return 0
@@ -489,8 +496,14 @@ def cmd_adopt(args: argparse.Namespace) -> int:
     except InstanceError as error:
         print(str(error), file=sys.stderr)
         return 2
-    copy_kernel(dest)
-    copy_adapters(dest, instance["adapters"])
+    conflicts = ownership_conflicts(dest, instance["adapters"], set())
+    overlays = dest / ".agents" / "overlays"
+    uncovered = [rel for rel in conflicts if not overlay_covers(overlays, dest, rel)]
+    if uncovered and not args.force:
+        print(json.dumps({"status": "ownership-conflict", "files": uncovered}, indent=2))
+        print("distribution-owned files differ; move cell logic to extensions or pass --force", file=sys.stderr)
+        return 3
+    copy_kernel(dest, instance["adapters"])
     ensure_gitignore_lines(dest)
     write_lock(dest, instance["adapters"])
     print(json.dumps({"status": "adopted", "dest": str(dest), "cell": instance["cell"]}, indent=2))
@@ -513,6 +526,27 @@ def overlay_covers(overlays: Path, vault: Path, rel: str) -> bool:
     return False
 
 
+def ownership_conflicts(
+    dest: Path,
+    adapters: list[str],
+    previously_owned: set[str],
+) -> list[str]:
+    conflicts: list[str] = []
+    for rel, source in managed_sources(adapters).items():
+        if rel in previously_owned:
+            continue
+        target = dest / rel
+        if target.is_symlink() or (
+            target.exists()
+            and (
+                not target.is_file()
+                or sha256_file(target) != sha256_file(source)
+            )
+        ):
+            conflicts.append(rel)
+    return conflicts
+
+
 def cmd_update(args: argparse.Namespace) -> int:
     dest = Path(args.dest).expanduser().resolve()
     lock_path = dest / LOCK_NAME
@@ -520,12 +554,19 @@ def cmd_update(args: argparse.Namespace) -> int:
         print("no lock file; run init or doctor", file=sys.stderr)
         return 2
     lock = load_lock(lock_path)
-    current = tree_hashes(dest)
+    instance = load_instance(dest / "instance.yaml")
+    target_adapters = instance["adapters"]
+    current = tree_hashes(dest, lock["adapters"])
+    owned = set(managed_sources(lock["adapters"]))
     drifted = [
         rel
         for rel, digest in lock["managed_hashes"].items()
-        if current.get(rel) and current.get(rel) != digest
+        if rel in owned and current.get(rel) != digest
     ]
+    drifted.extend(
+        ownership_conflicts(dest, target_adapters, set(lock["managed_hashes"]))
+    )
+    drifted = sorted(set(drifted))
     overlays = dest / ".agents" / "overlays"
     if drifted and not args.force:
         uncovered = [rel for rel in drifted if not overlay_covers(overlays, dest, rel)]
@@ -533,10 +574,9 @@ def cmd_update(args: argparse.Namespace) -> int:
             print(json.dumps({"status": "drift", "files": uncovered}, indent=2))
             print("kernel files changed locally; add overlays or pass --force", file=sys.stderr)
             return 3
-    instance = load_instance(dest / "instance.yaml")
-    copy_kernel(dest)
-    copy_adapters(dest, instance["adapters"])
-    write_lock(dest, instance["adapters"])
+    copy_kernel(dest, target_adapters)
+    ensure_gitignore_lines(dest)
+    write_lock(dest, target_adapters)
     print(json.dumps({"status": "updated", "dest": str(dest), "kernel_version": dist_version()}, indent=2))
     return 0
 
@@ -547,14 +587,31 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     payload: dict[str, Any] = {"dest": str(dest), "state": state}
     if state == "installed":
         lock = load_lock(dest / LOCK_NAME)
-        current = tree_hashes(dest)
+        adapters = lock.get("adapters") or []
+        current = tree_hashes(dest, adapters)
+        expected = distribution_hashes(adapters)
         payload["kernel_version_installed"] = lock.get("kernel_version")
         payload["kernel_version_dist"] = dist_version()
+        payload["lock_version"] = lock.get("version")
+        payload["portable_lock"] = lock.get("version") in {"2", "3"}
+        revision, dirty = distribution_provenance()
+        payload["distribution_revision_installed"] = lock.get("distribution_revision")
+        payload["distribution_dirty_installed"] = lock.get("distribution_dirty")
+        payload["distribution_revision_dist"] = revision
+        payload["distribution_dirty_dist"] = dirty
+        payload["reproducible_distribution"] = (
+            lock.get("distribution_revision") not in {None, "", "unknown", "unversioned"}
+            and not lock.get("distribution_dirty", True)
+        )
         payload["drift"] = [
             rel
             for rel, digest in lock.get("managed_hashes", {}).items()
-            if current.get(rel) != digest
+            if rel in expected and current.get(rel) != digest
         ]
+        payload["distribution_drift"] = [
+            rel for rel, digest in expected.items() if current.get(rel) != digest
+        ]
+        payload["managed_matches_dist"] = not payload["distribution_drift"]
         try:
             payload["orientation"] = orientation_status(dest)
         except InstanceError as error:
