@@ -11,7 +11,6 @@ import tempfile
 from pathlib import Path
 
 from bigquery_adapter import dry_run, extract
-from excel_renderer import render_workbook
 from report_engine import (
     ReportError,
     list_recipes,
@@ -41,7 +40,11 @@ def parse_args() -> argparse.Namespace:
 
 
 def generate(args: argparse.Namespace) -> dict[str, object]:
+    from excel_renderer import render_workbook
+
     recipe = load_recipe(args.report_id)
+    if recipe["renderer"] != "monthly-event-excel":
+        raise ReportError("renderer-unavailable", str(recipe["renderer"]))
     period = resolve_period(args.start_month, args.end_month, recipe.get("period_mode", "any"))
     recipe_dir = Path(recipe["recipe_dir"])
     query_path = recipe_dir / "query.sql"

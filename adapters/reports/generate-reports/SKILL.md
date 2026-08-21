@@ -34,7 +34,7 @@ Use Python 3.9 or newer with the interpreter prepared from `scripts/requirements
 <python> scripts/run_report.py generate --report-id <id> --output-dir <dir> --start-month YYYY-MM --end-month YYYY-MM [--input-csv <fixture>]
 ```
 
-The live branch always performs a dry-run, enforces the recipe caps, executes the fixed query with parameters, normalizes the four-column aggregate, creates the workbook, injects native PivotTables, validates OOXML, provenance and totals, then atomically publishes the workbook and non-sensitive manifest. Do not accept arbitrary SQL, project, dataset, table, exclusions, or renderer overrides.
+The live branch always performs a dry-run, enforces the recipe caps, executes the fixed query with parameters, normalizes the schema required by the named renderer, creates the artifact, validates provenance and totals, then atomically publishes the artifact and non-sensitive manifest. The bundled `monthly-event-excel` renderer owns its four-column event aggregate and PivotTable contract; read the reference before using or extending it. Do not accept arbitrary SQL, project, dataset, table, exclusions, or renderer overrides.
 
 Complete when the `.xlsx` and manifest exist, snapshot/query/recipe/implementation/workbook hashes and totals reconcile, all expected year sheets and PivotTables validate, and temporary extraction files were removed. A failed run leaves neither final file. For the same normalized input and implementation, the workbook SHA-256 must repeat; execution timestamps may differ in the manifest.
 
