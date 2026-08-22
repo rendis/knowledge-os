@@ -1763,6 +1763,8 @@ def complete_patch_images(
 
 def acknowledgement_document(
     raw: bytes,
+    *,
+    require_canonical: bool = True,
 ) -> tuple[dict[str, dict[str, Any]], bool]:
     if not raw:
         return {}, True
@@ -1810,11 +1812,9 @@ def acknowledgement_document(
     canonical = json.dumps(
         value, ensure_ascii=True, sort_keys=True, separators=(",", ":"),
     ).encode("utf-8") + b"\n"
-    return records, (
-        names == sorted(names)
-        and len(names) == len(set(names))
-        and raw == canonical
-    )
+    unique = len(names) == len(set(names))
+    canonical_encoding = names == sorted(names) and raw == canonical
+    return records, unique and (canonical_encoding or not require_canonical)
 
 def validate_acknowledgement_projection(
     gate: dict[str, Any],
@@ -1841,7 +1841,10 @@ def validate_acknowledgement_projection(
     ):
         issues.append(issue("acknowledgement-content-invalid", field))
         return
-    prior, prior_valid = acknowledgement_document(old_bytes)
+    prior, prior_valid = acknowledgement_document(
+        old_bytes,
+        require_canonical=False,
+    )
     observed, observed_valid = acknowledgement_document(new_bytes)
     if not prior_valid or not observed_valid:
         issues.append(issue("acknowledgement-content-invalid", field))
