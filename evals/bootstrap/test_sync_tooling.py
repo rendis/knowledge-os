@@ -13,6 +13,7 @@ DIST = Path(__file__).resolve().parents[2]
 META = DIST / "kernel" / "90-Meta"
 MANIFEST = META / "git-change-manifest.py"
 STATIC_SCAN = META / "static-evidence-scan.py"
+SYNC_RUN = META / "sync-run.py"
 
 
 def load_manifest_module():
@@ -90,6 +91,43 @@ class SyncToolingEval(unittest.TestCase):
                     check=False,
                 )
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_resumable_sync_public_commands_replace_validate_write(self) -> None:
+        manifest_help = subprocess.run(
+            [sys.executable, "-B", str(MANIFEST), "--help"],
+            cwd=str(DIST), text=True, capture_output=True, check=False,
+        )
+        self.assertEqual(manifest_help.returncode, 0, manifest_help.stdout + manifest_help.stderr)
+        self.assertIn("validate-projection", manifest_help.stdout)
+        self.assertIn("close-package", manifest_help.stdout)
+        self.assertNotIn("validate-write", manifest_help.stdout)
+
+        gate_help = subprocess.run(
+            [sys.executable, "-B", str(MANIFEST), "gate-batch", "--help"],
+            cwd=str(DIST), text=True, capture_output=True, check=False,
+        )
+        self.assertEqual(gate_help.returncode, 0, gate_help.stdout + gate_help.stderr)
+        self.assertIn("--package", gate_help.stdout)
+        self.assertNotIn("--item", gate_help.stdout)
+
+        sync_help = subprocess.run(
+            [sys.executable, "-B", str(SYNC_RUN), "--help"],
+            cwd=str(DIST), text=True, capture_output=True, check=False,
+        )
+        self.assertEqual(sync_help.returncode, 0, sync_help.stdout + sync_help.stderr)
+        for command in ("begin", "checkpoint-package", "seal-gate", "status", "validate-unit", "apply-unit", "resume", "close"):
+            with self.subTest(command=command):
+                self.assertIn(command, sync_help.stdout)
+
+    def test_retired_basename_rejection_heuristics_are_removed(self) -> None:
+        source = MANIFEST.read_text(encoding="utf-8")
+        for retired in (
+            "validate-write",
+            "content.count(basename)",
+            "rejected-repository-added",
+        ):
+            with self.subTest(retired=retired):
+                self.assertFalse(retired in source, retired)
 
 
 if __name__ == "__main__":

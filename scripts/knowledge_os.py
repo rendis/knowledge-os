@@ -226,6 +226,7 @@ def ensure_gitignore_lines(dest: Path) -> None:
     required = (
         "/.knowledge-os-config.yaml",
         "/.knowledge-os-config.*.tmp",
+        "/.agents/state/map-ecosystem/sync/",
     )
     path = dest / ".gitignore"
     lines = path.read_text(encoding="utf-8").splitlines() if path.is_file() else []

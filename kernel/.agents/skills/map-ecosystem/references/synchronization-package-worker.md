@@ -8,7 +8,7 @@ Use this mode only when the parent supplies one complete JSON card with this sha
 {
   "marker": "SYNC_PACKAGE_WORKER_V1",
   "role": "extractor | reviewer",
-  "run_root": "<absolute path>",
+  "run_root": "<absolute package work path>",
   "repository": "<full repository name>",
   "source_checkout": "<absolute read-only checkout>",
   "production_ref": "<explicit local or remote ref>",
@@ -25,13 +25,13 @@ Use this mode only when the parent supplies one complete JSON card with this sha
 }
 ```
 
-Require every path except `source_checkout`, `vault_context`, and `search_roots` to be below `run_root`. Require `allowed_write` to equal `analysis` for an extractor and `review` for a reviewer. Return `worker-contract-invalid` to the parent when a field is missing or inconsistent; do not start a top-level workflow.
+Require every path except `source_checkout`, `vault_context`, and `search_roots` to be below `run_root`. `run_root` is a package work area, never the durable run checkpoint. Require `allowed_write` to equal `analysis` for an extractor and `review` for a reviewer. Return `worker-contract-invalid` to the parent when a field is missing or inconsistent; do not start a top-level workflow.
 
 ## Shared envelope
 
 Use the coordinator bindings as the package authority. Start in `run_root`. Read source blobs only from `old_oid` and `new_oid` in `source_checkout`; never substitute working-tree bytes. Read only the supplied package artifacts, exact `vault_context`, and targeted identifier matches under `search_roots`, and write exactly `allowed_write`. Leave every source checkout and vault file unchanged.
 
-Remote freshness, vault resolution, repository identity, Obsidian binding, inventory, and seed-node discovery belong to the coordinator. Persistent memory is not package evidence and is not queried for package context. The package worker loads no other ecosystem branch, performs no fetch or checkout, and launches no helper workflow. Do not delegate.
+Remote freshness, vault resolution, repository identity, Obsidian binding, inventory, seed-node discovery, checkpointing, gate sealing, projection, application, and closure belong to the coordinator. Persistent memory is not package evidence and is not queried for package context. The package worker loads no other ecosystem branch, performs no fetch or checkout, and launches no helper workflow. Do not delegate.
 
 Inspect credential-suspect paths only through safe non-secret context. Never quote or persist a detected value. Treat an unavailable external deployment body as `not-observed` for dependent fields rather than expanding the assignment.
 
@@ -49,7 +49,7 @@ Fill these closed semantic values:
 
 Write the candidate once. Missing semantic decisions remain invalid and become deterministic fallback. Structural drift alone is normalized from the scaffold without another agent pass.
 
-The extractor writes only `analysis`. It does not finalize, check, review, reconcile the batch, query Obsidian, or write documentation. Completion is one closed `analysis` artifact or one `worker-contract-invalid` response.
+The extractor writes only `analysis`. It does not finalize, check, review, checkpoint, reconcile the batch, query Obsidian, project, apply, or write documentation. Completion is one closed `analysis` artifact or one `worker-contract-invalid` response.
 
 ## Reviewer
 
@@ -77,4 +77,4 @@ Write exactly this review version 3 shape. Copy the repository and three digests
 }
 ```
 
-Use an empty `findings` array only with `accept`. Use at least one finding with `revise` or `blocked`; every finding has exactly the five fields shown, a non-empty unique sorted `nodes` array, and one exact evidence object. A defect confined to one claim targets exactly `claims.<claim_id>`, with one finding per invalid claim. Use a non-claim target only when the defect prevents a safe claim subset from being accepted. The reviewer writes only `review`. It does not repair analysis, repeat extraction, broaden scope, run a gate, or write documentation. Completion is one closed `review` artifact or one `worker-contract-invalid` response.
+Use an empty `findings` array only with `accept`. Use at least one finding with `revise` or `blocked`; every finding has exactly the five fields shown, a non-empty unique sorted `nodes` array, and one exact evidence object. A defect confined to one claim targets exactly `claims.<claim_id>`, with one finding per invalid claim. Use a non-claim target only when the defect prevents a safe claim subset from being accepted. The reviewer writes only `review`. It does not repair analysis, repeat extraction, broaden scope, checkpoint, run a gate, project, apply, or write documentation. Completion is one closed `review` artifact or one `worker-contract-invalid` response.

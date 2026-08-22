@@ -114,7 +114,10 @@ class BootstrapEval(unittest.TestCase):
             self.assertIn('"AGENTS.md":', lock)
             self.assertIn('"90-Meta/audit-vault.py":', lock)
             self.assertNotIn('"Arquitectura.base":', lock)
-            self.assertNotIn(".knowledge-os.lock.yaml", (dest / ".gitignore").read_text(encoding="utf-8"))
+            gitignore = (dest / ".gitignore").read_text(encoding="utf-8")
+            self.assertNotIn(".knowledge-os.lock.yaml", gitignore)
+            self.assertIn("/.agents/state/map-ecosystem/sync/", gitignore)
+            self.assertNotIn(".agents/state/map-ecosystem/sync", lock)
             doctor = run(["sh", str(INSTALL), "doctor", "--dest", str(dest)])
             self.assertEqual(doctor.returncode, 0, doctor.stderr)
             info = json.loads(doctor.stdout)
@@ -158,6 +161,7 @@ class BootstrapEval(unittest.TestCase):
             missing = [target for target in targets if not (dest / target).is_file()]
             self.assertEqual(missing, [], f"documented command targets missing: {missing}")
             self.assertTrue((dest / "90-Meta/git-change-manifest.py").is_file())
+            self.assertTrue((dest / "90-Meta/sync-run.py").is_file())
             self.assertTrue((dest / "90-Meta/static-evidence-scan.py").is_file())
             for command in (
                 [sys.executable, "-B", "90-Meta/audit-vault.py"],
@@ -374,8 +378,16 @@ class BootstrapEval(unittest.TestCase):
             info = json.loads(doctor.stdout)
             self.assertEqual(info["state"], "installed")
             self.assertTrue(info["orientation"]["ready"])
+            sync_state = dest / ".agents" / "state" / "map-ecosystem" / "sync" / "active" / "run-eval" / "run.json"
+            sync_state.parent.mkdir(parents=True)
+            sync_state.write_text('{"local":"keep"}\n', encoding="utf-8")
             updated = run(["sh", str(INSTALL), "update", "--dest", str(dest)])
             self.assertEqual(updated.returncode, 0, updated.stderr)
+            self.assertEqual(sync_state.read_text(encoding="utf-8"), '{"local":"keep"}\n')
+            self.assertNotIn(
+                ".agents/state/map-ecosystem/sync",
+                (dest / ".knowledge-os.lock.yaml").read_text(encoding="utf-8"),
+            )
             self.assertTrue((dest / ".agents" / "skills" / "cell-local-tool" / "SKILL.md").is_file())
             self.assertTrue((dest / "90-Meta" / "Alcance.md").is_file())
             self.assertEqual(
