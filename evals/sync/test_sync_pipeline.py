@@ -87,7 +87,7 @@ class ResumableSyncEval(unittest.TestCase):
                 "--scaffold", str(artifacts[1]),
                 "--analysis", str(artifacts[2]),
                 "--review", str(artifacts[3]),
-                "--branch", "main",
+                "--production-ref", "refs/heads/main",
                 "--analysis-date", "2026-08-22",
                 "--output", str(package_path),
             )
@@ -256,7 +256,7 @@ class ResumableSyncEval(unittest.TestCase):
             self.assertTrue(payload["retryable"], payload)
             self.assertEqual(payload["resume_from"], "projection", payload)
 
-    def test_close_package_rechecks_the_declared_branch_oid(self) -> None:
+    def test_close_package_rechecks_the_declared_production_ref_oid(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             source, _, _ = make_repository_pair(root)
@@ -276,7 +276,55 @@ class ResumableSyncEval(unittest.TestCase):
             closed = self.run_manifest(
                 "close-package", "--repo", str(source), "--manifest", str(artifacts[0]),
                 "--scaffold", str(artifacts[1]), "--analysis", str(artifacts[2]),
-                "--review", str(artifacts[3]), "--branch", "main",
+                "--review", str(artifacts[3]),
+                "--production-ref", "refs/heads/main",
+                "--analysis-date", "2026-08-22", "--output", str(root / "closed.json"),
+            )
+            self.assertEqual(closed.returncode, 2, closed.stdout + closed.stderr)
+
+    def test_close_package_accepts_frozen_remote_ref_when_local_branch_is_stale(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            source, _, _ = make_repository_pair(root)
+            artifacts = package_artifacts(
+                root, source, SOURCE_REPOSITORY, claim_id=SOURCE_CLAIM,
+                requested_nodes=(NODE,),
+            )
+            analyzed_oid = json.loads(artifacts[0].read_text(encoding="utf-8"))["new_oid"]
+            subprocess.run(
+                ["git", "-C", str(source), "update-ref", "refs/remotes/origin/main", analyzed_oid],
+                check=True,
+            )
+            (source / "component.txt").write_text("local branch advanced\n", encoding="utf-8")
+            subprocess.run(["git", "-C", str(source), "add", "component.txt"], check=True)
+            subprocess.run(["git", "-C", str(source), "commit", "-qm", "advance local main"], check=True)
+            closed = self.run_manifest(
+                "close-package", "--repo", str(source), "--manifest", str(artifacts[0]),
+                "--scaffold", str(artifacts[1]), "--analysis", str(artifacts[2]),
+                "--review", str(artifacts[3]),
+                "--production-ref", "refs/remotes/origin/main",
+                "--analysis-date", "2026-08-22", "--output", str(root / "closed.json"),
+            )
+            self.assertEqual(closed.returncode, 0, closed.stdout + closed.stderr)
+
+    def test_close_package_rejects_nested_branch_masquerading_as_main(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            source, _, _ = make_repository_pair(root)
+            artifacts = package_artifacts(
+                root, source, SOURCE_REPOSITORY, claim_id=SOURCE_CLAIM,
+                requested_nodes=(NODE,),
+            )
+            analyzed_oid = json.loads(artifacts[0].read_text(encoding="utf-8"))["new_oid"]
+            subprocess.run(
+                ["git", "-C", str(source), "update-ref", "refs/heads/archive/main", analyzed_oid],
+                check=True,
+            )
+            closed = self.run_manifest(
+                "close-package", "--repo", str(source), "--manifest", str(artifacts[0]),
+                "--scaffold", str(artifacts[1]), "--analysis", str(artifacts[2]),
+                "--review", str(artifacts[3]),
+                "--production-ref", "refs/heads/archive/main",
                 "--analysis-date", "2026-08-22", "--output", str(root / "closed.json"),
             )
             self.assertEqual(closed.returncode, 2, closed.stdout + closed.stderr)
