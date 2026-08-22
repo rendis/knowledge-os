@@ -75,6 +75,11 @@ def installed_command_targets(vault: Path) -> set[str]:
 
 
 class BootstrapEval(unittest.TestCase):
+    def test_distribution_and_installed_kernel_versions_match(self) -> None:
+        distribution_version = (DIST / "VERSION").read_text(encoding="utf-8")
+        installed_version = (DIST / "kernel" / "VERSION").read_text(encoding="utf-8")
+        self.assertEqual(installed_version, distribution_version)
+
     def test_init_creates_orientation(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             dest = Path(tmp) / "cell"
