@@ -295,6 +295,37 @@ class ResumableSyncEval(unittest.TestCase):
             self.assertTrue(payload["retryable"], payload)
             self.assertEqual(payload["resume_from"], "projection", payload)
 
+    def test_write_group_rejects_invalid_coverage_frontmatter_value(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            _, _, oids = make_repository_pair(root)
+            gate = gate_v2(oids)
+            candidate = projection(gate)
+            after = "---\ncobertura-entradas: completa\n---\nbody\n"
+            patch = (
+                "--- a/10-Sistemas/target-service.md\n"
+                "+++ b/10-Sistemas/target-service.md\n"
+                "@@ -1 +1,4 @@\n"
+                "-before\n"
+                "+---\n"
+                + "+cobertura-entradas: completa\n"
+                + "+---\n"
+                + "+body\n"
+            )
+            candidate["patch"] = patch
+            candidate["patch_digest"] = hashlib.sha256(patch.encode("utf-8")).hexdigest()
+            candidate["result_files"] = {
+                "10-Sistemas/target-service.md": hashlib.sha256(
+                    after.encode("utf-8")
+                ).hexdigest(),
+            }
+            payload = self.projection_result(root, gate, candidate)
+            self.assertEqual(payload["code"], "projection-invalid", payload)
+            self.assertIn(
+                "projection-frontmatter-invalid",
+                {item["code"] for item in payload["issues"]},
+            )
+
     def test_write_group_cannot_target_agent_instruction_paths(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

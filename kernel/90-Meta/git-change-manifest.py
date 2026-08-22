@@ -15,7 +15,6 @@ from datetime import date
 from pathlib import Path, PurePosixPath
 from typing import Any, NoReturn
 
-
 MANIFEST_FIELDS = {
     "version", "old_oid", "new_oid", "paths", "environment_configs", "credential_suspects",
 }
@@ -88,6 +87,11 @@ PROJECTION_FIELDS = {
     "version", "run_id", "gate_digest", "unit_id", "unit_type",
     "patch_digest", "base_files", "result_files", "grants",
 }
+PROJECTION_COVERAGE_FIELDS = {
+    "cobertura-entradas", "cobertura-salidas", "cobertura-datos",
+    "cobertura-infra", "cobertura-flujos",
+}
+PROJECTION_COVERAGE_VALUES = {"completo", "parcial", "no-aplica", "por-confirmar"}
 CLOSED_PACKAGE_FIELDS = {
     "version", "code", "status", "repository", "new_oid", "manifest",
     "scaffold", "analysis", "review", "gate", "validation",
@@ -1816,6 +1820,24 @@ def acknowledgement_document(
     canonical_encoding = names == sorted(names) and raw == canonical
     return records, unique and (canonical_encoding or not require_canonical)
 
+def projected_coverage_values(raw: bytes) -> dict[str, str]:
+    try:
+        lines = raw.decode("utf-8", errors="strict").splitlines()
+    except UnicodeError:
+        return {}
+    if not lines or lines[0].strip() != "---":
+        return {}
+    values: dict[str, str] = {}
+    for line in lines[1:]:
+        if line.strip() == "---":
+            break
+        match = re.match(r"^([A-Za-z0-9_-]+):(?:\s*(.*))?$", line)
+        if match is None or match.group(1) not in PROJECTION_COVERAGE_FIELDS:
+            continue
+        value = (match.group(2) or "").split(" #", 1)[0].strip().strip("\"'")
+        values[match.group(1)] = value
+    return values
+
 def validate_acknowledgement_projection(
     gate: dict[str, Any],
     projection: dict[str, Any],
@@ -1971,6 +1993,13 @@ def validate_projection(
             != hashlib.sha256(new_bytes).hexdigest()
         ):
             issues.append(issue("projection-file-binding-invalid", f"patch[{path}]"))
+        if path.endswith(".md"):
+            for field, value in sorted(projected_coverage_values(new_bytes).items()):
+                if value not in PROJECTION_COVERAGE_VALUES:
+                    issues.append(issue(
+                        "projection-frontmatter-invalid",
+                        f"patch[{path}].{field}",
+                    ))
     for path in sorted(patch_paths):
         parsed_path = PurePosixPath(path)
         allowed = (
