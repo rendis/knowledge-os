@@ -70,7 +70,8 @@ class SyncRunStateEval(unittest.TestCase):
         result = self.run_manifest(
             "close-package", "--repo", str(repo), "--manifest", str(artifacts[0]),
             "--scaffold", str(artifacts[1]), "--analysis", str(artifacts[2]),
-            "--review", str(artifacts[3]), "--branch", "main",
+            "--review", str(artifacts[3]),
+            "--production-ref", "refs/heads/main",
             "--analysis-date", "2026-08-22", "--output", str(closed_path),
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)

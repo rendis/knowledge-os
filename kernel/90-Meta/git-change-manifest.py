@@ -3458,7 +3458,7 @@ def close_package(
     scaffold_path: Path,
     analysis_path: Path,
     review_path: Path,
-    branch: str,
+    production_ref: str,
     analysis_date: str,
 ) -> dict[str, Any]:
     manifest = read_json(manifest_path)
@@ -3477,13 +3477,18 @@ def close_package(
         parsed_date = date.fromisoformat(analysis_date)
     except (TypeError, ValueError) as error:
         raise ContractError("package-invalid", "analysis date is invalid") from error
-    if branch not in {"main", "master"} or parsed_date.isoformat() != analysis_date:
+    ref_match = re.fullmatch(
+        r"refs/(?:heads|remotes/origin)/(main|master)",
+        production_ref,
+    )
+    if ref_match is None or parsed_date.isoformat() != analysis_date:
         raise ContractError("package-invalid", "acknowledgement metadata is invalid")
-    branch_oid = resolve_commit(repo_path, f"refs/heads/{branch}")
+    branch = ref_match.group(1)
+    branch_oid = resolve_current_ref(repo_path, production_ref)
     if branch_oid != manifest.get("new_oid"):
         raise ContractError(
             "package-source-stale",
-            "package branch no longer resolves to the analyzed source OID",
+            "package production ref no longer resolves to the analyzed source OID",
         )
     gate = gate_batch_sources(
         [[repo_path, manifest_path, scaffold_path, analysis_path, review_path]],
@@ -3781,7 +3786,11 @@ def parser() -> StableArgumentParser:
     close.add_argument("--scaffold", required=True, type=Path)
     close.add_argument("--analysis", required=True, type=Path)
     close.add_argument("--review", required=True, type=Path)
-    close.add_argument("--branch", required=True, choices=("main", "master"))
+    close.add_argument(
+        "--production-ref",
+        required=True,
+        help="explicit local or origin remote main/master ref frozen for this package",
+    )
     close.add_argument("--analysis-date", required=True)
     close.add_argument("--output", required=True, type=Path)
     validate_projection_command = commands.add_parser(
@@ -3840,7 +3849,7 @@ def main(argv: list[str] | None = None) -> int:
             )
             payload = close_package(
                 args.repo, args.manifest, args.scaffold,
-                args.analysis, args.review, args.branch, args.analysis_date,
+                args.analysis, args.review, args.production_ref, args.analysis_date,
             )
             replace_json(args.output, payload)
             emit(payload)
