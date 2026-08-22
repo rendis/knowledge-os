@@ -223,6 +223,63 @@ class ResumableSyncEval(unittest.TestCase):
             self.assertTrue(payload["retryable"], payload)
             self.assertEqual(payload["resume_from"], "projection", payload)
 
+    def test_acknowledgement_projection_migrates_valid_pretty_printed_preimage(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            _, _, oids = make_repository_pair(root)
+            gate = gate_v2(oids)
+            candidate = projection(
+                gate, unit_id="acknowledgements", unit_type="acknowledgements", grants=[],
+            )
+            existing = {
+                "repository": "APP00001-existing",
+                "branch": "main",
+                "analyzed_sha": "1" * 12,
+                "decision": "no-change",
+                "analysis_date": "2026-08-21",
+            }
+            old_text = json.dumps(
+                {"version": 1, "repositories": [existing]},
+                indent=2,
+            ) + "\n"
+            added = {
+                "repository": TARGET_REPOSITORY,
+                "branch": "main",
+                "analyzed_sha": oids[TARGET_REPOSITORY][:12],
+                "decision": "review-rejected",
+                "analysis_date": "2026-08-22",
+            }
+            new_text = json.dumps(
+                {"version": 1, "repositories": sorted(
+                    [existing, added], key=lambda item: item["repository"],
+                )},
+                ensure_ascii=True,
+                sort_keys=True,
+                separators=(",", ":"),
+            ) + "\n"
+            old_lines = old_text.splitlines(keepends=True)
+            patch = (
+                "--- a/90-Meta/.sync-acknowledgements.json\n"
+                "+++ b/90-Meta/.sync-acknowledgements.json\n"
+                f"@@ -1,{len(old_lines)} +1 @@\n"
+                + "".join(f"-{line}" for line in old_lines)
+                + f"+{new_text}"
+            )
+            candidate["patch"] = patch
+            candidate["patch_digest"] = hashlib.sha256(patch.encode("utf-8")).hexdigest()
+            candidate["base_files"] = {
+                "90-Meta/.sync-acknowledgements.json": hashlib.sha256(
+                    old_text.encode("utf-8")
+                ).hexdigest(),
+            }
+            candidate["result_files"] = {
+                "90-Meta/.sync-acknowledgements.json": hashlib.sha256(
+                    new_text.encode("utf-8")
+                ).hexdigest(),
+            }
+            payload = self.projection_result(root, gate, candidate)
+            self.assertEqual(payload["status"], "pass", payload)
+
     def test_write_group_projection_covers_every_granted_node(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
