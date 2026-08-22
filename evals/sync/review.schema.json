@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Documentation vault synchronization blind review",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "role",
+    "agent_id",
+    "model",
+    "reasoning_effort",
+    "fork_turns",
+    "input_digest",
+    "findings"
+  ],
+  "properties": {
+    "role": {"enum": ["functional-review", "recovery-review"]},
+    "agent_id": {"type": "string", "minLength": 1},
+    "model": {"type": "string", "minLength": 1},
+    "reasoning_effort": {"type": "string", "minLength": 1},
+    "fork_turns": {"type": "string", "minLength": 1},
+    "input_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "finding_id",
+          "severity",
+          "requirement",
+          "file",
+          "line",
+          "claim",
+          "evidence",
+          "disposition"
+        ],
+        "properties": {
+          "finding_id": {"type": "string", "pattern": "^[A-Z]+-[0-9]{3}$"},
+          "severity": {"enum": ["P0", "P1", "P2", "P3"]},
+          "requirement": {"type": "string", "pattern": "^(REQ|SEC|CON|GUD|PAT)-[0-9]{3}$"},
+          "file": {"type": "string", "minLength": 1},
+          "line": {"type": "integer", "minimum": 1},
+          "claim": {"type": "string", "minLength": 1},
+          "evidence": {"type": "string", "minLength": 1},
+          "disposition": {"const": "reported"}
+        }
+      }
+    }
+  }
+}

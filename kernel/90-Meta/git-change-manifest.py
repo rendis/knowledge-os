@@ -11,6 +11,7 @@ import re
 import subprocess
 import sys
 import tempfile
+from datetime import date
 from pathlib import Path, PurePosixPath
 from typing import Any, NoReturn
 
@@ -72,7 +73,25 @@ GATE_WRITE_FIELDS = {
     "version", "code", "status", "repositories", "write_groups",
     "acknowledgements", "fallback_repositories", "pending_repositories",
 }
-GATE_WRITE_GROUP_FIELDS = {"group_id", "repositories", "nodes"}
+GATE_REPOSITORY_FIELDS = {
+    "repository", "verdict", "review_disposition", "result", "new_oid",
+    "is_new", "declared_nodes", "affected_nodes", "write_nodes",
+    "accepted_claim_ids", "rejected_claim_ids", "partial_accept",
+    "analysis_fallback", "fallback_reason", "cursor_decision", "disposition",
+}
+GATE_WRITE_GROUP_FIELDS = {"group_id", "repositories", "nodes", "grants"}
+GATE_GRANT_FIELDS = {"repository", "claim_id", "nodes"}
+GATE_ACKNOWLEDGEMENT_FIELDS = {
+    "repository", "new_oid", "decision", "branch", "analysis_date",
+}
+PROJECTION_FIELDS = {
+    "version", "run_id", "gate_digest", "unit_id", "unit_type",
+    "patch_digest", "base_files", "result_files", "grants",
+}
+CLOSED_PACKAGE_FIELDS = {
+    "version", "code", "status", "repository", "new_oid", "manifest",
+    "scaffold", "analysis", "review", "gate", "validation",
+}
 SYNC_PROCESS_PATTERN = re.compile(
     r"\b(?:la sync|la review|claims? (?:aceptad|rechazad)|por el gate|"
     r"conocimiento durable adicional publicado)\b",
@@ -82,8 +101,20 @@ CONTENT_KINDS = {"text", "binary", "gitlink"}
 MANIFEST_VERSION = 1
 ANALYSIS_VERSION = 2
 REVIEW_VERSION = 3
+GATE_VERSION = 2
+PROJECTION_VERSION = 1
+KNOWLEDGE_NODE_ROOTS = {
+    "10-Sistemas", "15-Arquitectura", "20-Repos", "25-Topics",
+    "30-Flujos", "40-Integraciones", "50-Glosario", "60-Operacion",
+    "70-Aprendizajes",
+}
 OID_PATTERN = re.compile(r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$")
 DIGEST_PATTERN = re.compile(r"^[0-9a-f]{64}$")
+PATCH_HUNK_PATTERN = re.compile(
+    r"^@@ -(?P<old_start>[0-9]+)(?:,(?P<old_count>[0-9]+))? "
+    r"\+(?P<new_start>[0-9]+)(?:,(?P<new_count>[0-9]+))? "
+    r"@@(?: .*)?(?:\r?\n)?$"
+)
 EMPTY_TREE_OIDS = {
     "4b825dc642cb6eb9a060e54bf8d69288fbee4904",
     hashlib.sha256(b"tree 0\0").hexdigest(),
@@ -1081,23 +1112,35 @@ def path_is_within(path: Path, root: Path) -> bool:
     except ValueError:
         return False
 
-def validate_gate_output(output: Path, items: list[list[Path]]) -> None:
-    protected_roots = [Path(__file__).resolve().parent.parent]
-    protected_roots.extend(item[0] for item in items)
-    if any(path_is_within(output, root) for root in protected_roots):
+def validate_closed_gate_output(output: Path, packages: list[Path]) -> None:
+    if path_is_within(output, Path(__file__).resolve().parent.parent):
         raise ContractError(
             "gate-output-protected",
-            "gate output must remain outside the vault and source repositories",
+            "gate output must remain outside the installed kernel",
         )
-    artifact_paths = {
-        path.resolve()
-        for item in items
-        for path in item[1:]
-    }
-    if output.resolve() in artifact_paths:
+    if output.resolve() in {path.resolve() for path in packages}:
         raise ContractError(
             "gate-output-overlap",
-            "gate output must not replace a package artifact",
+            "gate output must not replace a closed package",
+        )
+
+def validate_package_output(
+    output: Path,
+    repo: Path,
+    artifacts: list[Path],
+) -> None:
+    if (
+        path_is_within(output, Path(__file__).resolve().parent.parent)
+        or path_is_within(output, repo)
+    ):
+        raise ContractError(
+            "package-output-protected",
+            "closed package output must remain outside the kernel and source repository",
+        )
+    if output.resolve() in {path.resolve() for path in artifacts}:
+        raise ContractError(
+            "package-output-overlap",
+            "closed package output must not replace a semantic input",
         )
 
 def validate_finalize_output(output: Path, analysis: Path) -> None:
@@ -1112,13 +1155,23 @@ def validate_finalize_output(output: Path, analysis: Path) -> None:
             "finalization receipt already exists; do not invoke the finalizer again",
         )
 
+def stable_string_list(value: Any, validator: Any) -> bool:
+    return (
+        isinstance(value, list)
+        and all(validator(item) for item in value)
+        and value == sorted(set(value))
+    )
+
 def validate_gate_for_write(
     gate: dict[str, Any],
 ) -> tuple[set[str], bool, list[dict[str, str]]]:
     issues: list[dict[str, str]] = []
     if set(gate) != GATE_WRITE_FIELDS:
         return set(), False, [issue("gate-contract-invalid", "gate")]
-    if type(gate.get("version")) is not int or gate.get("version") != 1:
+    if (
+        type(gate.get("version")) is not int
+        or gate.get("version") != GATE_VERSION
+    ):
         issues.append(issue("gate-contract-invalid", "gate.version"))
     if gate.get("code") != "batch-gated":
         issues.append(issue("gate-not-write-ready", "gate.code"))
@@ -1129,29 +1182,58 @@ def validate_gate_for_write(
 
     repositories = gate.get("repositories")
     ready_records: list[dict[str, Any]] = []
+    repository_records: dict[str, dict[str, Any]] = {}
     if not isinstance(repositories, list):
         issues.append(issue("gate-contract-invalid", "gate.repositories"))
     else:
         names = []
         for index, item in enumerate(repositories):
             field = f"gate.repositories[{index}]"
-            if not isinstance(item, dict):
+            if not isinstance(item, dict) or set(item) != GATE_REPOSITORY_FIELDS:
                 issues.append(issue("gate-contract-invalid", field))
                 continue
             repository = item.get("repository")
             accepted_claim_ids = item.get("accepted_claim_ids")
+            rejected_claim_ids = item.get("rejected_claim_ids")
             disposition = item.get("disposition")
+            declared_nodes = item.get("declared_nodes")
+            affected_nodes = item.get("affected_nodes")
             write_nodes = item.get("write_nodes")
+            accepted_claim_ids_valid = stable_string_list(
+                accepted_claim_ids,
+                lambda value: isinstance(value, str) and bool(value.strip()),
+            )
+            rejected_claim_ids_valid = stable_string_list(
+                rejected_claim_ids,
+                lambda value: isinstance(value, str) and bool(value.strip()),
+            )
+            declared_nodes_valid = stable_string_list(
+                declared_nodes,
+                valid_basename,
+            )
+            affected_nodes_valid = stable_string_list(
+                affected_nodes,
+                valid_basename,
+            )
+            write_nodes_valid = stable_string_list(write_nodes, valid_basename)
             if not valid_repository_name(repository):
                 issues.append(issue("gate-contract-invalid", f"{field}.repository"))
             else:
                 names.append(repository)
-            if (
-                not isinstance(accepted_claim_ids, list)
-                or any(
-                    not isinstance(claim_id, str) or not claim_id.strip()
-                    for claim_id in accepted_claim_ids
-                )
+                repository_records[repository] = item
+            if not accepted_claim_ids_valid:
+                issues.append(issue(
+                    "gate-contract-invalid",
+                    f"{field}.accepted_claim_ids",
+                ))
+            if not rejected_claim_ids_valid:
+                issues.append(issue(
+                    "gate-contract-invalid",
+                    f"{field}.rejected_claim_ids",
+                ))
+            elif (
+                accepted_claim_ids_valid
+                and set(accepted_claim_ids).intersection(rejected_claim_ids)
             ):
                 issues.append(issue(
                     "gate-contract-invalid",
@@ -1162,20 +1244,68 @@ def validate_gate_for_write(
                     "gate-contract-invalid",
                     f"{field}.disposition",
                 ))
+            for name, valid in (
+                ("declared_nodes", declared_nodes_valid),
+                ("affected_nodes", affected_nodes_valid),
+                ("write_nodes", write_nodes_valid),
+            ):
+                if not valid:
+                    issues.append(issue(
+                        "gate-contract-invalid",
+                        f"{field}.{name}",
+                    ))
             if (
-                not isinstance(write_nodes, list)
-                or any(not valid_basename(node) for node in write_nodes)
-                or write_nodes != sorted(set(write_nodes))
-                or disposition == "cursor-ready" and write_nodes
+                write_nodes_valid
+                and declared_nodes_valid
+                and not set(write_nodes).issubset(declared_nodes)
             ):
                 issues.append(issue(
                     "gate-contract-invalid",
                     f"{field}.write_nodes",
                 ))
-            elif disposition == "write-ready" and valid_repository_name(repository):
+            if disposition == "cursor-ready" and write_nodes:
+                issues.append(issue(
+                    "gate-contract-invalid",
+                    f"{field}.write_nodes",
+                ))
+            if disposition == "write-ready" and not write_nodes:
+                issues.append(issue(
+                    "gate-contract-invalid",
+                    f"{field}.write_nodes",
+                ))
+            for name in ("is_new", "partial_accept", "analysis_fallback"):
+                if type(item.get(name)) is not bool:
+                    issues.append(issue(
+                        "gate-contract-invalid",
+                        f"{field}.{name}",
+                    ))
+            for name in ("fallback_reason", "cursor_decision"):
+                if not isinstance(item.get(name), str):
+                    issues.append(issue(
+                        "gate-contract-invalid",
+                        f"{field}.{name}",
+                    ))
+            if not valid_oid(item.get("new_oid")):
+                issues.append(issue("gate-contract-invalid", f"{field}.new_oid"))
+            if item.get("verdict") not in REVIEW_VERDICTS:
+                issues.append(issue("gate-contract-invalid", f"{field}.verdict"))
+            if item.get("result") not in RESULTS:
+                issues.append(issue("gate-contract-invalid", f"{field}.result"))
+            if not isinstance(item.get("review_disposition"), str):
+                issues.append(issue(
+                    "gate-contract-invalid",
+                    f"{field}.review_disposition",
+                ))
+            if (
+                disposition == "write-ready"
+                and valid_repository_name(repository)
+                and write_nodes_valid
+                and bool(write_nodes)
+            ):
                 ready_records.append({
                     "repository": repository,
                     "write_nodes": write_nodes,
+                    "grants": [],
                 })
         if names != sorted(names) or len(names) != len(set(names)):
             issues.append(issue("gate-contract-invalid", "gate.repositories"))
@@ -1192,6 +1322,7 @@ def validate_gate_for_write(
                 continue
             nodes = item["nodes"]
             group_repositories = item["repositories"]
+            grants = item["grants"]
             if (
                 not isinstance(nodes, list)
                 or not nodes
@@ -1214,15 +1345,198 @@ def validate_gate_for_write(
                     "gate-contract-invalid",
                     f"{field}.repositories",
                 ))
-        if groups != write_groups(ready_records):
+            valid_grants: list[dict[str, Any]] = []
+            if not isinstance(grants, list):
+                issues.append(issue("gate-contract-invalid", f"{field}.grants"))
+            else:
+                for grant_index, grant in enumerate(grants):
+                    grant_field = f"{field}.grants[{grant_index}]"
+                    if not isinstance(grant, dict) or set(grant) != GATE_GRANT_FIELDS:
+                        issues.append(issue("gate-contract-invalid", grant_field))
+                        continue
+                    grant_repository = grant["repository"]
+                    claim_id = grant["claim_id"]
+                    grant_nodes = grant["nodes"]
+                    record_item = repository_records.get(grant_repository)
+                    record_accepted = (
+                        record_item.get("accepted_claim_ids", [])
+                        if record_item is not None
+                        and isinstance(record_item.get("accepted_claim_ids"), list)
+                        else []
+                    )
+                    record_rejected = (
+                        record_item.get("rejected_claim_ids", [])
+                        if record_item is not None
+                        and isinstance(record_item.get("rejected_claim_ids"), list)
+                        else []
+                    )
+                    record_write_nodes = (
+                        record_item.get("write_nodes", [])
+                        if record_item is not None
+                        and isinstance(record_item.get("write_nodes"), list)
+                        else []
+                    )
+                    repository_valid = not (
+                        not valid_repository_name(grant_repository)
+                        or not isinstance(group_repositories, list)
+                        or grant_repository not in group_repositories
+                        or record_item is None
+                    )
+                    if not repository_valid:
+                        issues.append(issue(
+                            "gate-grant-invalid",
+                            f"{grant_field}.repository",
+                        ))
+                    claim_valid = not (
+                        not isinstance(claim_id, str)
+                        or not claim_id.strip()
+                        or record_item is None
+                        or claim_id not in record_accepted
+                        or claim_id in record_rejected
+                    )
+                    if not claim_valid:
+                        issues.append(issue(
+                            "gate-grant-invalid",
+                            f"{grant_field}.claim_id",
+                        ))
+                    nodes_valid = not (
+                        not isinstance(grant_nodes, list)
+                        or not grant_nodes
+                        or any(not valid_basename(node) for node in grant_nodes)
+                        or grant_nodes != sorted(set(grant_nodes))
+                        or not isinstance(nodes, list)
+                        or not set(grant_nodes).issubset(nodes)
+                        or record_item is None
+                        or not set(grant_nodes).issubset(record_write_nodes)
+                    )
+                    if not nodes_valid:
+                        issues.append(issue(
+                            "gate-grant-invalid",
+                            f"{grant_field}.nodes",
+                        ))
+                    if repository_valid and claim_valid and nodes_valid:
+                        valid_grants.append(grant)
+                ordered_grants = sorted(
+                    valid_grants,
+                    key=lambda value: (
+                        value.get("repository", ""),
+                        value.get("claim_id", ""),
+                        tuple(value.get("nodes", [])),
+                    ),
+                )
+                if grants != ordered_grants or len(ordered_grants) != len({
+                    (item.get("repository"), item.get("claim_id"))
+                    for item in ordered_grants
+                }):
+                    issues.append(issue("gate-contract-invalid", f"{field}.grants"))
+                if not grants:
+                    issues.append(issue(
+                        "gate-grant-invalid",
+                        f"{field}.grants",
+                    ))
+                if isinstance(nodes, list) and {
+                    node
+                    for grant in valid_grants
+                    for node in grant.get("nodes", [])
+                } != set(nodes):
+                    issues.append(issue("gate-grant-invalid", f"{field}.nodes"))
+                if isinstance(group_repositories, list) and {
+                    grant.get("repository") for grant in valid_grants
+                } != set(group_repositories):
+                    issues.append(issue(
+                        "gate-grant-invalid",
+                        f"{field}.repositories",
+                    ))
+        expected_groups = [
+            {
+                "group_id": item["group_id"],
+                "repositories": item["repositories"],
+                "nodes": item["nodes"],
+            }
+            for item in write_groups(ready_records)
+        ]
+        observed_groups = [
+            {
+                "group_id": item.get("group_id"),
+                "repositories": item.get("repositories"),
+                "nodes": item.get("nodes"),
+            }
+            for item in groups
+            if isinstance(item, dict)
+        ]
+        if observed_groups != expected_groups:
             issues.append(issue("gate-contract-invalid", "gate.write_groups"))
 
     acknowledgements = gate.get("acknowledgements")
     has_acknowledgements = isinstance(acknowledgements, list) and bool(acknowledgements)
     if not isinstance(acknowledgements, list):
         issues.append(issue("gate-contract-invalid", "gate.acknowledgements"))
-    if not isinstance(gate.get("fallback_repositories"), list):
+    else:
+        expected_acknowledgements = {
+            item["repository"]: {
+                "new_oid": item["new_oid"],
+                "decision": item["cursor_decision"],
+            }
+            for item in repositories
+            if (
+                isinstance(item, dict)
+                and set(item) == GATE_REPOSITORY_FIELDS
+                and item["disposition"] == "cursor-ready"
+            )
+        } if isinstance(repositories, list) else {}
+        acknowledgement_names: list[str] = []
+        for item in acknowledgements:
+            if not isinstance(item, dict) or set(item) != GATE_ACKNOWLEDGEMENT_FIELDS:
+                issues.append(issue("gate-contract-invalid", "gate.acknowledgements"))
+                continue
+            repository = item["repository"]
+            acknowledgement_names.append(repository)
+            expected_item = expected_acknowledgements.get(repository)
+            try:
+                parsed_date = date.fromisoformat(item["analysis_date"])
+            except (TypeError, ValueError):
+                parsed_date = None
+            if (
+                expected_item is None
+                or item["new_oid"] != expected_item["new_oid"]
+                or item["decision"] != expected_item["decision"]
+                or item["branch"] not in {"main", "master"}
+                or parsed_date is None
+                or parsed_date.isoformat() != item["analysis_date"]
+            ):
+                issues.append(issue("gate-contract-invalid", "gate.acknowledgements"))
+        if (
+            acknowledgement_names != sorted(expected_acknowledgements)
+            or len(acknowledgement_names) != len(set(acknowledgement_names))
+        ):
+            issues.append(issue("gate-contract-invalid", "gate.acknowledgements"))
+    fallback_repositories = gate.get("fallback_repositories")
+    if (
+        not isinstance(fallback_repositories, list)
+        or any(
+            not valid_repository_name(repository)
+            for repository in fallback_repositories
+        )
+        or fallback_repositories != sorted(set(fallback_repositories))
+    ):
         issues.append(issue("gate-contract-invalid", "gate.fallback_repositories"))
+    elif isinstance(repositories, list):
+        expected_fallbacks = sorted(
+            item["repository"]
+            for item in repositories
+            if (
+                isinstance(item, dict)
+                and set(item) == GATE_REPOSITORY_FIELDS
+                and valid_repository_name(item["repository"])
+                and isinstance(item["fallback_reason"], str)
+                and item["fallback_reason"]
+            )
+        )
+        if fallback_repositories != expected_fallbacks:
+            issues.append(issue(
+                "gate-contract-invalid",
+                "gate.fallback_repositories",
+            ))
     if (
         gate.get("status") == "all-ready"
         and not authorized_nodes
@@ -1237,76 +1551,457 @@ def validate_gate_for_write(
     return authorized_nodes, has_acknowledgements, unique_issues(issues)
 
 def patch_header_path(line: str) -> str | None:
-    value = line[4:].split("\t", 1)[0]
+    value = line[4:].rstrip("\r\n").split("\t", 1)[0]
     if value == "/dev/null":
         return None
-    return value.removeprefix("a/").removeprefix("b/")
+    return value[2:] if value.startswith(("a/", "b/")) else value
 
-def validate_write_patch(gate_path: Path, patch_path: Path) -> dict[str, Any]:
+def projection_invalid(issues: list[dict[str, str]]) -> dict[str, Any]:
+    return {
+        "code": "projection-invalid",
+        "status": "blocked",
+        "retryable": True,
+        "resume_from": "projection",
+        "issues": unique_issues(issues),
+    }
+
+def projection_file_digests(
+    value: Any,
+    field: str,
+    issues: list[dict[str, str]],
+) -> set[str]:
+    paths: set[str] = set()
+    if not isinstance(value, dict) or not value:
+        issues.append(issue("projection-contract-invalid", field))
+        return paths
+    for path, digest in value.items():
+        if not valid_path(path):
+            issues.append(issue("projection-contract-invalid", f"{field}.{path}"))
+        else:
+            paths.add(path)
+        if not isinstance(digest, str) or DIGEST_PATTERN.fullmatch(digest) is None:
+            issues.append(issue("projection-contract-invalid", f"{field}.{path}"))
+    return paths
+
+def projected_patch_sections(
+    patch_text: str,
+) -> tuple[dict[str, dict[str, Any]], list[dict[str, str]]]:
+    raw_lines = list(enumerate(patch_text.splitlines(keepends=True), start=1))
+    lines: list[tuple[int, str]] = []
+    issues: list[dict[str, str]] = []
+    for line_number, line in raw_lines:
+        if line.startswith("\\ No newline at end of file"):
+            if not lines:
+                issues.append(issue(
+                    "patch-structure-invalid",
+                    f"patch[{line_number}]",
+                ))
+            else:
+                previous_number, previous = lines[-1]
+                lines[-1] = (previous_number, previous.rstrip("\r\n"))
+            continue
+        lines.append((line_number, line))
+
+    sections: dict[str, dict[str, Any]] = {}
+    index = 0
+    while index < len(lines):
+        line_number, line = lines[index]
+        if not line.strip():
+            index += 1
+            continue
+        if not line.startswith("--- "):
+            issues.append(issue(
+                "patch-structure-invalid",
+                f"patch[{line_number}]",
+            ))
+            index += 1
+            continue
+        old_path = patch_header_path(line)
+        index += 1
+        if index >= len(lines) or not lines[index][1].startswith("+++ "):
+            issues.append(issue(
+                "patch-structure-invalid",
+                f"patch[{line_number}]",
+            ))
+            continue
+        new_path = patch_header_path(lines[index][1])
+        path = new_path or old_path
+        index += 1
+        if (
+            path is None
+            or not valid_path(path)
+            or path in sections
+            or old_path is not None
+            and new_path is not None
+            and old_path != new_path
+        ):
+            issues.append(issue(
+                "patch-structure-invalid",
+                f"patch[{line_number}]",
+            ))
+
+        hunks: list[dict[str, Any]] = []
+        while index < len(lines):
+            hunk_line_number, hunk_line = lines[index]
+            if (
+                hunk_line.startswith("--- ")
+                and index + 1 < len(lines)
+                and lines[index + 1][1].startswith("+++ ")
+            ):
+                break
+            if not hunk_line.strip():
+                index += 1
+                continue
+            match = PATCH_HUNK_PATTERN.fullmatch(hunk_line)
+            if match is None:
+                issues.append(issue(
+                    "patch-structure-invalid",
+                    f"patch[{hunk_line_number}]",
+                ))
+                index += 1
+                continue
+            hunk = {
+                "old_start": int(match.group("old_start")),
+                "old_count": int(match.group("old_count") or "1"),
+                "new_start": int(match.group("new_start")),
+                "new_count": int(match.group("new_count") or "1"),
+                "lines": [],
+            }
+            old_remaining = hunk["old_count"]
+            new_remaining = hunk["new_count"]
+            index += 1
+            while old_remaining or new_remaining:
+                if index >= len(lines):
+                    break
+                content_line_number, content_line = lines[index]
+                prefix = content_line[:1]
+                if prefix == " ":
+                    old_remaining -= 1
+                    new_remaining -= 1
+                elif prefix == "-":
+                    old_remaining -= 1
+                elif prefix == "+":
+                    new_remaining -= 1
+                    if SYNC_PROCESS_PATTERN.search(content_line[1:]):
+                        issues.append(issue(
+                            "sync-process-state-added",
+                            f"patch[{content_line_number}]",
+                        ))
+                else:
+                    issues.append(issue(
+                        "patch-structure-invalid",
+                        f"patch[{content_line_number}]",
+                    ))
+                    break
+                if old_remaining < 0 or new_remaining < 0:
+                    issues.append(issue(
+                        "patch-structure-invalid",
+                        f"patch[{content_line_number}]",
+                    ))
+                    break
+                hunk["lines"].append(content_line)
+                index += 1
+            if old_remaining or new_remaining:
+                issues.append(issue(
+                    "patch-structure-invalid",
+                    f"patch[{hunk_line_number}]",
+                ))
+            hunks.append(hunk)
+        if not hunks:
+            issues.append(issue("patch-structure-invalid", f"patch[{line_number}]"))
+        if path is not None and valid_path(path) and path not in sections:
+            sections[path] = {
+                "old_path": old_path,
+                "new_path": new_path,
+                "hunks": hunks,
+            }
+    if not sections:
+        issues.append(issue("patch-structure-invalid", "patch"))
+    return sections, issues
+
+def complete_patch_images(
+    section: dict[str, Any],
+) -> tuple[bytes, bytes] | None:
+    hunks = section.get("hunks")
+    if (
+        section.get("old_path") is None and section.get("new_path") is None
+        or not isinstance(hunks, list)
+        or len(hunks) != 1
+    ):
+        return None
+    hunk = hunks[0]
+    old_count = hunk.get("old_count")
+    new_count = hunk.get("new_count")
+    if (
+        type(old_count) is not int
+        or type(new_count) is not int
+        or hunk.get("old_start") != (0 if old_count == 0 else 1)
+        or hunk.get("new_start") != (0 if new_count == 0 else 1)
+        or not isinstance(hunk.get("lines"), list)
+    ):
+        return None
+    old_lines: list[str] = []
+    new_lines: list[str] = []
+    for line in hunk["lines"]:
+        if not isinstance(line, str) or not line:
+            return None
+        if line.startswith(" "):
+            old_lines.append(line[1:])
+            new_lines.append(line[1:])
+        elif line.startswith("-"):
+            old_lines.append(line[1:])
+        elif line.startswith("+"):
+            new_lines.append(line[1:])
+        else:
+            return None
+    if len(old_lines) != old_count or len(new_lines) != new_count:
+        return None
+    return (
+        "".join(old_lines).encode("utf-8"),
+        "".join(new_lines).encode("utf-8"),
+    )
+
+def acknowledgement_document(
+    raw: bytes,
+) -> tuple[dict[str, dict[str, Any]], bool]:
+    if not raw:
+        return {}, True
+    try:
+        value = json.loads(
+            raw.decode("utf-8", errors="strict"),
+            object_pairs_hook=reject_duplicate_keys,
+        )
+    except (json.JSONDecodeError, UnicodeError, DuplicateJsonKey):
+        return {}, False
+    if (
+        not isinstance(value, dict)
+        or set(value) != {"version", "repositories"}
+        or type(value.get("version")) is not int
+        or value["version"] != 1
+        or not isinstance(value.get("repositories"), list)
+    ):
+        return {}, False
+    records: dict[str, dict[str, Any]] = {}
+    names: list[str] = []
+    for record_value in value["repositories"]:
+        if (
+            not isinstance(record_value, dict)
+            or set(record_value) != {
+                "repository", "branch", "analyzed_sha", "decision",
+                "analysis_date",
+            }
+            or not valid_repository_name(record_value.get("repository"))
+            or record_value.get("branch") not in {"main", "master"}
+            or not isinstance(record_value.get("analyzed_sha"), str)
+            or re.fullmatch(r"[0-9a-f]{12}", record_value["analyzed_sha"]) is None
+            or not isinstance(record_value.get("decision"), str)
+            or not record_value["decision"].strip()
+        ):
+            return {}, False
+        try:
+            parsed_date = date.fromisoformat(record_value.get("analysis_date"))
+        except (TypeError, ValueError):
+            return {}, False
+        if parsed_date.isoformat() != record_value["analysis_date"]:
+            return {}, False
+        repository = record_value["repository"]
+        names.append(repository)
+        records[repository] = record_value
+    canonical = json.dumps(
+        value, ensure_ascii=True, sort_keys=True, separators=(",", ":"),
+    ).encode("utf-8") + b"\n"
+    return records, (
+        names == sorted(names)
+        and len(names) == len(set(names))
+        and raw == canonical
+    )
+
+def validate_acknowledgement_projection(
+    gate: dict[str, Any],
+    projection: dict[str, Any],
+    sections: dict[str, dict[str, Any]],
+    issues: list[dict[str, str]],
+) -> None:
+    field = "projection.acknowledgements"
+    section = sections.get("90-Meta/.sync-acknowledgements.json")
+    images = complete_patch_images(section) if section is not None else None
+    if images is None:
+        issues.append(issue("acknowledgement-content-invalid", field))
+        return
+    old_bytes, new_bytes = images
+    base_files = projection.get("base_files")
+    result_files = projection.get("result_files")
+    if (
+        not isinstance(base_files, dict)
+        or base_files.get("90-Meta/.sync-acknowledgements.json")
+        != hashlib.sha256(old_bytes).hexdigest()
+        or not isinstance(result_files, dict)
+        or result_files.get("90-Meta/.sync-acknowledgements.json")
+        != hashlib.sha256(new_bytes).hexdigest()
+    ):
+        issues.append(issue("acknowledgement-content-invalid", field))
+        return
+    prior, prior_valid = acknowledgement_document(old_bytes)
+    observed, observed_valid = acknowledgement_document(new_bytes)
+    if not prior_valid or not observed_valid:
+        issues.append(issue("acknowledgement-content-invalid", field))
+        return
+    expected = dict(prior)
+    for item in gate["acknowledgements"]:
+        record_value = observed.get(item["repository"])
+        if (
+            record_value is None
+            or record_value["branch"] != item["branch"]
+            or record_value["analyzed_sha"] != item["new_oid"][:12]
+            or record_value["decision"] != item["decision"]
+            or record_value["analysis_date"] != item["analysis_date"]
+        ):
+            issues.append(issue("acknowledgement-content-invalid", field))
+            return
+        expected[item["repository"]] = record_value
+    if observed != expected:
+        issues.append(issue("acknowledgement-content-invalid", field))
+
+def validate_projection(
+    gate_path: Path,
+    projection_path: Path,
+    patch_path: Path,
+) -> dict[str, Any]:
     gate = read_json(gate_path)
     try:
-        patch_text = patch_path.read_text(encoding="utf-8")
+        projection = read_json(projection_path)
+    except ContractError as error:
+        if error.code != "invalid-json":
+            raise
+        return projection_invalid([
+            issue("projection-contract-invalid", "projection"),
+        ])
+    try:
+        patch_bytes = patch_path.read_bytes()
+        patch_text = patch_bytes.decode("utf-8", errors="strict")
     except (OSError, UnicodeError) as error:
         raise OperationalError(
             "file-read-error",
             "projected patch could not be read",
         ) from error
-    authorized_nodes, has_acknowledgements, issues = validate_gate_for_write(gate)
-    if issues:
-        return {
-            "code": "write-patch-invalid",
-            "status": "blocked",
-            "issues": issues,
-        }
-    rejected_repositories = {
-        repository_basename(item["repository"])
-        for item in gate["repositories"]
-        if not item.get("accepted_claim_ids")
-    }
-    current_path = ""
-    old_path: str | None = None
-    mention_deltas: dict[tuple[str, str], int] = {}
-    for line_number, line in enumerate(patch_text.splitlines(), start=1):
-        if line.startswith("--- "):
-            old_path = patch_header_path(line)
+    _, has_acknowledgements, gate_issues = validate_gate_for_write(gate)
+    issues = prefix_issues(gate_issues, "gate")
+    if gate_issues:
+        return projection_invalid(issues)
+    if set(projection) != PROJECTION_FIELDS:
+        issues.append(issue("projection-contract-invalid", "projection"))
+        return projection_invalid(issues)
+    if (
+        type(projection.get("version")) is not int
+        or projection["version"] != PROJECTION_VERSION
+    ):
+        issues.append(issue("projection-contract-invalid", "projection.version"))
+    if not valid_basename(projection.get("run_id")):
+        issues.append(issue("projection-contract-invalid", "projection.run_id"))
+    if (
+        not isinstance(projection.get("gate_digest"), str)
+        or projection["gate_digest"] != canonical_digest(gate)
+    ):
+        issues.append(issue("projection-gate-digest-mismatch", "projection.gate_digest"))
+    if (
+        not isinstance(projection.get("patch_digest"), str)
+        or projection["patch_digest"] != hashlib.sha256(patch_bytes).hexdigest()
+    ):
+        issues.append(issue("projection-patch-digest-mismatch", "projection.patch_digest"))
+
+    unit_type = projection.get("unit_type")
+    unit_id = projection.get("unit_id")
+    projection_grants = projection.get("grants")
+    authorized_nodes: set[str] = set()
+    allowed_acknowledgement_path = False
+    if unit_type == "acknowledgements":
+        if unit_id != "acknowledgements" or not has_acknowledgements:
+            issues.append(issue("projection-unit-invalid", "projection.unit_id"))
+        if projection_grants != []:
+            issues.append(issue("projection-grants-invalid", "projection.grants"))
+        allowed_acknowledgement_path = True
+    elif unit_type == "write-group":
+        group = next(
+            (
+                item
+                for item in gate.get("write_groups", [])
+                if isinstance(item, dict) and item.get("group_id") == unit_id
+            ),
+            None,
+        )
+        if group is None:
+            issues.append(issue("projection-unit-invalid", "projection.unit_id"))
+        else:
+            authorized_nodes = set(group["nodes"])
+            if projection_grants != group["grants"]:
+                issues.append(issue("projection-grants-invalid", "projection.grants"))
+    else:
+        issues.append(issue("projection-unit-invalid", "projection.unit_type"))
+
+    base_paths = projection_file_digests(
+        projection.get("base_files"),
+        "projection.base_files",
+        issues,
+    )
+    result_paths = projection_file_digests(
+        projection.get("result_files"),
+        "projection.result_files",
+        issues,
+    )
+    patch_sections, patch_issues = projected_patch_sections(patch_text)
+    patch_paths = set(patch_sections)
+    issues.extend(patch_issues)
+    if base_paths != result_paths or patch_paths != result_paths:
+        issues.append(issue("projection-file-binding-invalid", "projection.result_files"))
+    for path, section in sorted(patch_sections.items()):
+        images = complete_patch_images(section)
+        if images is None:
+            issues.append(issue("projection-file-binding-invalid", f"patch[{path}]"))
             continue
-        if line.startswith("+++ "):
-            new_path = patch_header_path(line)
-            current_path = new_path or old_path or ""
-            for path in sorted({path for path in (old_path, new_path) if path}):
-                allowed = (
-                    path == "90-Meta/.sync-acknowledgements.json"
-                    and has_acknowledgements
-                    or path.endswith(".md")
-                    and PurePosixPath(path).stem in authorized_nodes
-                )
-                if not valid_path(path) or not allowed:
-                    issues.append(issue(
-                        "write-path-not-authorized",
-                        f"patch[{path}]",
-                    ))
-            old_path = None
-            continue
-        if not line.startswith(("+", "-")):
-            continue
-        content = line[1:]
-        if line.startswith("+") and SYNC_PROCESS_PATTERN.search(content):
-            issues.append(issue("sync-process-state-added", f"patch[{line_number}]"))
-        if current_path == "90-Meta/.sync-acknowledgements.json":
-            continue
-        for basename in sorted(rejected_repositories):
-            count = content.count(basename)
-            if count:
-                key = (current_path, basename)
-                mention_deltas[key] = mention_deltas.get(key, 0) + (
-                    count if line.startswith("+") else -count
-                )
-    for (path, _basename), delta in sorted(mention_deltas.items()):
-        if delta > 0:
-            issues.append(issue("rejected-repository-added", f"patch[{path}]"))
+        old_bytes, new_bytes = images
+        if (
+            not isinstance(projection.get("base_files"), dict)
+            or projection["base_files"].get(path)
+            != hashlib.sha256(old_bytes).hexdigest()
+            or not isinstance(projection.get("result_files"), dict)
+            or projection["result_files"].get(path)
+            != hashlib.sha256(new_bytes).hexdigest()
+        ):
+            issues.append(issue("projection-file-binding-invalid", f"patch[{path}]"))
+    for path in sorted(patch_paths):
+        parsed_path = PurePosixPath(path)
+        allowed = (
+            allowed_acknowledgement_path
+            and path == "90-Meta/.sync-acknowledgements.json"
+            or unit_type == "write-group"
+            and path.endswith(".md")
+            and len(parsed_path.parts) >= 2
+            and parsed_path.parts[0] in KNOWLEDGE_NODE_ROOTS
+            and parsed_path.stem in authorized_nodes
+        )
+        if not valid_path(path) or not allowed:
+            issues.append(issue("projection-path-not-authorized", f"patch[{path}]"))
+    if unit_type == "write-group" and {
+        PurePosixPath(path).stem for path in patch_paths
+    } != authorized_nodes:
+        issues.append(issue(
+            "projection-node-coverage-invalid",
+            "projection.result_files",
+        ))
+    if unit_type == "acknowledgements":
+        validate_acknowledgement_projection(
+            gate,
+            projection,
+            patch_sections,
+            issues,
+        )
     return {
-        "code": "write-patch-valid" if not issues else "write-patch-invalid",
+        "code": "projection-valid" if not issues else "projection-invalid",
         "status": "pass" if not issues else "blocked",
+        **({} if not issues else {
+            "retryable": True,
+            "resume_from": "projection",
+        }),
         "issues": unique_issues(issues),
     }
 
@@ -1486,7 +2181,12 @@ def valid_oid(value: Any) -> bool:
     return isinstance(value, str) and OID_PATTERN.fullmatch(value) is not None
 
 def valid_path(value: Any) -> bool:
-    if not isinstance(value, str) or not value or "\x00" in value:
+    if (
+        not isinstance(value, str)
+        or not value
+        or "\x00" in value
+        or "\\" in value
+    ):
         return False
     path = PurePosixPath(value)
     return (
@@ -2275,6 +2975,19 @@ def write_groups(
         groups.append({
             "repositories": sorted(repositories),
             "nodes": sorted(nodes),
+            "grants": sorted(
+                (
+                    grant
+                    for record in records
+                    if record["repository"] in repositories
+                    for grant in record.get("grants", [])
+                ),
+                key=lambda item: (
+                    item["repository"],
+                    item["claim_id"],
+                    tuple(item["nodes"]),
+                ),
+            ),
         })
     return [
         {
@@ -2284,9 +2997,10 @@ def write_groups(
         for index, group in enumerate(groups, start=1)
     ]
 
-def gate_batch(
+def gate_batch_sources(
     items: list[list[Path]],
     expected_repositories: list[str],
+    acknowledgement_metadata: dict[str, tuple[str, str]],
 ) -> dict[str, Any]:
     issues = []
     expected = []
@@ -2421,23 +3135,25 @@ def gate_batch(
         else:
             accepted_claim_ids = []
         accepted_claim_id_set = set(accepted_claim_ids)
-        if claim_ids:
-            eligible_write_nodes = sorted(
-                item["basename"]
-                for item in nodes
-                if (
-                    item["action"] != "no-change"
-                    and accepted_claim_id_set.intersection(item["claim_ids"])
-                )
-            )
-        elif not review_failure and review["verdict"] == "accept":
-            eligible_write_nodes = sorted(
-                item["basename"]
-                for item in nodes
-                if item["action"] != "no-change"
-            )
-        else:
-            eligible_write_nodes = []
+        grant_nodes: dict[str, set[str]] = {}
+        for node in nodes:
+            if node["action"] == "no-change":
+                continue
+            for claim_id in accepted_claim_id_set.intersection(node["claim_ids"]):
+                grant_nodes.setdefault(claim_id, set()).add(node["basename"])
+        grants = [
+            {
+                "repository": repository,
+                "claim_id": claim_id,
+                "nodes": sorted(node_names),
+            }
+            for claim_id, node_names in sorted(grant_nodes.items())
+        ]
+        eligible_write_nodes = {
+            node
+            for grant in grants
+            for node in grant["nodes"]
+        }
         records.append({
             "repository": repository,
             "verdict": "blocked" if review_failure else review["verdict"],
@@ -2461,12 +3177,13 @@ def gate_batch(
                     for basename in finding["nodes"]
                 })
             ),
-            "write_nodes": eligible_write_nodes,
+            "write_nodes": sorted(eligible_write_nodes),
             "accepted_claim_ids": accepted_claim_ids,
             "rejected_claim_ids": rejected_claim_ids,
             "partial_accept": partial_accept,
             "analysis_fallback": analysis_fallback,
             "fallback_reason": review_failure,
+            "grants": grants,
         })
 
     repositories = [item["repository"] for item in records]
@@ -2479,7 +3196,7 @@ def gate_batch(
         ))
     if issues:
         return {
-            "version": 1,
+            "version": GATE_VERSION,
             "code": "batch-invalid",
             "status": "blocked",
             "issues": issues,
@@ -2503,9 +3220,7 @@ def gate_batch(
             item["write_nodes"] = []
             disposition = "cursor-ready"
         elif (
-            item["is_new"]
-            and item["result"] == "no-change"
-            and not item["write_nodes"]
+            not item["write_nodes"]
         ):
             cursor_decision = "no-durable-node"
             disposition = "cursor-ready"
@@ -2513,7 +3228,11 @@ def gate_batch(
             disposition = "write-ready"
             ready.append(item)
         repository_results.append({
-            **item,
+            **{
+                key: value
+                for key, value in item.items()
+                if key != "grants"
+            },
             "cursor_decision": cursor_decision,
             "disposition": disposition,
         })
@@ -2524,6 +3243,8 @@ def gate_batch(
             "repository": item["repository"],
             "new_oid": item["new_oid"],
             "decision": item["cursor_decision"],
+            "branch": acknowledgement_metadata[item["repository"]][0],
+            "analysis_date": acknowledgement_metadata[item["repository"]][1],
         }
         for item in repository_results
         if item["disposition"] == "cursor-ready"
@@ -2539,7 +3260,7 @@ def gate_batch(
         else "complete-no-write"
     )
     return {
-        "version": 1,
+        "version": GATE_VERSION,
         "code": "batch-gated",
         "status": status,
         "repositories": repository_results,
@@ -2547,6 +3268,254 @@ def gate_batch(
         "acknowledgements": acknowledgements,
         "fallback_repositories": fallback_repositories,
         "pending_repositories": [],
+    }
+
+def validate_closed_package_value(
+    package: dict[str, Any],
+) -> list[dict[str, str]]:
+    issues: list[dict[str, str]] = []
+    if set(package) != CLOSED_PACKAGE_FIELDS:
+        return [issue("package-fields-invalid", "package")]
+    if (
+        package.get("version") != 1
+        or package.get("code") != "package-closed"
+        or package.get("status") != "complete"
+        or not valid_repository_name(package.get("repository"))
+        or not valid_oid(package.get("new_oid"))
+        or not all(isinstance(package.get(field), dict) for field in (
+            "manifest", "scaffold", "analysis", "gate", "validation",
+        ))
+        or package.get("review") is not None
+        and not isinstance(package["review"], dict)
+    ):
+        issues.append(issue("package-contract-invalid", "package"))
+        return issues
+    validation = package["validation"]
+    expected_validation = {
+        "manifest_digest": canonical_digest(package["manifest"]),
+        "scaffold_digest": canonical_digest(package["scaffold"]),
+        "analysis_digest": canonical_digest(package["analysis"]),
+        "review_digest": canonical_digest(package["review"]),
+        "gate_digest": canonical_digest(package["gate"]),
+    }
+    if validation != expected_validation:
+        issues.append(issue("package-lineage-invalid", "package.validation"))
+    gate = package["gate"]
+    _, _, gate_issues = validate_gate_for_write(gate)
+    issues.extend(prefix_issues(gate_issues, "package.gate"))
+    repositories = gate.get("repositories")
+    if (
+        not isinstance(repositories, list)
+        or len(repositories) != 1
+        or not isinstance(repositories[0], dict)
+        or repositories[0].get("repository") != package["repository"]
+        or repositories[0].get("new_oid") != package["new_oid"]
+        or package["manifest"].get("new_oid") != package["new_oid"]
+        or package["analysis"].get("repository") != package["repository"]
+    ):
+        issues.append(issue("package-identity-invalid", "package"))
+    if set(package["manifest"]) != MANIFEST_FIELDS:
+        issues.append(issue("package-semantic-invalid", "package.manifest"))
+    if set(package["scaffold"]) != ANALYSIS_FIELDS:
+        issues.append(issue("package-semantic-invalid", "package.scaffold"))
+    analysis = package["analysis"]
+    if set(analysis) != ANALYSIS_FIELDS:
+        issues.append(issue("package-semantic-invalid", "package.analysis"))
+    review = package["review"]
+    if review is not None and set(review) != REVIEW_FIELDS:
+        issues.append(issue("package-semantic-invalid", "package.review"))
+    claims = analysis.get("claims")
+    claim_ids: set[str] = set()
+    if not isinstance(claims, list):
+        issues.append(issue("package-semantic-invalid", "package.analysis.claims"))
+    else:
+        for index, claim in enumerate(claims):
+            if (
+                not isinstance(claim, dict)
+                or set(claim) != {"claim_id", "statement", "evidence"}
+                or not isinstance(claim.get("claim_id"), str)
+                or not claim["claim_id"].strip()
+                or not isinstance(claim.get("statement"), str)
+                or not claim["statement"].strip()
+                or not isinstance(claim.get("evidence"), list)
+                or not claim["evidence"]
+            ):
+                issues.append(issue(
+                    "package-semantic-invalid",
+                    f"package.analysis.claims[{index}]",
+                ))
+            else:
+                claim_ids.add(claim["claim_id"])
+    if isinstance(repositories, list) and len(repositories) == 1:
+        accepted = repositories[0].get("accepted_claim_ids")
+        if not isinstance(accepted, list) or not set(accepted).issubset(claim_ids):
+            issues.append(issue(
+                "package-authority-invalid",
+                "package.gate.repositories[0].accepted_claim_ids",
+            ))
+    if review is not None and (
+        review.get("repository") != package["repository"]
+        or review.get("manifest_digest") != canonical_digest(package["manifest"])
+        or review.get("scaffold_digest") != canonical_digest(package["scaffold"])
+        or review.get("analysis_digest") != canonical_digest(analysis)
+    ):
+        issues.append(issue("package-lineage-invalid", "package.review"))
+    has_write_authority = bool(gate.get("write_groups"))
+    if has_write_authority and review is None:
+        issues.append(issue(
+            "package-review-required",
+            "package.review",
+        ))
+    return unique_issues(issues)
+
+def closed_package(path: Path) -> tuple[dict[str, Any], list[dict[str, str]]]:
+    package = read_json(path)
+    issues = validate_closed_package_value(package)
+    return package, issues
+
+def gate_batch(
+    package_paths: list[Path],
+    expected_repositories: list[str],
+) -> dict[str, Any]:
+    issues: list[dict[str, str]] = []
+    expected = sorted(expected_repositories)
+    if (
+        not expected
+        or len(expected) != len(set(expected))
+        or any(not valid_repository_name(item) for item in expected)
+    ):
+        issues.append(issue("invalid-expected-repository", "expected_repositories"))
+    records: list[dict[str, Any]] = []
+    acknowledgements: list[dict[str, Any]] = []
+    fallback_repositories: list[str] = []
+    for index, path in enumerate(package_paths):
+        try:
+            package, package_issues = closed_package(path)
+        except (ContractError, OperationalError) as error:
+            package, package_issues = {}, [issue(error.code, "package")]
+        issues.extend(prefix_issues(package_issues, f"packages[{index}]"))
+        if package_issues:
+            continue
+        gate = package["gate"]
+        record_value = copy.deepcopy(gate["repositories"][0])
+        record_value["grants"] = sorted(
+            (
+                copy.deepcopy(grant)
+                for group in gate["write_groups"]
+                for grant in group["grants"]
+                if grant["repository"] == package["repository"]
+            ),
+            key=lambda item: (
+                item["repository"], item["claim_id"], tuple(item["nodes"]),
+            ),
+        )
+        records.append(record_value)
+        acknowledgements.extend(copy.deepcopy(gate["acknowledgements"]))
+        fallback_repositories.extend(gate["fallback_repositories"])
+    repositories = [item["repository"] for item in records]
+    if sorted(repositories) != expected:
+        issues.append(issue("batch-repository-coverage-mismatch", "packages"))
+    if len(repositories) != len(set(repositories)):
+        issues.append(issue("duplicate-batch-repository", "packages"))
+    if issues:
+        return {
+            "version": GATE_VERSION,
+            "code": "batch-invalid",
+            "status": "blocked",
+            "issues": unique_issues(issues),
+        }
+    ready = [item for item in records if item["disposition"] == "write-ready"]
+    repository_results = [
+        {key: value for key, value in item.items() if key != "grants"}
+        for item in sorted(records, key=lambda value: value["repository"])
+    ]
+    acknowledgements = sorted(
+        acknowledgements, key=lambda item: item["repository"]
+    )
+    result = {
+        "version": GATE_VERSION,
+        "code": "batch-gated",
+        "status": "all-ready" if ready or acknowledgements else "complete-no-write",
+        "repositories": repository_results,
+        "write_groups": write_groups(ready),
+        "acknowledgements": acknowledgements,
+        "fallback_repositories": sorted(set(fallback_repositories)),
+        "pending_repositories": [],
+    }
+    _, _, result_issues = validate_gate_for_write(result)
+    if result_issues:
+        return {
+            "version": GATE_VERSION,
+            "code": "batch-invalid",
+            "status": "blocked",
+            "issues": prefix_issues(result_issues, "gate"),
+        }
+    return result
+
+def close_package(
+    repo_path: Path,
+    manifest_path: Path,
+    scaffold_path: Path,
+    analysis_path: Path,
+    review_path: Path,
+    branch: str,
+    analysis_date: str,
+) -> dict[str, Any]:
+    manifest = read_json(manifest_path)
+    scaffold = read_json(scaffold_path)
+    analysis = read_json(analysis_path)
+    try:
+        review: dict[str, Any] | None = read_json(review_path)
+    except (ContractError, OperationalError) as error:
+        if error.code not in {"invalid-json", "file-read-error"}:
+            raise
+        review = None
+    repository = analysis.get("repository")
+    if not valid_repository_name(repository):
+        raise ContractError("package-invalid", "package repository is invalid")
+    try:
+        parsed_date = date.fromisoformat(analysis_date)
+    except (TypeError, ValueError) as error:
+        raise ContractError("package-invalid", "analysis date is invalid") from error
+    if branch not in {"main", "master"} or parsed_date.isoformat() != analysis_date:
+        raise ContractError("package-invalid", "acknowledgement metadata is invalid")
+    branch_oid = resolve_commit(repo_path, f"refs/heads/{branch}")
+    if branch_oid != manifest.get("new_oid"):
+        raise ContractError(
+            "package-source-stale",
+            "package branch no longer resolves to the analyzed source OID",
+        )
+    gate = gate_batch_sources(
+        [[repo_path, manifest_path, scaffold_path, analysis_path, review_path]],
+        [repository],
+        {repository: (branch, analysis_date)},
+    )
+    if gate.get("status") == "blocked":
+        return {
+            "version": 1,
+            "code": "package-invalid",
+            "status": "blocked",
+            "issues": gate.get("issues", []),
+        }
+    validation = {
+        "manifest_digest": canonical_digest(manifest),
+        "scaffold_digest": canonical_digest(scaffold),
+        "analysis_digest": canonical_digest(analysis),
+        "review_digest": canonical_digest(review),
+        "gate_digest": canonical_digest(gate),
+    }
+    return {
+        "version": 1,
+        "code": "package-closed",
+        "status": "complete",
+        "repository": repository,
+        "new_oid": manifest["new_oid"],
+        "manifest": manifest,
+        "scaffold": scaffold,
+        "analysis": analysis,
+        "review": review,
+        "gate": gate,
+        "validation": validation,
     }
 
 def finalize_analysis(
@@ -2792,12 +3761,10 @@ def parser() -> StableArgumentParser:
         required=True,
     )
     gate.add_argument(
-        "--item",
+        "--package",
         action="append",
-        nargs=5,
         type=Path,
         required=True,
-        metavar=("REPO", "MANIFEST", "SCAFFOLD", "ANALYSIS", "REVIEW"),
     )
     gate.add_argument(
         "--output",
@@ -2805,12 +3772,29 @@ def parser() -> StableArgumentParser:
         type=Path,
         help="persist the authoritative gate result as JSON",
     )
-    validate_write = commands.add_parser(
-        "validate-write",
-        help="validate the projected durable patch against the gate",
+    close = commands.add_parser(
+        "close-package",
+        help="persist a finalized, reviewed, gate-recoverable semantic package",
     )
-    validate_write.add_argument("--gate", required=True, type=Path)
-    validate_write.add_argument("--patch", required=True, type=Path)
+    close.add_argument("--repo", required=True, type=Path)
+    close.add_argument("--manifest", required=True, type=Path)
+    close.add_argument("--scaffold", required=True, type=Path)
+    close.add_argument("--analysis", required=True, type=Path)
+    close.add_argument("--review", required=True, type=Path)
+    close.add_argument("--branch", required=True, choices=("main", "master"))
+    close.add_argument("--analysis-date", required=True)
+    close.add_argument("--output", required=True, type=Path)
+    validate_projection_command = commands.add_parser(
+        "validate-projection",
+        help="validate one claim-aware projection unit against the sealed gate",
+    )
+    validate_projection_command.add_argument("--gate", required=True, type=Path)
+    validate_projection_command.add_argument(
+        "--projection",
+        required=True,
+        type=Path,
+    )
+    validate_projection_command.add_argument("--patch", required=True, type=Path)
     return root
 
 def main(argv: list[str] | None = None) -> int:
@@ -2841,14 +3825,30 @@ def main(argv: list[str] | None = None) -> int:
             replace_json(output, payload)
             emit(payload)
             return 0 if payload["status"] == "pass" else 2
-        if args.command == "validate-write":
-            payload = validate_write_patch(args.gate, args.patch)
+        if args.command == "validate-projection":
+            payload = validate_projection(
+                args.gate,
+                args.projection,
+                args.patch,
+            )
             emit(payload)
             return 0 if payload["status"] == "pass" else 2
+        if args.command == "close-package":
+            validate_package_output(
+                args.output, args.repo,
+                [args.manifest, args.scaffold, args.analysis, args.review],
+            )
+            payload = close_package(
+                args.repo, args.manifest, args.scaffold,
+                args.analysis, args.review, args.branch, args.analysis_date,
+            )
+            replace_json(args.output, payload)
+            emit(payload)
+            return 0 if payload["status"] == "complete" else 2
         if args.command == "gate-batch":
-            validate_gate_output(args.output, args.item)
+            validate_closed_gate_output(args.output, args.package)
             payload = gate_batch(
-                args.item,
+                args.package,
                 args.expected_repository,
             )
             replace_json(args.output, payload)

@@ -5,6 +5,10 @@ These checks are **not** installed into a cell vault.
 ```bash
 python3 -B kernel/90-Meta/test_instance.py
 python3 -B evals/bootstrap/test_bootstrap.py
+python3 -B evals/bootstrap/test_sync_tooling.py
+python3 -B evals/sync/test_sync_pipeline.py
+python3 -B evals/sync/test_sync_state.py
+python3 -B evals/sync/test_run_eval.py
 ```
 
-Adversarial rounds use `criteria.md` plus the persona briefs. Ledgers go in `evals/bootstrap/ledgers/` (gitignored results may also land in `evals/bootstrap/results/`).
+The synchronization checks cover the gate/projection contract, durable run state, independent units, and recovery. Their frozen criteria and ledgers live in `evals/sync/`; bootstrap ledgers remain in `evals/bootstrap/ledgers/` (gitignored results may also land in `evals/bootstrap/results/`).
