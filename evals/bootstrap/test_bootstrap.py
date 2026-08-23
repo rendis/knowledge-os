@@ -122,6 +122,12 @@ class BootstrapEval(unittest.TestCase):
             gitignore = (dest / ".gitignore").read_text(encoding="utf-8")
             self.assertNotIn(".knowledge-os.lock.yaml", gitignore)
             self.assertIn("/.agents/state/map-ecosystem/sync/", gitignore)
+            self.assertIn("/.plan/", gitignore)
+            self.assertNotIn("/plan/", gitignore)
+            obsidian_app = json.loads(
+                (dest / ".obsidian" / "app.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(obsidian_app["userIgnoreFilters"], [".plan/"])
             self.assertNotIn(".agents/state/map-ecosystem/sync", lock)
             doctor = run(["sh", str(INSTALL), "doctor", "--dest", str(dest)])
             self.assertEqual(doctor.returncode, 0, doctor.stderr)
@@ -309,7 +315,12 @@ class BootstrapEval(unittest.TestCase):
             extra.mkdir(parents=True)
             (extra / "SKILL.md").write_text("# cell-local-tool\n", encoding="utf-8")
             (dest / ".gitignore").write_text(
-                ".DS_Store\n/custom-ignore\n.knowledge-os.lock.yaml\n",
+                ".DS_Store\n/custom-ignore\n.knowledge-os.lock.yaml\n/plan/\n",
+                encoding="utf-8",
+            )
+            (dest / ".obsidian").mkdir()
+            (dest / ".obsidian" / "app.json").write_text(
+                '{"livePreview": true, "userIgnoreFilters": ["archive/", "plan/"]}\n',
                 encoding="utf-8",
             )
             refused = run(
@@ -371,6 +382,16 @@ class BootstrapEval(unittest.TestCase):
             gitignore = (dest / ".gitignore").read_text(encoding="utf-8")
             self.assertIn("/custom-ignore", gitignore)
             self.assertNotIn(".knowledge-os.lock.yaml", gitignore)
+            self.assertIn("/.plan/", gitignore)
+            self.assertNotIn("/plan/", gitignore)
+            obsidian_app = json.loads(
+                (dest / ".obsidian" / "app.json").read_text(encoding="utf-8")
+            )
+            self.assertTrue(obsidian_app["livePreview"])
+            self.assertEqual(
+                obsidian_app["userIgnoreFilters"],
+                ["archive/", ".plan/"],
+            )
             lock = (dest / ".knowledge-os.lock.yaml").read_text(encoding="utf-8")
             self.assertIn('version: "3"', lock)
             self.assertIn('"AGENTS.md":', lock)

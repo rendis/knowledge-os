@@ -69,7 +69,7 @@ Under **Evidencia acumulada**, assign immutable IDs `EV-001`, `EV-002`, and so o
 
 Append the next ID. Never renumber, recycle, delete, or rewrite an older entry to match a newer conclusion. Correct an error with a new entry that identifies what it corrects.
 
-The note summarizes evidence and links its durable locations; it does not copy raw logs, production rows, sensitive attachments, or secret values. `Fuentes durables` never points into ignored local workspaces such as `.investigations/`, `.operations/`, `.knowledge-os-handoffs/`, or `plan/`, nor names one of their local manifests, runners, hashes, results, run records, handoffs, or attachments as proof. A reproducible method qualifies only when the procedure, inputs, and criteria are themselves preserved durably or can be rerun from versioned tooling. If a local-only artifact is the sole support, the assessment is `insufficient-evidence`.
+The note summarizes evidence and links its durable locations; it does not copy raw logs, production rows, sensitive attachments, or secret values. `Fuentes durables` never points into ignored local workspaces such as `.investigations/`, `.operations/`, `.knowledge-os-handoffs/`, or `.plan/`, nor names one of their local manifests, runners, hashes, results, run records, handoffs, or attachments as proof. A reproducible method qualifies only when the procedure, inputs, and criteria are themselves preserved durably or can be rerun from versioned tooling. If a local-only artifact is the sole support, the assessment is `insufficient-evidence`.
 
 ## Lifecycle
 

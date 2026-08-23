@@ -41,4 +41,7 @@ Instance files (`instance.yaml`, `00-Home.md`, notes under `10/`–`70/`) are ne
 
 ## Local stores (Git-ignored)
 
-`.investigations/` · `.operations/` · `.knowledge-os-handoffs/` · `plan/` · `.knowledge-os-config.yaml`
+`.investigations/` · `.operations/` · `.knowledge-os-handoffs/` · `.plan/` · `.knowledge-os-config.yaml`
+
+Local implementation plans belong only in `.plan/`. Never create a visible
+`plan/` directory inside a cell vault: Obsidian indexes it as graph content.

@@ -23,7 +23,7 @@ Schema for a cell knowledge vault. Cell identity, systems, and source prefixes l
 | `70-Aprendizajes/` | Evidence-bounded engineering learnings |
 | `90-Meta/` | Schema, evidence framework, validators |
 
-`.agents/` holds skills and stays outside the Obsidian graph. Local ignored stores (`.investigations/`, `.operations/`, `.knowledge-os-handoffs/`, `.knowledge-os-config.yaml`, `plan/`) are not graph sources.
+`.agents/` holds skills and stays outside the Obsidian graph. Local ignored stores (`.investigations/`, `.operations/`, `.knowledge-os-handoffs/`, `.knowledge-os-config.yaml`, `.plan/`) are not graph sources. Local plans must live in `.plan/`; never create a visible `plan/` directory in a cell vault.
 
 ## Node selection
 

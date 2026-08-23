@@ -54,6 +54,10 @@ A minimal sync starts at `00-Home.md` and `instance.yaml`. If bootstrap is incom
 
 Synchronization stores its resumable local state under `.agents/state/map-ecosystem/sync/` in the cell; that state is ignored by Git and is never installed from this distribution. A sealed gate produces separate acknowledgement and documentation-group units. If a projection or application is recoverable, resume the emitted run rather than repeating its source analysis or review; the installed `map-ecosystem` references define the public commands and failure routing.
 
+Local implementation plans live under `.plan/`. Init, adopt, and update keep that
+directory ignored by Git and merge it into Obsidian's excluded-file settings;
+never create a visible `plan/` directory inside a cell vault.
+
 ## Layout of this repo
 
 | Path | Role |

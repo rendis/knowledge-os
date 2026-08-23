@@ -19,7 +19,6 @@ FORBIDDEN_RELATION_FILES = {
     "relations.sqlite",
     "relations.db",
 }
-EXCLUDED_ROOT_DIRS = {"plan"}
 SYNC_PROCESS_LEAKAGE = re.compile(
     r"\b(?:la sync|la review|claims? (?:aceptad|rechazad)|por el gate|"
     r"conocimiento durable adicional publicado)\b",
@@ -286,7 +285,7 @@ INVESTIGATION_ID = re.compile(
 )
 LOCAL_IGNORED_REFERENCE = re.compile(
     r"(?:\.investigations|\.operations|\.knowledge-os-handoffs)[/\\]"
-    r"|(?<![A-Za-z0-9_-])plan[/\\]"
+    r"|(?<![A-Za-z0-9_-])\.plan[/\\]"
 )
 LEARNING_EVIDENCE_FIELDS = (
     "Investigación",
@@ -932,7 +931,6 @@ def audit_forbidden_files(root: Path) -> list[str]:
         if (
             path.is_dir()
             or any(part.startswith(".") for part in relative_path.parts)
-            or (relative_path.parts and relative_path.parts[0] in EXCLUDED_ROOT_DIRS)
         ):
             continue
         if path.name in FORBIDDEN_RELATION_FILES:

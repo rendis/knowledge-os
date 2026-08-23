@@ -62,7 +62,7 @@ Evaluate the candidate against:
 
 The investigation may organize those references, but its prose, a story, an approval, or an undeployed commit does not independently satisfy the gate.
 
-A reproducible method qualifies only when its procedure, inputs, and criteria are preserved in a durable/versioned source or can be rerun from versioned tooling. Content under ignored local workspaces — including `.investigations/`, `.operations/`, `.knowledge-os-handoffs/`, and `plan/` — is provenance or working state; it cannot occupy `Fuentes durables` or independently support `extractable`.
+A reproducible method qualifies only when its procedure, inputs, and criteria are preserved in a durable/versioned source or can be rerun from versioned tooling. Content under ignored local workspaces — including `.investigations/`, `.operations/`, `.knowledge-os-handoffs/`, and `.plan/` — is provenance or working state; it cannot occupy `Fuentes durables` or independently support `extractable`.
 
 ## Required response
 

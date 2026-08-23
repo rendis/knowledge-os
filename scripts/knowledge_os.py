@@ -227,13 +227,20 @@ def ensure_gitignore_lines(dest: Path) -> None:
         "/.knowledge-os-config.yaml",
         "/.knowledge-os-config.*.tmp",
         "/.agents/state/map-ecosystem/sync/",
+        "/.plan/",
     )
     path = dest / ".gitignore"
     lines = path.read_text(encoding="utf-8").splitlines() if path.is_file() else []
     portable_lines = [
         line
         for line in lines
-        if line.strip() not in {".knowledge-os.lock.yaml", "/.knowledge-os.lock.yaml"}
+        if line.strip()
+        not in {
+            ".knowledge-os.lock.yaml",
+            "/.knowledge-os.lock.yaml",
+            "plan/",
+            "/plan/",
+        }
     ]
     changed = not path.is_file() or portable_lines != lines
     lines = portable_lines
@@ -243,6 +250,30 @@ def ensure_gitignore_lines(dest: Path) -> None:
             changed = True
     if changed:
         path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
+
+
+def ensure_obsidian_ignore_filters(dest: Path) -> None:
+    path = dest / ".obsidian" / "app.json"
+    payload: dict[str, object] = {}
+    if path.is_file():
+        loaded = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(loaded, dict):
+            raise ValueError(f"{path} must contain a JSON object")
+        payload = loaded
+    raw_filters = payload.get("userIgnoreFilters", [])
+    if not isinstance(raw_filters, list) or not all(
+        isinstance(item, str) for item in raw_filters
+    ):
+        raise ValueError(f"{path} userIgnoreFilters must be a list of strings")
+    filters = [item for item in raw_filters if item not in {"plan/", "/plan/"}]
+    if ".plan/" not in filters:
+        filters.append(".plan/")
+    payload["userIgnoreFilters"] = filters
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(payload, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
 
 
 def seed_skeleton(dest: Path, enabled_types: list[str] | None = None) -> None:
@@ -344,7 +375,7 @@ def write_bootstrap(dest: Path, instance: dict[str, Any]) -> None:
                 "/.operations/",
                 "/.knowledge-os-config.yaml",
                 "/.knowledge-os-config.*.tmp",
-                "/plan/",
+                "/.plan/",
                 "/output/",
                 "__pycache__/",
                 "",
@@ -464,6 +495,7 @@ def cmd_init(args: argparse.Namespace) -> int:
     copy_kernel(dest, instance["adapters"])
     write_bootstrap(dest, instance)
     ensure_gitignore_lines(dest)
+    ensure_obsidian_ignore_filters(dest)
     write_lock(dest, instance["adapters"])
     print(json.dumps({"status": "initialized", "dest": str(dest), "cell": instance["cell"]}, indent=2))
     return 0
@@ -506,6 +538,7 @@ def cmd_adopt(args: argparse.Namespace) -> int:
         return 3
     copy_kernel(dest, instance["adapters"])
     ensure_gitignore_lines(dest)
+    ensure_obsidian_ignore_filters(dest)
     write_lock(dest, instance["adapters"])
     print(json.dumps({"status": "adopted", "dest": str(dest), "cell": instance["cell"]}, indent=2))
     return 0
@@ -577,6 +610,7 @@ def cmd_update(args: argparse.Namespace) -> int:
             return 3
     copy_kernel(dest, target_adapters)
     ensure_gitignore_lines(dest)
+    ensure_obsidian_ignore_filters(dest)
     write_lock(dest, target_adapters)
     print(json.dumps({"status": "updated", "dest": str(dest), "kernel_version": dist_version()}, indent=2))
     return 0
