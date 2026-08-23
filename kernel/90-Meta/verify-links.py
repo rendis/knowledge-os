@@ -12,7 +12,6 @@ from vault_frontmatter import split_frontmatter
 
 EXPECTED_ORPHANS = {"00-Home", "README"}
 EXCLUDED_ROOT_FILES = {"AGENTS.md", "CLAUDE.md"}
-EXCLUDED_ROOT_DIRS = {"plan"}
 
 
 def visible_files(root: Path, pattern: str) -> list[Path]:
@@ -20,8 +19,6 @@ def visible_files(root: Path, pattern: str) -> list[Path]:
     for path in root.rglob(pattern):
         relative = path.relative_to(root)
         if any(part.startswith(".") for part in relative.parts):
-            continue
-        if relative.parts and relative.parts[0] in EXCLUDED_ROOT_DIRS:
             continue
         if relative.as_posix() in EXCLUDED_ROOT_FILES:
             continue
