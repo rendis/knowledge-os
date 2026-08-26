@@ -24,6 +24,7 @@ from instance import (  # noqa: E402
 )
 
 LOCK_NAME = ".knowledge-os.lock.yaml"
+MANAGED_HASH_COMMENT = "# gitleaks:allow -- managed SHA-256 digest"
 INSTANCE_OWNED = {
     "instance.yaml",
     "00-Home.md",
@@ -146,7 +147,7 @@ def dump_lock(data: dict[str, Any]) -> str:
         lines.append("  []")
     lines.append("managed_hashes:")
     for rel, digest in sorted((data.get("managed_hashes") or {}).items()):
-        lines.append(f'  "{rel}": {digest}')
+        lines.append(f'  "{rel}": {digest} {MANAGED_HASH_COMMENT}')
     lines.append("")
     return "\n".join(lines)
 
@@ -177,7 +178,11 @@ def load_lock(path: Path) -> dict[str, Any]:
             adapters.append(line[2:].strip())
         elif section == "hashes" and ":" in line:
             key, _, digest = line.partition(":")
-            hashes[key.strip().strip('"')] = digest.strip()
+            digest = digest.strip()
+            comment_suffix = f" {MANAGED_HASH_COMMENT}"
+            if digest.endswith(comment_suffix):
+                digest = digest[: -len(comment_suffix)]
+            hashes[key.strip().strip('"')] = digest
     return {
         "version": version,
         "kernel_version": kernel_version,
@@ -581,6 +586,68 @@ def ownership_conflicts(
     return conflicts
 
 
+def managed_lock_target(dest: Path, rel: str) -> Path:
+    relative = Path(rel)
+    allowed = any(
+        rel == entry
+        if not entry.endswith("/")
+        else rel.startswith(entry) and rel != entry
+        for entry in managed_paths()
+    )
+    if (
+        not rel
+        or "\\" in rel
+        or relative.is_absolute()
+        or any(part in {".", ".."} for part in relative.parts)
+        or relative.as_posix() != rel
+        or not allowed
+    ):
+        raise RuntimeError(f"lock contains an unsafe managed path: {rel}")
+    parent = dest
+    for part in relative.parts[:-1]:
+        parent /= part
+        if parent.is_symlink():
+            raise RuntimeError(f"managed path has a symlinked parent: {rel}")
+        if parent.exists() and not parent.is_dir():
+            raise RuntimeError(f"managed path has a non-directory parent: {rel}")
+    return dest / relative
+
+
+def retired_managed_conflicts(
+    dest: Path,
+    retired: list[str],
+    previous_hashes: dict[str, str],
+) -> list[str]:
+    conflicts: list[str] = []
+    for rel in retired:
+        target = managed_lock_target(dest, rel)
+        if not target.exists() and not target.is_symlink():
+            continue
+        if (
+            target.is_symlink()
+            or not target.is_file()
+            or sha256_file(target) != previous_hashes[rel]
+        ):
+            conflicts.append(rel)
+    return conflicts
+
+
+def remove_retired_managed_files(dest: Path, retired: list[str]) -> list[str]:
+    targets = [(rel, managed_lock_target(dest, rel)) for rel in retired]
+    for rel, target in targets:
+        if not target.exists() and not target.is_symlink():
+            continue
+        if not target.is_symlink() and not target.is_file():
+            raise RuntimeError(f"retired managed target is not a file: {rel}")
+    removed: list[str] = []
+    for rel, target in targets:
+        if not target.exists() and not target.is_symlink():
+            continue
+        target.unlink()
+        removed.append(rel)
+    return removed
+
+
 def cmd_update(args: argparse.Namespace) -> int:
     dest = Path(args.dest).expanduser().resolve()
     lock_path = dest / LOCK_NAME
@@ -590,16 +657,29 @@ def cmd_update(args: argparse.Namespace) -> int:
     lock = load_lock(lock_path)
     instance = load_instance(dest / "instance.yaml")
     target_adapters = instance["adapters"]
+    target_sources = managed_sources(target_adapters)
+    previous_hashes = lock["managed_hashes"]
+    retired = sorted(set(previous_hashes) - set(target_sources))
     current = tree_hashes(dest, lock["adapters"])
     owned = set(managed_sources(lock["adapters"]))
     drifted = [
         rel
-        for rel, digest in lock["managed_hashes"].items()
+        for rel, digest in previous_hashes.items()
         if rel in owned and current.get(rel) != digest
     ]
     drifted.extend(
-        ownership_conflicts(dest, target_adapters, set(lock["managed_hashes"]))
+        ownership_conflicts(dest, target_adapters, set(previous_hashes))
     )
+    try:
+        drifted.extend(retired_managed_conflicts(dest, retired, previous_hashes))
+    except RuntimeError as error:
+        print(
+            json.dumps(
+                {"status": "invalid-lock", "error": str(error)},
+                indent=2,
+            )
+        )
+        return 3
     drifted = sorted(set(drifted))
     overlays = dest / ".agents" / "overlays"
     if drifted and not args.force:
@@ -608,11 +688,31 @@ def cmd_update(args: argparse.Namespace) -> int:
             print(json.dumps({"status": "drift", "files": uncovered}, indent=2))
             print("kernel files changed locally; add overlays or pass --force", file=sys.stderr)
             return 3
+    try:
+        removed = remove_retired_managed_files(dest, retired)
+    except RuntimeError as error:
+        print(
+            json.dumps(
+                {"status": "invalid-lock", "error": str(error)},
+                indent=2,
+            )
+        )
+        return 3
     copy_kernel(dest, target_adapters)
     ensure_gitignore_lines(dest)
     ensure_obsidian_ignore_filters(dest)
     write_lock(dest, target_adapters)
-    print(json.dumps({"status": "updated", "dest": str(dest), "kernel_version": dist_version()}, indent=2))
+    print(
+        json.dumps(
+            {
+                "status": "updated",
+                "dest": str(dest),
+                "kernel_version": dist_version(),
+                "retired_managed_files": removed,
+            },
+            indent=2,
+        )
+    )
     return 0
 
 

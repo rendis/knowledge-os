@@ -17,22 +17,6 @@ def config_path(vault_root: Path) -> Path:
     return vault_root / CONFIG_NAME
 
 
-def iter_legacy_config_files(vault_root: Path) -> list[Path]:
-    """Local ignored configs from before knowledge-os, without naming a product file."""
-    found: list[Path] = []
-    if not vault_root.is_dir():
-        return found
-    for path in vault_root.iterdir():
-        if not path.is_file():
-            continue
-        name = path.name
-        if name == CONFIG_NAME or name.endswith(".tmp"):
-            continue
-        if name.startswith(".") and name.endswith("-config.yaml"):
-            found.append(path)
-    return sorted(found)
-
-
 def _atomic_write(path: Path, text: str) -> None:
     tmp = path.with_suffix(path.suffix + ".tmp")
     tmp.write_text(text, encoding="utf-8")
@@ -131,20 +115,7 @@ def dump_config(data: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
-def migrate_legacy_config(vault_root: Path) -> bool:
-    target = config_path(vault_root)
-    if target.is_file():
-        return False
-    legacy = iter_legacy_config_files(vault_root)
-    if len(legacy) != 1:
-        return False
-    data = parse_config_text(legacy[0].read_text(encoding="utf-8"))
-    _atomic_write(target, dump_config(data))
-    return True
-
-
 def load_data(vault_root: Path) -> dict[str, Any] | None:
-    migrate_legacy_config(vault_root)
     path = config_path(vault_root)
     if not path.is_file():
         return None
@@ -319,7 +290,6 @@ def main() -> int:
             "status",
             "initialize",
             "update",
-            "migrate-legacy",
             "locate-repository",
             "development-worktree-root",
             "repository",
@@ -338,10 +308,6 @@ def main() -> int:
     root = args.vault_root.expanduser().resolve()
     if args.command == "status":
         print(json.dumps(load_config(root), indent=2))
-        return 0
-    if args.command == "migrate-legacy":
-        migrated = migrate_legacy_config(root)
-        print(json.dumps({"migrated": migrated, **load_config(root)}, indent=2))
         return 0
     if args.command in {"initialize", "update"}:
         ports = {}

@@ -11,6 +11,7 @@ import io
 import json
 import os
 import re
+import stat
 import subprocess
 import sys
 import tempfile
@@ -29,8 +30,8 @@ SCHEMA_VERSION = 1
 DOCUMENTS = ("context.md", "jira.md", "scope.md")
 MANAGED_BEGIN = '<!-- knowledge-os:managed:start id="development handoff" -->'
 MANAGED_END = '<!-- knowledge-os:managed:end id="development handoff" -->'
-LEGACY_MANAGED_BEGIN = "<!-- BEGIN MANAGED: System A-System B DEVELOPMENT HANDOFF -->"
-LEGACY_MANAGED_END = "<!-- END MANAGED: System A-System B DEVELOPMENT HANDOFF -->"
+OBSOLETE_MANAGED_BEGIN = "<!-- BEGIN MANAGED: System A-System B DEVELOPMENT HANDOFF -->"
+OBSOLETE_MANAGED_END = "<!-- END MANAGED: System A-System B DEVELOPMENT HANDOFF -->"
 INSTRUCTION_FILES = ("AGENTS.md", "CLAUDE.md")
 IGNORE_RULE = "/.knowledge-os-handoffs/"
 STORE_NAME = ".knowledge-os-handoffs"
@@ -38,10 +39,12 @@ ACTIVE_NAME = "ACTIVE.yaml"
 MANIFEST_NAME = "handoff.yaml"
 START_NAME = "START.md"
 UPDATES_NAME = "implementation-updates.md"
+DEACTIVATION_DISPOSITIONS = {"paused", "abandoned", "reconciled"}
 MAX_DOCUMENT_BYTES = 1_048_576
 MAX_BUNDLE_BYTES = 3_145_728
 MAX_AGENTS_BYTES = 32_768
 MAX_UPDATES_BYTES = 1_048_576
+MAX_CLOSURE_UNTRACKED_PATHS = 10_000
 REVISION_RE = re.compile(r"v([0-9]{4})")
 UPDATE_HEADING_RE = re.compile(r"^## UPD-([0-9]{3,}) — (.+)$")
 ISSUE_KEY_RE = re.compile(r"[A-Z][A-Z0-9]+-[0-9]+")
@@ -1197,12 +1200,9 @@ def resolve_explicit_worktree(
 def resolve_handoff_target(
     vault_root: Path,
     remote: str,
-    worktree_path: str | None,
+    worktree_path: str,
 ) -> tuple[Path, str, str]:
-    if worktree_path is not None:
-        return resolve_explicit_worktree(vault_root, remote, worktree_path)
-    target, normalized_remote = resolve_repository(vault_root, remote)
-    return target, normalized_remote, current_branch(target)
+    return resolve_explicit_worktree(vault_root, remote, worktree_path)
 
 
 def slug(value: str) -> str:
@@ -1299,40 +1299,31 @@ def encode_managed_text(text: str, *, bom: bool, newline: str) -> bytes:
 
 
 def managed_section_bounds(text: str, *, label: str) -> tuple[int, int] | None:
-    observed: list[tuple[str, str]] = []
-    for begin_marker, end_marker in (
-        (MANAGED_BEGIN, MANAGED_END),
-        (LEGACY_MANAGED_BEGIN, LEGACY_MANAGED_END),
-    ):
-        begin_count = text.count(begin_marker)
-        end_count = text.count(end_marker)
-        if begin_count == 0 and end_count == 0:
-            continue
-        if begin_count != 1 or end_count != 1:
-            raise HandoffError(
-                "invalid_managed_block",
-                f"{label} must contain zero or one complete managed handoff block",
-                path=label,
-            )
-        observed.append((begin_marker, end_marker))
-    if not observed:
-        return None
-    if len(observed) != 1:
+    if OBSOLETE_MANAGED_BEGIN in text or OBSOLETE_MANAGED_END in text:
         raise HandoffError(
-            "invalid_managed_block",
-            f"{label} contains more than one managed handoff block",
+            "unsupported_managed_block_version",
+            f"{label} contains an unsupported managed handoff block",
             path=label,
         )
-    begin_marker, end_marker = observed[0]
-    begin = text.index(begin_marker)
-    end_start = text.index(end_marker)
+    begin_count = text.count(MANAGED_BEGIN)
+    end_count = text.count(MANAGED_END)
+    if begin_count == 0 and end_count == 0:
+        return None
+    if begin_count != 1 or end_count != 1:
+        raise HandoffError(
+            "invalid_managed_block",
+            f"{label} must contain zero or one complete managed handoff block",
+            path=label,
+        )
+    begin = text.index(MANAGED_BEGIN)
+    end_start = text.index(MANAGED_END)
     if end_start < begin:
         raise HandoffError(
             "invalid_managed_block",
             f"The managed handoff markers in {label} are inverted",
             path=label,
         )
-    return begin, end_start + len(end_marker)
+    return begin, end_start + len(MANAGED_END)
 
 
 def instruction_insertion_offset(text: str) -> int:
@@ -2061,6 +2052,158 @@ def path_fingerprint(path: Path) -> object:
     return {"type": "other"}
 
 
+def git_snapshot_bytes(target: Path, *arguments: str) -> bytes:
+    result = subprocess.run(
+        ["git", "--no-optional-locks", "-C", str(target), *arguments],
+        capture_output=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise HandoffError(
+            "repository_snapshot_failed",
+            "Git could not produce an exact repository closure snapshot",
+            exit_code=3,
+            operation=arguments[0] if arguments else "git",
+        )
+    return result.stdout
+
+
+def untracked_path_fingerprint(path: Path) -> dict[str, object]:
+    try:
+        before = path.lstat()
+    except OSError as error:
+        raise HandoffError(
+            "repository_state_unstable",
+            "An untracked path changed while the closure snapshot was being read",
+            exit_code=3,
+        ) from error
+    observed = (
+        before.st_mode,
+        before.st_size,
+        before.st_mtime_ns,
+        before.st_ctime_ns,
+    )
+    if stat.S_ISLNK(before.st_mode):
+        try:
+            value: dict[str, object] = {
+                "type": "symlink",
+                "sha256": sha256(os.fsencode(os.readlink(path))),
+            }
+        except OSError as error:
+            raise HandoffError(
+                "repository_state_unstable",
+                "An untracked symlink changed while the closure snapshot was being read",
+                exit_code=3,
+            ) from error
+    elif stat.S_ISREG(before.st_mode):
+        digest = hashlib.sha256()
+        try:
+            with path.open("rb") as stream:
+                for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                    digest.update(chunk)
+        except OSError as error:
+            raise HandoffError(
+                "repository_state_unstable",
+                "An untracked file changed while the closure snapshot was being read",
+                exit_code=3,
+            ) from error
+        value = {"type": "file", "sha256": digest.hexdigest()}
+    else:
+        value = {
+            "type": "other",
+            "mode": stat.S_IFMT(before.st_mode),
+            "size": before.st_size,
+        }
+    try:
+        after = path.lstat()
+    except OSError as error:
+        raise HandoffError(
+            "repository_state_unstable",
+            "An untracked path changed while the closure snapshot was being read",
+            exit_code=3,
+        ) from error
+    if observed != (
+        after.st_mode,
+        after.st_size,
+        after.st_mtime_ns,
+        after.st_ctime_ns,
+    ):
+        raise HandoffError(
+            "repository_state_unstable",
+            "An untracked path changed while the closure snapshot was being read",
+            exit_code=3,
+        )
+    return value
+
+
+def closure_fingerprint(target: Path, family_path: Path, active_path: Path) -> str:
+    head = git_snapshot_bytes(target, "rev-parse", "--verify", "HEAD").strip()
+    status = git_snapshot_bytes(
+        target,
+        "status",
+        "--porcelain=v1",
+        "-z",
+        "--branch",
+        "--untracked-files=all",
+        "--ignore-submodules=none",
+    )
+    diff = git_snapshot_bytes(
+        target,
+        "diff",
+        "--no-ext-diff",
+        "--binary",
+        "--submodule=diff",
+        "HEAD",
+        "--",
+    )
+    raw_paths = git_snapshot_bytes(
+        target,
+        "ls-files",
+        "--others",
+        "--exclude-standard",
+        "-z",
+    ).split(b"\0")
+    if raw_paths and raw_paths[-1] == b"":
+        raw_paths.pop()
+    if len(raw_paths) > MAX_CLOSURE_UNTRACKED_PATHS:
+        raise HandoffError(
+            "repository_snapshot_too_large",
+            "The repository has too many untracked paths for an exact closure snapshot",
+            exit_code=3,
+            maximum=MAX_CLOSURE_UNTRACKED_PATHS,
+        )
+    untracked: list[dict[str, object]] = []
+    for raw_path in raw_paths:
+        relative = Path(os.fsdecode(raw_path))
+        if relative.is_absolute() or ".." in relative.parts:
+            raise HandoffError(
+                "unsafe_repository_path",
+                "Git returned an unsafe untracked repository path",
+                exit_code=3,
+            )
+        untracked.append(
+            {
+                "path": raw_path.hex(),
+                **untracked_path_fingerprint(target / relative),
+            }
+        )
+    return sha256(
+        canonical_json(
+            {
+                "schema_version": SCHEMA_VERSION,
+                "handoff_family": path_fingerprint(family_path),
+                "active": path_fingerprint(active_path),
+                "repository": {
+                    "head": head.hex(),
+                    "status_sha256": sha256(status),
+                    "diff_sha256": sha256(diff),
+                    "untracked": untracked,
+                },
+            }
+        )
+    )
+
+
 def shallow_path_state(path: Path) -> dict[str, str]:
     if path.is_symlink():
         kind = "symlink"
@@ -2558,6 +2701,12 @@ def build_apply_plan_from_state(
     )
     desired_ignore, ignore_action = prepare_gitignore(state_root)
     updates_action, updates_summary = prepare_implementation_updates(family_path)
+    if existing is not None and updates_action == "create":
+        raise HandoffError(
+            "missing_implementation_updates",
+            "An existing handoff must contain implementation-updates.md",
+            path=str(family_path / UPDATES_NAME),
+        )
     if ignore_action == "none" and verify_effective_ignore:
         verify_ignored(state_root)
 
@@ -2733,7 +2882,7 @@ def build_apply_plan_from_state(
 def build_apply_plan(
     vault_root: Path,
     bundle_path: str,
-    worktree_path: str | None = None,
+    worktree_path: str,
 ) -> ApplyPlan:
     bundle = load_bundle(bundle_path)
     target, normalized_remote, branch = resolve_handoff_target(
@@ -2747,7 +2896,7 @@ def build_apply_plan(
         target=target,
         normalized_remote=normalized_remote,
         branch=branch,
-        explicit_worktree=worktree_path is not None,
+        explicit_worktree=True,
     )
 
 
@@ -3310,7 +3459,7 @@ def apply_plan(
     vault_root: Path,
     bundle_path: str,
     plan_token: str,
-    worktree_path: str | None = None,
+    worktree_path: str,
 ) -> dict[str, Any]:
     plan = build_apply_plan(vault_root, bundle_path, worktree_path)
     observed_token = plan.output["plan_token"]
@@ -3418,7 +3567,7 @@ def validate_repository(
     vault_root: Path,
     remote: str,
     *,
-    worktree_path: str | None = None,
+    worktree_path: str,
     allow_inactive: bool = True,
 ) -> dict[str, Any]:
     target, normalized_remote, branch = resolve_handoff_target(
@@ -3480,6 +3629,11 @@ def validate_repository(
             "ACTIVE.yaml and handoff.yaml disagree on the active revision",
         )
     updates = validate_implementation_updates(existing.family_path / UPDATES_NAME)
+    evidence_fingerprint = closure_fingerprint(
+        target,
+        existing.family_path,
+        store / ACTIVE_NAME,
+    )
     return {
         "status": "valid",
         "target": {
@@ -3490,17 +3644,29 @@ def validate_repository(
         "handoff_id": handoff_id,
         "family": family,
         "revision": existing.revision,
+        "materialized_at": existing.manifest["updated-at"],
         "manifest": str(existing.manifest_path),
         "history": existing.manifest["history"]["path"],
         "implementation_updates": updates,
+        "closure_fingerprint": evidence_fingerprint,
     }
 
 
 def build_deactivate_plan(
     vault_root: Path,
     remote: str,
-    worktree_path: str | None = None,
+    worktree_path: str,
+    disposition: str,
+    reconciled_handoff_id: str | None = None,
+    reconciled_revision: str | None = None,
+    reconciled_closure_fingerprint: str | None = None,
 ) -> dict[str, Any]:
+    if disposition not in DEACTIVATION_DISPOSITIONS:
+        raise HandoffError(
+            "invalid_deactivation_disposition",
+            "The deactivation disposition is not supported",
+            disposition=disposition,
+        )
     target, normalized_remote, branch = resolve_handoff_target(
         vault_root,
         remote,
@@ -3513,6 +3679,49 @@ def build_deactivate_plan(
     store = target / STORE_NAME
     ensure_safe_directory(store, label="handoff store")
     active, _ = read_active(store)
+    if disposition == "reconciled":
+        if active is None:
+            raise HandoffError(
+                "no_active_handoff",
+                "A reconciled deactivation requires one active handoff",
+            )
+        if (
+            reconciled_handoff_id is None
+            or reconciled_revision is None
+            or reconciled_closure_fingerprint is None
+        ):
+            raise HandoffError(
+                "reconciliation_identity_required",
+                "A reconciled deactivation requires the exact handoff ID, revision, and closure fingerprint",
+            )
+        if re.fullmatch(r"[a-f0-9]{64}", reconciled_closure_fingerprint) is None:
+            raise HandoffError(
+                "invalid_reconciliation_fingerprint",
+                "The reconciled closure fingerprint must be a lowercase SHA-256 digest",
+            )
+        if (
+            reconciled_handoff_id != active["handoff-id"]
+            or reconciled_revision != active["revision"]
+        ):
+            raise HandoffError(
+                "reconciliation_identity_mismatch",
+                "The reconciled identity does not match the active handoff",
+                active_handoff_id=active["handoff-id"],
+                active_revision=active["revision"],
+            )
+    elif any(
+        value is not None
+        for value in (
+            reconciled_handoff_id,
+            reconciled_revision,
+            reconciled_closure_fingerprint,
+        )
+    ):
+        raise HandoffError(
+            "unexpected_reconciliation_identity",
+            "Only a reconciled deactivation accepts reconciliation identity fields",
+        )
+    existing: ExistingHandoff | None = None
     if active is not None:
         existing = read_existing_handoff(
             store / str(active["family"]),
@@ -3526,6 +3735,31 @@ def build_deactivate_plan(
                 "ACTIVE.yaml does not resolve to its exact handoff revision",
             )
         validate_implementation_updates(existing.family_path / UPDATES_NAME)
+    reconciled_identity: dict[str, str] | None = None
+    if disposition == "reconciled":
+        assert existing is not None
+        assert reconciled_handoff_id is not None
+        assert reconciled_revision is not None
+        assert reconciled_closure_fingerprint is not None
+        observed_fingerprint = closure_fingerprint(
+            target,
+            existing.family_path,
+            store / ACTIVE_NAME,
+        )
+        if not hmac.compare_digest(
+            observed_fingerprint,
+            reconciled_closure_fingerprint,
+        ):
+            raise HandoffError(
+                "reconciliation_snapshot_mismatch",
+                "The local evidence changed after the reconciliation snapshot was validated",
+                exit_code=3,
+            )
+        reconciled_identity = {
+            "handoff_id": reconciled_handoff_id,
+            "revision": reconciled_revision,
+            "closure_fingerprint": reconciled_closure_fingerprint,
+        }
     if active is not None:
         action = "deactivate"
     elif instructions_changed:
@@ -3550,6 +3784,8 @@ def build_deactivate_plan(
             {
                 "schema_version": SCHEMA_VERSION,
                 "operation": "deactivate",
+                "disposition": disposition,
+                "reconciled_identity": reconciled_identity,
                 "target": str(target),
                 "remote": normalized_remote,
                 "active": path_fingerprint(store / ACTIVE_NAME),
@@ -3568,6 +3804,8 @@ def build_deactivate_plan(
     return {
         "status": "planned",
         "operation": "deactivate",
+        "disposition": disposition,
+        "reconciled_identity": reconciled_identity,
         "action": action,
         "target": {
             "path": str(target),
@@ -3585,21 +3823,34 @@ def deactivate(
     vault_root: Path,
     remote: str,
     plan_token: str | None,
-    worktree_path: str | None = None,
+    worktree_path: str,
+    disposition: str,
+    reconciled_handoff_id: str | None = None,
+    reconciled_revision: str | None = None,
+    reconciled_closure_fingerprint: str | None = None,
 ) -> dict[str, Any]:
-    plan = build_deactivate_plan(vault_root, remote, worktree_path)
+    plan = build_deactivate_plan(
+        vault_root,
+        remote,
+        worktree_path,
+        disposition,
+        reconciled_handoff_id,
+        reconciled_revision,
+        reconciled_closure_fingerprint,
+    )
     if plan_token is None:
         return plan
     if not hmac.compare_digest(plan["plan_token"], plan_token):
         raise HandoffError(
             "plan_stale",
-            "The active pointer changed after planning; create a new plan",
+            "The deactivation inputs changed after planning; create a new plan",
             exit_code=3,
         )
     if plan["action"] == "noop":
         return {
             "status": "unchanged",
             "action": "noop",
+            "disposition": plan["disposition"],
             "target": plan["target"],
         }
     target = Path(plan["target"]["path"])
@@ -3618,6 +3869,7 @@ def deactivate(
         return {
             "status": "policy-refreshed",
             "action": "refresh-policy",
+            "disposition": plan["disposition"],
             "target": plan["target"],
         }
     active_path = target / STORE_NAME / ACTIVE_NAME
@@ -3631,7 +3883,9 @@ def deactivate(
     return {
         "status": "deactivated",
         "action": "deactivate",
+        "disposition": plan["disposition"],
         "target": plan["target"],
+        "preserved_handoff_id": plan["active"]["handoff-id"],
         "preserved_family": plan["active"]["family"],
         "preserved_revision": plan["active"]["revision"],
     }
@@ -3711,23 +3965,31 @@ def build_parser() -> ArgumentParser:
 
     plan = commands.add_parser("plan", help="Create a read-only handoff effect plan")
     plan.add_argument("--bundle", required=True)
-    plan.add_argument("--worktree-path")
+    plan.add_argument("--worktree-path", required=True)
 
     apply = commands.add_parser("apply", help="Apply one unchanged approved plan")
     apply.add_argument("--bundle", required=True)
-    apply.add_argument("--worktree-path")
+    apply.add_argument("--worktree-path", required=True)
     apply.add_argument("--plan-token", required=True)
 
     validate = commands.add_parser("validate", help="Validate an active handoff")
     validate.add_argument("--repository-remote", required=True)
-    validate.add_argument("--worktree-path")
+    validate.add_argument("--worktree-path", required=True)
 
     deactivate_parser = commands.add_parser(
         "deactivate",
         help="Plan or apply removal of only the active pointer",
     )
     deactivate_parser.add_argument("--repository-remote", required=True)
-    deactivate_parser.add_argument("--worktree-path")
+    deactivate_parser.add_argument("--worktree-path", required=True)
+    deactivate_parser.add_argument(
+        "--disposition",
+        choices=tuple(sorted(DEACTIVATION_DISPOSITIONS)),
+        required=True,
+    )
+    deactivate_parser.add_argument("--reconciled-handoff-id")
+    deactivate_parser.add_argument("--reconciled-revision")
+    deactivate_parser.add_argument("--reconciled-closure-fingerprint")
     deactivate_parser.add_argument("--plan-token")
     return parser
 
@@ -3821,6 +4083,10 @@ def main(argv: list[str] | None = None) -> int:
                     args.repository_remote,
                     args.plan_token,
                     args.worktree_path,
+                    args.disposition,
+                    args.reconciled_handoff_id,
+                    args.reconciled_revision,
+                    args.reconciled_closure_fingerprint,
                 )
             )
             return 0

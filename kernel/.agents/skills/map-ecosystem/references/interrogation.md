@@ -16,7 +16,7 @@ Accept a question, proposed change, or starting node. Resolve aliases only to fi
 ```
 
    Use `neighbors` for dependency, topic, flow, and impact. Use `hygiene` for unresolved links and orphans. Use `investigations` for vault ↔ `.investigations/` join (on-demand scan; not a second index). `manage-investigation` remains owner of the store.
-3. Open **only** the stems/paths named in the JSON. For change impact, query `neighbors` of the changed unit, then `neighbors` of its `publica-en` / `gatillado-por` / `participa-en` targets. Skip types disabled in `instance.yaml` `graph.enabled_types` (do not expand Pub/Sub when `topic` is disabled). If the question asks where a fact belongs, load [node-selection.md](node-selection.md) and open the candidate note, not the full Convenciones file.
+3. Open **only** the stems/paths named in the JSON. For change impact, query `neighbors` of the changed unit, then `neighbors` of its `publica-en` / `gatillado-por` / `participa-en` targets. Skip types disabled in `instance.yaml` `graph.enabled_types` (do not expand Pub/Sub when `topic` is disabled). If the question asks where a fact belongs, load [node-selection.md](../../../../90-Meta/node-selection.md) and open the candidate note, not the full Convenciones file.
 4. Expand a second named note only when the JSON edge is required by the question:
    - Pub/Sub: producer → topic → consumer (only when `topic` is enabled).
    - HTTP: caller → consumed repository or integration.
@@ -26,7 +26,7 @@ Accept a question, proposed change, or starting node. Resolve aliases only to fi
    - Domain language: follow a glossary edge only when the definition changes the interpretation of a contract, rule, or flow.
    - Operation: follow the selected procedure to its linked standards; use `manage-operational-workflow` only when the user asks to execute or resume it.
 5. When the conclusion depends on a declared schema repository and `inspect-database` is enabled, load that adapter for evidence only. Keep this branch primary.
-6. Open a Framework **section pointer** only when a claim needs the evidence hierarchy. For implementation questions outside that database handoff, resolve the target repository by remote identity under the ordered `SOURCE_ROOTS`. Treat every non-managed root as read-only. If the repository is missing or the source context is unusable, follow [vault-resolution.md](vault-resolution.md): repair configuration through its owner skill and never clone without configured authority in an exact `CLONE_ROOT`.
+6. Open a Framework **section pointer** only when a claim needs the evidence hierarchy. For implementation questions outside that database handoff, resolve the target repository by remote identity under the ordered `SOURCE_ROOTS`. Treat every non-managed root as read-only. If the repository is missing or the source context is unusable, follow [vault-resolution.md](../../../../90-Meta/vault-resolution.md): repair configuration through its owner skill and never clone without configured authority in an exact `CLONE_ROOT`.
 7. Stop expanding when the next hop cannot change the decision, impact, or uncertainties of the question. Root Bases (`Repos.base`, `Auditoria.base`) are derived radar, not authority.
 
 ## Recipes

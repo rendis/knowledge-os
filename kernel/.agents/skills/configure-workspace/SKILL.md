@@ -7,7 +7,9 @@ description: "Trigger: inspect or change local workspace config when `.knowledge
 
 Treat `<VAULT_ROOT>/.knowledge-os-config.yaml` as local state. This skill is the sole writer. Use the semantic CLI; never edit the YAML directly.
 
-If another ignored `.*-config.yaml` exists and the canonical file does not, `status` migrates it once. Development worktree root and database proxy ports are independent capabilities; their absence does not make repository discovery incomplete.
+Only the canonical `.knowledge-os-config.yaml` is configuration. `status` and every semantic read are read-only; they neither inspect nor migrate similarly named files. Development worktree root and database proxy ports are independent capabilities; their absence does not make repository discovery incomplete.
+
+Before reading or changing configuration, load `../../../90-Meta/vault-resolution.md` and run `../../../90-Meta/resolve-vault.py` relative to this skill directory. Pass any user-supplied path through that resolver. Bind `VAULT_ROOT` only from a single `resolved` result; an `invalid`, `ambiguous`, or `not_found` result blocks configuration.
 
 ## 1. Inspect
 

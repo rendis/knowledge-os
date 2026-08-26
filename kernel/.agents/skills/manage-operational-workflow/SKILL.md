@@ -17,11 +17,11 @@ Treat the selected procedure in `60-Operacion/` as the runbook, connected capabi
 
 When the input is a validated publication package, accept its exact artifacts, source anchor, target, requested action, and limitations as run inputs. Do not read or modify its source workspace or invoke its producer; return the verified publication result to the caller. This keeps the dependency one-way.
 
-Resolve the canonical vault through `map-ecosystem`; when that resolver is unavailable, use an exact user-supplied vault path. Read `60-Operacion/Operacion.md`, resolve the selected note with `python3 90-Meta/operational-catalog.py resolve --basename <name>` (or `--report-id <id>`), then read only that `tipo: operacional` note and its linked dependencies. For a legacy run that recorded a former flat path, resolve its basename through the same catalog and preserve the historical run record unchanged.
+Load `../../../90-Meta/vault-resolution.md` and run `../../../90-Meta/resolve-vault.py` relative to this skill directory. Pass any user-supplied path through that resolver and continue only with one canonical `VAULT_ROOT`. Read `60-Operacion/Operacion.md`, resolve the selected note with `python3 90-Meta/operational-catalog.py resolve --basename <name>` (or `--report-id <id>`), then read only that `tipo: operacional` note and its linked dependencies.
 
 Load [references/procedure-contract.md](references/procedure-contract.md) when interpreting, authoring, or changing an operational note. For Execute, Resume, Close, or a persistent Draft, load [references/execution-record.md](references/execution-record.md). Copy [assets/operation-run-template.md](assets/operation-run-template.md) only when opening a new run.
 
-When the request advises on, estimates, drafts, creates, updates, decomposes, converts, links, reparents, or validates Jira work items, load [references/jira-work-items.md](references/jira-work-items.md) before building the effect plan. Keep the versioned Jira notes under `60-Operacion/Jira/` as the semantic authority and use the reference only for the execution recipe.
+When the request advises on, estimates, drafts, creates, updates, decomposes, converts, links, reparents, or validates Jira work items, load `../../../90-Meta/jira-evidence.md` and [references/jira-work-items.md](references/jira-work-items.md) before building the effect plan. Use the shared contract for current read-only Jira evidence; keep the versioned Jira notes under `60-Operacion/Jira/` as the semantic authority and this skill as the sole owner of planned Jira effects.
 
 Create `.operations/<run-id>/run.md` for Execute or a Draft that must survive the current session. Resume and Close require the exact existing run record.
 

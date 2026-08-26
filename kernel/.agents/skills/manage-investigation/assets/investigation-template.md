@@ -44,6 +44,8 @@ learning-outcome: <not-evaluated|no-learning|already-covered|insufficient-eviden
 
 ## Affected surfaces
 
+## Development handoffs
+
 ## Open questions
 
 ## Decisions

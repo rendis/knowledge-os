@@ -9,7 +9,7 @@ Treat the vault and versioned deployment evidence as the flight plan. Reach the 
 
 ## 1. Build the target card
 
-1. Resolve the canonical vault and use the `map-ecosystem` **interrogation** branch as the primary evidence workflow.
+1. Load `../../../90-Meta/vault-resolution.md` and run `../../../90-Meta/resolve-vault.py` relative to this skill directory. Continue only with one canonical `VAULT_ROOT`, then use the `map-ecosystem` **interrogation** branch as the primary evidence workflow.
 2. Read the named or inferred flow, its participant notes, backlinks, and each participant's **Infraestructura y scheduling** section.
 3. Read `60-Operacion/GCP/GCP - Catalogo de ambientes y runtimes.md` and `60-Operacion/GCP/GCP - Inspeccion segura de runtime.md`.
 4. If a deployable target is incomplete, inspect its versioned Actions, Cloud Build, manifests, overlays, or reusable deployment workflows through `map-ecosystem` before considering a live query.
@@ -22,12 +22,12 @@ Keep unknown values explicit. An environment name or project naming pattern is n
 ## 2. Classify the requested effect
 
 - **Runtime read:** continue with metadata, status, logs, or supported metrics.
-- **Application or database data:** load `inspect-database` for the cell PostgreSQL evidence; keep its target, credential, and read-only rules authoritative.
+- **Application or database data:** read `VAULT_ROOT/instance.yaml` and require `postgres` in `adapters`, then require `VAULT_ROOT/.agents/skills/inspect-database/SKILL.md` as a regular installed file. Only after both checks pass may `inspect-database` own the PostgreSQL evidence request. If either check fails, stop with `database-evidence-adapter-unavailable`, name the failed condition, and do not substitute a GCP query, ad-hoc database access, or another skill.
 - **Mutation or local access setup:** load `manage-operational-workflow`, select the matching runbook or draft an effect plan, and stop this skill before any changing command. This includes deploys, restarts, scaling, configuration, IAM, API enablement, GKE endpoint changes, `get-credentials`, and credential installation.
 
 Do not turn a mutation request into a permission probe by attempting the change.
 
-**Complete when:** each requested outcome has exactly one read, database, or operational-handoff branch and no changing action remains in the inspection branch.
+**Complete when:** each requested outcome has exactly one available read, database, or operational-handoff branch and no changing action remains in the inspection branch.
 
 ## 3. Prove current access safely
 

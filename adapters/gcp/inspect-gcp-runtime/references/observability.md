@@ -20,7 +20,7 @@ Strict `gcloud` does not expose arbitrary Cloud Monitoring time-series reads. Ap
 - For GKE point-in-time CPU or memory, use bounded `kubectl top` when the Metrics API and RBAC permit it. Do not describe this as a Cloud Monitoring time series.
 - `cloud-monitoring-metric-selection` selects metric descriptors; it does not retrieve metric values. Use it only when `list_metric_descriptors` is already available and the user explicitly accepts that non-`gcloud` read for descriptor discovery. Do not install or configure an MCP server from this skill.
 - When the request requires actual historical values and no approved capability exists, return `query-unsupported` with the exact metric concept, resource, project, and interval needed.
-- For the cell PostgreSQL internals, hand off to `inspect-database`; its production safeguards remain authoritative.
+- For cell PostgreSQL internals, apply the adapter-availability gate in the parent skill. Hand off to `inspect-database` only when `postgres` is declared and its exact skill is installed; otherwise stop with `database-evidence-adapter-unavailable`.
 
 Never turn unavailable metrics into an inferred healthy state.
 

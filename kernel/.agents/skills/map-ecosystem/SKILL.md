@@ -33,9 +33,9 @@ Use this skill for a cell-vault query, documentation update, ecosystem synchroni
 
 ## Execution Steps
 
-1. Load `references/vault-resolution.md` and run `scripts/resolve-vault.py`. Bind the resolved vault and configured source roots; a failed resolution blocks root-dependent work.
+1. Load `../../../90-Meta/vault-resolution.md` and run `../../../90-Meta/resolve-vault.py` relative to this skill directory. Bind the resolved vault and configured source roots; a failed resolution blocks root-dependent work.
 2. Select one primary branch from the table. Load only its recipe and supporting references it explicitly requires.
-3. Before a source read or delegation, bind its checkout by configured remote identity. Before a technical write, apply the production-evidence gate and load `references/node-selection.md`.
+3. Before a source read or delegation, bind its checkout by configured remote identity. Before a technical write, apply the production-evidence gate and load `../../../90-Meta/node-selection.md`.
 4. For deployable repositories, load `references/deployment-evidence.md`. For synchronization, use sealed gate grants and the per-unit state contract; use `status` or `resume` rather than inferring a next step.
 5. Report inspected evidence, changes, limitations, and observed checks. Stop when the selected recipe's completion criterion is met.
 
@@ -48,5 +48,5 @@ Return the resolved scope, evidence used, decisions and written paths, limitatio
 - `references/vault-synchronization.md` — coordinator recipe.
 - `references/synchronization-state-machine.md` — durable run, unit, and recovery contract.
 - `references/synchronization-package-worker.md` — bounded extractor/reviewer contract.
-- `references/vault-resolution.md` — vault and source binding.
-- `references/node-selection.md` — canonical node and lifecycle choice.
+- `../../../90-Meta/vault-resolution.md` — vault and source binding.
+- `../../../90-Meta/node-selection.md` — canonical node and lifecycle choice.

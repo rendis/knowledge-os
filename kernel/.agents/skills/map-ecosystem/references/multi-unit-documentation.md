@@ -2,7 +2,7 @@
 
 ## Input and authority
 
-Accept a domain, flow, or explicit unit set. Confirm write authorization, load [node-selection.md](node-selection.md), and define the boundary: source units, system, environments, and synthesis question.
+Accept a domain, flow, or explicit unit set. Confirm write authorization, load [node-selection.md](../../../../90-Meta/node-selection.md), and define the boundary: source units, system, environments, and synthesis question.
 
 ## Per-unit analysis
 
@@ -15,7 +15,7 @@ Accept a domain, flow, or explicit unit set. Confirm write authorization, load [
 
 1. Normalize logical topic and resource names according to Convenciones; retain real variants in `nombre-raw` or the note body.
 2. Resolve asynchronous edges through topics and HTTP edges through direct links.
-3. Update composite services, runtime, topics, integrations, flows, glossary, operational notes, MOCs, and indices only when the node-selection standard and evidence threshold are satisfied.
+3. Update composite services, runtime, topics, integrations, flows, glossary, operational notes, MOCs, and indices only when the [node-selection standard](../../../../90-Meta/node-selection.md) and evidence threshold are satisfied.
 4. Detect contradictions across units; preserve both pieces of evidence and record the issue as a limitation until resolved.
 5. Run the gates once per group and again for the complete synthesis.
 

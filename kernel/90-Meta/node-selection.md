@@ -1,4 +1,4 @@
-# Select and maintain vault nodes
+# Select and maintain canonical vault nodes
 
 ## When to load
 

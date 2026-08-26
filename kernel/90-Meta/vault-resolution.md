@@ -1,4 +1,4 @@
-# Resolve and interact with the vault
+# Resolve and interact with the canonical vault
 
 Load this reference before reading any repository-relative instruction or operating on the cell map. The skill may run from the vault, a source repository, or an unrelated working directory.
 
@@ -9,7 +9,7 @@ Load this reference before reading any repository-relative instruction or operat
 - [Source configuration and selection](#source-configuration-and-selection)
 - [Managed clone authorization](#managed-clone-authorization)
 - [Interaction protocol](#interaction-protocol)
-- [Filesystem fallback](#filesystem-fallback)
+- [Filesystem interaction](#filesystem-interaction)
 - [Completion criterion](#completion-criterion)
 
 ## Canonical identity
@@ -24,16 +24,16 @@ Never identify the vault by directory basename alone. The local folder and Obsid
 
 ## Resolution
 
-Run the bundled resolver from the installed skill directory. Use `python3` on macOS/Linux, `py -3` or `python` on native Windows, and quote paths on every platform:
+Locate this shared resolver relative to the active installed skill directory. Use `python3` on macOS/Linux, `py -3` or `python` on native Windows, and quote paths on every platform:
 
 ```text
-<python> -B "<installed-skill-dir>/scripts/resolve-vault.py"
+<python> -B "<installed-skill-dir>/../../../90-Meta/resolve-vault.py"
 ```
 
 If the user supplied a path, pass it explicitly:
 
 ```text
-<python> -B "<installed-skill-dir>/scripts/resolve-vault.py" --path "<path>"
+<python> -B "<installed-skill-dir>/../../../90-Meta/resolve-vault.py" --path "<path>"
 ```
 
 The resolver is read-only and applies this order:
@@ -62,7 +62,7 @@ Resolve again after a new user-supplied vault path, configuration change, clone,
 
 ## Source configuration and selection
 
-`VAULT_ROOT/.knowledge-os-config.yaml` is the single local source of reusable repository roots and clone authority. The resolver does not interpret or repair it; it calls the versioned semantic API and forwards its `source_context`. Environment variables, conventional sibling discovery, and resolver-level source-root overrides are not configuration fallbacks.
+`VAULT_ROOT/.knowledge-os-config.yaml` is the single local source of reusable repository roots and clone authority. The resolver does not interpret or repair it; it calls the versioned semantic API and forwards its `source_context`. Environment variables, conventional sibling discovery, and resolver-level source-root overrides are not valid configuration sources.
 
 `SOURCE_ROOTS` are discovery inputs; a successful semantic response is the only checkout binding. Before reading a source repository or assigning it to a worker, obtain its expected Git remote and run `python3 -B 90-Meta/workspace-config.py --vault-root "<VAULT_ROOT>" locate-repository "<GIT_REMOTE>" --format json`. Use only the `path` returned by that command, and repeat the resolution for every required repository. A configured discovery root represents itself when it is a Git repository; otherwise only its immediate child directories are candidates. The semantic API normalizes SSH and HTTPS remotes, performs no recursive scan, and rejects zero or multiple matches without writing configuration.
 
@@ -102,16 +102,16 @@ Use Obsidian CLI for search, canonical resolution, backlinks, unresolved links, 
 
 Never issue an Obsidian command without the explicit `"vault=<obsidian_vault>"` argument; the implicit target is the most recently focused vault and is not safe evidence.
 
-## Filesystem fallback
+## Filesystem interaction
 
 If the resolver finds the vault but no matching Obsidian registration or CLI is available:
 
 1. Use targeted filesystem reads and `rg` for discovery.
-2. Use `<python> -B 90-Meta/verify-links.py` from `VAULT_ROOT` for links and orphan fallback.
+2. Use `<python> -B 90-Meta/verify-links.py` from `VAULT_ROOT` for filesystem link and orphan checks.
 3. Run all other Framework gates that are available.
 4. Report that Obsidian-native resolution, backlinks, or rendering were not verified.
 
-The companion `obsidian-cli`, `obsidian-markdown`, and `obsidian-bases` skills improve tool-specific operation when installed, but this skill does not depend on them for vault identity, routing, evidence boundaries, or fallback behavior.
+The companion `obsidian-cli`, `obsidian-markdown`, and `obsidian-bases` skills improve tool-specific operation when installed, but vault identity, routing, and evidence boundaries remain valid in either interaction mode.
 
 ## Completion criterion
 

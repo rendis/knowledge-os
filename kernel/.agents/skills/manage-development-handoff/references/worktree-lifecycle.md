@@ -79,11 +79,11 @@ Complete preparation and worktree-only creation do not authorize source edits, c
 
 Multi-repository creation is sequential and has no broad rollback. On failure, report created, failed, and untouched worktrees and re-plan only the unfinished targets.
 
-## Existing worktrees and legacy checkouts
+## Existing worktrees
 
 Refresh, validation, activation, and deactivation use the exact absolute `--worktree-path`. The helper verifies that it is under the configured root, follows `<root>/<remote-repository-basename>/<jira-description>`, uses the canonical repository basename derived from the supplied remote, is registered to the repository resolved by that remote, is attached to a branch, and matches the package's Jira key.
 
-The CLI retains path-less compatibility for validating or retiring handoffs already materialized in historical main checkouts. Do not use that compatibility path to create a new handoff. Do not relocate existing state automatically.
+Every refresh, validation, activation, and deactivation requires the exact absolute worktree path. A missing or non-canonical path blocks the operation; the helper does not search historical checkouts or relocate state.
 
 ## Completion criterion
 

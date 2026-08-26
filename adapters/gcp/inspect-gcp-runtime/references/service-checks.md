@@ -11,7 +11,7 @@ Load this reference after the target card identifies the exact project, service,
 | Pub/Sub | topic or subscription description | Existence, retention, dead-letter and retry configuration relevant to the flow | Message bodies, pulls, seeks, acks, and publishes are data or mutations. |
 | Cloud Scheduler | job description | Enabled or paused state, schedule, target identity, last attempt metadata when exposed | Do not run, pause, resume, or update a job. |
 | Eventarc | trigger description | Conditions, destination, transport topic, active conditions | Do not create, update, or delete triggers. |
-| Cloud SQL | instance description | Instance state, region, database version, availability configuration | SQL contents and PostgreSQL internals belong to `inspect-database`. |
+| Cloud SQL | instance description | Instance state, region, database version, availability configuration | SQL contents and PostgreSQL internals belong to `inspect-database` only after the parent skill's adapter-availability gate passes. |
 | Firestore | database description | Database identity, location, type, concurrency mode, deletion protection when exposed | Documents, collections, exports, and writes are outside this inspection branch. |
 | GKE | cluster description followed by explicit-context Kubernetes reads | Control-plane and workload state | Read [gke.md](gke.md). |
 

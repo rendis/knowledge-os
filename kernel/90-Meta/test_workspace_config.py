@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Tests for workspace-config migrate, update merge, and proxy ports."""
+"""Tests for workspace-config read purity, update merge, and proxy ports."""
 from __future__ import annotations
 
 import importlib.util
@@ -70,11 +70,12 @@ class WorkspaceConfigTests(unittest.TestCase):
             self.assertEqual(status["proxy_ports"]["prod"], "5436")
             self.assertEqual(status["worktree_root"], "/tmp/trees")
 
-    def test_migrate_unquoted_legacy_paths(self) -> None:
+    def test_status_ignores_legacy_config_without_writing(self) -> None:
         wc = load_module()
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            (root / ".old-workspace-config.yaml").write_text(
+            legacy = root / ".old-workspace-config.yaml"
+            legacy.write_text(
                 "\n".join(
                     [
                         "version: 1",
@@ -96,13 +97,13 @@ class WorkspaceConfigTests(unittest.TestCase):
                 + "\n",
                 encoding="utf-8",
             )
-            self.assertTrue(wc.migrate_legacy_config(root))
             status = wc.load_config(root)
-            self.assertEqual(status["source_context"]["roots"][0]["path"], "/opt/src")
-            self.assertEqual(status["proxy_ports"]["uat"], "5434")
-            self.assertTrue((root / ".knowledge-os-config.yaml").is_file())
+            self.assertEqual(status["status"], "uninitialized")
+            self.assertEqual(status["source_context"]["roots"], [])
+            self.assertFalse((root / ".knowledge-os-config.yaml").exists())
+            self.assertTrue(legacy.is_file())
 
-    def test_migrate_quoted_legacy_file(self) -> None:
+    def test_update_does_not_import_legacy_config(self) -> None:
         wc = load_module()
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -127,11 +128,12 @@ class WorkspaceConfigTests(unittest.TestCase):
                 + "\n",
                 encoding="utf-8",
             )
-            self.assertTrue(wc.migrate_legacy_config(root))
+            wc.apply_config(root, proxy_ports={"prod": "5436"})
             status = wc.load_config(root)
-            self.assertEqual(status["source_context"]["roots"][0]["path"], "/opt/src")
-            self.assertEqual(status["proxy_ports"]["dev"], "5433")
-            self.assertEqual(status["worktree_root"], "/opt/trees")
+            self.assertEqual(status["source_context"]["roots"], [])
+            self.assertNotIn("dev", status["proxy_ports"])
+            self.assertEqual(status["proxy_ports"]["prod"], "5436")
+            self.assertIsNone(status["worktree_root"])
 
 
 if __name__ == "__main__":

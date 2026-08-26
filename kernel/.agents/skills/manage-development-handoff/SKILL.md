@@ -9,8 +9,8 @@ Treat one persistent worktree as the implementation boundary for one Jira story 
 
 ## Preflight
 
-1. Resolve the canonical vault and source context through `map-ecosystem`; keep its interrogation branch read-only.
-2. For every route that materializes or activates content, load [the input-bundle contract](references/input-bundle.md) and complete its intake protocol until every target is `exact-package`. Resolve `producer-required` through `manage-investigation` and resume this workflow with the returned directories; stop `invalid-package` at the producer with its exact failure. Never inspect or change the source investigation or Jira. Validation and deactivation use an exact repository remote and worktree path and do not require a package.
+1. Load `../../../90-Meta/vault-resolution.md` and run `../../../90-Meta/resolve-vault.py` relative to this skill directory. Bind `VAULT_ROOT` and source context only from one canonical `resolved` result.
+2. For every route that materializes or activates content, load [the input-bundle contract](references/input-bundle.md) and complete its intake protocol until every target is `exact-package`. Resolve `producer-required` through `manage-investigation` and continue this workflow with the exact directories it produced; stop `invalid-package` at the producer with its exact failure. Never inspect or change the source investigation or Jira. Validation and deactivation use an exact repository remote and worktree path and do not require a package.
 3. Resolve the development worktree root through the configuration API. If it is missing or unavailable, invoke `configure-workspace`; resume only after `development-worktree-root --format json` succeeds.
 4. Resolve `scripts/development-handoff.py` and bundled assets relative to this skill. Use the helper for every worktree and handoff operation.
 
@@ -21,9 +21,9 @@ Complete preflight only when the vault, every input required by the selected rou
 - **Prepare and materialize**: default for a request to prepare a new handoff; plan worktree and handoff effects together, authorize once, then execute both phases.
 - **Worktree only**: create only the persistent Jira worktree when the user explicitly requests that narrower outcome.
 - **Refresh or activate**: reuse one exact existing Jira worktree and plan a no-op, activation, bootstrap, or selective update.
+- **Bind development handoff**: after validation, pass one normalized materialization observation to the case-owning route in `manage-investigation`; never write the case here.
 - **Validate**: verify an active or inactive handoff in one exact worktree without writing.
-- **Deactivate**: preview and remove that worktree's active pointer while reconciling the managed instruction policy.
-- **Legacy maintenance**: validate or retire handoffs already present in historical main checkouts; never create new ones there.
+- **Deactivate**: preview and remove an exact worktree's active pointer with an explicit `paused`, `abandoned`, or vault-coordinated `reconciled` disposition while refreshing the managed instruction policy.
 
 Load [the worktree lifecycle](references/worktree-lifecycle.md) when preparing or selecting worktrees. Load [the repository-state contract](references/repository-state.md) before planning, applying, validating, or deactivating materialized state.
 
@@ -35,8 +35,9 @@ Load [the worktree lifecycle](references/worktree-lifecycle.md) when preparing o
 4. Re-run `plan-handoff` with the selected source for every package. Reject the batch if any source, remote, branch, configured root, path, managed file effect, or token is unresolved; do not omit a target.
 5. Present every Git effect, exact managed-file effect, ignored handoff path, and sequential failure boundary as one complete effect plan and one explicit authorization. The user's request for the handoff includes its canonical local package; the physical root instruction file or files and `.gitignore` remain visible effects in that same preview.
 6. Apply every unchanged token with `prepare-handoff`. The helper revalidates the complete token before Git writes, verifies the created branch and `HEAD`, requires the real file plan to match the authorized projection, materializes it, and validates the active handoff.
+7. For every validated target, invoke **Bind development handoff** in `manage-investigation` with only the normalized in-memory observation defined by the input-bundle contract. If binding fails, stop at `materialized-unbound`, preserve `ACTIVE.yaml` and all materialized evidence, and identify the exact target and case failure; do not roll back or describe that target as complete.
 
-Skip creation only when refresh targets an exact existing registered worktree that already matches the repository container and Jira key. Complete this route when every target validates at the planned revision, or a partial result names prepared, worktree-created, handoff-applied, failed, and untouched targets.
+Skip creation only when refresh targets an exact existing registered worktree that already matches the repository container and Jira key. Complete this route when every target validates at the planned revision and its `DH-NNN` binding validates, or a partial result names prepared, worktree-created, handoff-applied, materialized-unbound, failed, and untouched targets.
 
 ## Prepare only worktrees
 
@@ -57,10 +58,11 @@ Complete planning only when every target has a valid read-only plan and the user
 
 1. Apply each authorized package with its exact `--worktree-path` and approved `plan_token`; never substitute a path, token, or package.
 2. After each apply, run `validate` with the same remote and worktree path and record the observed family, revision, and `implementation-updates.md` entry count.
-3. On failure, stop the batch. Report applied, failed, and untouched targets; retain successful handoffs and re-plan only the remaining work.
-4. Hand the user each validated worktree path, branch, and revision so development can begin in a fresh session rooted there.
+3. Invoke **Bind development handoff** in `manage-investigation` with the package source identity and the exact normalized validation observation. The case owner alone reads and mutates the case. If it fails, stop at `materialized-unbound`, leave the active repository state intact, and retry only that case binding from a fresh validation observation.
+4. On any earlier failure, stop the batch. Report applied, failed, and untouched targets; retain successful handoffs and re-plan only the remaining work.
+5. Hand the user each bound worktree path, branch, and revision so development can begin in a fresh session rooted there.
 
-Complete apply only when every authorized target validates at its planned revision, or a partial result identifies the exact resume boundary without claiming rollback.
+No materialization or activation is complete until its exact `DH-NNN` binding passes case validation. Complete apply only when every authorized target validates at its planned revision and is bound, or a partial result identifies the exact resume boundary without claiming rollback.
 
 ## Validate
 
@@ -70,12 +72,13 @@ Complete validation only when every requested worktree has an observed status an
 
 ## Deactivate
 
-1. When deactivation represents completed development, require a successful `reconcile-development-handoff` result first. An explicitly abandoned or paused handoff may deactivate without that result, but must not be reported as reconciled or complete.
-2. Run `deactivate` with the exact worktree path and without a token; present the pointer deletion and any current-policy root-instruction refresh as separate effects.
-3. Wait for explicit authorization, then repeat with the returned token.
-4. Confirm `ACTIVE.yaml` is absent and the materialized family, history, `implementation-updates.md`, managed block, and ignore rule remain.
+1. Classify the disposition before planning. A direct deactivation request may use only `paused` or `abandoned` and must not be reported as reconciled or complete.
+2. A `reconciled` disposition is accepted only when `reconcile-development-handoff` invokes this route in the same vault-side interaction after the source case update validates. Require its exact active handoff ID, revision, and local closure fingerprint from the unchanged post-write **Validate** result; never accept a prior result, repository claim, or status packet.
+3. Run `deactivate` with the exact worktree path, disposition, and all required reconciled identity fields, but without a token. The helper must recompute the closure fingerprint and reject any change in the active family/changelog or Git-visible repository state. Present the pointer deletion and any current-policy root-instruction refresh as separate effects.
+4. Wait for explicit authorization, then repeat the exact command with the returned token.
+5. Confirm `ACTIVE.yaml` is absent and the materialized family, history, `implementation-updates.md`, managed block, and ignore rule remain. Report the disposition and preserved identity.
 
-Complete deactivation only when the pointer removal is observed and all preserved state remains intact.
+Complete deactivation only when the pointer removal is observed, the approved disposition and exact closure fingerprint are bound to the plan token, and all preserved state remains intact. A changed, failed, or unauthorized completed closure leaves `ACTIVE.yaml` in place.
 
 ## Authority
 

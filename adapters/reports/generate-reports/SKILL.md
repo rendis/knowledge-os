@@ -9,7 +9,7 @@ Resolve report semantics from the vault and execute only the matching bundled re
 
 ## 1. Resolve
 
-1. Resolve the canonical vault with `map-ecosystem`.
+1. Load `../../../90-Meta/vault-resolution.md` and run `../../../90-Meta/resolve-vault.py` relative to this skill directory. Continue only with one canonical `VAULT_ROOT`.
 2. Run `python3 90-Meta/operational-catalog.py list-reports` or `resolve --report-id <id>`.
 3. Read the resolved report note and [references/report-contract.md](references/report-contract.md).
 4. If the matching recipe directory contains an extra note, read it; do not assume a product-specific report-id.

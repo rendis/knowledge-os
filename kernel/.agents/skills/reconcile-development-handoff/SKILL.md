@@ -1,20 +1,21 @@
 ---
 name: reconcile-development-handoff
-description: Reconcile an active cell development handoff with its implementation worktree, branch and pull-request evidence, current Jira story, and directly dependent blocked Jira stories, then return the normalized result to the source investigation. Use when development changed or completed, when handoff definition changes must be checked, or before closing or deactivating a completed handoff.
+description: Pull evidence from an active development worktree registered by a source investigation, reconcile it with current Jira and direct dependents, update the case through its sole writer, and optionally close the pointer. Use when development changed or completed or when a completed handoff must be reconciled and deactivated.
 ---
 
 # Reconcile development handoffs
 
-Treat reconciliation as a three-way comparison between the immutable handoff baseline, `implementation-updates.md`, and current repository/Jira evidence. Coordinate the comparison; let `manage-investigation` remain the sole writer of the source case. Do not create a `return/` directory or any parallel reconciliation artifact.
+Treat reconciliation as a vault-owned pull: select an exact worktree from the source investigation, then compare the immutable handoff baseline, `implementation-updates.md`, and current repository/Jira evidence. `manage-investigation` remains the sole writer of the source case. Do not ask the repository to invoke this skill or create a callback, status packet, `return/` directory, or parallel reconciliation artifact.
 
 ## 1. Bind the exact handoff
 
-1. Resolve the canonical vault through `map-ecosystem` and keep its interrogation branch read-only.
-2. Load [references/reconciliation-contract.md](references/reconciliation-contract.md) and [references/downstream-context.md](references/downstream-context.md).
-3. Require one exact worktree path. Run the `manage-development-handoff` validator for that path and repository remote; stop on inactive or invalid state.
-4. Read the entire active `handoff.yaml`, referenced history event, `START.md`, `jira.md`, `context.md`, `scope.md`, and `implementation-updates.md`. Bind the investigation ID, story ID, Jira key/site, normalized repository remote, family, and revision from those files.
+1. Load `../../../90-Meta/vault-resolution.md` and run `../../../90-Meta/resolve-vault.py` relative to this skill directory. Continue only with one canonical `VAULT_ROOT`.
+2. Load [references/reconciliation-contract.md](references/reconciliation-contract.md), [references/downstream-context.md](references/downstream-context.md), and `../../../90-Meta/jira-evidence.md`.
+3. Require one selected source investigation and story. Read the entire case and select exactly one current `DH-NNN` entry from **Development handoffs**. Bind its Jira site/key, repository remote, exact absolute worktree path, handoff ID, family, and revision. A repository message, path, branch, or completion claim may help select the case but is not authoritative and cannot replace this register.
+4. Invoke the `manage-development-handoff` **Validate** route with the registered remote and worktree path. Require its active handoff ID, family, and revision to equal the case entry and retain its exact `closure_fingerprint`; stop on zero, multiple, inactive, invalid, or mismatched bindings.
+5. Read the entire active `handoff.yaml`, referenced history event, `START.md`, `jira.md`, `context.md`, `scope.md`, and `implementation-updates.md`. Require their investigation, story, Jira, repository, family, and revision identities to match both the case and active pointer.
 
-Complete this stage when one valid active identity and every comparison input are bound; otherwise return the exact missing or conflicting invariant.
+Complete this stage when one valid active identity, one local closure fingerprint, and every comparison input are bound; otherwise report the exact missing or conflicting invariant.
 
 ## 2. Inspect implementation and delivery evidence
 
@@ -27,7 +28,7 @@ Complete this stage when each local, remote, pull-request, merge, test, and depl
 
 ## 3. Inspect Jira and direct dependents
 
-1. Use `manage-operational-workflow` in its read-only **Advise** branch with the Jira work-item reference and the versioned Jira validation standard.
+1. Apply `90-Meta/jira-evidence.md` directly with the registered Jira site/key. This is a read-only evidence operation, not an operational workflow or `.operations/` run.
 2. Re-read the source story, its material fields, relevant comments/evidence/attachments, current update timestamp, and every typed issue link.
 3. Select directly dependent Jira stories only through the one-hop rule in the downstream contract. Resolve the exact observed link type and direction; never infer dependency from text, hierarchy, shared labels, or proximity.
 4. Read each selected dependent story far enough to determine the context and contracts it needs from this implementation.
@@ -36,7 +37,7 @@ Complete this stage when the source story is current and every direct dependent 
 
 ## 4. Close changelog coverage
 
-Apply the comparison matrix in the reconciliation contract. Match every material definition delta found in repository, delivery, or Jira evidence to one or more `UPD-NNN` entries. If any material delta is absent from the changelog, stop reconciliation and return the exact missing entry content required by the managed handoff rule; do not reconstruct it silently in the investigation.
+Apply the comparison matrix in the reconciliation contract. Match every material definition delta found in repository, delivery, or Jira evidence to one or more `UPD-NNN` entries. If any material delta is absent from the changelog, stop before changing the case and report a deficiency card containing the observed delta, affected baseline, evidence, materiality reason, and missing coverage. Do not author the repository's `UPD-NNN` entry or prescribe exact changelog text.
 
 Complete this stage only when every material delta is logged and consistent, or reconciliation is explicitly blocked with the unmatched evidence.
 
@@ -48,10 +49,14 @@ Complete this stage when each direct dependent is `ready`, `partial`, `still-blo
 
 ## 6. Reconcile the source investigation
 
-Hand the normalized reconciliation context to `manage-investigation` through its **Reconcile development** route. Let that workflow update the case snapshot, stable registers, draft synchronization, readiness, learning assessment state, and History. Keep branch, pull-request, Jira, and implementation claims in future/undeployed state until a separate post-deployment `map-ecosystem` audit proves production.
+Immediately before the case write, invoke **Validate** again and require the same identity and closure fingerprint captured before evidence inspection. If either changed, discard the assembled local comparison and restart from the new snapshot; do not write a stale reconciliation.
 
-Complete reconciliation when the case validates against its record contract, every observed material change and dependent card is represented, no unlogged delta remains, and no Jira, source-code, Git remote, pull-request, deployment, or technical-vault write was performed.
+Pass the normalized vault-side context and exact closure fingerprint directly to `manage-investigation` through its **Reconcile development** route in the same interaction. Let that workflow update the case snapshot, stable registers, draft synchronization, readiness, learning assessment state, and History. Keep branch, pull-request, Jira, and implementation claims in future/undeployed state until a separate post-deployment `map-ecosystem` audit proves production.
+
+When completed development must also be closed, continue only after the case write validates. Invoke **Validate** once more, require the same identity and closure fingerprint, then invoke `manage-development-handoff` **Deactivate** with disposition `reconciled`, the exact registered handoff ID and revision, and that fingerprint. Preview its effects, obtain separate authorization, and apply the unchanged token. Planning and apply both recompute local evidence; any mutation fails closed and preserves `ACTIVE.yaml`. Report the exact closure blocker and never treat a prior or transient reconciliation claim as sufficient.
+
+Complete reconciliation when the case validates against its record contract, every observed material change and dependent card is represented, no unlogged delta remains, and any requested completed closure either removed the exact active pointer through the authorized reconciled disposition or left it intact with an explicit blocker. No Jira, source-code, Git remote, pull-request, deployment, or technical-vault write is performed.
 
 ## Authority
 
-Keep handoff, repository, Git remote, pull-request, Jira, and deployment inspection read-only. Do not edit source code, append the changelog on behalf of implementation, change Jira, commit, push, create or update a pull request, deploy, or write the technical vault. The only durable write belongs to `manage-investigation` inside the already selected local case.
+Keep handoff content, repository, Git remote, pull-request, Jira, and deployment inspection read-only. Do not edit source code, append the changelog on behalf of implementation, change Jira, commit, push, create or update a pull request, deploy, or write the technical vault. Durable case writes belong only to `manage-investigation`; pointer removal belongs only to an explicitly authorized `manage-development-handoff` deactivation after that case write succeeds.
