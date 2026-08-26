@@ -51,7 +51,7 @@ Each material export compares `jira.md`, `context.md`, and `scope.md` independen
 
 `START.md` is stable bootstrap material. `history/v0001.md` records the baseline and hashes without duplicating every source document. Later events record the reason, changed and unchanged paths, old/new semantic hashes, and unified diffs for changed documents only. Each event stores the previous event's SHA-256; `handoff.yaml` anchors the current event, making the entire history chain tamper-evident.
 
-`implementation-updates.md` is deliberately outside the content revision and hash chain. It is the single append-only changelog for material changes to the exported definition discovered during any later activity. Its entries use contiguous `UPD-NNN` IDs and the mandatory fields defined in the managed root-instruction block. Existing entries are never edited, deleted, reordered, or renumbered; a later entry names what it supersedes. `Analysis` is present only when analysis actually occurred. A missing legacy changelog is a bootstrap effect and never increments `vNNNN`.
+`implementation-updates.md` is deliberately outside the content revision and hash chain. It is the single append-only changelog for material changes to the exported definition discovered during any later activity. Its entries use contiguous `UPD-NNN` IDs and the mandatory fields defined in the managed root-instruction block. Existing entries are never edited, deleted, reordered, or renumbered; a later entry names what it supersedes. `Analysis` is present only when analysis actually occurred. The file is created with a new family; its absence from an existing family is invalid.
 
 History events are immutable. `handoff.yaml` is the current integrity index and `ACTIVE.yaml` is the worktree-local active pointer. It answers which exact handoff revision governs the current implementation session without scanning every retained family. One worktree has at most one active handoff; concurrent stories use separate worktrees and therefore separate pointers.
 
@@ -72,7 +72,7 @@ The managed block uses these markers:
 
 Select the physical instruction surfaces from the filesystem state observed on the target OS. When one root file is a symlink directly to the other physical root file, preserve the symlink and manage only its physical target. When both are physical files, manage both. When neither exists, create `AGENTS.md`. A broken, external, chained, or mutually recursive instruction symlink blocks the operation.
 
-Zero marker pairs means insert the bundled block after root frontmatter and the first H1 when present. Keep this near the beginning rather than appending it: the handoff preflight remains inside the instruction budget, while the repository's own detailed guidance follows it and retains local authority. One complete current pair means replace only that pair. One complete legacy `BEGIN MANAGED`/`END MANAGED` pair is migrated in place to the current markers. In all cases, when repository content follows the end marker, leave at least one blank line before that content. Duplicate, incomplete, mixed, or inverted markers block the operation. A non-empty root `AGENTS.override.md` also blocks because it hides the root instruction contract.
+Zero marker pairs means insert the bundled block after root frontmatter and the first H1 when present. Keep this near the beginning rather than appending it: the handoff preflight remains inside the instruction budget, while the repository's own detailed guidance follows it and retains local authority. One complete current pair means replace only that pair. Any obsolete, duplicate, incomplete, mixed, or inverted marker set blocks the operation. In all cases, when repository content follows the end marker, leave at least one blank line before that content. A non-empty root `AGENTS.override.md` also blocks because it hides the root instruction contract.
 
 Preserve encoding, line endings, file mode, existing separator space, symlink topology, and every other byte outside the managed block. Keep each resulting instruction file within 32 KiB. Add the ignore rule without reordering or rewriting existing rules; a negation or effective Git-ignore conflict blocks.
 
@@ -82,7 +82,7 @@ Generated baseline files are read-only to the implementation agent. `implementat
 
 ## Plan and apply
 
-For a new worktree and initial handoff, `plan-handoff` projects this file plan from the selected base commit and combines it with the Git effects. `prepare-handoff` consumes the one approved complete token, creates the worktree, and requires the real `plan` token below to equal that projection before applying any file effect. Keep the standalone commands for refresh, activation, recovery from a `worktree-created` boundary, and legacy maintenance.
+For a new worktree and initial handoff, `plan-handoff` projects this file plan from the selected base commit and combines it with the Git effects. `prepare-handoff` consumes the one approved complete token, creates the worktree, and requires the real `plan` token below to equal that projection before applying any file effect. Keep the standalone commands for refresh, activation, and recovery from a `worktree-created` boundary.
 
 Run:
 
@@ -116,7 +116,7 @@ Run:
   --worktree-path <absolute-worktree-path>
 ```
 
-Validation is read-only. It checks the current exact managed policy, effective ignore behavior, active identity, current revision, contiguous history, normalized remote, every raw and semantic baseline hash, and the changelog's canonical H1, contiguous IDs, required fields, allowed states, backward-only entry references, and secret scan. It cannot prove that no earlier entry was rewritten; closure reconciliation detects missing semantic coverage against repository and Jira evidence. `inactive` is valid when the bootstrap remains but `ACTIVE.yaml` is absent.
+Validation is read-only. It checks the current exact managed policy, effective ignore behavior, active identity, current revision, contiguous history, normalized remote, every raw and semantic baseline hash, and the changelog's canonical H1, contiguous IDs, required fields, allowed states, backward-only entry references, and secret scan. For an active handoff it also returns `closure_fingerprint`, a SHA-256 binding of the exact active family, `ACTIVE.yaml`, `HEAD`, Git status, binary diff, and names and contents of non-ignored untracked paths. It cannot prove that no earlier entry was rewritten or attest a case-file mutation; reconciliation owns those semantic and procedural checks. `inactive` is valid when the bootstrap remains but `ACTIVE.yaml` is absent.
 
 ## Deactivate
 
@@ -125,11 +125,14 @@ Preview deactivation without a token:
 ```text
 <python> -B <skill-dir>/scripts/development-handoff.py \
   --vault-root <vault-root> deactivate --repository-remote <git-remote> \
-  --worktree-path <absolute-worktree-path>
+  --worktree-path <absolute-worktree-path> \
+  --disposition <paused|abandoned|reconciled> \
+  [--reconciled-handoff-id <handoff-id> --reconciled-revision <vNNNN> \
+   --reconciled-closure-fingerprint <sha256>]
 ```
 
-After explicit authorization, repeat with the returned `--plan-token`. Deactivation removes `ACTIVE.yaml` and, when stale, replaces only the exact managed policy block in the same approved plan. It preserves the ignore rule, materialized family, changelog, and complete history. If the pointer is already absent but policy is stale, the action is `refresh-policy`; exact current state is a no-op. Reapplying the same package later activates the existing revision.
+After explicit authorization, repeat with the returned `--plan-token`. `reconciled` requires all three reconciliation fields and binds them to the active pointer, current local evidence, and token; direct paused or abandoned closure omits them. Planning fails with `reconciliation_snapshot_mismatch` when the supplied fingerprint is no longer current. Apply recomputes the same plan, so a mutation during the authorization wait fails as `plan_stale`. Deactivation removes `ACTIVE.yaml` and, when stale, replaces only the exact managed policy block in the same approved plan. It preserves the ignore rule, materialized family, changelog, and complete history. If the pointer is already absent but policy is stale, the action is `refresh-policy`; exact current state is a no-op. Reapplying the same package later activates the existing revision.
 
 ## Completion criterion
 
-A plan is complete when every exact worktree, branch, revision, and effect is visible. Apply is complete when every authorized worktree validates at its planned revision, or a partial result names applied, failed, and untouched targets without claiming rollback. Deactivation is complete when that worktree's pointer is absent and all family history remains intact.
+A plan is complete when every exact worktree, branch, revision, and effect is visible. Apply is complete when every authorized worktree validates at its planned revision, or a partial result names applied, failed, and untouched targets without claiming rollback. Deactivation is complete when that worktree's pointer is absent, its authorized disposition is reported, and all family history remains intact.

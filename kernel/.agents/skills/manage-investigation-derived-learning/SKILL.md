@@ -9,11 +9,11 @@ Turn completed or sufficiently evidenced investigation work into bounded, cumula
 
 ## Preflight
 
-1. Load the `map-ecosystem` [vault-resolution reference](../map-ecosystem/references/vault-resolution.md) and run its bundled `scripts/resolve-vault.py` before reading any repository-relative path. Require one canonical remote- and marker-verified result, then bind every path below to its `VAULT_ROOT`; an unresolved or ambiguous vault blocks the workflow.
+1. Load `../../../90-Meta/vault-resolution.md` and run `../../../90-Meta/resolve-vault.py` relative to this skill directory before reading any vault-relative path. Require one canonical remote- and marker-verified result, then bind every path below to its `VAULT_ROOT`; an unresolved or ambiguous vault blocks the workflow.
 2. Resolve the exact `VAULT_ROOT/.investigations/<id>/investigation.md`. Read the complete case, not only its current summary or last History entry.
 3. From `VAULT_ROOT`, confirm `.investigations/` is ignored with `git check-ignore .investigations/` and that `git ls-files '.investigations/**'` is empty. Treat the case as local provenance and a source map, never as durable proof by itself.
 4. Load [references/assessment-contract.md](references/assessment-contract.md), [references/learning-note-contract.md](references/learning-note-contract.md), `VAULT_ROOT/90-Meta/Convenciones.md`, and the **Gate de aprendizaje durable** in `VAULT_ROOT/90-Meta/Auditoria - Framework.md`.
-5. Load the `map-ecosystem` `node-selection` reference before selecting or planning a durable target. When the conclusion depends on cell implementation context or source repositories, also load its read-only interrogation branch and resolve every source repository through that workflow before inspecting it.
+5. Load `../../../90-Meta/node-selection.md` before selecting or planning a durable target. When the conclusion depends on cell implementation context or source repositories, also load the `map-ecosystem` read-only interrogation branch and resolve every source repository through that workflow before inspecting it.
 6. Identify the requested mode:
    - **Assess**: evaluate and report only.
    - **Publish or revalidate**: assess first, then prepare durable effects only if the result is `extractable`.
@@ -59,7 +59,7 @@ Continue only for `extractable`.
 
 1. Run the versioned gates from `90-Meta/Auditoria - Framework.md`.
 2. Inspect the complete diff and confirm that a failed or no-op assessment produced no durable change.
-3. When Obsidian is available, verify the exact vault binding, unresolved links, backlinks, and unexpected orphans using the explicit-vault protocol. Otherwise report the unobserved native checks and use the versioned fallback.
+3. When Obsidian is available, verify the exact vault binding, unresolved links, backlinks, and unexpected orphans using the explicit-vault protocol. In filesystem interaction mode, report the unobserved native checks and run the versioned filesystem checks.
 4. Report outcome, lifecycle action, changed notes, evidence boundary, checks observed, and remaining revalidation triggers.
 
 **Complete when:** all applicable gates pass, every changed link resolves canonically, and the final report distinguishes durable learning from investigation-local provenance.

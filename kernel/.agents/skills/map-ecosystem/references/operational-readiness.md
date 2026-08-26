@@ -50,9 +50,9 @@ A failure in a closing dimension does not retroactively block authoring. Report 
 First run the resolver from `SKILL_DIR`, the installed `map-ecosystem` skill directory, not from a presumed vault copy. Use the interpreter available on the host:
 
 ```text
-macOS/Linux (bash, zsh, fish): python3 -B "<installed-skill-dir>/scripts/resolve-vault.py"
-Windows PowerShell:            py -3 -B "<installed-skill-dir>\scripts\resolve-vault.py"
-Windows fallback:              python -B "<installed-skill-dir>\scripts\resolve-vault.py"
+macOS/Linux (bash, zsh, fish): python3 -B "<installed-skill-dir>/../../../90-Meta/resolve-vault.py"
+Windows PowerShell:            py -3 -B "<installed-skill-dir>\..\..\..\90-Meta\resolve-vault.py"
+Windows Python:                python -B "<installed-skill-dir>\..\..\..\90-Meta\resolve-vault.py"
 ```
 
 Only after a `resolved` result, change to `VAULT_ROOT` and run the applicable commands below. In these examples, `<python>` means the same selected interpreter command (`python3`, `py -3`, or `python`). Quoted placeholders must be replaced with the exact resolver values.
@@ -83,7 +83,7 @@ git --no-optional-locks -C "<vault_root>" status --porcelain
 
 The argument-vector form above is shell-neutral; do not copy the literal angle-bracket placeholders. CI uses the `python` executable installed by `actions/setup-python`. Local Windows hosts may use `py -3` or `python`; macOS/Linux commonly use `python3`.
 
-Read `source_context` as defined in [vault-resolution.md](vault-resolution.md). An arbitrary directory is not proof that the target repository is usable. Report source configuration independently from readiness; mixed postures are valid:
+Read `source_context` as defined in [vault-resolution.md](../../../../90-Meta/vault-resolution.md). An arbitrary directory is not proof that the target repository is usable. Report source configuration independently from readiness; mixed postures are valid:
 
 - **Configured discovery** — reusable roots came from the semantic workspace view with `origin: config`.
 - **Configured clone authority** — `clone_authorized: true` and `clone_origin: config`; the exact clone root is also marked `managed` in `roots`.
@@ -118,7 +118,7 @@ If it is not `initialized`, load `configure-workspace`. The observed gap opens d
 
 **Source access unavailable or inconsistent.** Load `configure-workspace`, report the semantic status/error, and collect only the exact root or candidate choice it requires. If cloning is needed, obtain approval for an exact existing managed root and let the owner skill record it before acquisition. A vault-only query does not require source access.
 
-**Vault resolution not `resolved`.** Follow [vault-resolution.md](vault-resolution.md): `invalid` means report the wrong path; `ambiguous` means present verified candidates and request a choice; `not_found` means request an explicit local path or separate authorization and destination to clone the vault.
+**Vault resolution not `resolved`.** Follow [vault-resolution.md](../../../../90-Meta/vault-resolution.md): `invalid` means report the wrong path; `ambiguous` means present verified candidates and request a choice; `not_found` means request an explicit local path or separate authorization and destination to clone the vault.
 
 **Pinned dependencies or gates unavailable.** Report the missing/mismatched dependency and affected closing gates. CI installs `90-Meta/requirements-ci.txt` in an isolated runner. Locally, run `<python> -m pip install --no-deps -r 90-Meta/requirements-ci.txt` only when the user asked to prepare/fix the environment or explicitly authorized installation, then re-run the failed gates.
 
@@ -130,7 +130,7 @@ If it is not `initialized`, load `configure-workspace`. The observed gap opens d
 
 ## Managed clone authority
 
-Use the single normative protocol in [vault-resolution.md](vault-resolution.md). In summary, configured discovery is read-only by default; an exact resolved `CLONE_ROOT` grants only the documented clone/fetch and detached-temporary-worktree operations. The clone root must be one configured repository root; parent/child overlap does not transfer authority, and a clone root equal to or inside `VAULT_ROOT` is invalid.
+Use the single normative protocol in [vault-resolution.md](../../../../90-Meta/vault-resolution.md). In summary, configured discovery is read-only by default; an exact resolved `CLONE_ROOT` grants only the documented clone/fetch and detached-temporary-worktree operations. The clone root must be one configured repository root; parent/child overlap does not transfer authority, and a clone root equal to or inside `VAULT_ROOT` is invalid.
 
 ## Completion criterion
 

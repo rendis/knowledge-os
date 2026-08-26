@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Resolve a cell knowledge vault using instance.yaml identity and markers."""
+"""Resolve the canonical cell knowledge vault using identity and markers."""
 from __future__ import annotations
 
 import argparse
@@ -12,6 +12,8 @@ import sys
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
+
+from instance import load_instance
 
 MARKERS = (
     "AGENTS.md",
@@ -46,8 +48,11 @@ def normalize_remote(remote: str) -> str | None:
     if scp and "://" not in value:
         host, path = scp.groups()
     else:
-        parsed = urlparse(value if "://" in value else f"https://{value}")
-        host, path = parsed.hostname or "", parsed.path
+        try:
+            parsed = urlparse(value if "://" in value else f"https://{value}")
+            host, path = parsed.hostname or "", parsed.path
+        except ValueError:
+            return None
     path = path.strip("/")
     if path.casefold().endswith(".git"):
         path = path[:-4]
@@ -59,17 +64,6 @@ def git_remote(path: Path) -> str | None:
     return result.stdout.strip() if result.returncode == 0 else None
 
 
-def load_declared_remote(root: Path) -> str:
-    instance = root / "instance.yaml"
-    if not instance.is_file():
-        return ""
-    for line in instance.read_text(encoding="utf-8").splitlines():
-        stripped = line.strip()
-        if stripped.startswith("remote:"):
-            return stripped.split(":", 1)[1].strip().strip('"')
-    return ""
-
-
 def marker_check(path: Path) -> tuple[bool, list[str]]:
     missing = [marker for marker in MARKERS if not (path / marker).is_file()]
     return not missing, missing
@@ -78,20 +72,27 @@ def marker_check(path: Path) -> tuple[bool, list[str]]:
 def validate_vault(path: Path) -> dict[str, Any]:
     root = path.resolve()
     markers_valid, missing = marker_check(root)
-    declared = load_declared_remote(root)
+    declared = ""
+    instance_error: str | None = None
+    try:
+        instance = load_instance(root / "instance.yaml")
+        declared = str(instance["vault"]["remote"])
+    except Exception as error:
+        instance_error = f"{type(error).__name__}: {error}"
     remote = git_remote(root)
     identity = normalize_remote(remote or "")
     declared_identity = normalize_remote(declared)
-    remote_ok = True
-    if declared_identity:
-        remote_ok = identity == declared_identity
+    remote_ok = not declared or (
+        declared_identity is not None and identity == declared_identity
+    )
     return {
         "path": str(root),
-        "valid": markers_valid and remote_ok,
+        "valid": markers_valid and instance_error is None and remote_ok,
         "remote": remote,
         "declared_remote": declared,
         "remote_identity": identity,
         "missing_markers": missing,
+        "instance_error": instance_error,
     }
 
 
@@ -130,7 +131,7 @@ def obsidian_vaults() -> tuple[bool, list[dict[str, str]]]:
 
 def workspace_source_context(vault_root: Path) -> dict[str, Any]:
     helper = vault_root / "90-Meta" / "workspace-config.py"
-    fallback = {
+    unavailable_context = {
         "status": "unavailable",
         "roots": [],
         "clone_root": None,
@@ -139,7 +140,7 @@ def workspace_source_context(vault_root: Path) -> dict[str, Any]:
         "warnings": ["workspace configuration API is unavailable; run configure-workspace"],
     }
     if not helper.is_file():
-        return fallback
+        return unavailable_context
     result = run(
         [sys.executable, "-B", str(helper), "--vault-root", str(vault_root), "status", "--format", "json"]
     )
@@ -147,8 +148,8 @@ def workspace_source_context(vault_root: Path) -> dict[str, Any]:
         response = json.loads(result.stdout)
         context = response["source_context"]
     except (json.JSONDecodeError, KeyError, TypeError):
-        return fallback
-    return context if isinstance(context, dict) else fallback
+        return unavailable_context
+    return context if isinstance(context, dict) else unavailable_context
 
 
 def orientation(vault_root: Path) -> dict[str, Any]:
@@ -158,6 +159,7 @@ def orientation(vault_root: Path) -> dict[str, Any]:
     result = run(
         [
             sys.executable,
+            "-B",
             "-c",
             "import json,sys; sys.path.insert(0, sys.argv[1]); from instance import orientation_status; "
             "from pathlib import Path; print(json.dumps(orientation_status(Path(sys.argv[2]))))",
@@ -180,6 +182,7 @@ def resolved_payload(
     registered_by_path: dict[tuple[Any, ...], str],
     obsidian_available: bool,
     source: str,
+    declared_remote: str,
 ) -> dict[str, Any]:
     resolved_root = root.resolve()
     vault_name = registered_by_path.get(path_identity(resolved_root))
@@ -188,11 +191,11 @@ def resolved_payload(
         vault_root=str(resolved_root),
         obsidian_vault=vault_name,
         obsidian_available=obsidian_available,
-        interaction_mode="obsidian-cli" if vault_name else "filesystem-fallback",
+        interaction_mode="obsidian-cli" if vault_name else "filesystem",
         source_context=workspace_source_context(resolved_root),
         orientation=orientation(resolved_root),
         resolution_source=source,
-        declared_remote=load_declared_remote(resolved_root),
+        declared_remote=declared_remote,
     )
 
 
@@ -206,24 +209,51 @@ def resolve(explicit: Path | None, cwd: Path) -> tuple[int, dict[str, Any]]:
             checked = validate_vault(candidate)
             if checked["valid"]:
                 return 0, resolved_payload(
-                    Path(checked["path"]), registered_by_path, obsidian_available, "explicit"
+                    Path(checked["path"]),
+                    registered_by_path,
+                    obsidian_available,
+                    "explicit",
+                    str(checked["declared_remote"]),
                 )
         return 2, payload("invalid", reason="The explicit path is not inside a cell vault.", checked_path=str(explicit))
     for candidate in ancestors(cwd):
         checked = validate_vault(candidate)
         if checked["valid"]:
             return 0, resolved_payload(
-                Path(checked["path"]), registered_by_path, obsidian_available, "cwd"
+                Path(checked["path"]),
+                registered_by_path,
+                obsidian_available,
+                "cwd",
+                str(checked["declared_remote"]),
             )
     matches = []
     for item in registered:
         checked = validate_vault(Path(item["path"]).expanduser())
         if checked["valid"]:
-            matches.append({"name": item["name"], "path": checked["path"]})
+            matches.append(
+                {
+                    "name": item["name"],
+                    "path": checked["path"],
+                    "declared_remote": checked["declared_remote"],
+                }
+            )
     if len(matches) == 1:
-        return 0, resolved_payload(Path(matches[0]["path"]), registered_by_path, obsidian_available, "obsidian")
+        return 0, resolved_payload(
+            Path(matches[0]["path"]),
+            registered_by_path,
+            obsidian_available,
+            "obsidian",
+            str(matches[0]["declared_remote"]),
+        )
     if len(matches) > 1:
-        return 2, payload("ambiguous", reason="Multiple registered vaults match cell markers.", candidates=matches)
+        return 2, payload(
+            "ambiguous",
+            reason="Multiple registered vaults match cell markers.",
+            candidates=[
+                {"name": item["name"], "path": item["path"]}
+                for item in matches
+            ],
+        )
     return 2, payload("not_found", reason="No local cell vault was found.", obsidian_available=obsidian_available)
 
 

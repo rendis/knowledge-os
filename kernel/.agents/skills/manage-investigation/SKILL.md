@@ -9,19 +9,20 @@ Treat each investigation as a durable case file: keep its current understanding 
 
 ## Preflight
 
-1. Resolve the repository root and use `<root>/.investigations/` as the case-file root.
-2. Before the first write, run `git check-ignore .investigations/` from the repository root and require output proving the path is ignored.
-3. Run `git ls-files '.investigations/**'` and require empty output. Stop and report any tracked path.
+1. Load `../../../90-Meta/vault-resolution.md` and run `../../../90-Meta/resolve-vault.py` relative to this skill directory. Bind one canonical `VAULT_ROOT`; use only `VAULT_ROOT/.investigations/` as the case-file root.
+2. Before the first write, run `git check-ignore .investigations/` from `VAULT_ROOT` and require output proving the path is ignored.
+3. From `VAULT_ROOT`, run `git ls-files '.investigations/**'` and require empty output. Stop and report any tracked path.
 4. Load [references/record-contract.md](references/record-contract.md) before creating or changing a case file.
 5. Resolve `scripts/investigation-case.py` relative to this skill. Use it for Open, Consolidate, and mechanical validation; do not reproduce its locking, archive, or rollback logic manually.
 
-Complete preflight only when the repository root is known, the local store is ignored, no investigation file is tracked, and the record contract is loaded.
+Complete preflight only when `VAULT_ROOT` is canonical, the local store is ignored, no investigation file is tracked, and the record contract is loaded.
 
 ## Route the request
 
 - **Open**: create a case file from a message, bug, ticket, issue, or attachment.
 - **Resume**: find a case file by exact `id`, then `consolidated-from`, source reference, title, or keywords. Present candidates only when several match.
 - **Investigate**: gather evidence, refine the current understanding, resolve contradictions, and record decisions.
+- **Bind development handoff**: own the case binding decision for one validated materialization or activation result; mutate only for a new or advanced revision.
 - **Reconcile development**: consume one normalized result from `reconcile-development-handoff` and update the exact source case.
 - **Consolidate**: reconcile duplicate case files into one canonical directory while retaining retired IDs in its lineage.
 - **Validate**: apply [references/readiness-and-lifecycle.md](references/readiness-and-lifecycle.md).
@@ -45,8 +46,7 @@ Complete when the case file has no equivalent active case, has a unique ID, orig
 1. Read the entire matching `investigation.md` before acting.
 2. When `exports/` contains drafts, load [references/export-contract.md](references/export-contract.md) and inspect their source timestamps and register references.
 3. Reconstruct the current state from frontmatter and **Current state**; use **History** only for provenance.
-4. For a legacy case without `purpose`, `vault-outcome`, or `learning-outcome`, classify them before the next material change and record the classification in History.
-5. Report the active status, purpose, vault outcome, learning outcome, current understanding, blockers, open questions, stale drafts, and next useful action.
+4. Report the active status, purpose, vault outcome, learning outcome, current understanding, blockers, open questions, registered development handoffs, stale drafts, and next useful action.
 
 Complete when one case file is selected, draft freshness is known, and the next action follows the current state without reviving superseded understanding.
 
@@ -55,21 +55,31 @@ Complete when one case file is selected, draft freshness is known, and the next 
 1. Prefer repository evidence, supplied sources, and available domain procedures over recall. Separate facts, inferences, contradictions, and limitations.
 2. Treat persistent memory, prior cases, and neighboring workspaces only as discovery leads. Before using their content, confirm the source is explicitly in scope, inspect it directly, and register the verified evidence. Never treat memory, path proximity, or an unrelated local project as evidence or authorization.
 3. For cell ecosystem evidence, load `map-ecosystem`, select its read-only interrogation branch, and keep resolved source repositories read-only.
-4. Maintain an explicit boundary between **current productive state** and **future/proposed state**. For `purpose: development` or `mixed`, represent both independently; decisions and acceptance criteria for future work never become facts.
-5. Maintain `vault-outcome` as evidence changes. Development or undeployed behavior is `deferred-until-production`; a possible current-state fact is at most `candidate-for-audit` until `map-ecosystem` independently verifies it. In a mixed case, this field follows the current-state candidate when one exists, while the future portion remains explicitly deferred and outside the vault.
-6. Resolve evident defaults directly. When a material decision remains ambiguous, load [references/questioning-protocol.md](references/questioning-protocol.md).
-7. After every material finding or answer, update **Current state**, `updated-at`, the affected registers, and append one History event.
-8. Preserve stable identifiers and replacement links; never renumber, recycle, or silently change the meaning of a registered item.
-9. When existing drafts reference changed material, load [references/export-contract.md](references/export-contract.md) and reconcile or mark every affected draft stale in the same interaction. Record the outcome in History.
-10. When new evidence, context, or a decision could change a completed learning assessment, preserve that assessment in History and reset `learning-outcome` to `not-evaluated`.
+4. For current Jira evidence, load `../../../90-Meta/jira-evidence.md` and apply its narrow read-only contract directly. Do not create an operational run for evidence collection.
+5. Maintain an explicit boundary between **current productive state** and **future/proposed state**. For `purpose: development` or `mixed`, represent both independently; decisions and acceptance criteria for future work never become facts.
+6. Maintain `vault-outcome` as evidence changes. Development or undeployed behavior is `deferred-until-production`; a possible current-state fact is at most `candidate-for-audit` until `map-ecosystem` independently verifies it. In a mixed case, this field follows the current-state candidate when one exists, while the future portion remains explicitly deferred and outside the vault.
+7. Resolve evident defaults directly. When a material decision remains ambiguous, load [references/questioning-protocol.md](references/questioning-protocol.md).
+8. After every material finding or answer, update **Current state**, `updated-at`, the affected registers, and append one History event.
+9. Preserve stable identifiers and replacement links; never renumber, recycle, or silently change the meaning of a registered item.
+10. When existing drafts reference changed material, load [references/export-contract.md](references/export-contract.md) and reconcile or mark every affected draft stale in the same interaction. Record the outcome in History.
+11. When new evidence, context, or a decision could change a completed learning assessment, preserve that assessment in History and reset `learning-outcome` to `not-evaluated`.
 
 Complete the iteration when every new material fact, inference, contradiction, question, decision, and scope change is represented in both the current state and chronology, current and future states remain separated, `vault-outcome` is accurate, `learning-outcome` reflects the current evidence snapshot, and every affected draft has an explicit synchronization state.
 
+## Bind development handoff
+
+1. Accept only one normalized in-memory observation assembled by `manage-development-handoff` after its repository-state validation succeeds. Require the exact package path, investigation ID and `S-NNN`, canonical Jira site and key, normalized repository remote, absolute worktree path, handoff ID, family, revision, and materialization timestamp. This is vault-side workflow context, not a repository callback or durable return package.
+2. Resolve the exact source case from the investigation ID, read the entire current case, and verify that the package source identity and story still match it. Reject a missing case, missing story, mismatched Jira identity, or a story-and-repository identity already bound to different immutable coordinates.
+3. Under the case open gate, allocate the next contiguous `DH-NNN` only for a new story-and-repository identity. Advance that entry in place only when the validated materialized revision is the exact next revision. An activation or retry of the exact current revision, coordinates, and materialization timestamp is a validated byte-level case no-op. Reject revision regression, revision gaps, or a same-revision observation with different coordinates; never renumber or reuse an identifier.
+4. Only for a new or advanced binding, append one human-readable History event naming the `DH-NNN`, action, story, Jira key, repository remote, worktree, handoff ID, and revision, plus the exact associated `knowledge-os:development-handoff-binding` marker from the record contract. Use the validated manifest `updated-at` as both `Materialized at` and the event timestamp, update the case `updated-at`, then run the case validator. Roll back the case mutation if validation fails and report the exact binding failure to the initiating vault-side workflow. For an exact same-revision no-op, run the validator without changing case bytes.
+
+Complete only when the canonical case contains exactly one mechanically valid binding for the observed story-and-repository identity and its ordered History records every materialized content revision once. This route never reads or writes repository state, Jira, remote Git, or the technical vault.
+
 ## Reconcile development
 
-1. Accept only one complete normalized in-memory context from `reconcile-development-handoff`; require the exact case, story, Jira, repository, family, and revision identity.
+1. Accept only one complete normalized in-memory context assembled by `reconcile-development-handoff`; require the exact case, `DH-NNN`, story, Jira, repository, worktree, handoff ID, family, revision, and validated local closure fingerprint.
 2. Load [references/development-reconciliation.md](references/development-reconciliation.md), read the entire current case, and reject any identity mismatch or missing comparison surface.
-3. Apply the returned baseline deltas, changelog provenance, implementation/delivery/Jira evidence, and direct-dependent cards to Current state and the stable registers without re-reading or mutating the worktree.
+3. Apply the assembled baseline deltas, changelog provenance, implementation/delivery/Jira evidence, and direct-dependent cards to Current state and the stable registers without re-reading or mutating the worktree. Record the closure fingerprint in the single reconciliation History event as the local snapshot binding.
 4. Reconcile affected drafts, reset a stale learning assessment when required, append one material History event, and run the case validator. Preserve a byte-level no-op when nothing in the case changed.
 
 Complete when the selected case alone represents the reconciled implementation and downstream context, its current/future boundary remains correct, every affected draft has an explicit synchronization state, structural validation passes, and no source repository, Jira, remote Git, pull request, deployment, or technical-vault write occurred.
@@ -82,7 +92,7 @@ Complete when exactly one case directory remains for the equivalence group, its 
 
 ## Validate
 
-Run the helper's `validate` command for structural and transactional invariants, then apply the lifecycle gate from [references/readiness-and-lifecycle.md](references/readiness-and-lifecycle.md). A missing `dedupe-key` in a legacy case is a warning, not an instruction to rewrite it. Move backward when new evidence invalidates readiness. When a required source is unreadable, report the observable failure, set `status: blocked`, and wait for the user to decide how to proceed.
+Run the helper's `validate` command for structural and transactional invariants, then apply the lifecycle gate from [references/readiness-and-lifecycle.md](references/readiness-and-lifecycle.md). Move backward when new evidence invalidates readiness. When a required source is unreadable, report the observable failure, set `status: blocked`, and wait for the user to decide how to proceed.
 
 Complete when the status is supported by its gate, or `blocked` names the dependency, prior state, and user action required.
 
@@ -95,10 +105,11 @@ Complete when the status is supported by its gate, or `blocked` names the depend
 5. When the user requests external publication of a release-ready draft, build the publication package defined by the export contract and hand it to `manage-operational-workflow`.
 6. Keep connector selection, external-effect authorization, publication, and read-back verification inside that operational workflow.
 7. After the handoff returns a verified result, update the local draft and History with the non-sensitive external reference and publication status.
-8. When the user requests development handoff for a release-ready story with a current Jira snapshot, build one repository-specific package per target from the development section of the export contract.
-9. Hand only the exact package directories to `manage-development-handoff`; that skill owns target resolution, preview, authorization, materialization, and validation and must not read or change this case. When Export resolves its `producer-required` intake state, return the directories to the initiating workflow so it resumes without asking the user to submit the handoff again.
+8. When the user requests development handoff for a release-ready story, load `../../../90-Meta/jira-evidence.md`, obtain a current exact Jira snapshot under its read-only contract, and build one repository-specific package per target from the development section of the export contract.
+9. Hand only the exact package directories to `manage-development-handoff`; that skill owns target resolution, preview, authorization, materialization, validation, and the required handoff to **Bind development handoff**, but must not read or change this case. When Export resolves its `producer-required` intake state, continue the initiating vault-side interaction with those exact directories.
+10. Observe the consumer's terminal state. A target is complete only after **Bind development handoff** validates its stable `DH-NNN`; `materialized-unbound` is a source-case blocker with the repository state left inspectable and active for an exact retry.
 
-Complete when each draft is current and traces to the case file and evidence, every requested external publication has either been handed off with an exact current package or returned with a verified reference recorded locally, and every requested development handoff has one current package per target repository or an explicit source blocker.
+Complete when each draft is current and traces to the case file and evidence, every requested external publication has either been handed off with an exact current package or observed with a verified reference recorded locally, and every materialized development target has one current package plus one exact `DH-NNN` binding or an explicit source blocker.
 
 ## Learn
 

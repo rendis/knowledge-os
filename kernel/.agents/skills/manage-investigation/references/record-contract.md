@@ -19,7 +19,7 @@ Do not maintain a separate index. Resume by searching `investigation.md` frontma
 
 Use `handoffs/` only for repository-specific development input packages that conform to the `manage-development-handoff` input contract. Create one package per target repository; the consumer receives the package directory, never authority to read or mutate the investigation case.
 
-Development reconciliation creates no reverse package under `handoffs/` or elsewhere. `reconcile-development-handoff` returns normalized context in memory, and `manage-investigation` applies it directly to the canonical case through [development-reconciliation.md](development-reconciliation.md).
+Development reconciliation creates no reverse package under `handoffs/` or elsewhere. The vault selects a registered worktree, assembles normalized context in memory, and `manage-investigation` applies it directly to the canonical case through [development-reconciliation.md](development-reconciliation.md).
 
 ## Frontmatter
 
@@ -41,7 +41,7 @@ vault-outcome: deferred-until-production
 learning-outcome: not-evaluated
 ```
 
-`dedupe-key` is required for newly created cases. Derive it from the stable problem or outcome, not from incidental wording. Existing records without it remain valid legacy records; treat them as possible matches that require semantic review rather than mutating them automatically.
+`dedupe-key` is required. Derive it from the stable problem or outcome, not from incidental wording.
 
 `purpose` classifies the intended outcome:
 
@@ -58,7 +58,7 @@ learning-outcome: not-evaluated
 - `candidate-for-audit`: a current/productive fact may qualify, but `map-ecosystem` has not independently applied its production-evidence gate.
 - `documented`: `map-ecosystem` independently verified the productive fact and confirmed that the canonical vault already represented it correctly or updated and verified the affected notes. Record the canonical notes, lifecycle result, evidence boundary, and observed checks in Readiness and History.
 
-For `purpose: mixed`, the field follows the current-state candidate when one exists; every future-state portion remains explicitly deferred and outside the vault regardless of that value. Purpose never proves eligibility for the vault. Existing cases without these fields remain valid legacy records, but the next material Resume must classify them and, for development or mixed work, separate current productive state from future/proposed state before changing status, evidence, decisions, exports, or publication.
+For `purpose: mixed`, the field follows the current-state candidate when one exists; every future-state portion remains explicitly deferred and outside the vault regardless of that value. Purpose never proves eligibility for the vault.
 
 `learning-outcome` records the latest explicit assessment by `manage-investigation-derived-learning`; it is independent of `purpose`, investigation status, story export, and `vault-outcome`:
 
@@ -69,7 +69,7 @@ For `purpose: mixed`, the field follows the current-state candidate when one exi
 - `candidate`: the assessment was `extractable`, but no durable publication was completed.
 - `documented`: the skill created, enriched, challenged, superseded, or revalidated the canonical note and the vault gates passed.
 
-The assessment itself is read-only. `manage-investigation` may record its returned outcome, target note, evidence boundary, case snapshot, and observed checks in Readiness and History after the assessment completes. When a later material input could change that result, preserve the prior event in History and reset the field to `not-evaluated`. Existing cases without `learning-outcome` remain valid legacy records; classify the field before a learning handoff or the next material case update.
+The assessment itself is read-only. `manage-investigation` may record its observed outcome, target note, evidence boundary, case snapshot, and checks in Readiness and History after the assessment completes. When a later material input could change that result, preserve the prior event in History and reset the field to `not-evaluated`.
 
 Use `unknown` only when the value cannot be derived and does not justify a question. Add these fields only while blocked:
 
@@ -106,11 +106,12 @@ Keep these sections in this order, translated to the user's working language whe
    - Inferences
    - Contradictions
 5. Affected surfaces
-6. Open questions
-7. Decisions
-8. Acceptance criteria
-9. Readiness
-10. History
+6. Development handoffs
+7. Open questions
+8. Decisions
+9. Acceptance criteria
+10. Readiness
+11. History
 
 **Current state** is the consumable snapshot. Update it in place. A development or mixed case must keep **Current productive state** and **Future/proposed state** as separate subsections; a future proposal may cite current facts for context but must not blur their status. **History** is append-only and records material inputs, findings, state changes, decision changes, attachment outcomes, exports, and publications with timestamps.
 
@@ -124,12 +125,42 @@ Assign stable identifiers:
 - Decisions: `D-001`, `D-002`, ...
 - Acceptance criteria: `AC-001`, `AC-002`, ...
 - Exports: `S-001`, `S-002`, ...
+- Development handoffs: `DH-001`, `DH-002`, ...
 
 An identifier is immutable after assignment. Never renumber, recycle, delete, or change the meaning of an existing identifier. A materially different claim, question, decision, criterion, attachment, or export receives the next available identifier. Preserve inactive entries with their state and replacement or resolution links so older History events and exports remain interpretable.
 
 Each question records `open`, `resolved`, or `superseded` state. Keep open questions first. Retain resolved and superseded questions in a clearly labeled subsection of **Open questions**, with the resolving decision or evidence; a replacement question receives a new ID and reciprocal `supersedes`/`superseded-by` links.
 
 Each evidence entry states its claim, category (`fact`, `inference`, `contradiction`, or `limitation`), source, and relevant location such as file, section, page, line, URL, or revision. Link decisions and acceptance criteria to supporting identifiers when available.
+
+Each materialized development target has one stable entry under **Development handoffs**. Allocate a new `DH-NNN` for a new story-and-repository identity; update that same entry when a later materialization advances its current revision. Record these fields exactly:
+
+```text
+### DH-001 — <Jira key> / <repository basename>
+
+- Story ID: <S-NNN>
+- Jira site: <canonical site>
+- Jira key: <exact key>
+- Repository remote: <normalized remote>
+- Worktree path: <exact absolute worktree path>
+- Handoff ID: <exact handoff ID>
+- Family: <exact family>
+- Revision: <vNNNN>
+- Materialized at: <ISO-8601 timestamp with UTC offset>
+```
+
+The same History event that creates or advances a binding includes one exact marker on its own two-space-indented line:
+
+```text
+- <materialized-at> — <action in the cell note locale> development handoff `DH-001`; story `S-NNN`; Jira `<key>`; repository `<remote>`; worktree `<absolute-path>`; handoff `<handoff-id>`; revision `<vNNNN>`.
+  <!-- knowledge-os:development-handoff-binding {"dh":"DH-001","family":"<family>","handoff-id":"<handoff-id>","jira-key":"<key>","jira-site":"<site>","materialized-at":"<timestamp>","repository-remote":"<remote>","revision":"<vNNNN>","story-id":"<S-NNN>","worktree-path":"<absolute-path>"} -->
+```
+
+Use canonical compact UTF-8 JSON: keep the keys in the exact lexicographic order shown, omit structural whitespace, and allow no duplicate key. Reserved `knowledge-os:development-handoff-binding` markers may appear only in History. The surrounding History bullet starts with the marker's exact `materialized-at`, remains human-readable, names the action, and includes the exact `DH-NNN`, story, Jira key, repository remote, worktree path, handoff ID, and revision through the labelled fragments shown above. An incidental value occurrence inside another coordinate does not satisfy its role. Keep exactly one event and marker per materialized content revision, in actual `v0001` through current-revision order. The current marker must match every field in the current register entry; older markers preserve their observed worktree path and timestamp while retaining the stable story, Jira, repository, handoff, and family identity.
+
+An activation or idempotent binding retry of the exact already-recorded revision and coordinates is a byte-level case no-op: validate the existing current entry and marker, but append no History event and no duplicate marker. A same-revision observation that changes any recorded coordinate or timestamp is a conflict, not an activation.
+
+This register is the vault-owned locator for later reconciliation. Populate it only from the same vault-side materialization result after validation; do not infer it from branch names, repository messages, or a callback. History records every new or advanced binding so prior paths and revisions remain interpretable.
 
 For a reconciled implementation, keep one source implementation card and one card per directly dependent Jira story in **Affected surfaces**. Each dependent card names the exact typed-link direction, consumer contracts, what can start, remaining gaps, repository/branch/PR observations, and `ready`, `partial`, `still-blocked`, or `not-applicable` readiness. These cards are case context, not Jira status changes or production evidence.
 
@@ -162,4 +193,4 @@ Inspect before persisting. When a source exposes credentials, tokens, private ke
 
 ## Completion criterion
 
-The record conforms when identity and register meanings are immutable, the current snapshot matches the latest material evidence and decisions, registers are traceable without reused IDs, History preserves chronology, attachment and consolidation handling is explicit, affected exports have an explicit synchronization state, and no secret value is persisted.
+The record conforms when identity and register meanings are immutable, the current snapshot matches the latest material evidence and decisions, registers are traceable without reused IDs, every materialized development target has one exact `DH-NNN` binding, History preserves chronology, attachment and consolidation handling is explicit, affected exports have an explicit synchronization state, and no secret value is persisted.

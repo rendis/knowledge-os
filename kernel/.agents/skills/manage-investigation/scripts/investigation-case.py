@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Iterator
+from urllib.parse import urlparse
 
 
 ID_PATTERN = re.compile(r"^\d{8}-\d{6}-[a-z0-9]+(?:-[a-z0-9]+)*(?:-\d{2})?$")
@@ -61,9 +62,57 @@ FUTURE_PROPOSED_STATE_ALIASES = (
     "Estado futuro/propuesto",
     "Estado futuro o propuesto",
 )
+DEVELOPMENT_HANDOFF_SECTION_ALIASES = (
+    "Development handoffs",
+    "Handoffs de desarrollo",
+)
+HISTORY_SECTION_ALIASES = ("History", "Historial")
+DEVELOPMENT_HANDOFF_FIELDS = (
+    "Story ID",
+    "Jira site",
+    "Jira key",
+    "Repository remote",
+    "Worktree path",
+    "Handoff ID",
+    "Family",
+    "Revision",
+    "Materialized at",
+)
+DEVELOPMENT_HANDOFF_HEADING_RE = re.compile(
+    r"^### (DH-([0-9]{3,})) — (.+)$"
+)
+DEVELOPMENT_HANDOFF_FIELD_RE = re.compile(r"^- ([A-Za-z ]+): (.+)$")
+DEVELOPMENT_HANDOFF_HISTORY_MARKER_TOKEN = (
+    "knowledge-os:development-handoff-binding"
+)
+DEVELOPMENT_HANDOFF_HISTORY_MARKER_RE = re.compile(
+    r"^  <!-- "
+    + re.escape(DEVELOPMENT_HANDOFF_HISTORY_MARKER_TOKEN)
+    + r" (\{.*\}) -->$"
+)
+DEVELOPMENT_HANDOFF_HISTORY_KEYS = (
+    "dh",
+    "story-id",
+    "jira-site",
+    "jira-key",
+    "repository-remote",
+    "worktree-path",
+    "handoff-id",
+    "family",
+    "revision",
+    "materialized-at",
+)
+STORY_ID_RE = re.compile(r"^S-[0-9]{3,}$")
+JIRA_KEY_RE = re.compile(r"^[A-Z][A-Z0-9]+-[0-9]+$")
+HANDOFF_ID_RE = re.compile(r"^[a-f0-9]{64}$")
+HANDOFF_FAMILY_RE = re.compile(
+    r"^[a-z0-9]+(?:-[a-z0-9]+)*--[a-z0-9]+(?:-[a-z0-9]+)*$"
+)
+HANDOFF_REVISION_RE = re.compile(r"^v[0-9]{4}$")
 REQUIRED_FIELDS = (
     "id",
     "title",
+    "dedupe-key",
     "status",
     "created-at",
     "updated-at",
@@ -71,6 +120,9 @@ REQUIRED_FIELDS = (
     "source-ref",
     "requester-role",
     "export-intent",
+    "purpose",
+    "vault-outcome",
+    "learning-outcome",
 )
 REQUIRED_SECTIONS = (
     ("Original request", "Solicitud original"),
@@ -78,6 +130,7 @@ REQUIRED_SECTIONS = (
     ("References and attachments", "Referencias y adjuntos"),
     ("Evidence", "Evidencia"),
     ("Affected surfaces", "Superficies afectadas"),
+    DEVELOPMENT_HANDOFF_SECTION_ALIASES,
     ("Open questions", "Preguntas abiertas"),
     ("Decisions", "Decisiones"),
     ("Acceptance criteria", "Criterios de aceptación"),
@@ -481,6 +534,447 @@ def subsection_names(
     return names
 
 
+def canonical_jira_site(value: str) -> str | None:
+    parsed = urlparse(value)
+    if (
+        parsed.scheme.casefold() != "https"
+        or not parsed.hostname
+        or parsed.username
+        or parsed.password
+        or parsed.query
+        or parsed.fragment
+    ):
+        return None
+    host = parsed.hostname.casefold()
+    try:
+        port = parsed.port
+    except ValueError:
+        return None
+    if port:
+        host = f"{host}:{port}"
+    return f"https://{host}{parsed.path.rstrip('/')}"
+
+
+def canonical_slug(value: str) -> str:
+    return "-".join(re.findall(r"[a-z0-9]+", value.casefold()))
+
+
+def named_section(
+    text: str,
+    aliases: tuple[str, ...],
+) -> tuple[list[str] | None, int]:
+    lines = text.splitlines()
+    starts = [
+        index
+        for index, line in enumerate(lines)
+        if line.startswith("## ")
+        and line[3:].strip() in aliases
+    ]
+    if len(starts) != 1:
+        return None, len(starts)
+    start = starts[0] + 1
+    end = next(
+        (
+            index
+            for index in range(start, len(lines))
+            if lines[index].startswith("## ")
+        ),
+        len(lines),
+    )
+    return lines[start:end], 1
+
+
+def development_handoff_section(text: str) -> tuple[list[str] | None, int]:
+    return named_section(text, DEVELOPMENT_HANDOFF_SECTION_ALIASES)
+
+
+def offset_timestamp(value: str) -> datetime | None:
+    try:
+        observed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if observed.tzinfo is None or observed.utcoffset() is None:
+        return None
+    return observed
+
+
+def has_offset_timestamp(value: str) -> bool:
+    return offset_timestamp(value) is not None
+
+
+def handoff_history_binding(
+    entry_id: str,
+    fields: dict[str, str],
+) -> dict[str, str]:
+    return {
+        "dh": entry_id,
+        "story-id": fields["Story ID"],
+        "jira-site": fields["Jira site"],
+        "jira-key": fields["Jira key"],
+        "repository-remote": fields["Repository remote"],
+        "worktree-path": fields["Worktree path"],
+        "handoff-id": fields["Handoff ID"],
+        "family": fields["Family"],
+        "revision": fields["Revision"],
+        "materialized-at": fields["Materialized at"],
+    }
+
+
+def validate_development_handoff_history(
+    text: str,
+    entries: list[tuple[str, int, str, dict[str, str]]],
+) -> list[str]:
+    lines, section_count = named_section(text, HISTORY_SECTION_ALIASES)
+    if section_count == 0:
+        if DEVELOPMENT_HANDOFF_HISTORY_MARKER_TOKEN in text:
+            return [
+                "Development handoff binding markers must appear only in History"
+            ]
+        return []
+    if section_count != 1 or lines is None:
+        return ["History section must appear exactly once"]
+
+    errors: list[str] = []
+    marker_occurrences = text.count(DEVELOPMENT_HANDOFF_HISTORY_MARKER_TOKEN)
+    history_marker_occurrences = sum(
+        line.count(DEVELOPMENT_HANDOFF_HISTORY_MARKER_TOKEN) for line in lines
+    )
+    if marker_occurrences != history_marker_occurrences:
+        errors.append(
+            "Development handoff binding markers must appear only in History"
+        )
+    markers: list[tuple[dict[str, str], str | None]] = []
+    current_event: str | None = None
+    current_event_has_binding = False
+    for line in lines:
+        if line.startswith("- "):
+            current_event = line
+            current_event_has_binding = False
+            continue
+        if DEVELOPMENT_HANDOFF_HISTORY_MARKER_TOKEN not in line:
+            if line and not line[0].isspace():
+                current_event = None
+                current_event_has_binding = False
+            continue
+        event = current_event
+        if event is None:
+            errors.append(
+                "Development handoff binding must belong to one human-readable "
+                "History event"
+            )
+        elif current_event_has_binding:
+            errors.append(
+                "A History event must contain at most one development handoff binding"
+            )
+        else:
+            current_event_has_binding = True
+        match = DEVELOPMENT_HANDOFF_HISTORY_MARKER_RE.fullmatch(line)
+        if match is None:
+            errors.append("History contains an invalid development handoff binding marker")
+            continue
+        duplicate_keys: set[str] = set()
+
+        def history_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+            parsed: dict[str, Any] = {}
+            for key, item in pairs:
+                if key in parsed:
+                    duplicate_keys.add(key)
+                parsed[key] = item
+            return parsed
+
+        raw_marker = match.group(1)
+        try:
+            value = json.loads(
+                raw_marker,
+                object_pairs_hook=history_object,
+            )
+        except json.JSONDecodeError:
+            errors.append("History contains invalid development handoff binding JSON")
+            continue
+        if duplicate_keys:
+            errors.append(
+                "History development handoff binding contains duplicate keys: "
+                + ", ".join(sorted(duplicate_keys))
+            )
+            continue
+        if (
+            not isinstance(value, dict)
+            or tuple(sorted(value)) != tuple(sorted(DEVELOPMENT_HANDOFF_HISTORY_KEYS))
+            or any(not isinstance(item, str) or not item for item in value.values())
+        ):
+            errors.append("History development handoff binding has invalid fields")
+            continue
+        canonical_marker = json.dumps(
+            value,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        if raw_marker != canonical_marker:
+            errors.append(
+                "History development handoff binding must use canonical compact JSON"
+            )
+        markers.append((value, event))
+
+    entry_fields = {
+        entry_id: fields
+        for entry_id, _, _, fields in entries
+        if all(field in fields for field in DEVELOPMENT_HANDOFF_FIELDS)
+    }
+    revisions: dict[str, list[int]] = {entry_id: [] for entry_id in entry_fields}
+    materialized_times: dict[str, list[datetime]] = {
+        entry_id: [] for entry_id in entry_fields
+    }
+    current_matches: dict[str, int] = {entry_id: 0 for entry_id in entry_fields}
+    for marker, event in markers:
+        entry_id = marker["dh"]
+        fields = entry_fields.get(entry_id)
+        if fields is None:
+            errors.append(f"History binding references unknown {entry_id}")
+            continue
+        stable_pairs = (
+            ("story-id", "Story ID"),
+            ("jira-site", "Jira site"),
+            ("jira-key", "Jira key"),
+            ("repository-remote", "Repository remote"),
+            ("handoff-id", "Handoff ID"),
+            ("family", "Family"),
+        )
+        if any(marker[key] != fields[field] for key, field in stable_pairs):
+            errors.append(f"History binding for {entry_id} changes its stable identity")
+            continue
+        revision_match = HANDOFF_REVISION_RE.fullmatch(marker["revision"])
+        current_match = HANDOFF_REVISION_RE.fullmatch(fields["Revision"])
+        if revision_match is None or current_match is None:
+            errors.append(f"History binding for {entry_id} has invalid Revision")
+            continue
+        revision_number = int(revision_match.group(0)[1:])
+        current_number = int(current_match.group(0)[1:])
+        if revision_number < 1 or revision_number > current_number:
+            errors.append(f"History binding for {entry_id} exceeds its current Revision")
+            continue
+        worktree = marker["worktree-path"]
+        if (
+            not Path(worktree).is_absolute()
+            or any(segment in {".", ".."} for segment in re.split(r"[\\/]", worktree))
+        ):
+            errors.append(f"History binding for {entry_id} has invalid Worktree path")
+            continue
+        materialized_at = offset_timestamp(marker["materialized-at"])
+        if materialized_at is None:
+            errors.append(f"History binding for {entry_id} has invalid Materialized at")
+            continue
+        if event is not None:
+            event_prefix = f"- {marker['materialized-at']} — "
+            target_fragment = f"development handoff `{entry_id}`"
+            if not event.startswith(event_prefix):
+                errors.append(
+                    f"History event for {entry_id} must start with its Materialized at"
+                )
+            else:
+                action, separator, _ = event[len(event_prefix) :].partition(
+                    f" {target_fragment};"
+                )
+                if not separator or not any(character.isalnum() for character in action):
+                    errors.append(
+                        f"History event for {entry_id} must name an action before "
+                        "its development handoff target"
+                    )
+            visible_fragments = (
+                (entry_id, target_fragment),
+                (marker["story-id"], f"story `{marker['story-id']}`"),
+                (marker["jira-key"], f"Jira `{marker['jira-key']}`"),
+                (
+                    marker["repository-remote"],
+                    f"repository `{marker['repository-remote']}`",
+                ),
+                (
+                    marker["worktree-path"],
+                    f"worktree `{marker['worktree-path']}`",
+                ),
+                (marker["handoff-id"], f"handoff `{marker['handoff-id']}`"),
+                (marker["revision"], f"revision `{marker['revision']}`"),
+            )
+            missing_values = [
+                value
+                for value, fragment in visible_fragments
+                if fragment not in event
+            ]
+            if missing_values:
+                errors.append(
+                    f"History event for {entry_id} does not name its exact binding target: "
+                    + ", ".join(missing_values)
+                )
+        revisions[entry_id].append(revision_number)
+        materialized_times[entry_id].append(materialized_at)
+        if marker == handoff_history_binding(entry_id, fields):
+            current_matches[entry_id] += 1
+
+    for entry_id, fields in entry_fields.items():
+        current_match = HANDOFF_REVISION_RE.fullmatch(fields["Revision"])
+        if current_match is None:
+            continue
+        current_number = int(current_match.group(0)[1:])
+        expected_revisions = list(range(1, current_number + 1))
+        if sorted(revisions[entry_id]) != expected_revisions:
+            errors.append(
+                f"History bindings for {entry_id} must cover each Revision from v0001"
+            )
+        elif revisions[entry_id] != expected_revisions:
+            errors.append(
+                f"History bindings for {entry_id} must appear in Revision order from v0001"
+            )
+        elif any(
+            current < previous
+            for previous, current in zip(
+                materialized_times[entry_id],
+                materialized_times[entry_id][1:],
+            )
+        ):
+            errors.append(
+                f"History bindings for {entry_id} Materialized at timestamps must "
+                "preserve Revision chronology"
+            )
+        if current_matches[entry_id] != 1:
+            errors.append(
+                f"History must contain exactly one current binding for {entry_id}"
+            )
+    return errors
+
+
+def validate_development_handoffs(text: str) -> list[str]:
+    lines, section_count = development_handoff_section(text)
+    if section_count == 0:
+        return []
+    if section_count != 1 or lines is None:
+        return ["Development handoffs section must appear exactly once"]
+
+    errors: list[str] = []
+    entries: list[tuple[str, int, str, dict[str, str]]] = []
+    index = 0
+    while index < len(lines):
+        if not lines[index].strip():
+            index += 1
+            continue
+        heading = DEVELOPMENT_HANDOFF_HEADING_RE.fullmatch(lines[index])
+        if heading is None:
+            errors.append(
+                "Development handoffs contains content outside an exact DH-NNN entry"
+            )
+            break
+        entry_id, number, title = heading.groups()
+        index += 1
+        fields: dict[str, str] = {}
+        field_order: list[str] = []
+        while index < len(lines) and not lines[index].startswith("### "):
+            line = lines[index]
+            index += 1
+            if not line.strip():
+                continue
+            field_match = DEVELOPMENT_HANDOFF_FIELD_RE.fullmatch(line)
+            if field_match is None:
+                errors.append(f"{entry_id} contains invalid content")
+                continue
+            field, value = field_match.groups()
+            if field not in DEVELOPMENT_HANDOFF_FIELDS:
+                errors.append(f"{entry_id} contains unknown field {field}")
+                continue
+            if field in fields:
+                errors.append(f"{entry_id} repeats field {field}")
+                continue
+            fields[field] = value.strip()
+            field_order.append(field)
+        missing = [field for field in DEVELOPMENT_HANDOFF_FIELDS if not fields.get(field)]
+        if missing:
+            errors.append(f"{entry_id} is missing fields {', '.join(missing)}")
+        if not missing and tuple(field_order) != DEVELOPMENT_HANDOFF_FIELDS:
+            errors.append(f"{entry_id} fields are out of order")
+        entries.append((entry_id, int(number), title.strip(), fields))
+
+    observed_ids = [entry_id for entry_id, _, _, _ in entries]
+    if len(set(observed_ids)) != len(observed_ids):
+        errors.append("Development handoffs contains duplicate DH-NNN identifiers")
+    observed_numbers = [number for _, number, _, _ in entries]
+    if observed_numbers != list(range(1, len(entries) + 1)):
+        errors.append("Development handoff identifiers must be contiguous from DH-001")
+
+    targets: set[tuple[str, str]] = set()
+    worktrees: set[str] = set()
+    handoff_ids: set[str] = set()
+    for entry_id, _, title, fields in entries:
+        if any(field not in fields for field in DEVELOPMENT_HANDOFF_FIELDS):
+            continue
+        story_id = fields["Story ID"]
+        jira_site = fields["Jira site"]
+        jira_key = fields["Jira key"]
+        remote = fields["Repository remote"]
+        worktree = fields["Worktree path"]
+        handoff_id = fields["Handoff ID"]
+        family = fields["Family"]
+        revision = fields["Revision"]
+        materialized_at = fields["Materialized at"]
+
+        if STORY_ID_RE.fullmatch(story_id) is None:
+            errors.append(f"{entry_id} has invalid Story ID")
+        canonical_site = canonical_jira_site(jira_site)
+        if canonical_site is None or jira_site != canonical_site:
+            errors.append(f"{entry_id} has invalid canonical Jira site")
+        if JIRA_KEY_RE.fullmatch(jira_key) is None:
+            errors.append(f"{entry_id} has invalid Jira key")
+        remote_segments = remote.split("/")
+        if (
+            remote != remote.casefold()
+            or "://" in remote
+            or "\\" in remote
+            or remote.endswith(".git")
+            or len(remote_segments) < 2
+            or any(not segment or segment in {".", ".."} for segment in remote_segments)
+            or any(character.isspace() for character in remote)
+        ):
+            errors.append(f"{entry_id} has invalid normalized Repository remote")
+        worktree_path = Path(worktree)
+        worktree_segments = re.split(r"[\\/]", worktree)
+        if (
+            not worktree_path.is_absolute()
+            or any(segment in {".", ".."} for segment in worktree_segments)
+        ):
+            errors.append(f"{entry_id} has invalid absolute Worktree path")
+        if HANDOFF_ID_RE.fullmatch(handoff_id) is None:
+            errors.append(f"{entry_id} has invalid Handoff ID")
+        if HANDOFF_FAMILY_RE.fullmatch(family) is None:
+            errors.append(f"{entry_id} has invalid Family")
+        if HANDOFF_REVISION_RE.fullmatch(revision) is None:
+            errors.append(f"{entry_id} has invalid Revision")
+        if not has_offset_timestamp(materialized_at):
+            errors.append(f"{entry_id} has invalid Materialized at timestamp")
+
+        repository_name = remote.rsplit("/", 1)[-1]
+        if title != f"{jira_key} / {repository_name}":
+            errors.append(f"{entry_id} heading does not match Jira and repository")
+        expected_family = f"{canonical_slug(jira_key)}--{canonical_slug(repository_name)}"
+        if family != expected_family:
+            errors.append(f"{entry_id} Family does not match Jira and repository")
+        if canonical_site is not None:
+            expected_handoff_id = hashlib.sha256(
+                "|".join((canonical_site.casefold(), jira_key, remote)).encode("utf-8")
+            ).hexdigest()
+            if handoff_id != expected_handoff_id:
+                errors.append(f"{entry_id} Handoff ID does not match its identity")
+
+        target = (story_id, remote)
+        if target in targets:
+            errors.append(f"{entry_id} duplicates a story-and-repository target")
+        targets.add(target)
+        if worktree in worktrees:
+            errors.append(f"{entry_id} reuses a Worktree path")
+        worktrees.add(worktree)
+        if handoff_id in handoff_ids:
+            errors.append(f"{entry_id} reuses a Handoff ID")
+        handoff_ids.add(handoff_id)
+    errors.extend(validate_development_handoff_history(text, entries))
+    return errors
+
+
 def sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as handle:
@@ -551,25 +1045,17 @@ def validate_root(root: Path, *, ignore_lock: bool = False) -> tuple[list[str], 
             elif record.dedupe_key in keys:
                 errors.append(f"duplicate dedupe-key: {record.dedupe_key}")
             keys[record.dedupe_key] = record.path
-        else:
-            warnings.append(f"{relative}: legacy record has no dedupe-key")
 
         purpose = str(record.fields.get("purpose", ""))
-        if not purpose:
-            warnings.append(f"{relative}: legacy record has no purpose")
-        elif purpose not in PURPOSES:
+        if purpose and purpose not in PURPOSES:
             errors.append(f"{relative}: invalid purpose")
 
         vault_outcome = str(record.fields.get("vault-outcome", ""))
-        if not vault_outcome:
-            warnings.append(f"{relative}: legacy record has no vault-outcome")
-        elif vault_outcome not in VAULT_OUTCOMES:
+        if vault_outcome and vault_outcome not in VAULT_OUTCOMES:
             errors.append(f"{relative}: invalid vault-outcome")
 
         learning_outcome = str(record.fields.get("learning-outcome", ""))
-        if not learning_outcome:
-            warnings.append(f"{relative}: legacy record has no learning-outcome")
-        elif learning_outcome not in LEARNING_OUTCOMES:
+        if learning_outcome and learning_outcome not in LEARNING_OUTCOMES:
             errors.append(f"{relative}: invalid learning-outcome")
 
         status = str(record.fields.get("status", ""))
@@ -613,10 +1099,7 @@ def validate_root(root: Path, *, ignore_lock: bool = False) -> tuple[list[str], 
             if missing_future_state:
                 state_messages.append("missing Future/proposed state subsection")
             for message in state_messages:
-                if record.dedupe_key:
-                    errors.append(f"{relative}: {message}")
-                else:
-                    warnings.append(f"{relative}: legacy record {message}")
+                errors.append(f"{relative}: {message}")
 
         observed_sections = section_names(record.text)
         required_positions: list[int] = []
@@ -635,6 +1118,11 @@ def validate_root(root: Path, *, ignore_lock: bool = False) -> tuple[list[str], 
             errors.append(f"{relative}: missing sections {', '.join(missing_sections)}")
         elif required_positions != sorted(required_positions):
             errors.append(f"{relative}: required sections are out of order")
+
+        errors.extend(
+            f"{relative}: {message}"
+            for message in validate_development_handoffs(record.text)
+        )
 
         for retired_id in record.consolidated_from:
             if retired_id in lineage:

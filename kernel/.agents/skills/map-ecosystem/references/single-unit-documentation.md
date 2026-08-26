@@ -2,7 +2,7 @@
 
 ## Input and authority
 
-Accept one target repository or durable vault node and confirm that the user authorized a vault update. Load [node-selection.md](node-selection.md), classify the target type and lifecycle action, and state the evidence boundary. If the request is analysis or diagnosis only, return to the interrogation branch. If the target is `tipo: aprendizaje`, hand it to `manage-investigation-derived-learning`; this technical documentation recipe does not own that assessment or write.
+Accept one target repository or durable vault node and confirm that the user authorized a vault update. Load [node-selection.md](../../../../90-Meta/node-selection.md), classify the target type and lifecycle action, and state the evidence boundary. If the request is analysis or diagnosis only, return to the interrogation branch. If the target is `tipo: aprendizaje`, hand it to `manage-investigation-derived-learning`; this technical documentation recipe does not own that assessment or write.
 
 ## Baseline
 
@@ -13,7 +13,7 @@ Accept one target repository or durable vault node and confirm that the user aut
    - `changed`: record the existing `commit-analizado`, production branch, and new 12-character remote SHA, then continue with the old-to-new comparison.
    - `new`: confirm ownership via instance.yaml prefixes or an explicit allowlist in the instance catalog, plus the production branch, then continue without an old SHA.
    - Any lifecycle, ambiguity, or invalid-note state: resolve it or report it as a blocker before scanning; do not silently treat it as `changed`.
-4. For `changed`, `new`, or an explicitly forced audit, resolve the repository by remote identity under `SOURCE_ROOTS`. Reuse a non-managed checkout only when it already contains the required evidence; never fetch, checkout, reset, merge, or write there. When its root is also `managed: true`, switch explicitly to the `CLONE_ROOT` role before clone/fetch and follow [vault-resolution.md](vault-resolution.md); its existing working tree remains read-only. If no managed root is authorized, obtain explicit approval for an exact existing root and hand configuration to its owner skill before cloning.
+4. For `changed`, `new`, or an explicitly forced audit, resolve the repository by remote identity under `SOURCE_ROOTS`. Reuse a non-managed checkout only when it already contains the required evidence; never fetch, checkout, reset, merge, or write there. When its root is also `managed: true`, switch explicitly to the `CLONE_ROOT` role before clone/fetch and follow [vault-resolution.md](../../../../90-Meta/vault-resolution.md); its existing working tree remains read-only. If no managed root is authorized, obtain explicit approval for an exact existing root and hand configuration to its owner skill before cloning.
 5. For `changed`, ensure both the recorded commit and new HEAD are available. If a read-only source lacks either commit, switch to the managed `CLONE_ROOT` or request authorization; never deepen or fetch the read-only clone. In a managed clone, deepen the fetch or fetch the old commit explicitly when required. Inspect `git log --oneline <old>..<new>` and `git diff --stat <old>..<new>` before the full scan. Record the limitation if the remote no longer exposes the recorded commit.
 6. For repository targets, run `<python> -B 90-Meta/static-evidence-scan.py --repo <note>` from `VAULT_ROOT` as an initial sweep. Add `--source-repo "<resolved-repository-path>"` only for an exact configured checkout or the detached temporary worktree produced after fetching a managed clone. Treat the report as a sweep, not a conclusion.
 
@@ -41,11 +41,11 @@ For System B PostgreSQL, distinguish a confirmed writer from a reader or candida
 
 ## Modeling and writing
 
-1. Confirm identity, placement, lifecycle action, naming, and contract using Convenciones and [node-selection.md](node-selection.md).
+1. Confirm identity, placement, lifecycle action, naming, and contract using Convenciones and [node-selection.md](../../../../90-Meta/node-selection.md).
 2. Extract the fields and sections required by the selected node contract. For repositories, include purpose, triggers, inputs/outputs, rules, data, infrastructure, countries, and relationships with supporting evidence. A deployable repository must include the per-environment deployment matrix required by Convenciones.
 3. Edit the target note using the exact Convenciones contract.
 4. For repository re-analysis, update `commit-analizado`, `fecha-analisis`, `rama-analizada`, and `ultima-auditoria` together, even when only traceability changes.
-5. Propagate contract changes to every node class required by [node-selection.md](node-selection.md), including relevant glossary and navigation nodes. Keep asynchronous topology routed through the topic.
+5. Propagate contract changes to every node class required by [node-selection.md](../../../../90-Meta/node-selection.md), including relevant glossary and navigation nodes. Keep asynchronous topology routed through the topic.
 6. Express absence using the required Spanish wording “no observado en fuentes estáticas revisadas”; use `#por-confirmar` only when the limitation affects business understanding.
 
 For an operational note, use the closed `tipo: operacional` contract, keep unverified organization-specific content in `borrador`, and update `ultima-verificacion` only after checking the relevant platform or owner. Never turn one `.operations/` run into the normative procedure.

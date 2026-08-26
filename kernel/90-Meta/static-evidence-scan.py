@@ -23,7 +23,7 @@ from cell_scope import approved_cross_scope_repositories
 
 ROOT = Path(__file__).resolve().parents[1]
 NOTES_ROOT = ROOT / "20-Repos"
-VAULT_RESOLVER = ROOT / ".agents/skills/map-ecosystem/scripts/resolve-vault.py"
+VAULT_RESOLVER = ROOT / "90-Meta/resolve-vault.py"
 VAULT_CONTAINER_REPO = ""
 APP_PREFIXES: tuple[str, ...] = ()
 APPROVED_CROSS_APP_REPOSITORIES: set[str] = set()
@@ -326,7 +326,7 @@ def source_repos(
 
 def resolved_source_context() -> dict[str, object]:
     result = subprocess.run(
-        [sys.executable, str(VAULT_RESOLVER), "--path", str(ROOT)],
+        [sys.executable, "-B", str(VAULT_RESOLVER), "--path", str(ROOT)],
         text=True,
         capture_output=True,
         check=False,

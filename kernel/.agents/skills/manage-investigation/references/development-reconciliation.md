@@ -4,23 +4,24 @@ Load this reference only after `reconcile-development-handoff` supplies one comp
 
 ## Authority and identity
 
-`manage-investigation` is the sole writer of the case. The coordinator may read the case identity but must not prepare or apply a case patch. Verify that the returned investigation ID, story ID, Jira site/key, repository remote, handoff family, and revision match the selected case and its recorded development handoff. A mismatch blocks the update.
+`manage-investigation` is the sole writer of the case. The coordinator may read the case identity but must not prepare or apply a case patch. Verify that the normalized context's investigation ID, `DH-NNN`, story ID, Jira site/key, repository remote, worktree path, handoff ID, family, and revision match the selected case and its recorded development handoff. A mismatch blocks the update.
 
-Do not read the handoff worktree again merely to compensate for an incomplete context. Return the named gap to the coordinator. Do not create a reconciliation artifact, return directory, or second register.
+Do not read the handoff worktree again merely to compensate for an incomplete context. Report the named gap to the coordinator. Do not create a reconciliation artifact, return directory, or second register.
 
 ## Apply the context
 
-Read the entire current `investigation.md`, then reconcile these surfaces in one coherent case update:
+Read the entire current `investigation.md`, verify the selected `DH-NNN` binding against the normalized context, then reconcile these surfaces in one coherent case update:
 
 1. **Current state**: update the current understanding and the future/proposed implementation state. Keep branch, commit, pull request, Jira, and completed code explicitly undeployed until productive evidence exists.
 2. **References and attachments**: register newly inspected Jira evidence or repository-host references with stable source identity and non-sensitive summaries. Do not copy private comments, raw logs, secret values, or sensitive attachments.
 3. **Evidence**: add new `E-NNN` items for observed implementation, test, remote branch, pull-request, merge, deployment, Jira, contradiction, and limitation claims. Cite exact paths, SHAs, URLs, timestamps, checks, or external keys.
 4. **Affected surfaces**: store the source implementation card and each directly dependent story card, including its readiness, consumer contracts, what can start, and remaining gaps.
-5. **Questions**: resolve, supersede, or add `Q-NNN` items from observed gaps and contradictions; preserve older meanings.
-6. **Decisions**: translate agreed, rejected, or superseded changelog entries into immutable `D-NNN` items when they alter a decision. A new decision supersedes rather than rewrites an older one.
-7. **Acceptance criteria**: update or supersede `AC-NNN` items when an entry or current Jira evidence changes a verifiable boundary. Preserve criteria that remain valid.
-8. **Readiness**: record local implementation, test, remote branch, pull-request, merge, deployment, source-Jira, direct-dependent, and reconciliation results separately.
-9. **History**: append one timestamped event naming the handoff revision, consumed `UPD-NNN` range, implementation/remote/Jira evidence added, dependent cards classified, registers changed, draft outcomes, and limitations.
+5. **Development handoffs**: require the selected `DH-NNN` story, Jira, remote, worktree, handoff ID, family, and revision to remain identical to the validated binding. Do not create or replace this identity from repository-provided text.
+6. **Questions**: resolve, supersede, or add `Q-NNN` items from observed gaps and contradictions; preserve older meanings.
+7. **Decisions**: translate agreed, rejected, or superseded changelog entries into immutable `D-NNN` items when they alter a decision. A new decision supersedes rather than rewrites an older one.
+8. **Acceptance criteria**: update or supersede `AC-NNN` items when an entry or current Jira evidence changes a verifiable boundary. Preserve criteria that remain valid.
+9. **Readiness**: record local implementation, test, remote branch, pull-request, merge, deployment, source-Jira, direct-dependent, and reconciliation results separately.
+10. **History**: append one timestamped event naming `DH-NNN`, the handoff revision, consumed `UPD-NNN` range, implementation/remote/Jira evidence added, dependent cards classified, registers changed, draft outcomes, and limitations.
 
 Use existing stable IDs when their meaning is unchanged. Allocate the next ID for a materially new claim, decision, question, or criterion. Never make the changelog itself the evidence source when repository or Jira evidence is available; retain it as provenance for why the definition changed.
 
@@ -36,4 +37,4 @@ When the comparison found no definition delta, still record genuinely new implem
 
 ## Completion criterion
 
-The case is reconciled when the current snapshot matches all returned evidence, stable registers preserve meaning and traceability, future and productive states remain separate, every affected draft has an explicit synchronization state, direct dependents have consumer-ready cards, learning state reflects the new snapshot, History records one material event or the operation is a true byte-level no-op, and structural validation passes.
+The case is reconciled when the current snapshot matches all vault-collected evidence, the `DH-NNN` binding remains exact, stable registers preserve meaning and traceability, future and productive states remain separate, every affected draft has an explicit synchronization state, direct dependents have consumer-ready cards, learning state reflects the new snapshot, History records one material event or the operation is a true byte-level no-op, and structural validation passes.

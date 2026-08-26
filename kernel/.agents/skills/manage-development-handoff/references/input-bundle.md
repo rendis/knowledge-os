@@ -22,8 +22,8 @@ Create a package only after the investigation and story are release-ready and th
 Classify each materialization or activation input as exactly one state:
 
 - `exact-package`: an exact existing package directory was supplied and passes this contract; continue with consumer preflight.
-- `producer-required`: the request identifies an investigation and Jira story but no exact package directory exists. Invoke the Export route of `manage-investigation`, let that owner inspect the case and obtain the current Jira snapshot, then resume the same handoff request with every returned exact directory. Do not ask the user to coordinate or resubmit the workflow.
-- `invalid-package`: an existing candidate package fails this contract. Return its exact validation failure to `manage-investigation` and stop the consumer until the producer returns a corrected package.
+- `producer-required`: the request identifies an investigation and Jira story but no exact package directory exists. Invoke the Export route of `manage-investigation`, let that owner inspect the case and obtain the current Jira snapshot, then continue the same handoff request with every exact directory it produces. Do not ask the user to coordinate or resubmit the workflow.
+- `invalid-package`: an existing candidate package fails this contract. Give its exact validation failure to `manage-investigation` and stop the consumer until that owner produces a corrected package.
 
 Absence is `producer-required`, not `invalid-package`. The consumer never opens the case or Jira while resolving any state. Validation and deactivation of an existing worktree do not consume a package and therefore bypass this protocol.
 
@@ -76,7 +76,7 @@ Rules:
 - Set `snapshot-source` to `connected-readback` or `user-supplied-export`. Memory, a stale published draft, and an inferred reconstruction are not sources.
 - Set `freshness: current` only after comparing the copied fields with the source represented by `jira.updated-at`.
 - Resolve the target by its real Git remote. Do not put a local path in the package.
-- Write a concise `change.summary` for every export. Add a per-file reason when it explains the change more precisely; the summary is the fallback reason.
+- Write a concise `change.summary` for every export. Add a per-file reason when it explains the change more precisely; otherwise the summary is the reason for that file.
 
 ## Document roles
 
@@ -118,6 +118,19 @@ The exact input bytes are materialized when a document changes. The producer the
 
 After materialization, the implementation agent never edits these three documents. Any material information, agreement, discovery, or decision that changes or complements their definition is appended to the materialized `implementation-updates.md` under the repository-state contract. A later producer refresh may create a new immutable content revision; it never rewrites or clears that changelog.
 
+## Post-materialization binding
+
+After `validate` succeeds, the consumer assembles one normalized in-memory observation from the exact package and validated repository state:
+
+- package path, investigation ID, and story ID;
+- canonical Jira site and key;
+- normalized repository remote and absolute worktree path;
+- handoff ID, family, revision, and `materialized_at` derived from the validated manifest `updated-at`.
+
+Pass that observation to the **Bind development handoff** route of `manage-investigation`. The consumer never opens or edits the case, and the repository neither returns evidence nor invokes a vault skill: it only persists inspectable evidence under `.knowledge-os-handoffs/`. If the case owner cannot validate the binding, classify the target as `materialized-unbound`, preserve its active materialized state, and stop before claiming completion. Retry binding only from a new successful repository-state validation; do not persist a return package or infer identity from branch names or messages.
+
+The case owner records only new or advanced materialized content revisions. An activation, no-op application, or binding retry for the exact already-recorded revision and coordinates validates that binding without changing case bytes or duplicating its History marker.
+
 ## Completion criterion
 
-The package is complete only when the schema validates, the Jira copy is current and traceable, all three documents are non-empty and secret-free, the remote identifies one configured repository, and the context and scope are specific to that repository.
+The package is complete only when the schema validates, the Jira copy is current and traceable, all three documents are non-empty and secret-free, the remote identifies one configured repository, and the context and scope are specific to that repository. Package completeness alone does not make a materialization or activation complete; the post-materialization binding must also validate.
