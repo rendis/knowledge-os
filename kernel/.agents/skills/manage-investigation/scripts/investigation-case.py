@@ -899,7 +899,7 @@ def validate_development_handoffs(text: str) -> list[str]:
         errors.append("Development handoff identifiers must be contiguous from DH-001")
 
     targets: set[tuple[str, str]] = set()
-    worktrees: set[str] = set()
+    worktrees: dict[str, str] = {}
     handoff_ids: set[str] = set()
     for entry_id, _, title, fields in entries:
         if any(field not in fields for field in DEVELOPMENT_HANDOFF_FIELDS):
@@ -965,9 +965,12 @@ def validate_development_handoffs(text: str) -> list[str]:
         if target in targets:
             errors.append(f"{entry_id} duplicates a story-and-repository target")
         targets.add(target)
-        if worktree in worktrees:
-            errors.append(f"{entry_id} reuses a Worktree path")
-        worktrees.add(worktree)
+        registered_remote = worktrees.get(worktree)
+        if registered_remote is not None and registered_remote != remote:
+            errors.append(
+                f"{entry_id} reuses a Worktree path for a different Repository remote"
+            )
+        worktrees.setdefault(worktree, remote)
         if handoff_id in handoff_ids:
             errors.append(f"{entry_id} reuses a Handoff ID")
         handoff_ids.add(handoff_id)

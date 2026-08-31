@@ -25,11 +25,11 @@ Classify each materialization or activation input as exactly one state:
 - `producer-required`: the request identifies an investigation and Jira story but no exact package directory exists. Invoke the Export route of `manage-investigation`, let that owner inspect the case and obtain the current Jira snapshot, then continue the same handoff request with every exact directory it produces. Do not ask the user to coordinate or resubmit the workflow.
 - `invalid-package`: an existing candidate package fails this contract. Give its exact validation failure to `manage-investigation` and stop the consumer until that owner produces a corrected package.
 
-Absence is `producer-required`, not `invalid-package`. The consumer never opens the case or Jira while resolving any state. Validation and deactivation of an existing worktree do not consume a package and therefore bypass this protocol.
+Absence is `producer-required`, not `invalid-package`. The consumer never opens the case or Jira while resolving any state. Validation and state updates for an existing worktree do not consume a package and therefore bypass this protocol.
 
 ## Canonical package
 
-Create one package per Jira issue and target repository:
+Create one package per Jira issue and target repository. Packages from the same investigation and repository may later share one worktree; they never share a family directory:
 
 ```text
 .investigations/<investigation-id>/handoffs/

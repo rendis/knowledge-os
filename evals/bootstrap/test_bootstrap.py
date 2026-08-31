@@ -11,6 +11,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -100,6 +101,10 @@ class BootstrapEval(unittest.TestCase):
         self.assertNotIn("reconcile-development-handoff", start)
         self.assertIn("Leave `.knowledge-os-handoffs/ACTIVE.yaml` intact", managed_block)
         self.assertIn("The vault independently resolves this worktree", managed_block)
+        self.assertIn("For each selected entry, read its `handoff.yaml`", managed_block)
+        self.assertNotIn("every listed `handoff.yaml`", managed_block)
+        self.assertIn("`ready-for-production` or `production`", managed_block)
+        self.assertIn("files they affect", managed_block)
         self.assertNotIn("manage-operational-workflow", reconcile)
         self.assertIn("90-Meta/jira-evidence.md", reconcile)
 
@@ -244,6 +249,14 @@ class BootstrapEval(unittest.TestCase):
         owner = (
             DIST / "kernel/.agents/skills/manage-investigation/SKILL.md"
         ).read_text(encoding="utf-8")
+        export_contract = (
+            DIST
+            / "kernel/.agents/skills/manage-investigation/references/export-contract.md"
+        ).read_text(encoding="utf-8")
+        repository_state = (
+            DIST
+            / "kernel/.agents/skills/manage-development-handoff/references/repository-state.md"
+        ).read_text(encoding="utf-8")
         self.assertIn("## Development handoffs", template)
         self.assertIn("`DH-001`", contract)
         self.assertIn("exact absolute worktree path", contract)
@@ -254,6 +267,101 @@ class BootstrapEval(unittest.TestCase):
         self.assertIn(
             "No materialization or activation is complete until",
             consumer,
+        )
+        self.assertIn("component or implementation scope", owner)
+        self.assertIn("existing `DH-NNN`", owner)
+        self.assertIn("separate worktree", export_contract)
+        self.assertIn("shared group", consumer)
+        self.assertIn("first handoff's Jira branch", repository_state)
+        self.assertIn("selected entry is not `active`", repository_state)
+        self.assertNotIn("while another family is active", repository_state)
+
+    def test_investigation_allows_shared_worktree_only_for_same_repository(self) -> None:
+        helper = (
+            DIST
+            / "kernel/.agents/skills/manage-investigation/scripts/investigation-case.py"
+        )
+        module_name = "investigation_case_shared_worktree_eval"
+        spec = importlib.util.spec_from_file_location(module_name, helper)
+        self.assertIsNotNone(spec)
+        self.assertIsNotNone(spec.loader)
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[module_name] = module
+        self.addCleanup(sys.modules.pop, module_name, None)
+        spec.loader.exec_module(module)
+
+        worktree = "/tmp/worktrees/repository/abc-123-change"
+        site = "https://example.atlassian.net"
+
+        def entry(number: int, story: str, jira: str, remote: str) -> tuple[str, dict[str, str]]:
+            repository = remote.rsplit("/", 1)[-1]
+            handoff_id = hashlib.sha256(
+                "|".join((site.casefold(), jira, remote)).encode("utf-8")
+            ).hexdigest()
+            fields = {
+                "dh": f"DH-{number:03d}",
+                "story-id": story,
+                "jira-site": site,
+                "jira-key": jira,
+                "repository-remote": remote,
+                "worktree-path": worktree,
+                "handoff-id": handoff_id,
+                "family": f"{jira.casefold()}--{repository}",
+                "revision": "v0001",
+                "materialized-at": f"2026-08-31T12:0{number}:00+00:00",
+            }
+            register = (
+                f"### {fields['dh']} — {jira} / {repository}\n\n"
+                f"- Story ID: {story}\n"
+                f"- Jira site: {site}\n"
+                f"- Jira key: {jira}\n"
+                f"- Repository remote: {remote}\n"
+                f"- Worktree path: {worktree}\n"
+                f"- Handoff ID: {handoff_id}\n"
+                f"- Family: {fields['family']}\n"
+                "- Revision: v0001\n"
+                f"- Materialized at: {fields['materialized-at']}\n"
+            )
+            return register, fields
+
+        def history(fields: dict[str, str]) -> str:
+            marker = json.dumps(fields, sort_keys=True, separators=(",", ":"))
+            return (
+                f"- {fields['materialized-at']} — bound development handoff "
+                f"`{fields['dh']}`; story `{fields['story-id']}`; Jira "
+                f"`{fields['jira-key']}`; repository `{fields['repository-remote']}`; "
+                f"worktree `{fields['worktree-path']}`; handoff "
+                f"`{fields['handoff-id']}`; revision `v0001`.\n"
+                f"  <!-- knowledge-os:development-handoff-binding {marker} -->\n"
+            )
+
+        first_register, first = entry(
+            1, "S-001", "ABC-123", "example.invalid/team/repository"
+        )
+        second_register, second = entry(
+            2, "S-002", "ABC-124", "example.invalid/team/repository"
+        )
+        same_repository = (
+            "## Development handoffs\n\n"
+            f"{first_register}\n{second_register}\n"
+            "## History\n\n"
+            f"{history(first)}{history(second)}"
+        )
+        self.assertEqual(module.validate_development_handoffs(same_repository), [])
+
+        other_register, other = entry(
+            2, "S-002", "ABC-124", "example.invalid/team/other-repository"
+        )
+        different_repository = (
+            "## Development handoffs\n\n"
+            f"{first_register}\n{other_register}\n"
+            "## History\n\n"
+            f"{history(first)}{history(other)}"
+        )
+        errors = module.validate_development_handoffs(different_repository)
+        self.assertIn(
+            "DH-002 reuses a Worktree path for a different Repository remote",
+            errors,
         )
 
     def test_investigation_validator_requires_the_handoff_register(self) -> None:
@@ -746,7 +854,7 @@ class BootstrapEval(unittest.TestCase):
             self.assertEqual(invalid.returncode, 2, invalid.stdout + invalid.stderr)
             self.assertIn("missing sections Development handoffs", invalid.stderr)
 
-    def test_deactivate_requires_exact_target_and_disposition(self) -> None:
+    def test_set_state_requires_exact_target_handoff_and_state(self) -> None:
         helper = (
             DIST
             / "kernel/.agents/skills/manage-development-handoff/scripts/development-handoff.py"
@@ -758,7 +866,7 @@ class BootstrapEval(unittest.TestCase):
                 str(helper),
                 "--vault-root",
                 str(DIST),
-                "deactivate",
+                "set-state",
                 "--repository-remote",
                 "https://example.invalid/example/repository.git",
             ]
@@ -767,9 +875,10 @@ class BootstrapEval(unittest.TestCase):
         error = json.loads(result.stderr)["error"]
         self.assertEqual(error["code"], "usage_error")
         self.assertIn("--worktree-path", error["message"])
-        self.assertIn("--disposition", error["message"])
+        self.assertIn("--handoff-id", error["message"])
+        self.assertIn("--state", error["message"])
 
-    def test_reconciled_deactivation_binds_the_active_identity(self) -> None:
+    def test_state_updates_bind_the_selected_handoff_and_snapshot(self) -> None:
         helper = (
             DIST
             / "kernel/.agents/skills/manage-development-handoff/scripts/development-handoff.py"
@@ -796,10 +905,18 @@ class BootstrapEval(unittest.TestCase):
             store = target / ".knowledge-os-handoffs"
             family_path = store / "abc-123--repository"
             family_path.mkdir(parents=True)
-            active = {
+            entry = {
                 "handoff-id": "a" * 64,
                 "family": family_path.name,
                 "revision": "v0002",
+                "manifest": f"{family_path.name}/handoff.yaml",
+                "activated-at": "2026-08-31T12:00:00Z",
+                "state": "active",
+            }
+            active = {
+                "schema-version": 2,
+                "investigation-id": "20260831-shared-worktree",
+                "handoffs": [entry],
             }
             replacements = {
                 "resolve_handoff_target": mock.Mock(
@@ -811,6 +928,10 @@ class BootstrapEval(unittest.TestCase):
                     return_value=SimpleNamespace(
                         revision="v0002",
                         family_path=family_path,
+                        manifest={
+                            "source": {"investigation-id": active["investigation-id"]},
+                            "story": {"issue-key": "ABC-123"},
+                        },
                     )
                 ),
                 "validate_implementation_updates": mock.Mock(return_value={}),
@@ -819,48 +940,1009 @@ class BootstrapEval(unittest.TestCase):
             }
             with mock.patch.multiple(module, **replacements):
                 with self.assertRaises(module.HandoffError) as raised:
-                    module.build_deactivate_plan(
+                    module.build_set_state_plan(
                         DIST,
                         "https://example.invalid/team/repository.git",
                         str(target),
-                        "reconciled",
+                        entry["handoff-id"],
+                        "ready-for-production",
                     )
-                self.assertEqual(raised.exception.code, "reconciliation_identity_required")
-
-                reconciled = module.build_deactivate_plan(
-                    DIST,
-                    "https://example.invalid/team/repository.git",
-                    str(target),
-                    "reconciled",
-                    active["handoff-id"],
-                    active["revision"],
-                    "b" * 64,
-                )
-                paused = module.build_deactivate_plan(
-                    DIST,
-                    "https://example.invalid/team/repository.git",
-                    str(target),
-                    "paused",
-                )
-                self.assertEqual(reconciled["reconciled_identity"]["revision"], "v0002")
                 self.assertEqual(
-                    reconciled["reconciled_identity"]["closure_fingerprint"],
+                    raised.exception.code, "reconciliation_fingerprint_required"
+                )
+
+                ready = module.build_set_state_plan(
+                    DIST,
+                    "https://example.invalid/team/repository.git",
+                    str(target),
+                    entry["handoff-id"],
+                    "ready-for-production",
                     "b" * 64,
                 )
-                self.assertNotEqual(reconciled["plan_token"], paused["plan_token"])
+                reopened = module.build_set_state_plan(
+                    DIST,
+                    "https://example.invalid/team/repository.git",
+                    str(target),
+                    entry["handoff-id"],
+                    "active",
+                )
+                self.assertEqual(ready["action"], "set-state")
+                self.assertEqual(ready["state"], "ready-for-production")
+                self.assertEqual(reopened["action"], "noop")
+                self.assertNotEqual(ready["plan_token"], reopened["plan_token"])
+
+                with self.assertRaises(module.HandoffError) as skipped:
+                    module.build_set_state_plan(
+                        DIST,
+                        "https://example.invalid/team/repository.git",
+                        str(target),
+                        entry["handoff-id"],
+                        "production",
+                    )
+                self.assertEqual(skipped.exception.code, "invalid_state_transition")
 
                 replacements["closure_fingerprint"].return_value = "c" * 64
                 with self.assertRaises(module.HandoffError) as changed:
-                    module.build_deactivate_plan(
+                    module.build_set_state_plan(
                         DIST,
                         "https://example.invalid/team/repository.git",
                         str(target),
-                        "reconciled",
-                        active["handoff-id"],
-                        active["revision"],
+                        entry["handoff-id"],
+                        "ready-for-production",
                         "b" * 64,
                     )
                 self.assertEqual(changed.exception.code, "reconciliation_snapshot_mismatch")
+
+    def test_active_registry_accepts_multiple_handoffs_and_rejects_bad_state(self) -> None:
+        helper = (
+            DIST
+            / "kernel/.agents/skills/manage-development-handoff/scripts/development-handoff.py"
+        )
+        module_name = "development_handoff_active_registry_eval"
+        spec = importlib.util.spec_from_file_location(module_name, helper)
+        self.assertIsNotNone(spec)
+        self.assertIsNotNone(spec.loader)
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[module_name] = module
+        self.addCleanup(sys.modules.pop, module_name, None)
+        spec.loader.exec_module(module)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            store = Path(tmp) / ".knowledge-os-handoffs"
+            store.mkdir()
+            investigation = "20260831-shared-worktree"
+            first = SimpleNamespace(
+                active=None,
+                handoff_id="a" * 64,
+                family="abc-101--repository",
+                bundle=SimpleNamespace(source={"investigation-id": investigation}),
+            )
+            first_raw = module.active_bytes(
+                plan=first,
+                revision="v0001",
+                activated_at="2026-08-31T12:00:00Z",
+            )
+            (store / "ACTIVE.yaml").write_bytes(first_raw)
+            active, _ = module.read_active(store)
+            self.assertEqual(active["schema-version"], 2)
+            self.assertEqual(active["handoffs"][0]["state"], "active")
+
+            first.active = active
+            reactivated_raw = module.active_bytes(
+                plan=first,
+                revision="v0001",
+                activated_at="2026-08-31T12:02:00Z",
+            )
+            (store / "ACTIVE.yaml").write_bytes(reactivated_raw)
+            active, _ = module.read_active(store)
+            self.assertEqual(
+                active["handoffs"][0]["activated-at"],
+                "2026-08-31T12:02:00Z",
+            )
+
+            second = SimpleNamespace(
+                active=active,
+                handoff_id="b" * 64,
+                family="abc-102--repository",
+                bundle=SimpleNamespace(source={"investigation-id": investigation}),
+            )
+            second_raw = module.active_bytes(
+                plan=second,
+                revision="v0001",
+                activated_at="2026-08-31T12:01:00Z",
+            )
+            (store / "ACTIVE.yaml").write_bytes(second_raw)
+            shared, _ = module.read_active(store)
+            self.assertEqual(len(shared["handoffs"]), 2)
+            self.assertEqual(
+                [item["family"] for item in shared["handoffs"]],
+                ["abc-101--repository", "abc-102--repository"],
+            )
+
+            shared["handoffs"][1]["state"] = "unknown"
+            (store / "ACTIVE.yaml").write_bytes(module.yaml_bytes(shared))
+            with self.assertRaises(module.HandoffError) as invalid:
+                module.read_active(store)
+            self.assertEqual(invalid.exception.code, "invalid_handoff_state")
+
+    def test_existing_worktree_accepts_only_same_investigation_packages(self) -> None:
+        helper = (
+            DIST
+            / "kernel/.agents/skills/manage-development-handoff/scripts/development-handoff.py"
+        )
+        module_name = "development_handoff_shared_worktree_eval"
+        spec = importlib.util.spec_from_file_location(module_name, helper)
+        self.assertIsNotNone(spec)
+        self.assertIsNotNone(spec.loader)
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[module_name] = module
+        self.addCleanup(sys.modules.pop, module_name, None)
+        spec.loader.exec_module(module)
+
+        investigation = "20260831-shared-worktree"
+        active = {
+            "schema-version": 2,
+            "investigation-id": investigation,
+            "handoffs": [
+                {
+                    "handoff-id": "a" * 64,
+                    "family": "abc-101--repository",
+                    "revision": "v0001",
+                    "manifest": "abc-101--repository/handoff.yaml",
+                    "activated-at": "2026-08-31T12:00:00Z",
+                    "state": "active",
+                }
+            ],
+        }
+        bundle = SimpleNamespace(
+            source={"investigation-id": investigation},
+            jira={"issue-key": "ABC-102"},
+            documents={},
+            fingerprint="bundle",
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "worktree"
+            store = target / ".knowledge-os-handoffs"
+            store.mkdir(parents=True)
+            (store / "ACTIVE.yaml").write_bytes(module.yaml_bytes(active))
+
+            def existing(family_path: Path, **_: object) -> SimpleNamespace | None:
+                if family_path.name != "abc-101--repository":
+                    return None
+                return SimpleNamespace(
+                    revision="v0001",
+                    family_path=family_path,
+                    manifest={
+                        "source": {"investigation-id": investigation},
+                        "story": {"issue-key": "ABC-101"},
+                    },
+                )
+
+            replacements = {
+                "read_active": mock.Mock(return_value=(active, b"active")),
+                "read_existing_handoff": mock.Mock(side_effect=existing),
+                "prepare_instructions": mock.Mock(return_value=({}, {})),
+                "prepare_gitignore": mock.Mock(return_value=(b"", "none")),
+                "prepare_implementation_updates": mock.Mock(
+                    return_value=("create", {"entries": 0})
+                ),
+                "validate_implementation_updates": mock.Mock(return_value={}),
+                "verify_ignored": mock.Mock(),
+                "rev_parse_optional": mock.Mock(return_value="c" * 40),
+                "read_asset": mock.Mock(return_value=b"asset"),
+                "handoff_identity": mock.Mock(
+                    return_value=("abc-102--repository", "b" * 64)
+                ),
+            }
+            with mock.patch.multiple(module, **replacements):
+                plan = module.build_apply_plan_from_state(
+                    bundle,
+                    state_root=target,
+                    target=target,
+                    normalized_remote="example.invalid/team/repository",
+                    branch="issue/ABC-101-first-story",
+                    explicit_worktree=True,
+                )
+                self.assertEqual(plan.output["action"], "create")
+                self.assertEqual(plan.active["investigation-id"], investigation)
+
+                with self.assertRaises(module.HandoffError) as wrong_branch:
+                    module.build_apply_plan_from_state(
+                        bundle,
+                        state_root=target,
+                        target=target,
+                        normalized_remote="example.invalid/team/repository",
+                        branch="issue/ABC-999-unrelated",
+                        explicit_worktree=True,
+                    )
+                self.assertEqual(
+                    wrong_branch.exception.code, "worktree_branch_mismatch"
+                )
+
+                third_bundle = SimpleNamespace(
+                    source={"investigation-id": investigation},
+                    jira={"issue-key": "ABC-103"},
+                    documents={},
+                    fingerprint="third-bundle",
+                )
+                replacements["handoff_identity"].return_value = (
+                    "abc-103--repository",
+                    "c" * 64,
+                )
+                third_before_attach = module.build_apply_plan_from_state(
+                    third_bundle,
+                    state_root=target,
+                    target=target,
+                    normalized_remote="example.invalid/team/repository",
+                    branch="issue/ABC-101-first-story",
+                    explicit_worktree=True,
+                )
+                active_after_attach = {
+                    **active,
+                    "handoffs": [
+                        *active["handoffs"],
+                        {
+                            "handoff-id": "b" * 64,
+                            "family": "abc-102--repository",
+                            "revision": "v0001",
+                            "manifest": "abc-102--repository/handoff.yaml",
+                            "activated-at": "2026-08-31T12:05:00Z",
+                            "state": "active",
+                        },
+                    ],
+                }
+                (store / "ACTIVE.yaml").write_bytes(
+                    module.yaml_bytes(active_after_attach)
+                )
+                replacements["read_active"].return_value = (
+                    active_after_attach,
+                    b"active-after-attach",
+                )
+
+                def existing_after_attach(
+                    family_path: Path, **_: object
+                ) -> SimpleNamespace | None:
+                    if family_path.name == "abc-103--repository":
+                        return None
+                    return SimpleNamespace(
+                        revision="v0001",
+                        family_path=family_path,
+                        manifest={
+                            "source": {"investigation-id": investigation},
+                            "story": {"issue-key": "ABC-101"},
+                        },
+                    )
+
+                replacements["read_existing_handoff"].side_effect = (
+                    existing_after_attach
+                )
+                third_after_attach = module.build_apply_plan_from_state(
+                    third_bundle,
+                    state_root=target,
+                    target=target,
+                    normalized_remote="example.invalid/team/repository",
+                    branch="issue/ABC-101-first-story",
+                    explicit_worktree=True,
+                )
+                self.assertNotEqual(
+                    third_before_attach.output["plan_token"],
+                    third_after_attach.output["plan_token"],
+                )
+
+                replacements["read_existing_handoff"].side_effect = None
+                replacements["read_existing_handoff"].return_value = None
+                with self.assertRaises(module.HandoffError) as invalid_registry:
+                    module.build_apply_plan_from_state(
+                        bundle,
+                        state_root=target,
+                        target=target,
+                        normalized_remote="example.invalid/team/repository",
+                        branch="issue/ABC-101-first-story",
+                        explicit_worktree=True,
+                    )
+                self.assertEqual(
+                    invalid_registry.exception.code, "invalid_active_pointer"
+                )
+
+                replacements["read_existing_handoff"].side_effect = existing
+
+                bundle.source = {"investigation-id": "20260831-other"}
+                with self.assertRaises(module.HandoffError) as mismatch:
+                    module.build_apply_plan_from_state(
+                        bundle,
+                        state_root=target,
+                        target=target,
+                        normalized_remote="example.invalid/team/repository",
+                        branch="issue/ABC-101-first-story",
+                        explicit_worktree=True,
+                    )
+                self.assertEqual(
+                    mismatch.exception.code, "worktree_investigation_mismatch"
+                )
+
+                bundle.source = {"investigation-id": investigation}
+                replacements["read_active"].return_value = (None, None)
+                replacements["read_existing_handoff"].side_effect = lambda path, **_: (
+                    SimpleNamespace(
+                        revision="v0001",
+                        family_path=path,
+                        manifest={
+                            "source": {"investigation-id": "20260831-previous"},
+                            "story": {"issue-key": "ABC-102"},
+                        },
+                    )
+                )
+                with self.assertRaises(module.HandoffError) as orphan:
+                    module.build_apply_plan_from_state(
+                        bundle,
+                        state_root=target,
+                        target=target,
+                        normalized_remote="example.invalid/team/repository",
+                        branch="issue/ABC-102-second-story",
+                        explicit_worktree=True,
+                    )
+                self.assertEqual(
+                    orphan.exception.code, "worktree_investigation_mismatch"
+                )
+
+    def test_shared_handoff_apply_adopts_v1_and_serializes_store_writes(self) -> None:
+        helper = (
+            DIST
+            / "kernel/.agents/skills/manage-development-handoff/scripts/development-handoff.py"
+        )
+        module_name = "development_handoff_real_shared_flow_eval"
+        spec = importlib.util.spec_from_file_location(module_name, helper)
+        self.assertIsNotNone(spec)
+        self.assertIsNotNone(spec.loader)
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[module_name] = module
+        self.addCleanup(sys.modules.pop, module_name, None)
+        spec.loader.exec_module(module)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            target = root / "worktree"
+            target.mkdir()
+            self.assertEqual(
+                run(["git", "init", "-q", "-b", "issue/ABC-101-first"], cwd=target).returncode,
+                0,
+            )
+            (target / ".gitignore").write_text(
+                "/.knowledge-os-handoffs/\n", encoding="utf-8"
+            )
+            (target / "README.md").write_text("# Repository\n", encoding="utf-8")
+            self.assertEqual(run(["git", "add", "."], cwd=target).returncode, 0)
+            committed = run(
+                [
+                    "git",
+                    "-c",
+                    "user.name=Bootstrap Eval",
+                    "-c",
+                    "user.email=bootstrap@example.invalid",
+                    "commit",
+                    "-q",
+                    "-m",
+                    "baseline",
+                ],
+                cwd=target,
+            )
+            self.assertEqual(committed.returncode, 0, committed.stderr)
+
+            remote = "https://example.invalid/team/repository.git"
+            normalized_remote = "example.invalid/team/repository"
+            investigation = "20260831-shared-worktree"
+
+            def write_bundle(issue_key: str, story_id: str) -> Path:
+                bundle = root / issue_key.casefold()
+                bundle.mkdir()
+                (bundle / "bundle.yaml").write_text(
+                    "\n".join(
+                        (
+                            "schema-version: 1",
+                            "source:",
+                            f'  investigation-id: "{investigation}"',
+                            '  investigation-updated-at: "2026-08-31T12:00:00Z"',
+                            f'  story-id: "{story_id}"',
+                            "jira:",
+                            '  site: "https://example.atlassian.net"',
+                            f'  issue-key: "{issue_key}"',
+                            f'  url: "https://example.atlassian.net/browse/{issue_key}"',
+                            '  updated-at: "2026-08-31T11:55:00Z"',
+                            '  captured-at: "2026-08-31T12:01:00Z"',
+                            '  freshness: "current"',
+                            '  snapshot-source: "connected-readback"',
+                            "repository:",
+                            f'  remote: "{remote}"',
+                            "change:",
+                            f'  summary: "Implement {issue_key}."',
+                            "",
+                        )
+                    ),
+                    encoding="utf-8",
+                )
+                (bundle / "jira.md").write_text(
+                    f"# Jira\n\n{issue_key}\n", encoding="utf-8"
+                )
+                (bundle / "context.md").write_text(
+                    f"# Context\n\nContext for {issue_key}.\n", encoding="utf-8"
+                )
+                (bundle / "scope.md").write_text(
+                    f"# Scope\n\nScope for {issue_key}.\n", encoding="utf-8"
+                )
+                return bundle
+
+            first_bundle = write_bundle("ABC-101", "S-001")
+            second_bundle = write_bundle("ABC-102", "S-002")
+            resolved = mock.Mock(
+                return_value=(target, normalized_remote, "issue/ABC-101-first")
+            )
+            with mock.patch.object(module, "resolve_handoff_target", resolved):
+                first_plan = module.build_apply_plan(
+                    DIST, str(first_bundle), str(target)
+                )
+                original_atomic_write = module.atomic_write
+                first_interrupted = False
+
+                def interrupt_first(path: Path, raw: bytes) -> None:
+                    nonlocal first_interrupted
+                    if (
+                        not first_interrupted
+                        and path == target / ".knowledge-os-handoffs/ACTIVE.yaml"
+                    ):
+                        first_interrupted = True
+                        raise KeyboardInterrupt()
+                    original_atomic_write(path, raw)
+
+                with mock.patch.object(
+                    module, "atomic_write", side_effect=interrupt_first
+                ):
+                    with self.assertRaises(KeyboardInterrupt):
+                        module.apply_plan(
+                            DIST,
+                            str(first_bundle),
+                            first_plan.output["plan_token"],
+                            str(target),
+                        )
+                self.assertTrue((target / "AGENTS.md").is_file())
+                interrupted_agents = (target / "AGENTS.md").read_bytes()
+                (target / "AGENTS.md").write_bytes(
+                    interrupted_agents + b"\nHuman edit after interruption.\n"
+                )
+                with self.assertRaises(module.HandoffError) as root_conflict:
+                    module.apply_plan(
+                        DIST,
+                        str(first_bundle),
+                        first_plan.output["plan_token"],
+                        str(target),
+                    )
+                self.assertEqual(
+                    root_conflict.exception.code, "handoff_recovery_conflict"
+                )
+                self.assertTrue(
+                    (target / "AGENTS.md")
+                    .read_bytes()
+                    .endswith(b"Human edit after interruption.\n")
+                )
+                self.assertTrue(
+                    (
+                        target
+                        / ".knowledge-os-handoffs"
+                        / module.TRANSACTION_NAME
+                    ).is_dir()
+                )
+                (target / "AGENTS.md").write_bytes(interrupted_agents)
+                first_result = module.apply_plan(
+                    DIST,
+                    str(first_bundle),
+                    first_plan.output["plan_token"],
+                    str(target),
+                )
+                self.assertEqual(first_result["status"], "applied")
+
+                store = target / ".knowledge-os-handoffs"
+                first_active, _ = module.read_active(store)
+                first_entry = first_active["handoffs"][0]
+                first_manifest_path = store / first_entry["manifest"]
+                first_manifest_raw = first_manifest_path.read_bytes()
+                malformed_manifest, _ = module.load_yaml_mapping(
+                    first_manifest_path, label="handoff.yaml"
+                )
+                malformed_manifest["source"] = "invalid"
+                first_manifest_path.write_bytes(module.yaml_bytes(malformed_manifest))
+                with self.assertRaises(module.HandoffError) as malformed:
+                    module.validate_repository(DIST, remote, worktree_path=str(target))
+                self.assertEqual(malformed.exception.code, "invalid_type")
+                first_manifest_path.write_bytes(first_manifest_raw)
+
+                legacy_active = {
+                    "schema-version": 1,
+                    "handoff-id": first_entry["handoff-id"],
+                    "family": first_entry["family"],
+                    "revision": first_entry["revision"],
+                    "manifest": first_entry["manifest"],
+                    "activated-at": first_entry["activated-at"],
+                }
+                (store / "ACTIVE.yaml").write_bytes(module.yaml_bytes(legacy_active))
+
+                legacy_validation = module.validate_repository(
+                    DIST, remote, worktree_path=str(target)
+                )
+                self.assertEqual(legacy_validation["status"], "valid")
+                self.assertEqual(len(legacy_validation["handoffs"]), 1)
+
+                second_plan = module.build_apply_plan(
+                    DIST, str(second_bundle), str(target)
+                )
+                second_result = module.apply_plan(
+                    DIST,
+                    str(second_bundle),
+                    second_plan.output["plan_token"],
+                    str(target),
+                )
+                self.assertEqual(second_result["status"], "applied")
+                shared, _ = module.read_active(store)
+                self.assertEqual(shared["schema-version"], 2)
+                self.assertEqual(shared["investigation-id"], investigation)
+                self.assertEqual(
+                    [entry["family"] for entry in shared["handoffs"]],
+                    ["abc-101--repository", "abc-102--repository"],
+                )
+                self.assertTrue((store / "abc-101--repository" / "handoff.yaml").is_file())
+                self.assertTrue((store / "abc-102--repository" / "handoff.yaml").is_file())
+
+                second_family = store / "abc-102--repository"
+                second_scope = second_bundle / "scope.md"
+
+                def assert_failed_apply_restores(
+                    content: str,
+                    fail_path: Path,
+                ) -> None:
+                    second_scope.write_text(content, encoding="utf-8")
+                    update_plan = module.build_apply_plan(
+                        DIST, str(second_bundle), str(target)
+                    )
+                    family_before = module.path_fingerprint(second_family)
+                    active_before = (store / "ACTIVE.yaml").read_bytes()
+                    failed = False
+
+                    def fail_once(path: Path, raw: bytes) -> None:
+                        nonlocal failed
+                        if not failed and path == fail_path:
+                            failed = True
+                            raise OSError("forced write failure")
+                        original_atomic_write(path, raw)
+
+                    with mock.patch.object(
+                        module, "atomic_write", side_effect=fail_once
+                    ):
+                        with self.assertRaises(OSError):
+                            module.apply_plan(
+                                DIST,
+                                str(second_bundle),
+                                update_plan.output["plan_token"],
+                                str(target),
+                            )
+                    self.assertTrue(failed)
+                    self.assertFalse((store / module.TRANSACTION_NAME).exists())
+                    self.assertEqual(
+                        module.path_fingerprint(second_family), family_before
+                    )
+                    self.assertEqual(
+                        (store / "ACTIVE.yaml").read_bytes(), active_before
+                    )
+                    retry = module.build_apply_plan(
+                        DIST, str(second_bundle), str(target)
+                    )
+                    self.assertEqual(
+                        retry.output["plan_token"],
+                        update_plan.output["plan_token"],
+                    )
+                    applied = module.apply_plan(
+                        DIST,
+                        str(second_bundle),
+                        retry.output["plan_token"],
+                        str(target),
+                    )
+                    self.assertEqual(applied["status"], "applied")
+
+                assert_failed_apply_restores(
+                    "# Scope\n\nScope v2 for ABC-102.\n",
+                    second_family / "handoff.yaml",
+                )
+                assert_failed_apply_restores(
+                    "# Scope\n\nScope v3 for ABC-102.\n",
+                    store / "ACTIVE.yaml",
+                )
+
+                second_scope.write_text(
+                    "# Scope\n\nScope v4 for ABC-102.\n", encoding="utf-8"
+                )
+                interrupted_plan = module.build_apply_plan(
+                    DIST, str(second_bundle), str(target)
+                )
+                interrupted = False
+
+                def interrupt_once(path: Path, raw: bytes) -> None:
+                    nonlocal interrupted
+                    if not interrupted and path == store / "ACTIVE.yaml":
+                        interrupted = True
+                        raise KeyboardInterrupt()
+                    original_atomic_write(path, raw)
+
+                with mock.patch.object(
+                    module, "atomic_write", side_effect=interrupt_once
+                ):
+                    with self.assertRaises(KeyboardInterrupt):
+                        module.apply_plan(
+                            DIST,
+                            str(second_bundle),
+                            interrupted_plan.output["plan_token"],
+                            str(target),
+                        )
+                self.assertTrue((store / module.TRANSACTION_NAME).is_dir())
+                with self.assertRaises(module.HandoffError) as pending:
+                    module.build_apply_plan(DIST, str(second_bundle), str(target))
+                self.assertEqual(
+                    pending.exception.code, "handoff_recovery_required"
+                )
+                interrupted_family = module.path_fingerprint(second_family)
+                interrupted_active = (store / "ACTIVE.yaml").read_bytes()
+                with self.assertRaises(module.HandoffError) as wrong_token:
+                    module.apply_plan(
+                        DIST,
+                        str(second_bundle),
+                        "0" * 64,
+                        str(target),
+                    )
+                self.assertEqual(wrong_token.exception.code, "plan_stale")
+                self.assertTrue((store / module.TRANSACTION_NAME).is_dir())
+                self.assertEqual(
+                    module.path_fingerprint(second_family), interrupted_family
+                )
+                self.assertEqual(
+                    (store / "ACTIVE.yaml").read_bytes(), interrupted_active
+                )
+                with self.assertRaises(module.HandoffError) as wrong_bundle:
+                    module.apply_plan(
+                        DIST,
+                        str(first_bundle),
+                        interrupted_plan.output["plan_token"],
+                        str(target),
+                    )
+                self.assertEqual(wrong_bundle.exception.code, "plan_stale")
+                self.assertTrue((store / module.TRANSACTION_NAME).is_dir())
+                self.assertEqual(
+                    module.path_fingerprint(second_family), interrupted_family
+                )
+                self.assertEqual(
+                    (store / "ACTIVE.yaml").read_bytes(), interrupted_active
+                )
+                history = second_family / "history"
+                saved_history = root / "saved-history"
+                external_history = root / "external-history"
+                history.rename(saved_history)
+                external_history.mkdir()
+                external_event = (
+                    external_history
+                    / f"{interrupted_plan.output['handoff']['revision']}.md"
+                )
+                external_event.write_text("external\n", encoding="utf-8")
+                history.symlink_to(external_history, target_is_directory=True)
+                with self.assertRaises(module.HandoffError) as unsafe_target:
+                    module.apply_plan(
+                        DIST,
+                        str(second_bundle),
+                        interrupted_plan.output["plan_token"],
+                        str(target),
+                    )
+                self.assertEqual(
+                    unsafe_target.exception.code, "unsafe_transaction_target"
+                )
+                self.assertEqual(
+                    external_event.read_text(encoding="utf-8"), "external\n"
+                )
+                self.assertTrue((store / module.TRANSACTION_NAME).is_dir())
+                history.unlink()
+                saved_history.rename(history)
+                recovered = module.apply_plan(
+                    DIST,
+                    str(second_bundle),
+                    interrupted_plan.output["plan_token"],
+                    str(target),
+                )
+                self.assertEqual(recovered["status"], "applied")
+                self.assertFalse((store / module.TRANSACTION_NAME).exists())
+
+                third_bundle = write_bundle("ABC-103", "S-003")
+                third_plan = module.build_apply_plan(
+                    DIST, str(third_bundle), str(target)
+                )
+                third_interrupted = False
+
+                def interrupt_third(path: Path, raw: bytes) -> None:
+                    nonlocal third_interrupted
+                    if not third_interrupted and path == store / "ACTIVE.yaml":
+                        third_interrupted = True
+                        raise KeyboardInterrupt()
+                    original_atomic_write(path, raw)
+
+                with mock.patch.object(
+                    module, "atomic_write", side_effect=interrupt_third
+                ):
+                    with self.assertRaises(KeyboardInterrupt):
+                        module.apply_plan(
+                            DIST,
+                            str(third_bundle),
+                            third_plan.output["plan_token"],
+                            str(target),
+                        )
+                third_family = store / "abc-103--repository"
+                diagnostic = third_family / "diagnostic.txt"
+                diagnostic.write_text("preserve\n", encoding="utf-8")
+                with self.assertRaises(module.HandoffError) as conflict:
+                    module.apply_plan(
+                        DIST,
+                        str(third_bundle),
+                        third_plan.output["plan_token"],
+                        str(target),
+                    )
+                self.assertEqual(
+                    conflict.exception.code, "handoff_recovery_conflict"
+                )
+                self.assertEqual(diagnostic.read_text(encoding="utf-8"), "preserve\n")
+                self.assertTrue((store / module.TRANSACTION_NAME).is_dir())
+                diagnostic.unlink()
+                third_recovered = module.apply_plan(
+                    DIST,
+                    str(third_bundle),
+                    third_plan.output["plan_token"],
+                    str(target),
+                )
+                self.assertEqual(third_recovered["status"], "applied")
+                self.assertTrue((third_family / "handoff.yaml").is_file())
+
+            entered = threading.Event()
+
+            def enter_same_store() -> None:
+                with module.handoff_store_lock(target):
+                    entered.set()
+
+            with module.handoff_store_lock(target):
+                waiter = threading.Thread(target=enter_same_store)
+                waiter.start()
+                self.assertFalse(entered.wait(0.1))
+            self.assertTrue(entered.wait(1))
+            waiter.join(timeout=1)
+            self.assertFalse(waiter.is_alive())
+
+            windows_lock = SimpleNamespace(
+                LK_LOCK=1,
+                LK_UNLCK=2,
+                locking=mock.Mock(),
+            )
+            with (
+                mock.patch.object(module.os, "name", "nt"),
+                mock.patch.object(module, "msvcrt", windows_lock, create=True),
+            ):
+                with module.handoff_store_lock(target):
+                    pass
+            self.assertEqual(
+                [call.args[1] for call in windows_lock.locking.call_args_list],
+                [windows_lock.LK_LOCK, windows_lock.LK_UNLCK],
+            )
+
+            failed_windows_lock = SimpleNamespace(
+                LK_LOCK=1,
+                LK_UNLCK=2,
+                locking=mock.Mock(side_effect=OSError("busy")),
+            )
+            real_close = module.os.close
+            with (
+                mock.patch.object(module.os, "name", "nt"),
+                mock.patch.object(
+                    module, "msvcrt", failed_windows_lock, create=True
+                ),
+                mock.patch.object(module.os, "close", wraps=real_close) as close,
+            ):
+                with self.assertRaises(OSError):
+                    with module.handoff_store_lock(target):
+                        self.fail("The body must not run without the lock")
+            self.assertEqual(failed_windows_lock.locking.call_count, 1)
+            self.assertEqual(
+                failed_windows_lock.locking.call_args.args[1],
+                failed_windows_lock.LK_LOCK,
+            )
+            close.assert_called_once()
+
+    def test_state_flow_preserves_other_handoffs_and_reopens(self) -> None:
+        helper = (
+            DIST
+            / "kernel/.agents/skills/manage-development-handoff/scripts/development-handoff.py"
+        )
+        module_name = "development_handoff_state_flow_eval"
+        spec = importlib.util.spec_from_file_location(module_name, helper)
+        self.assertIsNotNone(spec)
+        self.assertIsNotNone(spec.loader)
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[module_name] = module
+        self.addCleanup(sys.modules.pop, module_name, None)
+        spec.loader.exec_module(module)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "worktree"
+            store = target / ".knowledge-os-handoffs"
+            first_family = store / "abc-101--repository"
+            second_family = store / "abc-102--repository"
+            first_family.mkdir(parents=True)
+            second_family.mkdir()
+            active = {
+                "schema-version": 2,
+                "investigation-id": "20260831-shared-worktree",
+                "handoffs": [
+                    {
+                        "handoff-id": "a" * 64,
+                        "family": first_family.name,
+                        "revision": "v0001",
+                        "manifest": f"{first_family.name}/handoff.yaml",
+                        "activated-at": "2026-08-31T12:00:00Z",
+                        "state": "active",
+                    },
+                    {
+                        "handoff-id": "b" * 64,
+                        "family": second_family.name,
+                        "revision": "v0001",
+                        "manifest": f"{second_family.name}/handoff.yaml",
+                        "activated-at": "2026-08-31T12:01:00Z",
+                        "state": "active",
+                    },
+                ],
+            }
+            (store / "ACTIVE.yaml").write_bytes(module.yaml_bytes(active))
+
+            def existing(path: Path, **_: object) -> SimpleNamespace:
+                return SimpleNamespace(
+                    revision="v0001",
+                    family_path=path,
+                    manifest={
+                        "source": {
+                            "investigation-id": active["investigation-id"]
+                        },
+                        "story": {"issue-key": "ABC-101"},
+                    },
+                )
+
+            replacements = {
+                "resolve_handoff_target": mock.Mock(
+                    return_value=(
+                        target,
+                        "example.invalid/team/repository",
+                        "issue/ABC-101-first-story",
+                    )
+                ),
+                "prepare_instructions": mock.Mock(return_value=({}, {})),
+                "read_existing_handoff": mock.Mock(side_effect=existing),
+                "validate_implementation_updates": mock.Mock(return_value={}),
+                "closure_fingerprint": mock.Mock(return_value="c" * 64),
+                "read_asset": mock.Mock(return_value=b"managed-policy"),
+                "now_utc": mock.Mock(return_value="2026-08-31T13:00:00Z"),
+            }
+            with mock.patch.multiple(module, **replacements):
+                ready = module.set_state(
+                    DIST,
+                    "https://example.invalid/team/repository.git",
+                    None,
+                    str(target),
+                    "a" * 64,
+                    "ready-for-production",
+                    "c" * 64,
+                )
+                applied_ready = module.set_state(
+                    DIST,
+                    "https://example.invalid/team/repository.git",
+                    ready["plan_token"],
+                    str(target),
+                    "a" * 64,
+                    "ready-for-production",
+                    "c" * 64,
+                )
+                self.assertEqual(applied_ready["status"], "state-updated")
+                observed, _ = module.read_active(store)
+                self.assertEqual(observed["handoffs"][0]["state"], "ready-for-production")
+                self.assertEqual(observed["handoffs"][1]["state"], "active")
+                ready_noop = module.set_state(
+                    DIST,
+                    "https://example.invalid/team/repository.git",
+                    None,
+                    str(target),
+                    "a" * 64,
+                    "ready-for-production",
+                )
+                self.assertEqual(ready_noop["action"], "noop")
+
+                production = module.set_state(
+                    DIST,
+                    "https://example.invalid/team/repository.git",
+                    None,
+                    str(target),
+                    "a" * 64,
+                    "production",
+                )
+                module.set_state(
+                    DIST,
+                    "https://example.invalid/team/repository.git",
+                    production["plan_token"],
+                    str(target),
+                    "a" * 64,
+                    "production",
+                )
+                production_noop = module.set_state(
+                    DIST,
+                    "https://example.invalid/team/repository.git",
+                    None,
+                    str(target),
+                    "a" * 64,
+                    "production",
+                )
+                self.assertEqual(production_noop["action"], "noop")
+                with self.assertRaises(module.HandoffError) as invalid_downgrade:
+                    module.build_set_state_plan(
+                        DIST,
+                        "https://example.invalid/team/repository.git",
+                        str(target),
+                        "a" * 64,
+                        "ready-for-production",
+                        "c" * 64,
+                    )
+                self.assertEqual(
+                    invalid_downgrade.exception.code,
+                    "invalid_state_transition",
+                )
+                reopen = module.set_state(
+                    DIST,
+                    "https://example.invalid/team/repository.git",
+                    None,
+                    str(target),
+                    "a" * 64,
+                    "active",
+                )
+                module.set_state(
+                    DIST,
+                    "https://example.invalid/team/repository.git",
+                    reopen["plan_token"],
+                    str(target),
+                    "a" * 64,
+                    "active",
+                )
+                reopened, _ = module.read_active(store)
+                self.assertEqual(reopened["handoffs"][0]["state"], "active")
+                self.assertEqual(
+                    reopened["handoffs"][0]["activated-at"],
+                    "2026-08-31T13:00:00Z",
+                )
+                self.assertEqual(reopened["handoffs"][1]["state"], "active")
+
+                stale = module.set_state(
+                    DIST,
+                    "https://example.invalid/team/repository.git",
+                    None,
+                    str(target),
+                    "a" * 64,
+                    "ready-for-production",
+                    "c" * 64,
+                )
+                reopened["handoffs"][1]["state"] = "ready-for-production"
+                (store / "ACTIVE.yaml").write_bytes(module.yaml_bytes(reopened))
+                with self.assertRaises(module.HandoffError) as changed:
+                    module.set_state(
+                        DIST,
+                        "https://example.invalid/team/repository.git",
+                        stale["plan_token"],
+                        str(target),
+                        "a" * 64,
+                        "ready-for-production",
+                        "c" * 64,
+                    )
+                self.assertEqual(changed.exception.code, "plan_stale")
 
     def test_closure_fingerprint_binds_handoff_and_repository_evidence(self) -> None:
         helper = (

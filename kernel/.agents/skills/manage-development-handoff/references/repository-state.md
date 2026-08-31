@@ -1,6 +1,6 @@
 # Development handoff repository state
 
-Load this reference for `plan`, `apply`, `validate`, and `deactivate` after the worktree lifecycle has selected one exact target.
+Load this reference for `plan`, `apply`, `validate`, and `set-state` after the worktree lifecycle has selected one exact target.
 
 ## Contents
 
@@ -9,17 +9,19 @@ Load this reference for `plan`, `apply`, `validate`, and `deactivate` after the 
 - [Managed repository surfaces](#managed-repository-surfaces)
 - [Plan and apply](#plan-and-apply)
 - [Validate](#validate)
-- [Deactivate](#deactivate)
+- [Set state](#set-state)
 - [Completion criterion](#completion-criterion)
 
 ## Materialized layout
 
-Each target worktree stores one readable current state plus append-only revision events:
+Each target worktree stores one registry plus one complete family per Jira story:
 
 ```text
 .knowledge-os-handoffs/
+├── .ACTIVE.lock
+├── .APPLY.transaction/        # only while an apply is incomplete
 ├── ACTIVE.yaml
-└── issue-3812--schema-repository/
+├── issue-3812--schema-repository/
     ├── handoff.yaml
     ├── START.md
     ├── jira.md
@@ -29,9 +31,12 @@ Each target worktree stores one readable current state plus append-only revision
     └── history/
         ├── v0001.md
         └── v0002.md
+└── issue-3813--schema-repository/
+    └── ...
 ```
 
 There is no directory per revision. An agent reads stable current paths, then the exact `history/vNNNN.md` event referenced by `handoff.yaml`.
+`.ACTIVE.lock` and `.APPLY.transaction/` are operational safeguards only; they carry no handoff state or history. The transaction snapshots only paths that the current apply may change and is removed after commit or rollback.
 
 ## Identity and revisions
 
@@ -45,15 +50,16 @@ The visible family is `<issue-key-lower>--<repository-basename-lower>`. `handoff
 
 Each material export compares `jira.md`, `context.md`, and `scope.md` independently:
 
-- Same semantic hashes: no new revision and no rewritten document.
+- Same semantic hashes: no new revision and no rewritten document; when the selected entry is not `active`, reactivate it without creating history.
 - One or more changed hashes: increment `vNNNN`, write only changed documents, append one event, and update `handoff.yaml` and `ACTIVE.yaml`.
-- Same content while another family is active: reactivate the existing revision without creating history.
 
 `START.md` is stable bootstrap material. `history/v0001.md` records the baseline and hashes without duplicating every source document. Later events record the reason, changed and unchanged paths, old/new semantic hashes, and unified diffs for changed documents only. Each event stores the previous event's SHA-256; `handoff.yaml` anchors the current event, making the entire history chain tamper-evident.
 
 `implementation-updates.md` is deliberately outside the content revision and hash chain. It is the single append-only changelog for material changes to the exported definition discovered during any later activity. Its entries use contiguous `UPD-NNN` IDs and the mandatory fields defined in the managed root-instruction block. Existing entries are never edited, deleted, reordered, or renumbered; a later entry names what it supersedes. `Analysis` is present only when analysis actually occurred. The file is created with a new family; its absence from an existing family is invalid.
 
-History events are immutable. `handoff.yaml` is the current integrity index and `ACTIVE.yaml` is the worktree-local active pointer. It answers which exact handoff revision governs the current implementation session without scanning every retained family. One worktree has at most one active handoff; concurrent stories use separate worktrees and therefore separate pointers.
+History events are immutable. Each `handoff.yaml` is its family's integrity index. `ACTIVE.yaml` is the worktree-local registry for one investigation and lists every handoff's exact revision and current state: `active`, `ready-for-production`, or `production`. `activated-at` records the latest materialization or state transition that placed that entry in `active`. A shared worktree never combines investigations or repositories.
+
+A schema-v1 `ACTIVE.yaml` is accepted only as its original single active handoff. The next materialization or state change writes the schema-v2 registry; no separate migration artifact or history is created.
 
 ## Managed repository surfaces
 
@@ -92,9 +98,9 @@ Run:
   --worktree-path <absolute-worktree-path>
 ```
 
-`plan` is read-only. It resolves `repository.remote` through `90-Meta/workspace-config.py locate-repository`, verifies that the explicit path is a registered worktree under the configured root and attached to the Jira branch, validates current state, and returns the target, branch, action, revision, changed documents, exact effects, tracked status, and a `plan_token`.
+`plan` is read-only. It resolves `repository.remote` through `90-Meta/workspace-config.py locate-repository`, verifies that the explicit path is a registered worktree under the configured root and attached to a branch, and requires the first handoff's Jira branch to match on every operation. Later handoffs preserve that anchor branch and must match the registry investigation. The plan validates current state and returns the target, branch, action, revision, changed documents, exact effects, tracked status, and a `plan_token`.
 
-For existing worktrees, plan every package in a multi-repository handoff before the first write. Present one consolidated effect plan and obtain explicit authorization for the exact targets and effects. Then apply each unchanged plan:
+For existing worktrees, `plan` may attach a new family only when `ACTIVE.yaml` names the package's investigation. It preserves the existing branch and every registered family. Present the exact registry and family effects, then apply each unchanged plan:
 
 ```text
 <python> -B <skill-dir>/scripts/development-handoff.py \
@@ -102,7 +108,7 @@ For existing worktrees, plan every package in a multi-repository handoff before 
   --worktree-path <absolute-worktree-path> --plan-token <approved-token>
 ```
 
-`apply` recomputes the plan immediately. Any bundle, target branch or `HEAD`, instruction, ignore, active-pointer, changelog, or handoff-state change invalidates the token before writing. Current documents and pointers use atomic file replacement; `handoff.yaml` and `ACTIVE.yaml` are written last so readers can detect and retry an incomplete concurrent view. Never overwrite an existing `implementation-updates.md`.
+`apply` serializes one worktree, restores any interrupted apply, and then recomputes the approved plan. Any bundle, target branch or `HEAD`, instruction, ignore, registry, changelog, or handoff-state change invalidates the token before writing. Before its first write, it snapshots only the exact root instructions, ignore file, family files, and registry file that operation may touch and binds that snapshot to the approved token, exact bundle, and handoff. Before each write it records that file's expected hash. A handled write or validation failure restores those files immediately; an interrupted process leaves the snapshot so only the exact authorized apply can restore it before token validation. Recovery accepts a planned path only when it still has its prior content or that exact expected hash; other edits and unplanned content block recovery and remain preserved for explicit resolution. Current files still use atomic replacement, and successful validation marks the transaction committed before cleanup. Applying a changed or reopened family sets only that entry to `active`. Never overwrite an existing `implementation-updates.md`.
 
 Multi-repository preparation and application are sequential and have no broad rollback. If a later repository fails, validate and report every prepared, worktree-created, handoff-applied, failed, and untouched target; resume only from newly planned tokens.
 
@@ -116,23 +122,23 @@ Run:
   --worktree-path <absolute-worktree-path>
 ```
 
-Validation is read-only. It checks the current exact managed policy, effective ignore behavior, active identity, current revision, contiguous history, normalized remote, every raw and semantic baseline hash, and the changelog's canonical H1, contiguous IDs, required fields, allowed states, backward-only entry references, and secret scan. For an active handoff it also returns `closure_fingerprint`, a SHA-256 binding of the exact active family, `ACTIVE.yaml`, `HEAD`, Git status, binary diff, and names and contents of non-ignored untracked paths. It cannot prove that no earlier entry was rewritten or attest a case-file mutation; reconciliation owns those semantic and procedural checks. `inactive` is valid when the bootstrap remains but `ACTIVE.yaml` is absent.
+Validation is read-only. It checks the managed policy, ignore behavior, anchor branch, shared investigation, unique registry identities, every current revision and family, normalized remote, history, hashes, and changelogs. It returns one result per handoff, including state and a `closure_fingerprint` binding that family, the complete `ACTIVE.yaml`, `HEAD`, Git status, binary diff, and non-ignored untracked content. `inactive` is valid when the bootstrap remains but `ACTIVE.yaml` is absent.
 
-## Deactivate
+## Set state
 
-Preview deactivation without a token:
+Preview one state update without a token:
 
 ```text
 <python> -B <skill-dir>/scripts/development-handoff.py \
-  --vault-root <vault-root> deactivate --repository-remote <git-remote> \
+  --vault-root <vault-root> set-state --repository-remote <git-remote> \
   --worktree-path <absolute-worktree-path> \
-  --disposition <paused|abandoned|reconciled> \
-  [--reconciled-handoff-id <handoff-id> --reconciled-revision <vNNNN> \
-   --reconciled-closure-fingerprint <sha256>]
+  --handoff-id <handoff-id> \
+  --state <active|ready-for-production|production> \
+  [--closure-fingerprint <sha256>]
 ```
 
-After explicit authorization, repeat with the returned `--plan-token`. `reconciled` requires all three reconciliation fields and binds them to the active pointer, current local evidence, and token; direct paused or abandoned closure omits them. Planning fails with `reconciliation_snapshot_mismatch` when the supplied fingerprint is no longer current. Apply recomputes the same plan, so a mutation during the authorization wait fails as `plan_stale`. Deactivation removes `ACTIVE.yaml` and, when stale, replaces only the exact managed policy block in the same approved plan. It preserves the ignore rule, materialized family, changelog, and complete history. If the pointer is already absent but policy is stale, the action is `refresh-policy`; exact current state is a no-op. Reapplying the same package later activates the existing revision.
+After explicit authorization, repeat with the returned `--plan-token`. A change to `ready-for-production` requires an `active` entry and the exact current closure fingerprint; `production` requires `ready-for-production`; `active` reopens any selected entry. Repeating the current state is a no-op. Apply recomputes the plan, so mutation during authorization fails as `plan_stale`. Only the selected state and any stale managed policy change; families and other registry entries remain intact.
 
 ## Completion criterion
 
-A plan is complete when every exact worktree, branch, revision, and effect is visible. Apply is complete when every authorized worktree validates at its planned revision, or a partial result names applied, failed, and untouched targets without claiming rollback. Deactivation is complete when that worktree's pointer is absent, its authorized disposition is reported, and all family history remains intact.
+A plan is complete when every exact worktree, branch, revision, registry change, and effect is visible. Apply is complete when every authorized worktree validates at its planned revisions, or a partial result names applied, failed, and untouched targets without claiming rollback. A state update is complete when only the selected entry changed and validation preserves every family.

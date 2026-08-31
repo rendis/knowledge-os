@@ -133,7 +133,7 @@ Each question records `open`, `resolved`, or `superseded` state. Keep open quest
 
 Each evidence entry states its claim, category (`fact`, `inference`, `contradiction`, or `limitation`), source, and relevant location such as file, section, page, line, URL, or revision. Link decisions and acceptance criteria to supporting identifiers when available.
 
-Each materialized development target has one stable entry under **Development handoffs**. Allocate a new `DH-NNN` for a new story-and-repository identity; update that same entry when a later materialization advances its current revision. Record these fields exactly:
+Each materialized development target has one stable entry under **Development handoffs**. Allocate a new `DH-NNN` for a new story-and-repository identity; update that same entry when a later materialization advances its current revision. Entries from the same investigation and repository may share an exact worktree path; their story, Jira, handoff, family, and revision identities remain distinct. Record these fields exactly:
 
 ```text
 ### DH-001 — <Jira key> / <repository basename>

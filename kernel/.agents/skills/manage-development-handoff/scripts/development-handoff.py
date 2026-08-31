@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Plan, prepare, apply, validate, or deactivate Jira development handoffs."""
+"""Plan, prepare, apply, validate, or update Jira development handoffs."""
 from __future__ import annotations
 
 import argparse
@@ -11,11 +11,13 @@ import io
 import json
 import os
 import re
+import shutil
 import stat
 import subprocess
 import sys
 import tempfile
 import unicodedata
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -25,8 +27,14 @@ from urllib.parse import urlparse
 from ruamel.yaml import YAML
 from ruamel.yaml.error import YAMLError
 
+if os.name == "nt":
+    import msvcrt
+else:
+    import fcntl
+
 
 SCHEMA_VERSION = 1
+ACTIVE_SCHEMA_VERSION = 2
 DOCUMENTS = ("context.md", "jira.md", "scope.md")
 MANAGED_BEGIN = '<!-- knowledge-os:managed:start id="development handoff" -->'
 MANAGED_END = '<!-- knowledge-os:managed:end id="development handoff" -->'
@@ -36,10 +44,14 @@ INSTRUCTION_FILES = ("AGENTS.md", "CLAUDE.md")
 IGNORE_RULE = "/.knowledge-os-handoffs/"
 STORE_NAME = ".knowledge-os-handoffs"
 ACTIVE_NAME = "ACTIVE.yaml"
+LOCK_NAME = ".ACTIVE.lock"
+TRANSACTION_NAME = ".APPLY.transaction"
+TRANSACTION_PREPARE_NAME = ".APPLY.transaction.prepare"
+TRANSACTION_COMMITTED_NAME = "COMMITTED"
 MANIFEST_NAME = "handoff.yaml"
 START_NAME = "START.md"
 UPDATES_NAME = "implementation-updates.md"
-DEACTIVATION_DISPOSITIONS = {"paused", "abandoned", "reconciled"}
+HANDOFF_STATES = {"active", "ready-for-production", "production"}
 MAX_DOCUMENT_BYTES = 1_048_576
 MAX_BUNDLE_BYTES = 3_145_728
 MAX_AGENTS_BYTES = 32_768
@@ -174,6 +186,7 @@ class ApplyPlan:
     bundle: Bundle
     family: str
     handoff_id: str
+    active: dict[str, Any] | None
     existing: ExistingHandoff | None
     changed_documents: list[str]
     unchanged_documents: list[str]
@@ -1493,7 +1506,7 @@ def validate_implementation_updates(path: Path) -> dict[str, object]:
     if raw is None:
         raise HandoffError(
             "implementation_updates_missing",
-            "The active handoff has no implementation update changelog",
+            "The registered handoff has no implementation update changelog",
             path=str(path),
         )
     if len(raw) > MAX_UPDATES_BYTES:
@@ -1933,6 +1946,51 @@ def read_existing_handoff(
             "The canonical handoff family targets a different repository remote",
             family=family,
         )
+    source = expect_mapping(manifest.get("source"), field="manifest.source")
+    expect_exact_keys(
+        source,
+        {"investigation-id", "investigation-updated-at", "story-id"},
+        field="manifest.source",
+    )
+    source["investigation-id"] = expect_string(
+        source["investigation-id"],
+        field="manifest.source.investigation-id",
+        maximum=200,
+    )
+    source["investigation-updated-at"] = expect_timestamp(
+        source["investigation-updated-at"],
+        field="manifest.source.investigation-updated-at",
+    )
+    source["story-id"] = expect_string(
+        source["story-id"], field="manifest.source.story-id", maximum=32
+    )
+    if STORY_ID_RE.fullmatch(source["story-id"]) is None:
+        raise HandoffError(
+            "invalid_handoff_manifest",
+            "handoff.yaml contains an invalid source story ID",
+        )
+    story = expect_mapping(manifest.get("story"), field="manifest.story")
+    expect_exact_keys(
+        story,
+        {
+            "site",
+            "issue-key",
+            "url",
+            "updated-at",
+            "captured-at",
+            "freshness",
+            "snapshot-source",
+        },
+        field="manifest.story",
+    )
+    story["issue-key"] = expect_string(
+        story["issue-key"], field="manifest.story.issue-key", maximum=64
+    )
+    if ISSUE_KEY_RE.fullmatch(story["issue-key"]) is None:
+        raise HandoffError(
+            "invalid_handoff_manifest",
+            "handoff.yaml contains an invalid Jira issue key",
+        )
     revision = manifest.get("revision")
     if not isinstance(revision, str) or REVISION_RE.fullmatch(revision) is None:
         raise HandoffError(
@@ -1976,46 +2034,742 @@ def read_active(store: Path) -> tuple[dict[str, Any] | None, bytes | None]:
     if not path.exists() and not path.is_symlink():
         return None, None
     active, raw = load_yaml_mapping(path, label=ACTIVE_NAME)
-    expected = {
-        "schema-version",
+    schema_version = active.get("schema-version")
+    if schema_version == SCHEMA_VERSION:
+        expected = {
+            "schema-version",
+            "handoff-id",
+            "family",
+            "revision",
+            "manifest",
+            "activated-at",
+        }
+        expect_exact_keys(active, expected, field="ACTIVE.yaml")
+        handoff_id = expect_string(
+            active["handoff-id"], field="ACTIVE.yaml.handoff-id", maximum=64
+        )
+        family = expect_string(
+            active["family"], field="ACTIVE.yaml.family", maximum=200
+        )
+        revision = expect_string(
+            active["revision"], field="ACTIVE.yaml.revision", maximum=16
+        )
+        if (
+            re.fullmatch(r"[a-f0-9]{64}", handoff_id) is None
+            or FAMILY_RE.fullmatch(family) is None
+            or REVISION_RE.fullmatch(revision) is None
+        ):
+            raise HandoffError(
+                "invalid_active_pointer",
+                "Legacy ACTIVE.yaml contains a non-canonical identity",
+            )
+        manifest = validate_relative_path(
+            active["manifest"], field="ACTIVE.yaml.manifest"
+        )
+        if manifest != f"{family}/{MANIFEST_NAME}":
+            raise HandoffError(
+                "invalid_active_pointer",
+                "Legacy ACTIVE.yaml must point to its stable family manifest",
+            )
+        active["handoff-id"] = handoff_id
+        active["family"] = family
+        active["revision"] = revision
+        active["manifest"] = manifest
+        active["activated-at"] = expect_timestamp(
+            active["activated-at"], field="ACTIVE.yaml.activated-at"
+        )
+        return active, raw
+    if schema_version != ACTIVE_SCHEMA_VERSION:
+        raise HandoffError(
+            "unsupported_active_schema",
+            "ACTIVE.yaml uses an unsupported schema version",
+        )
+    expected = {"schema-version", "investigation-id", "handoffs"}
+    expect_exact_keys(active, expected, field="ACTIVE.yaml")
+    investigation_id = expect_string(
+        active["investigation-id"],
+        field="ACTIVE.yaml.investigation-id",
+        maximum=200,
+    )
+    raw_handoffs = active["handoffs"]
+    if not isinstance(raw_handoffs, list) or not raw_handoffs:
+        raise HandoffError(
+            "invalid_active_pointer",
+            "ACTIVE.yaml must contain at least one handoff",
+        )
+    seen_ids: set[str] = set()
+    seen_families: set[str] = set()
+    normalized_handoffs: list[dict[str, str]] = []
+    entry_keys = {
         "handoff-id",
         "family",
         "revision",
         "manifest",
         "activated-at",
+        "state",
     }
-    expect_exact_keys(active, expected, field="ACTIVE.yaml")
-    if active["schema-version"] != SCHEMA_VERSION:
-        raise HandoffError(
-            "unsupported_active_schema",
-            "ACTIVE.yaml uses an unsupported schema version",
+    for index, raw_entry in enumerate(raw_handoffs):
+        field = f"ACTIVE.yaml.handoffs[{index}]"
+        entry = expect_mapping(raw_entry, field=field)
+        expect_exact_keys(entry, entry_keys, field=field)
+        handoff_id = expect_string(
+            entry["handoff-id"], field=f"{field}.handoff-id", maximum=64
         )
-    family = expect_string(active["family"], field="ACTIVE.yaml.family", maximum=200)
-    if FAMILY_RE.fullmatch(family) is None:
-        raise HandoffError(
-            "invalid_active_pointer",
-            "ACTIVE.yaml contains a non-canonical family",
+        if re.fullmatch(r"[a-f0-9]{64}", handoff_id) is None:
+            raise HandoffError(
+                "invalid_active_pointer",
+                "ACTIVE.yaml contains an invalid handoff ID",
+            )
+        family = expect_string(entry["family"], field=f"{field}.family", maximum=200)
+        revision = expect_string(
+            entry["revision"], field=f"{field}.revision", maximum=16
         )
-    revision = expect_string(
-        active["revision"],
-        field="ACTIVE.yaml.revision",
-        maximum=16,
-    )
-    if REVISION_RE.fullmatch(revision) is None:
-        raise HandoffError(
-            "invalid_active_pointer",
-            "ACTIVE.yaml contains an invalid revision",
+        state = expect_string(entry["state"], field=f"{field}.state", maximum=32)
+        if FAMILY_RE.fullmatch(family) is None or REVISION_RE.fullmatch(revision) is None:
+            raise HandoffError(
+                "invalid_active_pointer",
+                "ACTIVE.yaml contains a non-canonical family or revision",
+            )
+        if state not in HANDOFF_STATES:
+            raise HandoffError(
+                "invalid_handoff_state",
+                "ACTIVE.yaml contains an unsupported handoff state",
+                state=state,
+            )
+        expected_manifest = f"{family}/{MANIFEST_NAME}"
+        manifest = validate_relative_path(entry["manifest"], field=f"{field}.manifest")
+        if manifest != expected_manifest:
+            raise HandoffError(
+                "invalid_active_pointer",
+                "ACTIVE.yaml must point to each stable family manifest",
+            )
+        if handoff_id in seen_ids or family in seen_families:
+            raise HandoffError(
+                "duplicate_active_handoff",
+                "ACTIVE.yaml contains a duplicate handoff identity",
+            )
+        seen_ids.add(handoff_id)
+        seen_families.add(family)
+        normalized_handoffs.append(
+            {
+                "handoff-id": handoff_id,
+                "family": family,
+                "revision": revision,
+                "manifest": manifest,
+                "activated-at": expect_timestamp(
+                    entry["activated-at"], field=f"{field}.activated-at"
+                ),
+                "state": state,
+            }
         )
-    expected_manifest = f"{family}/{MANIFEST_NAME}"
-    if validate_relative_path(
-        active["manifest"],
-        field="ACTIVE.yaml.manifest",
-    ) != expected_manifest:
-        raise HandoffError(
-            "invalid_active_pointer",
-            "ACTIVE.yaml must point to the stable family manifest",
-        )
+    active["investigation-id"] = investigation_id
+    active["handoffs"] = normalized_handoffs
     return active, raw
+
+
+def normalize_active_registry(
+    store: Path,
+    active: dict[str, Any],
+    normalized_remote: str,
+) -> dict[str, Any]:
+    if active["schema-version"] == ACTIVE_SCHEMA_VERSION:
+        return active
+    family = str(active["family"])
+    handoff_id = str(active["handoff-id"])
+    existing = read_existing_handoff(
+        store / family,
+        family=family,
+        handoff_id=handoff_id,
+        normalized_remote=normalized_remote,
+    )
+    if existing is None or existing.revision != active["revision"]:
+        raise HandoffError(
+            "invalid_active_pointer",
+            "Legacy ACTIVE.yaml does not resolve to the exact handoff revision",
+            handoff_id=handoff_id,
+        )
+    return {
+        "schema-version": ACTIVE_SCHEMA_VERSION,
+        "investigation-id": existing.manifest["source"]["investigation-id"],
+        "handoffs": [
+            {
+                "handoff-id": handoff_id,
+                "family": family,
+                "revision": str(active["revision"]),
+                "manifest": str(active["manifest"]),
+                "activated-at": str(active["activated-at"]),
+                "state": "active",
+            }
+        ],
+    }
+
+
+def active_entry(active: dict[str, Any], handoff_id: str) -> dict[str, str] | None:
+    return next(
+        (
+            entry
+            for entry in active["handoffs"]
+            if entry["handoff-id"] == handoff_id
+        ),
+        None,
+    )
+
+
+def validate_active_entries(
+    store: Path,
+    active: dict[str, Any],
+    normalized_remote: str,
+    branch: str,
+) -> list[tuple[dict[str, str], ExistingHandoff, dict[str, object]]]:
+    validated = []
+    for entry in active["handoffs"]:
+        handoff_id = entry["handoff-id"]
+        existing = read_existing_handoff(
+            store / entry["family"],
+            family=entry["family"],
+            handoff_id=handoff_id,
+            normalized_remote=normalized_remote,
+        )
+        if existing is None or existing.revision != entry["revision"]:
+            raise HandoffError(
+                "invalid_active_pointer",
+                "ACTIVE.yaml does not resolve to the exact handoff revision",
+                handoff_id=handoff_id,
+            )
+        if existing.manifest["source"]["investigation-id"] != active["investigation-id"]:
+            raise HandoffError(
+                "worktree_investigation_mismatch",
+                "Every handoff in a shared worktree must belong to its investigation",
+                handoff_id=handoff_id,
+            )
+        updates = validate_implementation_updates(existing.family_path / UPDATES_NAME)
+        validated.append((entry, existing, updates))
+    anchor_issue_key = validated[0][1].manifest["story"]["issue-key"]
+    branch_leaf = branch.rsplit("/", 1)[-1]
+    if "/" not in branch or not branch_leaf.startswith(f"{anchor_issue_key}-"):
+        raise HandoffError(
+            "worktree_branch_mismatch",
+            "The worktree branch no longer matches its first handoff",
+            exit_code=3,
+            branch=branch,
+            issue_key=anchor_issue_key,
+        )
+    return validated
+
+
+@contextmanager
+def handoff_store_lock(target: Path):
+    store = target / STORE_NAME
+    ensure_safe_directory(store, label="handoff store")
+    store.mkdir(parents=True, exist_ok=True)
+    lock_path = store / LOCK_NAME
+    if lock_path.is_symlink() or (lock_path.exists() and not lock_path.is_file()):
+        raise HandoffError(
+            "unsafe_lock_target",
+            "The handoff lock must be a regular file",
+            path=str(lock_path),
+        )
+    flags = os.O_RDWR | os.O_CREAT
+    flags |= getattr(os, "O_NOFOLLOW", 0)
+    descriptor = os.open(lock_path, flags, 0o600)
+    locked = False
+    try:
+        if os.fstat(descriptor).st_size == 0:
+            os.write(descriptor, b"\0")
+        os.lseek(descriptor, 0, os.SEEK_SET)
+        if os.name == "nt":
+            msvcrt.locking(descriptor, msvcrt.LK_LOCK, 1)
+        else:
+            fcntl.flock(descriptor, fcntl.LOCK_EX)
+        locked = True
+        yield
+    finally:
+        try:
+            if locked:
+                os.lseek(descriptor, 0, os.SEEK_SET)
+                if os.name == "nt":
+                    msvcrt.locking(descriptor, msvcrt.LK_UNLCK, 1)
+                else:
+                    fcntl.flock(descriptor, fcntl.LOCK_UN)
+        finally:
+            os.close(descriptor)
+
+
+def ensure_no_pending_transaction(store: Path) -> None:
+    transaction = store / TRANSACTION_NAME
+    if transaction.is_symlink() or (transaction.exists() and not transaction.is_dir()):
+        raise HandoffError(
+            "unsafe_transaction_state",
+            "The handoff transaction state must be a directory",
+            path=str(transaction),
+        )
+    committed = transaction / TRANSACTION_COMMITTED_NAME
+    if committed.is_symlink():
+        raise HandoffError(
+            "unsafe_transaction_state",
+            "The handoff transaction commit marker is unsafe",
+            path=str(committed),
+        )
+    if transaction.is_dir() and not committed.is_file():
+        raise HandoffError(
+            "handoff_recovery_required",
+            "A previous handoff apply was interrupted; retry its authorized apply before planning new work",
+            exit_code=3,
+            path=str(transaction),
+        )
+
+
+def apply_mutation_paths(plan: ApplyPlan, revision: str) -> list[str]:
+    prefix = f"{STORE_NAME}/{plan.family}/"
+    paths: list[str] = []
+    if plan.ignore_action != "none":
+        paths.append(".gitignore")
+    paths.extend(
+        name
+        for name, action in plan.instruction_actions.items()
+        if action != "none"
+    )
+    if plan.updates_action == "create":
+        paths.append(f"{prefix}{UPDATES_NAME}")
+    if plan.existing is None:
+        paths.append(f"{prefix}{START_NAME}")
+    paths.extend(f"{prefix}{name}" for name in plan.changed_documents)
+    if plan.output["action"] in {"create", "update"}:
+        paths.extend(
+            (
+                f"{prefix}history/{revision}.md",
+                f"{prefix}{MANIFEST_NAME}",
+            )
+        )
+    if plan.output["action"] in {"create", "update", "activate"}:
+        paths.append(f"{STORE_NAME}/{ACTIVE_NAME}")
+    return list(dict.fromkeys(paths))
+
+
+def remove_transaction_directory(path: Path) -> None:
+    if path.is_symlink() or (path.exists() and not path.is_dir()):
+        raise HandoffError(
+            "unsafe_transaction_state",
+            "The handoff transaction state is unsafe",
+            path=str(path),
+        )
+    if path.exists():
+        shutil.rmtree(path)
+
+
+def ensure_safe_transaction_target(store: Path, relative: str) -> None:
+    ensure_safe_directory(store, label="handoff store")
+    current = store
+    for part in Path(relative).parts[:-1]:
+        current /= part
+        if current.is_symlink() or (current.exists() and not current.is_dir()):
+            raise HandoffError(
+                "unsafe_transaction_target",
+                "A handoff transaction target has an unsafe directory ancestor",
+                path=str(current),
+            )
+
+
+def start_apply_transaction(plan: ApplyPlan, revision: str) -> bool:
+    store = plan.target / STORE_NAME
+    transaction = store / TRANSACTION_NAME
+    prepare = store / TRANSACTION_PREPARE_NAME
+    remove_transaction_directory(prepare)
+    if transaction.exists() or transaction.is_symlink():
+        raise HandoffError(
+            "handoff_recovery_required",
+            "A previous handoff apply must be recovered before a new write",
+            exit_code=3,
+            path=str(transaction),
+        )
+    relative_paths = apply_mutation_paths(plan, revision)
+    if not relative_paths:
+        return False
+    prepare.mkdir()
+    records: list[dict[str, object]] = []
+    try:
+        for index, relative in enumerate(relative_paths):
+            normalized = validate_relative_path(
+                relative, field="transaction.path"
+            )
+            ensure_safe_transaction_target(plan.target, normalized)
+            target = plan.target / normalized
+            raw = read_optional_file(target, label=normalized)
+            backup = None
+            if raw is not None:
+                backup = f"{index:04d}.bak"
+                atomic_write(prepare / backup, raw)
+            records.append(
+                {
+                    "path": normalized,
+                    "existed": raw is not None,
+                    "backup": backup,
+                    "postimage-sha256": None,
+                }
+            )
+        metadata = {
+            "schema-version": SCHEMA_VERSION,
+            "plan-token": str(plan.output["plan_token"]),
+            "bundle-fingerprint": plan.bundle.fingerprint,
+            "handoff-id": plan.handoff_id,
+            "family": plan.family,
+            "family-existed": (store / plan.family).is_dir(),
+            "paths": records,
+        }
+        atomic_write(
+            prepare / "transaction.json",
+            canonical_json(metadata) + b"\n",
+        )
+        os.replace(prepare, transaction)
+    except Exception:
+        remove_transaction_directory(prepare)
+        raise
+    return True
+
+
+def transactional_write(target: Path, path: Path, raw: bytes) -> None:
+    transaction = target / STORE_NAME / TRANSACTION_NAME
+    metadata = load_apply_transaction(transaction)
+    try:
+        relative = path.relative_to(target).as_posix()
+    except ValueError as error:
+        raise HandoffError(
+            "invalid_transaction_state",
+            "A transactional write is outside the target worktree",
+            path=str(path),
+        ) from error
+    matched = False
+    for record in metadata["paths"]:
+        if record["path"] == relative:
+            record["postimage-sha256"] = sha256(raw)
+            matched = True
+            break
+    if not matched:
+        raise HandoffError(
+            "invalid_transaction_state",
+            "A transactional write was not declared by the apply plan",
+            path=str(path),
+        )
+    ensure_safe_transaction_target(target, relative)
+    atomic_write(
+        transaction / "transaction.json",
+        canonical_json(metadata) + b"\n",
+    )
+    atomic_write(path, raw)
+
+
+def load_apply_transaction(transaction: Path) -> dict[str, Any]:
+    metadata_path = transaction / "transaction.json"
+    if metadata_path.is_symlink() or not metadata_path.is_file():
+        raise HandoffError(
+            "invalid_transaction_state",
+            "The handoff transaction metadata is missing or unsafe",
+            path=str(metadata_path),
+        )
+    try:
+        metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise HandoffError(
+            "invalid_transaction_state",
+            "The handoff transaction metadata is invalid",
+            path=str(metadata_path),
+        ) from error
+    metadata = expect_mapping(metadata, field="transaction")
+    expect_exact_keys(
+        metadata,
+        {
+            "schema-version",
+            "plan-token",
+            "bundle-fingerprint",
+            "handoff-id",
+            "family",
+            "family-existed",
+            "paths",
+        },
+        field="transaction",
+    )
+    family = expect_string(metadata["family"], field="transaction.family", maximum=200)
+    plan_token = expect_string(
+        metadata["plan-token"], field="transaction.plan-token", maximum=64
+    )
+    bundle_fingerprint = expect_string(
+        metadata["bundle-fingerprint"],
+        field="transaction.bundle-fingerprint",
+        maximum=64,
+    )
+    handoff_id = expect_string(
+        metadata["handoff-id"], field="transaction.handoff-id", maximum=64
+    )
+    if (
+        metadata["schema-version"] != SCHEMA_VERSION
+        or FAMILY_RE.fullmatch(family) is None
+        or re.fullmatch(r"[a-f0-9]{64}", plan_token) is None
+        or re.fullmatch(r"[a-f0-9]{64}", bundle_fingerprint) is None
+        or re.fullmatch(r"[a-f0-9]{64}", handoff_id) is None
+    ):
+        raise HandoffError(
+            "invalid_transaction_state",
+            "The handoff transaction identity is invalid",
+        )
+    if not isinstance(metadata["family-existed"], bool) or not isinstance(
+        metadata["paths"], list
+    ):
+        raise HandoffError(
+            "invalid_transaction_state",
+            "The handoff transaction snapshot is invalid",
+        )
+    return metadata
+
+
+def cleanup_committed_transaction(target: Path) -> bool:
+    transaction = target / STORE_NAME / TRANSACTION_NAME
+    if not transaction.exists() and not transaction.is_symlink():
+        return False
+    if transaction.is_symlink() or not transaction.is_dir():
+        raise HandoffError(
+            "unsafe_transaction_state",
+            "The handoff transaction state is unsafe",
+            path=str(transaction),
+        )
+    committed = transaction / TRANSACTION_COMMITTED_NAME
+    if committed.is_symlink():
+        raise HandoffError(
+            "unsafe_transaction_state",
+            "The handoff transaction commit marker is unsafe",
+            path=str(committed),
+        )
+    if not committed.is_file():
+        return False
+    remove_transaction_directory(transaction)
+    return True
+
+
+def restore_apply_transaction(
+    target: Path,
+    plan_token: str,
+    bundle_fingerprint: str,
+    handoff_id: str,
+) -> bool:
+    store = target / STORE_NAME
+    prepare = store / TRANSACTION_PREPARE_NAME
+    remove_transaction_directory(prepare)
+    transaction = store / TRANSACTION_NAME
+    if not transaction.exists() and not transaction.is_symlink():
+        return False
+    if transaction.is_symlink() or not transaction.is_dir():
+        raise HandoffError(
+            "unsafe_transaction_state",
+            "The handoff transaction state is unsafe",
+            path=str(transaction),
+        )
+    if cleanup_committed_transaction(target):
+        return False
+    metadata = load_apply_transaction(transaction)
+    if (
+        not hmac.compare_digest(str(metadata["plan-token"]), plan_token)
+        or not hmac.compare_digest(
+            str(metadata["bundle-fingerprint"]), bundle_fingerprint
+        )
+        or not hmac.compare_digest(str(metadata["handoff-id"]), handoff_id)
+    ):
+        raise HandoffError(
+            "plan_stale",
+            "Only the exact interrupted apply may recover this worktree",
+            exit_code=3,
+        )
+    family = str(metadata["family"])
+    family_existed = bool(metadata["family-existed"])
+    raw_records = metadata["paths"]
+    records: list[tuple[str, bool, str | None, str | None]] = []
+    seen: set[str] = set()
+    seen_backups: set[str] = set()
+    for index, raw_record in enumerate(raw_records):
+        record = expect_mapping(raw_record, field=f"transaction.paths[{index}]")
+        expect_exact_keys(
+            record,
+            {"path", "existed", "backup", "postimage-sha256"},
+            field=f"transaction.paths[{index}]",
+        )
+        relative = validate_relative_path(
+            record["path"], field=f"transaction.paths[{index}].path"
+        )
+        existed = record["existed"]
+        backup = record["backup"]
+        postimage = record["postimage-sha256"]
+        if (
+            relative in seen
+            or not isinstance(existed, bool)
+            or (
+                relative not in {".gitignore", *INSTRUCTION_FILES}
+                and relative != f"{STORE_NAME}/{ACTIVE_NAME}"
+                and not relative.startswith(f"{STORE_NAME}/{family}/")
+            )
+        ):
+            raise HandoffError(
+                "invalid_transaction_state",
+                "The handoff transaction contains invalid path records",
+            )
+        if backup is not None and (
+            not isinstance(backup, str)
+            or re.fullmatch(r"[0-9]{4}\.bak", backup) is None
+        ):
+            raise HandoffError(
+                "invalid_transaction_state",
+                "The handoff transaction contains an invalid backup",
+            )
+        if postimage is not None and (
+            not isinstance(postimage, str)
+            or re.fullmatch(r"[a-f0-9]{64}", postimage) is None
+        ):
+            raise HandoffError(
+                "invalid_transaction_state",
+                "The handoff transaction contains an invalid postimage",
+            )
+        if existed != (backup is not None):
+            raise HandoffError(
+                "invalid_transaction_state",
+                "The handoff transaction backup does not match its path state",
+            )
+        if (
+            not family_existed
+            and relative.startswith(f"{STORE_NAME}/{family}/")
+            and existed
+        ):
+            raise HandoffError(
+                "invalid_transaction_state",
+                "A new-family transaction contains an unexpected backup",
+            )
+        if backup is not None and backup in seen_backups:
+            raise HandoffError(
+                "invalid_transaction_state",
+                "The handoff transaction reuses a backup",
+            )
+        seen.add(relative)
+        if backup is not None:
+            seen_backups.add(backup)
+        records.append((relative, existed, backup, postimage))
+
+    for relative, _existed, _backup, _postimage in records:
+        ensure_safe_transaction_target(target, relative)
+
+    family_path = store / family
+    planned_family_files = {
+        relative
+        for relative, _existed, _backup, _postimage in records
+        if relative.startswith(f"{STORE_NAME}/{family}/")
+    }
+    allowed_family_directories: set[str] = set()
+    for relative in planned_family_files:
+        family_relative = Path(relative).relative_to(STORE_NAME, family)
+        for parent in family_relative.parents:
+            if parent != Path("."):
+                allowed_family_directories.add(parent.as_posix())
+    if not family_existed:
+        ensure_safe_directory(family_path, label="handoff family")
+        if family_path.exists():
+            for child in family_path.rglob("*"):
+                child_relative = child.relative_to(family_path).as_posix()
+                store_relative = f"{STORE_NAME}/{family}/{child_relative}"
+                known = (
+                    child.is_file() and store_relative in planned_family_files
+                ) or (
+                    child.is_dir()
+                    and child_relative in allowed_family_directories
+                )
+                if child.is_symlink() or not known:
+                    raise HandoffError(
+                        "handoff_recovery_conflict",
+                        "Interrupted apply recovery found unplanned family content",
+                        exit_code=3,
+                        path=str(child),
+                    )
+
+    preimages: dict[str, bytes | None] = {}
+
+    def ensure_recoverable_content(
+        relative: str,
+        existed: bool,
+        postimage: str | None,
+    ) -> None:
+        path = target / relative
+        if path.is_symlink() or (path.exists() and not path.is_file()):
+            raise HandoffError(
+                "unsafe_transaction_target",
+                "A handoff transaction restore target is unsafe",
+                path=str(path),
+            )
+        current = read_optional_file(path, label=relative)
+        original = preimages[relative]
+        if current is None:
+            matches = not existed
+        else:
+            current_sha256 = sha256(current)
+            matches = (
+                (original is not None and current_sha256 == sha256(original))
+                or (postimage is not None and current_sha256 == postimage)
+            )
+        if not matches:
+            raise HandoffError(
+                "handoff_recovery_conflict",
+                "Interrupted apply recovery found changed planned content",
+                exit_code=3,
+                path=str(path),
+            )
+
+    for relative, existed, backup, postimage in records:
+        original = None
+        if existed:
+            assert backup is not None
+            backup_path = transaction / backup
+            original = read_optional_file(backup_path, label=backup)
+            if original is None:
+                raise HandoffError(
+                    "invalid_transaction_state",
+                    "A required handoff transaction backup is missing",
+                    path=str(backup_path),
+                )
+        preimages[relative] = original
+        ensure_recoverable_content(relative, existed, postimage)
+
+    for relative, existed, backup, postimage in sorted(
+        records, key=lambda item: item[0] == f"{STORE_NAME}/{ACTIVE_NAME}"
+    ):
+        ensure_safe_transaction_target(target, relative)
+        ensure_recoverable_content(relative, existed, postimage)
+        path = target / relative
+        if existed:
+            raw = preimages[relative]
+            assert raw is not None
+            atomic_write(path, raw)
+        elif path.exists() or path.is_symlink():
+            if path.is_symlink() or not path.is_file():
+                raise HandoffError(
+                    "unsafe_transaction_target",
+                    "A handoff transaction restore target is unsafe",
+                    path=str(path),
+                )
+            path.unlink()
+    if not family_existed and family_path.exists():
+        for relative in sorted(
+            allowed_family_directories,
+            key=lambda value: len(Path(value).parts),
+            reverse=True,
+        ):
+            directory = family_path / relative
+            if directory.exists():
+                directory.rmdir()
+        family_path.rmdir()
+    remove_transaction_directory(transaction)
+    return True
+
+
+def commit_apply_transaction(target: Path) -> None:
+    transaction = target / STORE_NAME / TRANSACTION_NAME
+    atomic_write(transaction / TRANSACTION_COMMITTED_NAME, b"committed\n")
+    try:
+        remove_transaction_directory(transaction)
+    except OSError:
+        pass
 
 
 def path_fingerprint(path: Path) -> object:
@@ -2672,8 +3426,15 @@ def build_apply_plan_from_state(
     head: str | None = None,
     verify_effective_ignore: bool = True,
 ) -> ApplyPlan:
+    store = state_root / STORE_NAME
+    ensure_safe_directory(store, label="handoff store")
+    ensure_no_pending_transaction(store)
+    active, _ = read_active(store)
+    legacy_active = active is not None and active["schema-version"] == SCHEMA_VERSION
+    if active is not None:
+        active = normalize_active_registry(store, active, normalized_remote)
     branch_leaf = branch.rsplit("/", 1)[-1]
-    if explicit_worktree and (
+    if explicit_worktree and active is None and (
         "/" not in branch
         or not branch_leaf.startswith(f"{bundle.jira['issue-key']}-")
     ):
@@ -2684,17 +3445,34 @@ def build_apply_plan_from_state(
             branch=branch,
             issue_key=bundle.jira["issue-key"],
         )
+    investigation_id = bundle.source["investigation-id"]
+    if active is not None and active["investigation-id"] != investigation_id:
+        raise HandoffError(
+            "worktree_investigation_mismatch",
+            "A shared worktree may contain handoffs from only one investigation",
+            active_investigation=active["investigation-id"],
+            requested_investigation=investigation_id,
+        )
+    if active is not None:
+        validate_active_entries(store, active, normalized_remote, branch)
     family, handoff_id = handoff_identity(bundle, normalized_remote)
-    store = state_root / STORE_NAME
     family_path = store / family
-    ensure_safe_directory(store, label="handoff store")
     existing = read_existing_handoff(
         family_path,
         family=family,
         handoff_id=handoff_id,
         normalized_remote=normalized_remote,
     )
-    active, _ = read_active(store)
+    if (
+        existing is not None
+        and existing.manifest["source"]["investigation-id"] != investigation_id
+    ):
+        raise HandoffError(
+            "worktree_investigation_mismatch",
+            "The existing handoff family belongs to another investigation",
+            existing_investigation=existing.manifest["source"]["investigation-id"],
+            requested_investigation=investigation_id,
+        )
     desired_instructions, instruction_actions = prepare_instructions(state_root)
     instructions_changed = any(
         action != "none" for action in instruction_actions.values()
@@ -2731,13 +3509,14 @@ def build_apply_plan_from_state(
             action = "update"
         else:
             revision = existing.revision
+            entry = None if active is None else active_entry(active, handoff_id)
             active_matches = (
-                active is not None
-                and active["handoff-id"] == handoff_id
-                and active["family"] == family
-                and active["revision"] == revision
+                entry is not None
+                and entry["family"] == family
+                and entry["revision"] == revision
+                and entry["state"] == "active"
             )
-            if not active_matches:
+            if legacy_active or not active_matches:
                 action = "activate"
             elif (
                 instructions_changed
@@ -2868,6 +3647,7 @@ def build_apply_plan_from_state(
         bundle=bundle,
         family=family,
         handoff_id=handoff_id,
+        active=active,
         existing=existing,
         changed_documents=changed_documents,
         unchanged_documents=unchanged_documents,
@@ -3420,14 +4200,26 @@ def active_bytes(
     revision: str,
     activated_at: str,
 ) -> bytes:
+    entry = {
+        "handoff-id": plan.handoff_id,
+        "family": plan.family,
+        "revision": revision,
+        "manifest": f"{plan.family}/{MANIFEST_NAME}",
+        "activated-at": activated_at,
+        "state": "active",
+    }
+    handoffs = [] if plan.active is None else list(plan.active["handoffs"])
+    for index, current in enumerate(handoffs):
+        if current["handoff-id"] == plan.handoff_id:
+            handoffs[index] = entry
+            break
+    else:
+        handoffs.append(entry)
     return yaml_bytes(
         {
-            "schema-version": SCHEMA_VERSION,
-            "handoff-id": plan.handoff_id,
-            "family": plan.family,
-            "revision": revision,
-            "manifest": f"{plan.family}/{MANIFEST_NAME}",
-            "activated-at": activated_at,
+            "schema-version": ACTIVE_SCHEMA_VERSION,
+            "investigation-id": plan.bundle.source["investigation-id"],
+            "handoffs": handoffs,
         }
     )
 
@@ -3461,99 +4253,181 @@ def apply_plan(
     plan_token: str,
     worktree_path: str,
 ) -> dict[str, Any]:
-    plan = build_apply_plan(vault_root, bundle_path, worktree_path)
-    observed_token = plan.output["plan_token"]
-    if not hmac.compare_digest(str(observed_token), plan_token):
-        raise HandoffError(
-            "plan_stale",
-            "The bundle or target repository changed after planning; create a new plan",
-            exit_code=3,
-        )
-    action = plan.output["action"]
-    if action == "noop":
-        return {
-            "status": "unchanged",
-            "action": "noop",
-            "target": plan.output["target"],
-            "handoff": plan.output["handoff"],
-        }
-
-    if plan.ignore_action != "none":
-        atomic_write(plan.target / ".gitignore", plan.desired_ignore)
-    verify_ignored(plan.target)
-    for name, instruction_action in plan.instruction_actions.items():
-        if instruction_action != "none":
-            atomic_write(plan.target / name, plan.desired_instructions[name])
-
-    store = plan.target / STORE_NAME
-    family_path = store / plan.family
-    history_directory = family_path / "history"
-    for path, label in (
-        (store, "handoff store"),
-        (family_path, "handoff family"),
-        (history_directory, "handoff history"),
-    ):
-        ensure_safe_directory(path, label=label)
-        path.mkdir(parents=True, exist_ok=True)
-
-    if plan.updates_action == "create":
-        atomic_write(family_path / UPDATES_NAME, read_asset(UPDATES_ASSET))
-
-    revision = plan.output["handoff"]["revision"]
-    previous = plan.output["handoff"]["previous_revision"]
-    timestamp = now_utc()
-    if action in {"create", "update"}:
-        if plan.existing is None:
-            atomic_write(family_path / START_NAME, read_asset(START_ASSET))
-        event_raw = history_event_bytes(
-            plan=plan,
-            revision=revision,
-            previous=previous,
-            previous_event_sha256=(
-                None
-                if plan.existing is None
-                else str(plan.existing.manifest["history"]["sha256"])
-            ),
-            created_at=timestamp,
-        )
-        event_path = history_directory / f"{revision}.md"
-        if event_path.exists() or event_path.is_symlink():
-            raise HandoffError(
-                "revision_already_exists",
-                "The planned immutable history event already exists",
-                path=str(event_path),
-            )
-        atomic_write(event_path, event_raw)
-        for name in plan.changed_documents:
-            atomic_write(family_path / name, plan.bundle.documents[name].raw)
-        created_at = (
-            timestamp
-            if plan.existing is None
-            else str(plan.existing.manifest["created-at"])
-        )
-        manifest_raw = manifest_bytes(
-            plan=plan,
-            revision=revision,
-            previous=previous,
-            history_path=f"history/{revision}.md",
-            history_raw=event_raw,
-            created_at=created_at,
-            updated_at=timestamp,
-        )
-        atomic_write(family_path / MANIFEST_NAME, manifest_raw)
-
-    if action in {"create", "update", "activate"}:
-        atomic_write(
-            store / ACTIVE_NAME,
-            active_bytes(plan=plan, revision=revision, activated_at=timestamp),
-        )
-
-    validation = validate_repository(
+    bundle = load_bundle(bundle_path)
+    target, normalized_remote, branch = resolve_handoff_target(
         vault_root,
-        plan.bundle.repository_remote,
-        worktree_path=worktree_path,
-        allow_inactive=False,
+        bundle.repository_remote,
+        worktree_path,
     )
+    _requested_family, requested_handoff_id = handoff_identity(
+        bundle, normalized_remote
+    )
+    with handoff_store_lock(target):
+        cleanup_committed_transaction(target)
+        restore_apply_transaction(
+            target,
+            plan_token,
+            bundle.fingerprint,
+            requested_handoff_id,
+        )
+        plan = build_apply_plan_from_state(
+            bundle,
+            state_root=target,
+            target=target,
+            normalized_remote=normalized_remote,
+            branch=branch,
+            explicit_worktree=True,
+        )
+        if not hmac.compare_digest(str(plan.output["plan_token"]), plan_token):
+            raise HandoffError(
+                "plan_stale",
+                "The bundle or target repository changed after planning; create a new plan",
+                exit_code=3,
+            )
+        action = plan.output["action"]
+        if action == "noop":
+            return {
+                "status": "unchanged",
+                "action": "noop",
+                "target": plan.output["target"],
+                "handoff": plan.output["handoff"],
+            }
+        store = plan.target / STORE_NAME
+        family_path = store / plan.family
+        history_directory = family_path / "history"
+        revision = plan.output["handoff"]["revision"]
+        previous = plan.output["handoff"]["previous_revision"]
+        transaction_started = start_apply_transaction(plan, revision)
+        try:
+            if plan.ignore_action != "none":
+                transactional_write(
+                    plan.target,
+                    plan.target / ".gitignore",
+                    plan.desired_ignore,
+                )
+            verify_ignored(plan.target)
+            for name, instruction_action in plan.instruction_actions.items():
+                if instruction_action != "none":
+                    transactional_write(
+                        plan.target,
+                        plan.target / name,
+                        plan.desired_instructions[name],
+                    )
+
+            for path, label in (
+                (store, "handoff store"),
+                (family_path, "handoff family"),
+                (history_directory, "handoff history"),
+            ):
+                ensure_safe_directory(path, label=label)
+                path.mkdir(parents=True, exist_ok=True)
+
+            if plan.updates_action == "create":
+                transactional_write(
+                    plan.target,
+                    family_path / UPDATES_NAME,
+                    read_asset(UPDATES_ASSET),
+                )
+
+            timestamp = now_utc()
+            if action in {"create", "update"}:
+                if plan.existing is None:
+                    transactional_write(
+                        plan.target,
+                        family_path / START_NAME,
+                        read_asset(START_ASSET),
+                    )
+                event_raw = history_event_bytes(
+                    plan=plan,
+                    revision=revision,
+                    previous=previous,
+                    previous_event_sha256=(
+                        None
+                        if plan.existing is None
+                        else str(plan.existing.manifest["history"]["sha256"])
+                    ),
+                    created_at=timestamp,
+                )
+                event_path = history_directory / f"{revision}.md"
+                if event_path.exists() or event_path.is_symlink():
+                    raise HandoffError(
+                        "revision_already_exists",
+                        "The planned immutable history event already exists",
+                        path=str(event_path),
+                    )
+                transactional_write(plan.target, event_path, event_raw)
+                for name in plan.changed_documents:
+                    transactional_write(
+                        plan.target,
+                        family_path / name,
+                        plan.bundle.documents[name].raw,
+                    )
+                created_at = (
+                    timestamp
+                    if plan.existing is None
+                    else str(plan.existing.manifest["created-at"])
+                )
+                manifest_raw = manifest_bytes(
+                    plan=plan,
+                    revision=revision,
+                    previous=previous,
+                    history_path=f"history/{revision}.md",
+                    history_raw=event_raw,
+                    created_at=created_at,
+                    updated_at=timestamp,
+                )
+                transactional_write(
+                    plan.target,
+                    family_path / MANIFEST_NAME,
+                    manifest_raw,
+                )
+
+            if action in {"create", "update", "activate"}:
+                transactional_write(
+                    plan.target,
+                    store / ACTIVE_NAME,
+                    active_bytes(
+                        plan=plan,
+                        revision=revision,
+                        activated_at=timestamp,
+                    ),
+                )
+
+            validation = validate_repository(
+                vault_root,
+                plan.bundle.repository_remote,
+                worktree_path=worktree_path,
+                allow_inactive=False,
+                allow_pending_transaction=True,
+            )
+            if transaction_started:
+                commit_apply_transaction(plan.target)
+        except Exception as error:
+            if transaction_started:
+                try:
+                    restore_apply_transaction(
+                        plan.target,
+                        plan_token,
+                        plan.bundle.fingerprint,
+                        plan.handoff_id,
+                    )
+                except Exception as recovery_error:
+                    raise HandoffError(
+                        "handoff_recovery_failed",
+                        "The handoff apply failed and its original state could not be restored",
+                        exit_code=4,
+                        cause=(
+                            error.code
+                            if isinstance(error, HandoffError)
+                            else type(error).__name__
+                        ),
+                        recovery_error=(
+                            recovery_error.code
+                            if isinstance(recovery_error, HandoffError)
+                            else type(recovery_error).__name__
+                        ),
+                    ) from recovery_error
+            raise
     return {
         "status": "applied",
         "action": action,
@@ -3569,6 +4443,7 @@ def validate_repository(
     *,
     worktree_path: str,
     allow_inactive: bool = True,
+    allow_pending_transaction: bool = False,
 ) -> dict[str, Any]:
     target, normalized_remote, branch = resolve_handoff_target(
         vault_root,
@@ -3595,6 +4470,8 @@ def validate_repository(
     verify_ignored(target)
     store = target / STORE_NAME
     ensure_safe_directory(store, label="handoff store")
+    if not allow_pending_transaction:
+        ensure_no_pending_transaction(store)
     active, _ = read_active(store)
     if active is None:
         if allow_inactive:
@@ -3610,30 +4487,29 @@ def validate_repository(
             "no_active_handoff",
             "The repository has no active development handoff",
         )
-    family = str(active["family"])
-    handoff_id = str(active["handoff-id"])
-    existing = read_existing_handoff(
-        store / family,
-        family=family,
-        handoff_id=handoff_id,
-        normalized_remote=normalized_remote,
-    )
-    if existing is None:
-        raise HandoffError(
-            "invalid_active_pointer",
-            "ACTIVE.yaml points to a missing handoff family",
+    active = normalize_active_registry(store, active, normalized_remote)
+    handoffs: list[dict[str, Any]] = []
+    for entry, existing, updates in validate_active_entries(
+        store, active, normalized_remote, branch
+    ):
+        handoff_id = entry["handoff-id"]
+        handoffs.append(
+            {
+                "handoff_id": handoff_id,
+                "family": entry["family"],
+                "revision": existing.revision,
+                "state": entry["state"],
+                "materialized_at": existing.manifest["updated-at"],
+                "manifest": str(existing.manifest_path),
+                "history": existing.manifest["history"]["path"],
+                "implementation_updates": updates,
+                "closure_fingerprint": closure_fingerprint(
+                    target,
+                    existing.family_path,
+                    store / ACTIVE_NAME,
+                ),
+            }
         )
-    if existing.revision != active["revision"]:
-        raise HandoffError(
-            "invalid_active_pointer",
-            "ACTIVE.yaml and handoff.yaml disagree on the active revision",
-        )
-    updates = validate_implementation_updates(existing.family_path / UPDATES_NAME)
-    evidence_fingerprint = closure_fingerprint(
-        target,
-        existing.family_path,
-        store / ACTIVE_NAME,
-    )
     return {
         "status": "valid",
         "target": {
@@ -3641,31 +4517,24 @@ def validate_repository(
             "remote": normalized_remote,
             "branch": branch,
         },
-        "handoff_id": handoff_id,
-        "family": family,
-        "revision": existing.revision,
-        "materialized_at": existing.manifest["updated-at"],
-        "manifest": str(existing.manifest_path),
-        "history": existing.manifest["history"]["path"],
-        "implementation_updates": updates,
-        "closure_fingerprint": evidence_fingerprint,
+        "investigation_id": active["investigation-id"],
+        "handoffs": handoffs,
     }
 
 
-def build_deactivate_plan(
+def build_set_state_plan(
     vault_root: Path,
     remote: str,
     worktree_path: str,
-    disposition: str,
-    reconciled_handoff_id: str | None = None,
-    reconciled_revision: str | None = None,
-    reconciled_closure_fingerprint: str | None = None,
+    handoff_id: str,
+    state: str,
+    closure_fingerprint_value: str | None = None,
 ) -> dict[str, Any]:
-    if disposition not in DEACTIVATION_DISPOSITIONS:
+    if state not in HANDOFF_STATES:
         raise HandoffError(
-            "invalid_deactivation_disposition",
-            "The deactivation disposition is not supported",
-            disposition=disposition,
+            "invalid_handoff_state",
+            "The requested handoff state is not supported",
+            state=state,
         )
     target, normalized_remote, branch = resolve_handoff_target(
         vault_root,
@@ -3678,69 +4547,45 @@ def build_deactivate_plan(
     )
     store = target / STORE_NAME
     ensure_safe_directory(store, label="handoff store")
+    ensure_no_pending_transaction(store)
     active, _ = read_active(store)
-    if disposition == "reconciled":
-        if active is None:
-            raise HandoffError(
-                "no_active_handoff",
-                "A reconciled deactivation requires one active handoff",
-            )
-        if (
-            reconciled_handoff_id is None
-            or reconciled_revision is None
-            or reconciled_closure_fingerprint is None
-        ):
-            raise HandoffError(
-                "reconciliation_identity_required",
-                "A reconciled deactivation requires the exact handoff ID, revision, and closure fingerprint",
-            )
-        if re.fullmatch(r"[a-f0-9]{64}", reconciled_closure_fingerprint) is None:
-            raise HandoffError(
-                "invalid_reconciliation_fingerprint",
-                "The reconciled closure fingerprint must be a lowercase SHA-256 digest",
-            )
-        if (
-            reconciled_handoff_id != active["handoff-id"]
-            or reconciled_revision != active["revision"]
-        ):
-            raise HandoffError(
-                "reconciliation_identity_mismatch",
-                "The reconciled identity does not match the active handoff",
-                active_handoff_id=active["handoff-id"],
-                active_revision=active["revision"],
-            )
-    elif any(
-        value is not None
-        for value in (
-            reconciled_handoff_id,
-            reconciled_revision,
-            reconciled_closure_fingerprint,
-        )
-    ):
+    if active is None:
         raise HandoffError(
-            "unexpected_reconciliation_identity",
-            "Only a reconciled deactivation accepts reconciliation identity fields",
+            "no_active_handoff",
+            "A state update requires an active worktree registry",
         )
-    existing: ExistingHandoff | None = None
-    if active is not None:
-        existing = read_existing_handoff(
-            store / str(active["family"]),
-            family=str(active["family"]),
-            handoff_id=str(active["handoff-id"]),
-            normalized_remote=normalized_remote,
+    active = normalize_active_registry(store, active, normalized_remote)
+    entry = active_entry(active, handoff_id)
+    if entry is None:
+        raise HandoffError(
+            "handoff_not_found",
+            "The requested handoff is not registered in this worktree",
+            handoff_id=handoff_id,
         )
-        if existing is None or existing.revision != active["revision"]:
+    validated = validate_active_entries(store, active, normalized_remote, branch)
+    existing = next(
+        existing
+        for current, existing, _updates in validated
+        if current["handoff-id"] == handoff_id
+    )
+    if state == "ready-for-production" and entry["state"] not in {
+        "active",
+        "ready-for-production",
+    }:
+        raise HandoffError(
+            "invalid_state_transition",
+            "ready-for-production requires an active handoff",
+            current_state=entry["state"],
+        )
+    if state == "ready-for-production" and entry["state"] == "active":
+        if (
+            closure_fingerprint_value is None
+            or re.fullmatch(r"[a-f0-9]{64}", closure_fingerprint_value) is None
+        ):
             raise HandoffError(
-                "invalid_active_pointer",
-                "ACTIVE.yaml does not resolve to its exact handoff revision",
+                "reconciliation_fingerprint_required",
+                "ready-for-production requires the current closure fingerprint",
             )
-        validate_implementation_updates(existing.family_path / UPDATES_NAME)
-    reconciled_identity: dict[str, str] | None = None
-    if disposition == "reconciled":
-        assert existing is not None
-        assert reconciled_handoff_id is not None
-        assert reconciled_revision is not None
-        assert reconciled_closure_fingerprint is not None
         observed_fingerprint = closure_fingerprint(
             target,
             existing.family_path,
@@ -3748,20 +4593,29 @@ def build_deactivate_plan(
         )
         if not hmac.compare_digest(
             observed_fingerprint,
-            reconciled_closure_fingerprint,
+            closure_fingerprint_value,
         ):
             raise HandoffError(
                 "reconciliation_snapshot_mismatch",
                 "The local evidence changed after the reconciliation snapshot was validated",
                 exit_code=3,
             )
-        reconciled_identity = {
-            "handoff_id": reconciled_handoff_id,
-            "revision": reconciled_revision,
-            "closure_fingerprint": reconciled_closure_fingerprint,
-        }
-    if active is not None:
-        action = "deactivate"
+    elif state != "ready-for-production" and closure_fingerprint_value is not None:
+        raise HandoffError(
+            "unexpected_reconciliation_fingerprint",
+            "Only ready-for-production accepts a closure fingerprint",
+        )
+    if state == "production" and entry["state"] not in {
+        "ready-for-production",
+        "production",
+    }:
+        raise HandoffError(
+            "invalid_state_transition",
+            "production requires a ready-for-production handoff",
+            current_state=entry["state"],
+        )
+    if entry["state"] != state:
+        action = "set-state"
     elif instructions_changed:
         action = "refresh-policy"
     else:
@@ -3770,12 +4624,12 @@ def build_deactivate_plan(
     for name, instruction_action in instruction_actions.items():
         if instruction_action != "none":
             effects.append(effect(target, name, instruction_action))
-    if active is not None:
+    if action == "set-state":
         effects.append(
             effect(
                 target,
                 f"{STORE_NAME}/{ACTIVE_NAME}",
-                "delete",
+                "update",
                 tracked=False,
             )
         )
@@ -3783,9 +4637,10 @@ def build_deactivate_plan(
         canonical_json(
             {
                 "schema_version": SCHEMA_VERSION,
-                "operation": "deactivate",
-                "disposition": disposition,
-                "reconciled_identity": reconciled_identity,
+                "operation": "set-state",
+                "handoff_id": handoff_id,
+                "state": state,
+                "closure_fingerprint": closure_fingerprint_value,
                 "target": str(target),
                 "remote": normalized_remote,
                 "active": path_fingerprint(store / ACTIVE_NAME),
@@ -3803,9 +4658,9 @@ def build_deactivate_plan(
     )
     return {
         "status": "planned",
-        "operation": "deactivate",
-        "disposition": disposition,
-        "reconciled_identity": reconciled_identity,
+        "operation": "set-state",
+        "handoff_id": handoff_id,
+        "state": state,
         "action": action,
         "target": {
             "path": str(target),
@@ -3819,75 +4674,92 @@ def build_deactivate_plan(
     }
 
 
-def deactivate(
+def set_state(
     vault_root: Path,
     remote: str,
     plan_token: str | None,
     worktree_path: str,
-    disposition: str,
-    reconciled_handoff_id: str | None = None,
-    reconciled_revision: str | None = None,
-    reconciled_closure_fingerprint: str | None = None,
+    handoff_id: str,
+    state: str,
+    closure_fingerprint_value: str | None = None,
 ) -> dict[str, Any]:
-    plan = build_deactivate_plan(
+    if plan_token is None:
+        return build_set_state_plan(
+            vault_root,
+            remote,
+            worktree_path,
+            handoff_id,
+            state,
+            closure_fingerprint_value,
+        )
+    target, _normalized_remote, _branch = resolve_handoff_target(
         vault_root,
         remote,
         worktree_path,
-        disposition,
-        reconciled_handoff_id,
-        reconciled_revision,
-        reconciled_closure_fingerprint,
     )
-    if plan_token is None:
-        return plan
-    if not hmac.compare_digest(plan["plan_token"], plan_token):
-        raise HandoffError(
-            "plan_stale",
-            "The deactivation inputs changed after planning; create a new plan",
-            exit_code=3,
+    with handoff_store_lock(target):
+        cleanup_committed_transaction(target)
+        plan = build_set_state_plan(
+            vault_root,
+            remote,
+            worktree_path,
+            handoff_id,
+            state,
+            closure_fingerprint_value,
         )
-    if plan["action"] == "noop":
-        return {
-            "status": "unchanged",
-            "action": "noop",
-            "disposition": plan["disposition"],
-            "target": plan["target"],
-        }
-    target = Path(plan["target"]["path"])
-    if any(action != "none" for action in plan["policy"].values()):
-        desired_instructions, instruction_actions = prepare_instructions(target)
-        if instruction_actions != plan["policy"]:
+        if not hmac.compare_digest(plan["plan_token"], plan_token):
             raise HandoffError(
                 "plan_stale",
-                "The managed instruction policy changed after planning",
+                "The state-update inputs changed after planning; create a new plan",
                 exit_code=3,
             )
-        for name, instruction_action in instruction_actions.items():
-            if instruction_action != "none":
-                atomic_write(target / name, desired_instructions[name])
-    if plan["action"] == "refresh-policy":
-        return {
-            "status": "policy-refreshed",
-            "action": "refresh-policy",
-            "disposition": plan["disposition"],
-            "target": plan["target"],
-        }
-    active_path = target / STORE_NAME / ACTIVE_NAME
-    if active_path.is_symlink() or not active_path.is_file():
-        raise HandoffError(
-            "unsafe_write_target",
-            "ACTIVE.yaml is not a removable regular file",
-            path=str(active_path),
-        )
-    active_path.unlink()
+        if plan["action"] == "noop":
+            return {
+                "status": "unchanged",
+                "action": "noop",
+                "handoff_id": plan["handoff_id"],
+                "state": plan["state"],
+                "target": plan["target"],
+            }
+        if any(action != "none" for action in plan["policy"].values()):
+            desired_instructions, instruction_actions = prepare_instructions(target)
+            if instruction_actions != plan["policy"]:
+                raise HandoffError(
+                    "plan_stale",
+                    "The managed instruction policy changed after planning",
+                    exit_code=3,
+                )
+            for name, instruction_action in instruction_actions.items():
+                if instruction_action != "none":
+                    atomic_write(target / name, desired_instructions[name])
+        if plan["action"] == "refresh-policy":
+            return {
+                "status": "policy-refreshed",
+                "action": "refresh-policy",
+                "handoff_id": plan["handoff_id"],
+                "state": plan["state"],
+                "target": plan["target"],
+            }
+        active_path = target / STORE_NAME / ACTIVE_NAME
+        if active_path.is_symlink() or not active_path.is_file():
+            raise HandoffError(
+                "unsafe_write_target",
+                "ACTIVE.yaml is not a writable regular file",
+                path=str(active_path),
+            )
+        active = plan["active"]
+        entry = active_entry(active, handoff_id)
+        assert entry is not None
+        entry["state"] = state
+        if state == "active":
+            entry["activated-at"] = now_utc()
+        atomic_write(active_path, yaml_bytes(active))
     return {
-        "status": "deactivated",
-        "action": "deactivate",
-        "disposition": plan["disposition"],
+        "status": "state-updated",
+        "action": "set-state",
+        "handoff_id": handoff_id,
+        "state": state,
         "target": plan["target"],
-        "preserved_handoff_id": plan["active"]["handoff-id"],
-        "preserved_family": plan["active"]["family"],
-        "preserved_revision": plan["active"]["revision"],
     }
 
 
@@ -3972,25 +4844,24 @@ def build_parser() -> ArgumentParser:
     apply.add_argument("--worktree-path", required=True)
     apply.add_argument("--plan-token", required=True)
 
-    validate = commands.add_parser("validate", help="Validate an active handoff")
+    validate = commands.add_parser("validate", help="Validate a worktree handoff registry")
     validate.add_argument("--repository-remote", required=True)
     validate.add_argument("--worktree-path", required=True)
 
-    deactivate_parser = commands.add_parser(
-        "deactivate",
-        help="Plan or apply removal of only the active pointer",
+    state_parser = commands.add_parser(
+        "set-state",
+        help="Plan or apply one handoff state update",
     )
-    deactivate_parser.add_argument("--repository-remote", required=True)
-    deactivate_parser.add_argument("--worktree-path", required=True)
-    deactivate_parser.add_argument(
-        "--disposition",
-        choices=tuple(sorted(DEACTIVATION_DISPOSITIONS)),
+    state_parser.add_argument("--repository-remote", required=True)
+    state_parser.add_argument("--worktree-path", required=True)
+    state_parser.add_argument("--handoff-id", required=True)
+    state_parser.add_argument(
+        "--state",
+        choices=tuple(sorted(HANDOFF_STATES)),
         required=True,
     )
-    deactivate_parser.add_argument("--reconciled-handoff-id")
-    deactivate_parser.add_argument("--reconciled-revision")
-    deactivate_parser.add_argument("--reconciled-closure-fingerprint")
-    deactivate_parser.add_argument("--plan-token")
+    state_parser.add_argument("--closure-fingerprint")
+    state_parser.add_argument("--plan-token")
     return parser
 
 
@@ -4076,17 +4947,16 @@ def main(argv: list[str] | None = None) -> int:
                 )
             )
             return 0
-        if args.command == "deactivate":
+        if args.command == "set-state":
             emit_json(
-                deactivate(
+                set_state(
                     vault_root,
                     args.repository_remote,
                     args.plan_token,
                     args.worktree_path,
-                    args.disposition,
-                    args.reconciled_handoff_id,
-                    args.reconciled_revision,
-                    args.reconciled_closure_fingerprint,
+                    args.handoff_id,
+                    args.state,
+                    args.closure_fingerprint,
                 )
             )
             return 0

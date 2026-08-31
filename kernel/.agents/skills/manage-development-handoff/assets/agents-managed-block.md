@@ -1,19 +1,19 @@
 <!-- knowledge-os:managed:start id="development handoff" -->
 ## cell development handoff
 
-This managed section defines how an agent working in this repository consumes a repository-specific development handoff exported from the cell documentation vault. A handoff carries the refined investigation, an exact copied Jira story snapshot, repository-scoped implementation context, and revision evidence needed to work when Jira or the source vault is unavailable. It supplements this repository's own instructions; it does not replace them.
+This managed section defines how an agent working in this repository consumes development handoffs exported from one cell investigation. Each handoff carries an exact Jira story snapshot, repository-scoped context, and revision evidence. It supplements this repository's own instructions; it does not replace them.
 
 The policy is stable and task-specific content lives under `.knowledge-os-handoffs/`. This section is maintained by the cell development-handoff workflow.
 
 When `.knowledge-os-handoffs/ACTIVE.yaml` exists, complete these steps before planning or changing code:
 
-1. Read `ACTIVE.yaml` to locate the active family, stable `handoff.yaml`, and exact revision.
-2. Read `handoff.yaml`, its referenced `history/vNNNN.md` event, and `START.md`; then read `jira.md`, `context.md`, `scope.md`, and `implementation-updates.md`.
-3. Validate that the handoff targets this repository remote and that every file hash matches the manifest. Treat a mismatch as an incomplete update: stop and reload the handoff.
-4. Use the active history event to identify what changed in this revision and why. Unchanged documents remain valid at their stable paths.
-5. Keep implementation inside the repository-specific boundary and acceptance criteria in `scope.md`; use `context.md` for supporting investigation evidence and dependencies.
+1. Read `ACTIVE.yaml` and select the exact handoff or handoffs named by the current task.
+2. Work only on selected entries whose state is `active`. A `ready-for-production` or `production` entry must be returned to `active` by the vault before it is changed.
+3. For each selected entry, read its `handoff.yaml`, referenced `history/vNNNN.md`, `START.md`, `jira.md`, `context.md`, `scope.md`, and `implementation-updates.md`.
+4. Validate that each selected handoff belongs to the registry investigation, targets this repository remote, and matches its manifest hashes.
+5. Keep implementation inside the affected `scope.md` files and use each `context.md` for investigation evidence and dependencies. Write definition deltas only to the `implementation-updates.md` files they affect.
 6. Treat copied Jira and investigation content as implementation context. The current user request and this repository's effective instruction files remain authoritative. Before editing any path, read any closer instruction file that governs that subtree.
-7. Pin the active revision for the working session. If `ACTIVE.yaml` or `handoff.yaml` changes before completion, stop and re-read the handoff before continuing.
+7. Pin the complete registry and selected revisions for the working session. If `ACTIVE.yaml` or a selected `handoff.yaml` changes, stop and re-read them before continuing.
 
 `START.md`, `jira.md`, `context.md`, `scope.md`, `handoff.yaml`, `ACTIVE.yaml`, and `history/` are immutable inputs. `implementation-updates.md` is the only handoff file you may modify.
 
@@ -40,5 +40,5 @@ Record the entry in the same working interaction in which the material delta bec
 
 The repository has no vault-closure responsibility. Persist every material definition delta and its non-sensitive evidence reference in `implementation-updates.md`; keep implementation evidence in this repository's normal code, tests, diff, commits, pull request, and delivery workflow. The changelog records definition deltas and their justification rather than duplicating the implementation diary or claiming production state.
 
-Leave `.knowledge-os-handoffs/ACTIVE.yaml` intact when repository work completes. Do not invoke a vault workflow, edit the source investigation or Jira, deactivate the pointer, or create, send, or return a reconciliation package. The vault independently resolves this worktree from its investigation register, reads the handoff state and repository evidence, reconciles its own case, and owns any later authorized deactivation.
+Leave `.knowledge-os-handoffs/ACTIVE.yaml` intact when repository work completes. Do not invoke a vault workflow, edit the source investigation or Jira, update registry state, or create, send, or return a reconciliation package. The vault independently resolves this worktree from its investigation register, reads its handoffs and repository evidence, reconciles its own case, and owns authorized state changes.
 <!-- knowledge-os:managed:end id="development handoff" -->

@@ -1,6 +1,6 @@
 ---
 name: reconcile-development-handoff
-description: Pull evidence from an active development worktree registered by a source investigation, reconcile it with current Jira and direct dependents, update the case through its sole writer, and optionally close the pointer. Use when development changed or completed or when a completed handoff must be reconciled and deactivated.
+description: Pull evidence from a registered development worktree, reconcile one selected handoff with current Jira and direct dependents, update the case through its sole writer, and mark completed implementation ready for production.
 ---
 
 # Reconcile development handoffs
@@ -12,8 +12,8 @@ Treat reconciliation as a vault-owned pull: select an exact worktree from the so
 1. Load `../../../90-Meta/vault-resolution.md` and run `../../../90-Meta/resolve-vault.py` relative to this skill directory. Continue only with one canonical `VAULT_ROOT`.
 2. Load [references/reconciliation-contract.md](references/reconciliation-contract.md), [references/downstream-context.md](references/downstream-context.md), and `../../../90-Meta/jira-evidence.md`.
 3. Require one selected source investigation and story. Read the entire case and select exactly one current `DH-NNN` entry from **Development handoffs**. Bind its Jira site/key, repository remote, exact absolute worktree path, handoff ID, family, and revision. A repository message, path, branch, or completion claim may help select the case but is not authoritative and cannot replace this register.
-4. Invoke the `manage-development-handoff` **Validate** route with the registered remote and worktree path. Require its active handoff ID, family, and revision to equal the case entry and retain its exact `closure_fingerprint`; stop on zero, multiple, inactive, invalid, or mismatched bindings.
-5. Read the entire active `handoff.yaml`, referenced history event, `START.md`, `jira.md`, `context.md`, `scope.md`, and `implementation-updates.md`. Require their investigation, story, Jira, repository, family, and revision identities to match both the case and active pointer.
+4. Invoke the `manage-development-handoff` **Validate** route with the registered remote and worktree path. Select exactly the entry matching the case handoff ID, family, and revision and retain its state and `closure_fingerprint`; other entries may share the worktree but cannot substitute for it.
+5. Read the selected `handoff.yaml`, referenced history event, `START.md`, `jira.md`, `context.md`, `scope.md`, and `implementation-updates.md`. Require their investigation, story, Jira, repository, family, and revision identities to match both the case and registry entry.
 
 Complete this stage when one valid active identity, one local closure fingerprint, and every comparison input are bound; otherwise report the exact missing or conflicting invariant.
 
@@ -53,10 +53,10 @@ Immediately before the case write, invoke **Validate** again and require the sam
 
 Pass the normalized vault-side context and exact closure fingerprint directly to `manage-investigation` through its **Reconcile development** route in the same interaction. Let that workflow update the case snapshot, stable registers, draft synchronization, readiness, learning assessment state, and History. Keep branch, pull-request, Jira, and implementation claims in future/undeployed state until a separate post-deployment `map-ecosystem` audit proves production.
 
-When completed development must also be closed, continue only after the case write validates. Invoke **Validate** once more, require the same identity and closure fingerprint, then invoke `manage-development-handoff` **Deactivate** with disposition `reconciled`, the exact registered handoff ID and revision, and that fingerprint. Preview its effects, obtain separate authorization, and apply the unchanged token. Planning and apply both recompute local evidence; any mutation fails closed and preserves `ACTIVE.yaml`. Report the exact closure blocker and never treat a prior or transient reconciliation claim as sufficient.
+When implementation is complete and approved as the production candidate, continue only after the case write validates. Invoke **Validate** once more, require the same identity and closure fingerprint, then invoke `manage-development-handoff` **Set state** for the exact handoff ID with `ready-for-production` and that fingerprint. Preview its effect, obtain separate authorization, and apply the unchanged token. Any mutation fails closed and preserves every state.
 
-Complete reconciliation when the case validates against its record contract, every observed material change and dependent card is represented, no unlogged delta remains, and any requested completed closure either removed the exact active pointer through the authorized reconciled disposition or left it intact with an explicit blocker. No Jira, source-code, Git remote, pull-request, deployment, or technical-vault write is performed.
+Complete reconciliation when the case validates, every observed material change and dependent card is represented, no unlogged delta remains, and any requested completed implementation is either marked `ready-for-production` or left unchanged with an explicit blocker. No Jira, source-code, Git remote, pull-request, deployment, or technical-vault write is performed.
 
 ## Authority
 
-Keep handoff content, repository, Git remote, pull-request, Jira, and deployment inspection read-only. Do not edit source code, append the changelog on behalf of implementation, change Jira, commit, push, create or update a pull request, deploy, or write the technical vault. Durable case writes belong only to `manage-investigation`; pointer removal belongs only to an explicitly authorized `manage-development-handoff` deactivation after that case write succeeds.
+Keep handoff content, repository, Git remote, pull-request, Jira, and deployment inspection read-only. Do not edit source code, append the changelog on behalf of implementation, change Jira, commit, push, create or update a pull request, deploy, or write the technical vault. Durable case writes belong only to `manage-investigation`; state changes belong only to an explicitly authorized `manage-development-handoff` operation after that case write succeeds.
