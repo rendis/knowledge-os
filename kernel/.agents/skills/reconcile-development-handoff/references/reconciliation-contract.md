@@ -1,6 +1,6 @@
 # Development reconciliation contract
 
-Load this reference after one exact `DH-NNN` investigation entry resolves to one active handoff and both identities validate.
+Load this reference after one exact `DH-NNN` investigation entry resolves to one registry handoff and both identities validate.
 
 ## Comparison inputs
 
@@ -60,7 +60,7 @@ The card never invents an update title, status, agreement, analysis, or exact en
 ## Fail-closed rules
 
 - A material delta is absent from the changelog: stop before changing the investigation.
-- The case has no unique `DH-NNN` binding or it disagrees with the active handoff: stop before reading the worktree as authoritative evidence.
+- The case has no unique `DH-NNN` binding or it disagrees with the selected registry handoff: stop before reading the worktree as authoritative evidence.
 - Jira cannot establish the current source story or link direction: mark the affected Jira and dependent portions blocked; do not infer.
 - The remote branch cannot be observed: report only the local branch.
 - Pull-request state is unavailable: do not infer it from a branch name or commit.
@@ -69,4 +69,4 @@ The card never invents an update title, status, agreement, analysis, or exact en
 
 ## Completion criterion
 
-The comparison is complete only when every observed material delta has one classification, every non-unchanged delta is covered by a valid changelog entry, current external state is distinguished from local intent, and the in-memory context is sufficient for `manage-investigation` to update the case without re-reading the implementation worktree. Completed deactivation is a later authorized effect and is never evidence that this comparison succeeded.
+The comparison is complete only when every observed material delta has one classification, every non-unchanged delta is covered by a valid changelog entry, current external state is distinguished from local intent, and the in-memory context is sufficient for `manage-investigation` to update the case without re-reading the implementation worktree. A later authorized state update is never evidence that this comparison succeeded.

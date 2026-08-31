@@ -81,9 +81,9 @@ Multi-repository creation is sequential and has no broad rollback. On failure, r
 
 ## Existing worktrees
 
-Refresh, validation, activation, and deactivation use the exact absolute `--worktree-path`. The helper verifies that it is under the configured root, follows `<root>/<remote-repository-basename>/<jira-description>`, uses the canonical repository basename derived from the supplied remote, is registered to the repository resolved by that remote, is attached to a branch, and matches the package's Jira key.
+Refresh, attachment, validation, and state updates use the exact absolute `--worktree-path`. The helper verifies that it is under the configured root, follows `<root>/<remote-repository-basename>/<jira-description>`, uses the canonical repository basename derived from the supplied remote, is registered to the repository resolved by that remote, and is attached to a branch. The first handoff must match the branch Jira key; later handoffs reuse that branch only when `ACTIVE.yaml` names their same investigation.
 
-Every refresh, validation, activation, and deactivation requires the exact absolute worktree path. A missing or non-canonical path blocks the operation; the helper does not search historical checkouts or relocate state.
+Every refresh, attachment, validation, and state update requires the exact absolute worktree path. A missing or non-canonical path blocks the operation; the helper does not search historical checkouts or relocate state.
 
 ## Completion criterion
 

@@ -61,6 +61,8 @@ When no compatible integration exists, deliver the local Markdown draft without 
 
 A development handoff is separate from publication. Require a release-ready development or mixed story, one exact current Jira snapshot, and an explicit target remote for every repository that owns implementation work.
 
+Before materialization, require an exact repository remote and explicit overlap in the named component or implementation scope before proposing a shared worktree. A common remote alone is not enough; when overlap is absent or ambiguous, recommend a separate worktree. Compare new packages with both the current selection and existing `DH-NNN` entries from this investigation. Show compatible existing worktree paths and let the user choose reuse, a new shared worktree, or separate worktrees. Persist no grouping artifact: each story keeps its package and later `DH-NNN` identity.
+
 Load [the development input-bundle contract](../../manage-development-handoff/references/input-bundle.md) and create one canonical package per target under:
 
 ```text
@@ -72,7 +74,7 @@ Compile `jira.md` from the current read-only snapshot produced under `VAULT_ROOT
 
 When the target story is a directly dependent story previously reconciled from another implementation, include its current dependent card in the repository-specific package. Carry the observed contracts, APIs/events/data/configuration, compatibility and verification requirements, what can start, remaining gaps, source repository remote, and observed remote branch/PR state. Re-read the dependent Jira story before export; do not make its implementation worktree rediscover an already captured source contract.
 
-Keep repository evidence flow one-way: hand only the exact package directories to `manage-development-handoff`; the repository persists its state and evidence under `.knowledge-os-handoffs/` and sends no callback or reconciliation package. The consumer must not read or modify the investigation case, refresh Jira, or reinterpret the story. After repository-state validation, it passes one normalized in-memory observation to the **Bind development handoff** route of `manage-investigation`. That owner alone creates or advances the stable `DH-NNN`, appends History once per materialized content revision, and validates the case; an exact same-revision activation or retry is a byte-level case no-op. A binding failure leaves the materialized repository state active and produces `materialized-unbound`, which is the exact retry boundary.
+Keep repository evidence flow one-way: hand only the exact package directories and the user's worktree choice to `manage-development-handoff`; the repository persists its state and evidence under `.knowledge-os-handoffs/` and sends no callback or reconciliation package. The consumer must not read or modify the investigation case, refresh Jira, or reinterpret the story. After repository-state validation, it passes one normalized in-memory observation per handoff to the **Bind development handoff** route of `manage-investigation`. That owner alone creates or advances each stable `DH-NNN`; several entries may record the same exact worktree path while retaining distinct story and handoff identities.
 
 ## Completion criterion
 
