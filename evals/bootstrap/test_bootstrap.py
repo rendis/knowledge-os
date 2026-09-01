@@ -85,6 +85,58 @@ def installed_command_targets(vault: Path) -> set[str]:
 
 
 class BootstrapEval(unittest.TestCase):
+    def test_operational_catalog_derives_cell_area_mocs(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for area in ("Git", "Runtime"):
+                moc = root / "60-Operacion" / area / f"{area}.md"
+                moc.parent.mkdir(parents=True)
+                moc.write_text(
+                    "---\ntipo: indice\ntags: [moc, operacion]\n---\n",
+                    encoding="utf-8",
+                )
+
+            result = run(
+                [
+                    sys.executable,
+                    "-B",
+                    str(DIST / "kernel/90-Meta/operational-catalog.py"),
+                    "--root",
+                    str(root),
+                    "list-areas",
+                ]
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertEqual(
+                json.loads(result.stdout),
+                [
+                    {"area": "Git", "path": "60-Operacion/Git/Git.md"},
+                    {
+                        "area": "Runtime",
+                        "path": "60-Operacion/Runtime/Runtime.md",
+                    },
+                ],
+            )
+
+            broken = root / "60-Operacion" / "Broken"
+            broken.mkdir()
+            (broken / "Rule.md").write_text("# Missing area MOC\n", encoding="utf-8")
+            invalid = run(
+                [
+                    sys.executable,
+                    "-B",
+                    str(DIST / "kernel/90-Meta/operational-catalog.py"),
+                    "--root",
+                    str(root),
+                    "list-areas",
+                ]
+            )
+            self.assertEqual(invalid.returncode, 2, invalid.stdout + invalid.stderr)
+            invalid_payload = json.loads(invalid.stdout)
+            self.assertEqual(invalid_payload["error"], "contract-invalid")
+            self.assertIn("missing area MOC", invalid_payload["message"])
+
     def test_development_handoff_responsibilities_are_vault_pull_based(self) -> None:
         managed_block = (
             DIST
@@ -2207,6 +2259,9 @@ class BootstrapEval(unittest.TestCase):
             self.assertTrue((dest / "instance.yaml").is_file())
             self.assertTrue((dest / "AGENTS.md").is_file())
             self.assertTrue((dest / ".agents" / "skills" / "map-ecosystem" / "SKILL.md").is_file())
+            git_skill = dest / ".agents" / "skills" / "manage-git-workflow"
+            self.assertTrue((git_skill / "SKILL.md").is_file())
+            self.assertTrue((git_skill / "references" / "defaults.md").is_file())
             self.assertFalse((dest / ".agents" / "skills" / "inspect-gcp-runtime").exists())
             for shared in (
                 "resolve-vault.py",
@@ -2471,6 +2526,10 @@ class BootstrapEval(unittest.TestCase):
                     f"# {dirname}\nKeep this knowledge byte for byte.\n",
                     encoding="utf-8",
                 )
+            git_policy = dest / "60-Operacion" / "Git" / "Git.md"
+            git_policy.parent.mkdir(parents=True)
+            git_policy_text = "# Git\nKeep cell Git policy byte for byte.\n"
+            git_policy.write_text(git_policy_text, encoding="utf-8")
             (dest / "90-Meta").mkdir()
             (dest / "90-Meta" / "Alcance.md").write_text("# Cell scope\nKeep extra.\n", encoding="utf-8")
             (dest / "90-Meta" / "audit-vault.py").write_text("# cell-audit-keep\n", encoding="utf-8")
@@ -2578,6 +2637,13 @@ class BootstrapEval(unittest.TestCase):
                 (dest / ".knowledge-os.lock.yaml").read_text(encoding="utf-8"),
             )
             self.assertTrue((dest / ".agents" / "skills" / "cell-local-tool" / "SKILL.md").is_file())
+            self.assertEqual(git_policy.read_text(encoding="utf-8"), git_policy_text)
+            installed_git_skill = dest / ".agents/skills/manage-git-workflow/SKILL.md"
+            distributed_git_skill = DIST / "kernel/.agents/skills/manage-git-workflow/SKILL.md"
+            self.assertEqual(
+                installed_git_skill.read_bytes(),
+                distributed_git_skill.read_bytes(),
+            )
             self.assertTrue((dest / "90-Meta" / "Alcance.md").is_file())
             self.assertEqual(
                 (dest / "90-Meta" / "audit-vault.py").read_bytes(),
