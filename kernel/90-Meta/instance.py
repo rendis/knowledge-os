@@ -43,7 +43,10 @@ def _parse_simple_yaml(text: str) -> dict[str, Any]:
     try:
         import yaml  # type: ignore
 
-        data = yaml.safe_load(text)
+        try:
+            data = yaml.safe_load(text)
+        except yaml.YAMLError as error:
+            raise InstanceError("invalid instance.yaml syntax") from error
         if not isinstance(data, dict):
             raise InstanceError("instance.yaml must be a mapping")
         return data
