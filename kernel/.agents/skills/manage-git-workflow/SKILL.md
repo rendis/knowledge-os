@@ -1,17 +1,19 @@
 ---
 name: manage-git-workflow
-description: Operate or document repository Git and GitHub workflows using the vault's local policy. Use for branch, commit, synchronization, pull-request, merge, release, hotfix, or recovery work; persistent work-item handoff worktrees belong to manage-development-handoff.
+description: Analyze or maintain a vault's Git/GitHub policy, or operate source repositories governed by it. Use for policy evidence and source-repository branch, commit, synchronization, pull-request, merge, release, hotfix, or recovery work; use repository instructions for routine local versioning of the vault itself, and manage-development-handoff for persistent work-item handoff worktrees.
 ---
 
 # Manage Git workflows
 
-Treat `60-Operacion/Git/Git.md` as the cell-specific policy, applicable repository instructions as the repository-specific policy, and live Git or GitHub state as current operational truth. Use [the generic defaults](references/defaults.md) only for repository operations whose applicable policies leave a decision unanswered.
+Treat `60-Operacion/Git/Git.md` as the cell-specific policy for the source repositories it covers. Apply it to the vault repository itself only when the note explicitly includes that repository. Treat applicable repository instructions as the repository-specific policy and live Git or GitHub state as current operational truth. Use [the generic defaults](references/defaults.md) only for repository operations whose applicable policies leave a decision unanswered.
 
 ## 1. Select the workflow
 
 1. Load `../../../90-Meta/vault-resolution.md` and run `../../../90-Meta/resolve-vault.py` relative to this skill directory. Bind one canonical `VAULT_ROOT`.
-2. Read `${VAULT_ROOT}/60-Operacion/Git/Git.md` when it exists.
-3. Choose one workflow:
+2. When the request targets a repository, resolve its exact Git root. Classify it as the vault repository when that root is `VAULT_ROOT`; otherwise classify it as a source repository.
+3. For routine local status, staging, or commit work on the vault repository, follow its applicable repository instructions and end this skill unless the user explicitly invoked it.
+4. Read `${VAULT_ROOT}/60-Operacion/Git/Git.md` for policy evidence or a source-repository operation when the note exists. For a vault-repository operation, apply the note only when it explicitly includes that repository.
+5. Choose one workflow:
    - **Policy evidence** — the request supplies or asks to analyze, propose, document, or maintain Git/GitHub rules. Follow section 2. Repository resolution, live state, and generic defaults are outside this workflow unless the evidence or requested delta is repository-specific.
    - **Repository operation** — the request asks to inspect or change a branch, commit, synchronization, pull request, merge, release, hotfix, or recovery state. Follow sections 3 and 4.
 
@@ -44,7 +46,7 @@ Policy maintenance is complete when the delta accounts for every supported chang
 
 1. Resolve one exact repository identity from an explicit local path, the current Git worktree, a GitHub URL, or `<host>/<owner>/<repo>`; confirm the host for `owner/repo` shorthand. A GitHub-only operation may use that remote identity without a checkout. Stop an ambiguous target before any mutation.
 2. For read-only local inspection without a supplied checkout, follow the source-repository binding in `vault-resolution.md`; invoke `configure-workspace` when its discovery configuration is missing or invalid. Keep every checkout resolved from `SOURCE_ROOTS` read-only. A local mutation requires an exact worktree supplied by the user or current task whose mutation is authorized; never acquire a checkout as a side effect of resolution.
-3. Read applicable instructions from the local checkout or relevant remote ref. Apply the most specific compatible rule; the vault policy overrides this skill's defaults, while safety and authorization constraints remain in force.
+3. Read applicable instructions from the local checkout or relevant remote ref. Apply the most specific compatible rule. For source repositories, the vault policy overrides this skill's defaults; for the vault repository, it does so only when the note explicitly includes that repository. Safety and authorization constraints remain in force.
 4. Load [references/defaults.md](references/defaults.md) only when the requested operation needs a decision not answered by repository or vault policy.
 5. Inspect the minimum live context required by the operation: worktree status, branch, upstream, remotes and relevant refs; for GitHub work, also confirm the host, repository, authenticated account, base branch, and applicable checks or rulesets.
 
