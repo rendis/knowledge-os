@@ -10,9 +10,6 @@ from typing import Any
 
 from vault_frontmatter import read_frontmatter
 
-AREAS = ("Base de datos", "DevOps", "GCP", "Jira", "Reporteria")
-
-
 class CatalogError(Exception):
     """Stable catalog error with a machine-readable code."""
 
@@ -44,12 +41,27 @@ def notes(root: Path) -> list[dict[str, Any]]:
 
 
 def list_areas(root: Path) -> list[dict[str, str]]:
+    operation_root = root / "60-Operacion"
+    if not operation_root.is_dir():
+        raise CatalogError("contract-invalid", f"missing operation root: {operation_root}")
     result = []
-    for area in AREAS:
-        path = root / "60-Operacion" / area / f"{area}.md"
+    for directory in sorted(path for path in operation_root.iterdir() if path.is_dir()):
+        if not any(directory.glob("*.md")):
+            continue
+        path = directory / f"{directory.name}.md"
         if not path.is_file():
-            raise CatalogError("contract-invalid", f"missing area MOC: {area}")
-        result.append({"area": area, "path": path.relative_to(root).as_posix()})
+            raise CatalogError("contract-invalid", f"missing area MOC: {path}")
+        fields = read_frontmatter(path)
+        tags = fields.get("tags")
+        if (
+            fields.get("tipo") != "indice"
+            or not isinstance(tags, list)
+            or not {"moc", "operacion"}.issubset(tags)
+        ):
+            raise CatalogError("contract-invalid", f"invalid area MOC: {path}")
+        result.append(
+            {"area": path.parent.name, "path": path.relative_to(root).as_posix()}
+        )
     return result
 
 
