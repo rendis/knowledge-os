@@ -5,38 +5,29 @@ description: Operate or document repository Git and GitHub workflows using the v
 
 # Manage Git workflows
 
-Treat `60-Operacion/Git/Git.md` as the cell-specific policy, applicable repository instructions as the repository-specific policy, and live Git or GitHub state as current operational truth. Use [the generic defaults](references/defaults.md) only for decisions those sources leave unanswered.
+Treat `60-Operacion/Git/Git.md` as the cell-specific policy, applicable repository instructions as the repository-specific policy, and live Git or GitHub state as current operational truth. Use [the generic defaults](references/defaults.md) only for repository operations whose applicable policies leave a decision unanswered.
 
-## 1. Resolve context and policy
+## 1. Select the workflow
 
 1. Load `../../../90-Meta/vault-resolution.md` and run `../../../90-Meta/resolve-vault.py` relative to this skill directory. Bind one canonical `VAULT_ROOT`.
-2. Resolve one exact repository identity from an explicit local path, the current Git worktree, a GitHub URL, or `<host>/<owner>/<repo>`; confirm the host for `owner/repo` shorthand. A GitHub-only operation may use that remote identity without a checkout. Stop an ambiguous target before any mutation.
-3. For read-only local inspection without a supplied checkout, follow the source-repository binding in `vault-resolution.md`; invoke `configure-workspace` when its discovery configuration is missing or invalid. Keep every checkout resolved from `SOURCE_ROOTS` read-only. A local mutation requires an exact worktree supplied by the user or current task whose mutation is authorized; never acquire a checkout as a side effect of resolution.
-4. Read applicable instructions from the local checkout, or from the relevant ref for a GitHub-only operation, plus `${VAULT_ROOT}/60-Operacion/Git/Git.md` when it exists. Apply the most specific compatible rule; the vault policy overrides this skill's defaults, while safety and authorization constraints remain in force.
-5. Load [references/defaults.md](references/defaults.md) only when the requested operation needs a decision not answered by the repository or vault policy.
-6. Inspect the minimum live context required by the operation: worktree status, branch, upstream, remotes and relevant refs; for GitHub work, also confirm the host, repository, authenticated account, base branch, and applicable checks or rulesets.
+2. Read `${VAULT_ROOT}/60-Operacion/Git/Git.md` when it exists.
+3. Choose one workflow:
+   - **Policy evidence** — the request supplies or asks to analyze, propose, document, or maintain Git/GitHub rules. Follow section 2. Repository resolution, live state, and generic defaults are outside this workflow unless the evidence or requested delta is repository-specific.
+   - **Repository operation** — the request asks to inspect or change a branch, commit, synchronization, pull request, merge, release, hotfix, or recovery state. Follow sections 3 and 4.
 
-Context is resolved when the exact repository, applicable policy, current state, and unresolved conflicts are known without changing target refs, worktree files, or remote state.
+Workflow selection is complete when one branch owns the request; use policy evidence when the request is solely about new rules, even if those rules describe future repository operations.
 
-## 2. Plan the operation
+## 2. Analyze and maintain vault policy
 
-Choose the smallest operation that reaches the requested outcome. Use local `git` for repository state and history; use authenticated `gh` for GitHub resources. Bind every `gh` invocation to the resolved host and repository: use `--repo` or `GH_REPO` for repository commands, and an exact API route plus host for `gh api`. Never rely on the repository inferred from the current directory. Consult live command help or official documentation for other syntax that may vary instead of maintaining a command catalog here.
+A policy-analysis response is a proposed delta, not a general summary or an operating guide. Extract only durable rules that affect Git or GitHub and compare them with the effective vault policy and any repository policy named by the evidence or request. Bound the proposal to workflows, exceptions, and artifacts named by that evidence, the effective policy, or the user's request. When examples help define a rule, reuse only examples supplied by those sources.
 
-Before a mutation, identify its exact repository, branch or ref, affected local state, remote destination, and verification. Treat the user's request as authority only for effects it explicitly includes. Obtain separate authorization for any additional commit, push, force update, merge, tag, release, branch deletion, destructive recovery, or GitHub write.
+Present only applicable delta labels: **Create**, **Add**, **Change**, **Remove**, **Contradiction**, **Limitation**, and **Blocker**. Omit empty labels. If the Git policy note does not exist, **Create** states its path, exact proposed rules, and index link. Each item states its affected workflow or scope and supporting evidence. Preserve explicit source statements unless stronger applicable evidence contradicts them.
 
-Planning is complete when every intended effect is explicit, unrelated work is protected, and any missing policy, identity, permission, or target is reported as a blocker.
+Treat the supplied evidence as sufficient for the subset it supports. A broader referenced source may enrich that subset later and does not delay an otherwise supported delta. Keep an explicit source rule in the proposal unless applicable evidence contradicts it. Report a **Limitation** only when the evidence identifies it or the supported rule cannot be stated accurately without it. Report a **Blocker** only when the exact requested Git decision cannot be made.
 
-## 3. Execute and verify
+For an analysis-only request that asks how to proceed, finish with one next policy step: review or authorize the delta, or obtain the evidence named by a **Blocker**. Keep that step within policy maintenance; omit interim repository behavior, additional artifacts, and verification work for an explicit source rule. Then stop without changes.
 
-Recheck the state used by the plan, then execute only the authorized operation. Preserve unrelated changes; stage explicit paths and inspect the staged diff before committing. If state changed materially, stop and re-plan rather than adapting a destructive command in place.
-
-Verify through the authoritative surface: inspect local refs and status after local Git operations, the remote ref after a push, and the repository identity plus created or changed GitHub object after a `gh` mutation. Report the exact resulting branch, commit, pull request, tag, release, or blocker.
-
-Execution is complete only when the requested result is observed and every additional or failed effect is visible.
-
-## 4. Maintain vault policy
-
-Create or update `${VAULT_ROOT}/60-Operacion/Git/Git.md` only when the user explicitly asks to document or maintain Git/GitHub policy. Create the area MOC with this minimum frontmatter:
+If any proposed effect is not already authorized—especially a change, removal, contradiction, or blocker—stop for user review. Create or update `${VAULT_ROOT}/60-Operacion/Git/Git.md` only when the request explicitly authorizes the resulting policy change. Preserve unrelated existing rules. Create the area MOC with this minimum frontmatter:
 
 ```yaml
 ---
@@ -47,7 +38,31 @@ tags: [moc, operacion, operacion/area/git]
 
 Record durable domain rules, exceptions, and escalation points; keep transient repository state and command transcripts out. Link a newly created area note from `60-Operacion/Operacion.md` when that index exists.
 
-Policy maintenance is complete when the note states only supported local rules, distinguishes unknowns from defaults, and no operational Git or GitHub effect was inferred from documentation authority.
+Policy maintenance is complete when the delta accounts for every supported change to the effective Git policy, the note states only authorized local rules, unresolved blockers remain explicit, and no repository operation was inferred from documentation authority.
+
+## 3. Plan a repository operation
+
+1. Resolve one exact repository identity from an explicit local path, the current Git worktree, a GitHub URL, or `<host>/<owner>/<repo>`; confirm the host for `owner/repo` shorthand. A GitHub-only operation may use that remote identity without a checkout. Stop an ambiguous target before any mutation.
+2. For read-only local inspection without a supplied checkout, follow the source-repository binding in `vault-resolution.md`; invoke `configure-workspace` when its discovery configuration is missing or invalid. Keep every checkout resolved from `SOURCE_ROOTS` read-only. A local mutation requires an exact worktree supplied by the user or current task whose mutation is authorized; never acquire a checkout as a side effect of resolution.
+3. Read applicable instructions from the local checkout or relevant remote ref. Apply the most specific compatible rule; the vault policy overrides this skill's defaults, while safety and authorization constraints remain in force.
+4. Load [references/defaults.md](references/defaults.md) only when the requested operation needs a decision not answered by repository or vault policy.
+5. Inspect the minimum live context required by the operation: worktree status, branch, upstream, remotes and relevant refs; for GitHub work, also confirm the host, repository, authenticated account, base branch, and applicable checks or rulesets.
+
+Context is resolved when the exact repository, applicable policy, current state, and unresolved conflicts are known without changing target refs, worktree files, or remote state.
+
+Choose the smallest operation that reaches the requested outcome. Use local `git` for repository state and history; use authenticated `gh` for GitHub resources. Bind every `gh` invocation to the resolved host and repository: use `--repo` or `GH_REPO` for repository commands, and an exact API route plus host for `gh api`. Never rely on the repository inferred from the current directory. Consult live command help or official documentation for other syntax that may vary instead of maintaining a command catalog here.
+
+Before a mutation, identify its exact repository, branch or ref, affected local state, remote destination, and verification. Treat the user's request as authority only for effects it explicitly includes. Obtain separate authorization for any additional commit, push, force update, merge, tag, release, branch deletion, destructive recovery, or GitHub write.
+
+Planning is complete when every intended effect is explicit, unrelated work is protected, and any missing policy, identity, permission, or target is reported as a blocker.
+
+## 4. Execute and verify
+
+Recheck the state used by the plan, then execute only the authorized operation. Preserve unrelated changes; stage explicit paths and inspect the staged diff before committing. If state changed materially, stop and re-plan rather than adapting a destructive command in place.
+
+Verify through the authoritative surface: inspect local refs and status after local Git operations, the remote ref after a push, and the repository identity plus created or changed GitHub object after a `gh` mutation. Report the exact resulting branch, commit, pull request, tag, release, or blocker.
+
+Execution is complete only when the requested result is observed and every additional or failed effect is visible.
 
 ## Ownership
 
