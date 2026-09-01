@@ -10,7 +10,13 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "90-Meta"))
 
-from instance import dump_instance, load_instance, orientation_status, validate_instance  # noqa: E402
+from instance import (  # noqa: E402
+    InstanceError,
+    dump_instance,
+    load_instance,
+    orientation_status,
+    validate_instance,
+)
 
 
 class InstanceTests(unittest.TestCase):
@@ -72,37 +78,75 @@ class InstanceTests(unittest.TestCase):
             ],
         )
 
+    def test_rejects_noncanonical_kebab_case_ids(self) -> None:
+        base = self.sample()
+        for field, value, message in (
+            ("id", "core-", "tracker id must be kebab-case: core-"),
+            (
+                "provider",
+                "jira--cloud",
+                "tracker provider must be kebab-case: jira--cloud",
+            ),
+        ):
+            with self.subTest(field=field, value=value):
+                candidate = dict(base)
+                tracker = {
+                    "id": "core",
+                    "provider": "jira",
+                    "url": "https://core.invalid",
+                }
+                tracker[field] = value
+                candidate["trackers"] = [tracker]
+                with self.assertRaisesRegex(InstanceError, message):
+                    validate_instance(candidate)
+
     def test_rejects_ambiguous_or_unsafe_trackers(self) -> None:
         base = self.sample()
         invalid_sets = (
-            [
-                {"id": "same", "provider": "jira", "url": "https://one.invalid"},
-                {"id": "same", "provider": "clickup", "url": "https://two.invalid"},
-            ],
-            [
-                {"id": "one", "provider": "jira", "url": "https://same.invalid"},
-                {"id": "two", "provider": "jira", "url": "https://same.invalid/"},
-            ],
-            [
-                {
-                    "id": "credentialed",
-                    "provider": "jira",
-                    "url": "https://user:secret@example.invalid",
-                }
-            ],
-            [
-                {"id": "bad id", "provider": "jira", "url": "https://one.invalid"}
-            ],
+            (
+                [
+                    {"id": "same", "provider": "jira", "url": "https://one.invalid"},
+                    {"id": "same", "provider": "clickup", "url": "https://two.invalid"},
+                ],
+                "duplicate tracker id: same",
+            ),
+            (
+                [
+                    {"id": "one", "provider": "jira", "url": "https://same.invalid"},
+                    {"id": "two", "provider": "jira", "url": "https://same.invalid/"},
+                ],
+                "duplicate tracker target: jira https://same.invalid",
+            ),
+            (
+                [
+                    {
+                        "id": "credentialed",
+                        "provider": "jira",
+                        "url": "https://user:secret@example.invalid",
+                    }
+                ],
+                "tracker URL must be a credential-free HTTPS URL",
+            ),
+            (
+                [
+                    {
+                        "id": "bad id",
+                        "provider": "jira",
+                        "url": "https://one.invalid",
+                    }
+                ],
+                "tracker id must be kebab-case: bad id",
+            ),
         )
-        for trackers in invalid_sets:
+        for trackers, message in invalid_sets:
             with self.subTest(trackers=trackers):
                 candidate = dict(base)
                 candidate["trackers"] = trackers
-                with self.assertRaises(Exception):
+                with self.assertRaisesRegex(InstanceError, message):
                     validate_instance(candidate)
 
     def test_rejects_empty_systems(self) -> None:
-        with self.assertRaises(Exception):
+        with self.assertRaisesRegex(InstanceError, "systems must be a non-empty list"):
             validate_instance({"cell": {"name": "X", "purpose": "Y"}, "systems": []})
 
     def test_orientation_incomplete(self) -> None:

@@ -1912,6 +1912,13 @@ class BootstrapEval(unittest.TestCase):
                 ]
             )
             self.assertEqual(initialized.returncode, 0, initialized.stderr)
+            instance_path = cell / "instance.yaml"
+            instance_path.write_text(
+                instance_path.read_text(encoding="utf-8").replace(
+                    'provider: "clickup"', 'provider: "ClickUp"', 1
+                ),
+                encoding="utf-8",
+            )
 
             helper = (
                 cell
@@ -1965,10 +1972,12 @@ class BootstrapEval(unittest.TestCase):
                 tracker_id: str,
                 provider: str,
                 tracker_url: str,
+                item_url: str | None = None,
             ) -> Path:
                 bundle = root / name
                 bundle.mkdir()
                 reference = "TASK-7"
+                item_url = item_url or f"{tracker_url}/items/{reference}"
                 (bundle / "bundle.yaml").write_text(
                     f'''schema-version: 2
 source:
@@ -1980,7 +1989,7 @@ work-item:
   provider: "{provider}"
   tracker-url: "{tracker_url}"
   reference: "{reference}"
-  url: "{tracker_url}/items/{reference}"
+  url: "{item_url}"
   updated-at: "2026-08-31T11:55:00Z"
   captured-at: "2026-08-31T12:01:00Z"
   freshness: "current"
@@ -2010,6 +2019,7 @@ change:
                     "clickup-main",
                     "clickup",
                     "https://clickup.example.com/team",
+                    "https://clickup.example.com/t/TASK-7",
                 ),
                 package(
                     "notion-package",
@@ -2053,7 +2063,6 @@ change:
             self.assertTrue(
                 all((store / family / "work-item.md").is_file() for family in families)
             )
-            instance_path = cell / "instance.yaml"
             instance_path.write_text(
                 instance_path.read_text(encoding="utf-8")
                 .replace('provider: "notion"', 'provider: "replacement"', 1)

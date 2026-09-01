@@ -9,7 +9,8 @@ Jira-specific identity and relationship mapping.
 Resolve exactly one configured tracker whose provider is `jira`. Accept either:
 
 - its tracker ID plus an exact Jira issue key; or
-- a canonical issue URL that resolves below that tracker's canonical URL.
+- its canonical browser URL, whose path is the tracker's base path plus
+  `/browse/<KEY>` and whose `<KEY>` exactly matches the observed issue key.
 
 Map the observed issue to the shared snapshot with that tracker ID,
 `provider: jira`, its canonical tracker URL, the exact observed issue key as the

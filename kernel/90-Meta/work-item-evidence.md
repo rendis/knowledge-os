@@ -4,9 +4,11 @@ Use this shared contract whenever a vault workflow needs current external work-i
 
 ## Resolve the tracker
 
-Read `instance.yaml` and require one exact configured tracker plus one exact provider-native work-item reference. With one configured tracker, select it. With several, accept an explicit tracker ID or resolve an exact item URL to one configured canonical tracker URL; ambiguity blocks the read.
+Read `instance.yaml` and require one exact configured tracker plus one exact provider-native work-item reference. With one configured tracker, select it. With several, accept an explicit tracker ID or resolve the exact item URL origin to one configured tracker origin; ambiguity blocks the read.
 
 The tracker binding is its exact `id`, `provider`, and canonical URL. Once a case or handoff references that ID, a different provider or URL is a different tracker and requires a new ID or an explicit migration.
+
+Require a credential-free HTTPS item URL on the resolved tracker's exact origin. Then load `90-Meta/<provider>-evidence.md` when that provider mapping exists; it may impose stricter identity, URL-membership, field, or relationship rules. Without a mapping, preserve the exact generic identity and mark relationships `unsupported`.
 
 ## Read-only procedure
 
@@ -16,7 +18,6 @@ The tracker binding is its exact `id`, `provider`, and canonical URL. Once a cas
 4. Redact secrets, credentials, private personal data, and sensitive attachment contents. Preserve only non-sensitive identity, location, behavioral relevance, and access limitations.
 5. When relationships matter, preserve the provider's observed relationship identity and direction. Follow at most one observed relationship hop. Never infer a dependency from hierarchy, labels, prose, shared grouping, or proximity.
 6. Record unavailable fields, denied content, stale timestamps, partial reads, and contradictions. Do not substitute memory, copied handoff text, or a case narrative for current external state.
-7. For Jira, also load `jira-evidence.md` for its inward/outward link normalization.
 
 ## Normalized in-memory snapshot
 

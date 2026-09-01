@@ -7,6 +7,7 @@ import codecs
 import difflib
 import hashlib
 import hmac
+import importlib.util
 import io
 import json
 import os
@@ -424,12 +425,6 @@ def validate_work_item_url(value: object, *, tracker_url: str) -> str:
             "work-item.url contains an invalid port",
             field="work-item.url",
         ) from error
-    tracker_path = tracker_parsed.path.rstrip("/")
-    item_matches_tracker_path = (
-        not tracker_path
-        or parsed.path == tracker_path
-        or parsed.path.startswith(f"{tracker_path}/")
-    )
     if (
         parsed.scheme.casefold() != "https"
         or not parsed.hostname
@@ -438,7 +433,6 @@ def validate_work_item_url(value: object, *, tracker_url: str) -> str:
         or parsed.fragment
         or parsed.hostname.casefold() != (tracker_parsed.hostname or "").casefold()
         or (port or 443) != (tracker_port or 443)
-        or not item_matches_tracker_path
     ):
         raise HandoffError(
             "invalid_work_item_url",
@@ -787,13 +781,34 @@ def validate_tracker_binding(vault_root: Path, bundle: Bundle) -> None:
             "The vault must contain a valid instance.yaml tracker registry",
             path=str(instance_path),
         )
-    instance, _ = load_yaml_mapping(instance_path, label="instance.yaml")
-    trackers = instance.get("trackers", [])
-    if not isinstance(trackers, list):
+    instance_helper = vault_root / "90-Meta/instance.py"
+    if not instance_helper.is_file() or instance_helper.is_symlink():
         raise HandoffError(
             "invalid_tracker_configuration",
-            "instance.yaml trackers must be a list",
+            "The vault does not expose the managed instance validator",
+            path=str(instance_helper),
         )
+    spec = importlib.util.spec_from_file_location(
+        "_knowledge_os_instance", instance_helper
+    )
+    if spec is None or spec.loader is None:
+        raise HandoffError(
+            "invalid_tracker_configuration",
+            "The managed instance validator could not be loaded",
+            path=str(instance_helper),
+        )
+    instance_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(instance_module)
+    try:
+        instance = instance_module.load_instance(instance_path)
+    except instance_module.InstanceError as error:
+        raise HandoffError(
+            "invalid_tracker_configuration",
+            "The vault must contain a valid instance.yaml tracker registry",
+            path=str(instance_path),
+            reason=str(error),
+        ) from error
+    trackers = instance.get("trackers", [])
     tracker_id = bundle.work_item["tracker-id"]
     matches = [
         item

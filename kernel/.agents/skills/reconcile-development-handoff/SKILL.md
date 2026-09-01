@@ -10,7 +10,7 @@ Treat reconciliation as a vault-owned pull: select an exact worktree from the so
 ## 1. Bind the exact handoff
 
 1. Load `../../../90-Meta/vault-resolution.md` and run `../../../90-Meta/resolve-vault.py` relative to this skill directory. Continue only with one canonical `VAULT_ROOT`.
-2. Load [references/reconciliation-contract.md](references/reconciliation-contract.md), [references/downstream-context.md](references/downstream-context.md), `../../../90-Meta/work-item-evidence.md`, and the provider-specific mapping when one exists.
+2. Load [references/reconciliation-contract.md](references/reconciliation-contract.md), [references/downstream-context.md](references/downstream-context.md), and `../../../90-Meta/work-item-evidence.md`.
 3. Require one selected source investigation and story. Read the entire case and select exactly one current `DH-NNN` entry from **Development handoffs**. Bind its tracker ID, provider, tracker URL, work-item reference, repository remote, exact absolute worktree path, handoff ID, family, and revision. A repository message, path, branch, or completion claim may help select the case but is not authoritative and cannot replace this register.
 4. Invoke the `manage-development-handoff` **Validate** route with the registered remote and worktree path. Select exactly the entry matching the case handoff ID, family, and revision and retain its state and `closure_fingerprint`; other entries may share the worktree but cannot substitute for it.
 5. Read the selected `handoff.yaml`, referenced history event, `START.md`, `work-item.md`, `context.md`, `scope.md`, and `implementation-updates.md`. Require their investigation, story, work-item, repository, family, and revision identities to match both the case and registry entry.
@@ -28,7 +28,7 @@ Complete this stage when each local, remote, pull-request, merge, test, and depl
 
 ## 3. Inspect the work item and direct dependents
 
-1. Apply `90-Meta/work-item-evidence.md` directly with the registered tracker and reference, then the provider mapping when available. This is a read-only evidence operation, not an operational workflow or `.operations/` run.
+1. Apply `90-Meta/work-item-evidence.md` directly with the registered tracker and reference. This is a read-only evidence operation, not an operational workflow or `.operations/` run.
 2. Re-read the source work item, its material fields, relevant comments/evidence/attachments, current update timestamp, and every available typed relationship.
 3. Select directly dependent work items only through the one-hop rule in the downstream contract. Resolve the exact observed relation and direction; never infer dependency from text, hierarchy, shared labels, or proximity.
 4. Read each selected dependent story far enough to determine the context and contracts it needs from this implementation.
