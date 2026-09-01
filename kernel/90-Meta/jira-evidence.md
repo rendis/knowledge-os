@@ -1,42 +1,37 @@
 # Normalize Jira evidence
 
-Load `work-item-evidence.md` first. This reference adds only Jira-specific identity and relationship rules to that shared read-only contract.
+Load `work-item-evidence.md` first and apply its read-only procedure, snapshot,
+limitations, and completion criterion unchanged. This reference adds only the
+Jira-specific identity and relationship mapping.
 
-## Inputs
+## Identity mapping
 
-Require all of the following before reading Jira:
+Resolve exactly one configured tracker whose provider is `jira`. Accept either:
 
-- one configured Jira tracker ID plus exact issue key, or one canonical issue URL that resolves to exactly one configured Jira tracker;
-- the vault workflow and decision that require the evidence;
-- the smallest material field, comment, attachment, history, or relationship set needed for that decision;
-- an observation timestamp captured for the read.
+- its tracker ID plus an exact Jira issue key; or
+- a canonical issue URL that resolves below that tracker's canonical URL.
 
-An absent or ambiguous identity blocks the read. Do not select a site, project, issue, or relationship from textual similarity.
+Map the observed issue to the shared snapshot with that tracker ID,
+`provider: jira`, its canonical tracker URL, the exact observed issue key as the
+provider-native reference, and the canonical issue URL. Textual similarity does
+not resolve a tracker, project, or issue.
 
-## Read-only procedure
+## Relationship mapping
 
-1. Use an already connected Jira capability only for reads. Do not create `.operations/` state, select an operational runbook, or invoke an effect workflow.
-2. Read the source issue's current key, URL, type, status, summary, description, acceptance criteria, requested material fields, update timestamp, and only the comments, evidence, or attachments relevant to the stated purpose.
-3. Redact secrets, credentials, private personal data, and sensitive attachment contents. Preserve only non-sensitive identity, location, behavioral relevance, and the fact that restricted material exists.
-4. When relationships matter, read the live link metadata and issue links. Preserve the exact link type name, inward description, outward description, endpoint keys, and issue-scoped direction.
-5. Follow at most one observed relationship hop. Read a related issue only when the caller's contract selects that exact typed edge and direction; never infer dependency from hierarchy, labels, prose, shared components, or proximity.
-6. Record unavailable fields, denied content, stale timestamps, missing link metadata, and partial reads as explicit limitations. Do not substitute cached text, a copied handoff snapshot, a case narrative, or memory for current Jira state.
+When relationships matter, read Jira's live link metadata and issue links.
+Preserve the exact link type name, inward description, outward description,
+endpoint keys, and issue-scoped direction. A related issue is eligible for the
+shared contract's one-hop read only through that exact observed typed edge and
+direction.
 
-## Jira normalization
+Set relationships to `observed` only when both live link metadata and the
+issue-scoped direction were read successfully. Use `unavailable` when Jira
+supports the surface but metadata, endpoints, or direction could not be read
+unambiguously. Jira typed relationships never map to `unsupported`.
 
-Map the observed Jira item into the shared work-item snapshot. Set `tracker ID`, `provider: jira`, canonical tracker URL, and provider-native reference from the exact configured tracker and observed issue. Expose only the facts required by the caller:
+## Jira-specific snapshot fields
 
-- canonical site, key, URL, type, status, and update timestamp;
-- requested material fields with their observed field identities;
-- selected comments, evidence, and attachments with stable identity, timestamp, non-sensitive summary, and access limitation;
-- live link metadata and exact inward/outward endpoint observations;
-- one-hop related issue facts selected by the caller's contract;
-- observation method, timestamp, redactions, contradictions, and unavailable evidence.
-
-Set relationships to `observed` only when the live metadata and issue-scoped direction were read successfully. Use `unavailable` for denied, partial, or directionally ambiguous Jira relationship reads. Jira supports typed relationships, so this reference never returns `unsupported` for that surface.
-
-Keep the snapshot in the current vault-side interaction. This reference creates no Jira write, operation ledger, case patch, handoff file, cache, or second evidence store. Jira reads grant no external-write authority.
-
-## Completion criterion
-
-The read is complete when the exact issue identity is current, every requested fact is observed or explicitly unavailable, every relationship retains its live type and direction, sensitive material is minimized, and the caller can distinguish Jira evidence from copied baseline context and local inference.
+For each observed Jira relationship, add its live type name, inward and outward
+descriptions, endpoint keys, and direction relative to the source issue to the
+shared snapshot. All other fields and limitations come from
+`work-item-evidence.md`.
