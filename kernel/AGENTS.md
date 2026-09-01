@@ -14,7 +14,7 @@ Classify the request, then select one skill. For orientation or interrogation, f
 - `manage-investigation-derived-learning` — assess and publish `70-Aprendizajes/` notes.
 - `manage-development-handoff` — persistent work-item worktrees and handoff files.
 - `reconcile-development-handoff` — pull implementation evidence from a registered worktree into its source case and coordinate completed closure.
-- `manage-git-workflow` — apply the cell's Git/GitHub policy for repository workflow and maintain that policy when requested.
+- `manage-git-workflow` — analyze or maintain the cell's Git/GitHub policy, or apply it to source repositories; routine local versioning of this vault follows repository instructions.
 - `manage-operational-workflow` — runbooks with external effects after authorization.
 - `grilling` — one decision at a time.
 - `obsidian-cli`, `obsidian-markdown`, `obsidian-bases` — user-invoked Obsidian helpers.
