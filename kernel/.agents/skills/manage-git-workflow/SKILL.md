@@ -1,6 +1,6 @@
 ---
 name: manage-git-workflow
-description: Operate or document repository Git and GitHub workflows using the vault's local policy. Use for branch, commit, synchronization, pull-request, merge, release, hotfix, or recovery work; persistent Jira handoff worktrees belong to manage-development-handoff.
+description: Operate or document repository Git and GitHub workflows using the vault's local policy. Use for branch, commit, synchronization, pull-request, merge, release, hotfix, or recovery work; persistent work-item handoff worktrees belong to manage-development-handoff.
 ---
 
 # Manage Git workflows
@@ -66,4 +66,4 @@ Execution is complete only when the requested result is observed and every addit
 
 ## Ownership
 
-Route persistent Jira worktree creation, attachment, materialization, and handoff state through `manage-development-handoff`. This skill may operate inside an existing repository or worktree, but it does not change `.knowledge-os-handoffs/` or investigation records.
+Route persistent work-item worktree creation, attachment, materialization, and handoff state through `manage-development-handoff`. This skill may operate inside an existing repository or worktree, but it does not change `.knowledge-os-handoffs/` or investigation records.

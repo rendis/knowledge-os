@@ -5,6 +5,7 @@ import json
 import re
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 ALLOWED_ADAPTERS = ("gcp", "postgres", "reports")
 ALLOWED_PROFILES = ("production-gate", "documented-source", "mixed")
@@ -144,6 +145,16 @@ def dump_instance(data: dict[str, Any]) -> str:
         aliases = system.get("aliases") or []
         lines.append(f"    aliases: [{', '.join(_quote(a) for a in aliases)}]")
     lines.append("")
+    trackers = data.get("trackers") or []
+    if trackers:
+        lines.append("trackers:")
+        for tracker in trackers:
+            lines.append(f"  - id: {_quote(tracker['id'])}")
+            lines.append(f"    provider: {_quote(tracker['provider'])}")
+            lines.append(f"    url: {_quote(tracker['url'])}")
+    else:
+        lines.append("trackers: []")
+    lines.append("")
     vault = data.get("vault") or {}
     lines.append("vault:")
     lines.append(f"  remote: {_quote(vault.get('remote') or '')}")
@@ -186,6 +197,29 @@ def _quote(value: str) -> str:
     return f'"{text}"'
 
 
+def _canonical_tracker_url(value: object) -> str:
+    raw = str(value or "").strip()
+    parsed = urlparse(raw)
+    try:
+        port = parsed.port
+    except ValueError as error:
+        raise InstanceError(f"invalid tracker URL: {raw}") from error
+    if (
+        parsed.scheme.casefold() != "https"
+        or not parsed.hostname
+        or parsed.username
+        or parsed.password
+        or parsed.query
+        or parsed.fragment
+    ):
+        raise InstanceError(f"tracker URL must be a credential-free HTTPS URL: {raw}")
+    host = parsed.hostname.casefold()
+    if port:
+        host = f"{host}:{port}"
+    path = parsed.path.rstrip("/")
+    return f"https://{host}{path}"
+
+
 def validate_instance(data: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(data, dict):
         raise InstanceError("instance.yaml must be a mapping")
@@ -217,6 +251,32 @@ def validate_instance(data: dict[str, Any]) -> dict[str, Any]:
         normalized_systems.append(
             {"id": system_id, "name": name, "aliases": [str(a) for a in aliases if str(a).strip()]}
         )
+    trackers = data.get("trackers") or []
+    if not isinstance(trackers, list):
+        raise InstanceError("trackers must be a list")
+    normalized_trackers: list[dict[str, str]] = []
+    seen_tracker_ids: set[str] = set()
+    seen_tracker_targets: set[tuple[str, str]] = set()
+    for item in trackers:
+        if not isinstance(item, dict):
+            raise InstanceError("each tracker must be a mapping with id, provider, and url")
+        tracker_id = str(item.get("id") or "").strip()
+        provider = str(item.get("provider") or "").strip().casefold()
+        if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", tracker_id):
+            raise InstanceError(f"tracker id must be kebab-case: {tracker_id}")
+        if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", provider):
+            raise InstanceError(f"tracker provider must be kebab-case: {provider}")
+        url = _canonical_tracker_url(item.get("url"))
+        if tracker_id in seen_tracker_ids:
+            raise InstanceError(f"duplicate tracker id: {tracker_id}")
+        target = (provider, url)
+        if target in seen_tracker_targets:
+            raise InstanceError(f"duplicate tracker target: {provider} {url}")
+        seen_tracker_ids.add(tracker_id)
+        seen_tracker_targets.add(target)
+        normalized_trackers.append(
+            {"id": tracker_id, "provider": provider, "url": url}
+        )
     profile = ((data.get("evidence") or {}).get("profile")) or "production-gate"
     if profile not in ALLOWED_PROFILES:
         raise InstanceError(f"unknown evidence.profile: {profile}")
@@ -234,6 +294,7 @@ def validate_instance(data: dict[str, Any]) -> dict[str, Any]:
         "version": int(data.get("version") or 1),
         "cell": {"name": str(cell["name"]).strip(), "purpose": str(cell["purpose"]).strip()},
         "systems": normalized_systems,
+        "trackers": normalized_trackers,
         "vault": {"remote": str(((data.get("vault") or {}).get("remote") or "")).strip()},
         "sources": {
             "github_org": str(((data.get("sources") or {}).get("github_org") or "")).strip(),

@@ -34,6 +34,72 @@ class InstanceTests(unittest.TestCase):
         self.assertEqual(loaded["cell"]["name"], "Payments")
         self.assertEqual(loaded["systems"][0]["id"], "payments")
         self.assertEqual(loaded["evidence"]["profile"], "production-gate")
+        self.assertEqual(loaded["trackers"], [])
+
+    def test_tracker_roundtrip_supports_multiple_providers(self) -> None:
+        data = self.sample()
+        data["trackers"] = [
+            {
+                "id": "jira-core",
+                "provider": "jira",
+                "url": "https://core.atlassian.net/",
+            },
+            {
+                "id": "clickup-product",
+                "provider": "clickup",
+                "url": "https://app.clickup.com/123456",
+            },
+        ]
+        normalized = validate_instance(data)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "instance.yaml"
+            path.write_text(dump_instance(normalized), encoding="utf-8")
+            loaded = load_instance(path)
+
+        self.assertEqual(
+            loaded["trackers"],
+            [
+                {
+                    "id": "jira-core",
+                    "provider": "jira",
+                    "url": "https://core.atlassian.net",
+                },
+                {
+                    "id": "clickup-product",
+                    "provider": "clickup",
+                    "url": "https://app.clickup.com/123456",
+                },
+            ],
+        )
+
+    def test_rejects_ambiguous_or_unsafe_trackers(self) -> None:
+        base = self.sample()
+        invalid_sets = (
+            [
+                {"id": "same", "provider": "jira", "url": "https://one.invalid"},
+                {"id": "same", "provider": "clickup", "url": "https://two.invalid"},
+            ],
+            [
+                {"id": "one", "provider": "jira", "url": "https://same.invalid"},
+                {"id": "two", "provider": "jira", "url": "https://same.invalid/"},
+            ],
+            [
+                {
+                    "id": "credentialed",
+                    "provider": "jira",
+                    "url": "https://user:secret@example.invalid",
+                }
+            ],
+            [
+                {"id": "bad id", "provider": "jira", "url": "https://one.invalid"}
+            ],
+        )
+        for trackers in invalid_sets:
+            with self.subTest(trackers=trackers):
+                candidate = dict(base)
+                candidate["trackers"] = trackers
+                with self.assertRaises(Exception):
+                    validate_instance(candidate)
 
     def test_rejects_empty_systems(self) -> None:
         with self.assertRaises(Exception):

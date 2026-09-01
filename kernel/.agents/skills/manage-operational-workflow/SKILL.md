@@ -21,7 +21,7 @@ Load `../../../90-Meta/vault-resolution.md` and run `../../../90-Meta/resolve-va
 
 Load [references/procedure-contract.md](references/procedure-contract.md) when interpreting, authoring, or changing an operational note. For Execute, Resume, Close, or a persistent Draft, load [references/execution-record.md](references/execution-record.md). Copy [assets/operation-run-template.md](assets/operation-run-template.md) only when opening a new run.
 
-When the request advises on, estimates, drafts, creates, updates, decomposes, converts, links, reparents, or validates Jira work items, load `../../../90-Meta/jira-evidence.md` and [references/jira-work-items.md](references/jira-work-items.md) before building the effect plan. Use the shared contract for current read-only Jira evidence; keep the versioned Jira notes under `60-Operacion/Jira/` as the semantic authority and this skill as the sole owner of planned Jira effects.
+When the request advises on, estimates, drafts, creates, updates, decomposes, converts, links, reparents, or validates Jira work items, load `../../../90-Meta/work-item-evidence.md`, then `../../../90-Meta/jira-evidence.md` and [references/jira-work-items.md](references/jira-work-items.md) before building the effect plan. Use the shared contract plus the Jira mapping for current read-only evidence; keep the versioned Jira notes under `60-Operacion/Jira/` as the semantic authority and this skill as the sole owner of planned Jira effects.
 
 Create `.operations/<run-id>/run.md` for Execute or a Draft that must survive the current session. Resume and Close require the exact existing run record.
 

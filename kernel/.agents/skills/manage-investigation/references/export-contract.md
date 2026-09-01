@@ -59,7 +59,7 @@ When no compatible integration exists, deliver the local Markdown draft without 
 
 ## Development handoff
 
-A development handoff is separate from publication. Require a release-ready development or mixed story, one exact current Jira snapshot, and an explicit target remote for every repository that owns implementation work.
+A development handoff is separate from publication. Require a release-ready development or mixed story, one exact current work-item snapshot, and an explicit target remote for every repository that owns implementation work.
 
 Before materialization, require an exact repository remote and explicit overlap in the named component or implementation scope before proposing a shared worktree. A common remote alone is not enough; when overlap is absent or ambiguous, recommend a separate worktree. Compare new packages with both the current selection and existing `DH-NNN` entries from this investigation. Show compatible existing worktree paths and let the user choose reuse, a new shared worktree, or separate worktrees. Persist no grouping artifact: each story keeps its package and later `DH-NNN` identity.
 
@@ -67,14 +67,14 @@ Load [the development input-bundle contract](../../manage-development-handoff/re
 
 ```text
 .investigations/<investigation-id>/handoffs/
-└── <issue-key-lower>--<repository-basename-lower>/
+└── <work-item-token>--<repository-basename-lower>/
 ```
 
-Compile `jira.md` from the current read-only snapshot produced under `VAULT_ROOT/90-Meta/jira-evidence.md`; never reconstruct it from a published local draft, copied handoff, case History, or memory. Compile `context.md` and `scope.md` from the current case, registered evidence, decisions, acceptance criteria, and the selected repository boundary. A multi-repository story must produce different context and scope whenever ownership differs.
+Compile `work-item.md` from the current read-only snapshot produced under `VAULT_ROOT/90-Meta/work-item-evidence.md` and its provider-specific mapping; never reconstruct it from a published local draft, copied handoff, case History, or memory. Compile `context.md` and `scope.md` from the current case, registered evidence, decisions, acceptance criteria, and the selected repository boundary. A multi-repository story must produce different context and scope whenever ownership differs.
 
-When the target story is a directly dependent story previously reconciled from another implementation, include its current dependent card in the repository-specific package. Carry the observed contracts, APIs/events/data/configuration, compatibility and verification requirements, what can start, remaining gaps, source repository remote, and observed remote branch/PR state. Re-read the dependent Jira story before export; do not make its implementation worktree rediscover an already captured source contract.
+When the target story is a directly dependent story previously reconciled from another implementation, include its current dependent card in the repository-specific package. Carry the observed contracts, APIs/events/data/configuration, compatibility and verification requirements, what can start, remaining gaps, source repository remote, and observed remote branch/PR state. Re-read the dependent work item before export; do not make its implementation worktree rediscover an already captured source contract.
 
-Keep repository evidence flow one-way: hand only the exact package directories and the user's worktree choice to `manage-development-handoff`; the repository persists its state and evidence under `.knowledge-os-handoffs/` and sends no callback or reconciliation package. The consumer must not read or modify the investigation case, refresh Jira, or reinterpret the story. After repository-state validation, it passes one normalized in-memory observation per handoff to the **Bind development handoff** route of `manage-investigation`. That owner alone creates or advances each stable `DH-NNN`; several entries may record the same exact worktree path while retaining distinct story and handoff identities.
+Keep repository evidence flow one-way: hand only the exact package directories and the user's worktree choice to `manage-development-handoff`; the repository persists its state and evidence under `.knowledge-os-handoffs/` and sends no callback or reconciliation package. The consumer must not read or modify the investigation case, refresh the tracker, or reinterpret the story. After repository-state validation, it passes one normalized in-memory observation per handoff to the **Bind development handoff** route of `manage-investigation`. That owner alone creates or advances each stable `DH-NNN`; several entries may record the same exact worktree path while retaining distinct story and handoff identities.
 
 ## Completion criterion
 

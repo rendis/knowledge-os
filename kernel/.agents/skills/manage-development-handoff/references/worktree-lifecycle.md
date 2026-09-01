@@ -16,8 +16,8 @@ If the view returns `worktree_root_not_configured` or `worktree_root_unavailable
 The helper derives:
 
 ```text
-branch: <issue-prefix>/<JIRA-KEY>-<description-slug>
-path:   <worktree-root>/<remote-repository-basename>/<JIRA-KEY>-<description-slug>
+branch: <issue-prefix>/<work-item-token>-<description-slug>
+path:   <worktree-root>/<remote-repository-basename>/<work-item-token>-<description-slug>
 ```
 
 Derive `remote-repository-basename` from the configured URL of the matching Git remote in the configuration-resolved source checkout after removing an optional `.git` suffix. Preserve that URL's basename casing for the filesystem path; use the normalized remote only for identity comparison. The result is independent of the local checkout directory name. When that canonical repository container is absent, include its `create-directory` effect in the plan and create it only with the authorized worktree operation. Reuse an existing container only when it is a real directory outside any Git worktree; reject files, symlinks, and Git worktree parents.
@@ -81,7 +81,7 @@ Multi-repository creation is sequential and has no broad rollback. On failure, r
 
 ## Existing worktrees
 
-Refresh, attachment, validation, and state updates use the exact absolute `--worktree-path`. The helper verifies that it is under the configured root, follows `<root>/<remote-repository-basename>/<jira-description>`, uses the canonical repository basename derived from the supplied remote, is registered to the repository resolved by that remote, and is attached to a branch. The first handoff must match the branch Jira key; later handoffs reuse that branch only when `ACTIVE.yaml` names their same investigation.
+Refresh, attachment, validation, and state updates use the exact absolute `--worktree-path`. The helper verifies that it is under the configured root, follows `<root>/<remote-repository-basename>/<work-item-description>`, uses the canonical repository basename derived from the supplied remote, is registered to the repository resolved by that remote, and is attached to a branch. The first handoff must match the collision-safe work-item token in the branch; later handoffs reuse that branch only when `ACTIVE.yaml` names their same investigation.
 
 Every refresh, attachment, validation, and state update requires the exact absolute worktree path. A missing or non-canonical path blocks the operation; the helper does not search historical checkouts or relocate state.
 

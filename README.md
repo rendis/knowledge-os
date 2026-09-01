@@ -14,7 +14,7 @@ This repository is the **distribution / template**. A cell vault is a separate d
   --yes
 ```
 
-Without flags, `init` asks for cell name, purpose, systems, adapters, evidence profile, and note locale.
+Without flags, `init` asks for cell name, purpose, systems, optional trackers, adapters, evidence profile, and note locale. Non-interactive init accepts repeatable `--tracker id:provider:https://url`; omit it when the cell has no external work tracker.
 
 ```bash
 ./install.sh update --dest /path/to/cell-vault
@@ -41,7 +41,7 @@ The current distribution channel is local-only. The script is written so that on
 
 The cell vault owns:
 
-- `instance.yaml` — who the cell is, systems, source prefixes, evidence profile
+- `instance.yaml` — who the cell is, systems, trackers, source prefixes, evidence profile
 - `00-Home.md` — orientation; a later `update` does not overwrite it
 - `10-Sistemas/` — one stub note per declared system
 - `10/`–`70/` — the cell's knowledge graph
@@ -49,6 +49,8 @@ The cell vault owns:
 The distribution owns the thin `AGENTS.md` router, every generic file it ships under `90-Meta/`, kernel skills, selected adapter skills, `VERSION`, and the `CLAUDE.md` / `.claude/skills` symlink topology. `update` refreshes matching distribution files without deleting cell-only Meta files, skills, recipes, or overlays. The cell owns `instance.yaml`, `00-Home.md`, the root Bases, `90-Meta/Alcance.md`, and notes under `10/`–`70/`; those files are seeded or authored locally and never rewritten by `update`.
 
 `update` refreshes only the consumer vault; it never traverses development worktrees. An existing worktree receives the current managed instruction block during its next authorized handoff mutation.
+
+Version 0.5 uses work-item bundle and manifest schema 2. Jira-specific schema-1 packages or materialized families are not reinterpreted in place; configure their tracker and export a new schema-2 package. The legacy schema-1 `ACTIVE.yaml` pointer remains readable only as a registry wrapper around a current schema-2 family.
 
 When adopting or upgrading a vault, a pre-existing file that becomes distribution-owned must already match the distribution or be explicitly authorized with an overlay or `--force`. This prevents a newly managed runtime file from being overwritten silently.
 

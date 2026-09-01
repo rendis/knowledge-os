@@ -14,24 +14,24 @@ Load this reference for `plan`, `apply`, `validate`, and `set-state` after the w
 
 ## Materialized layout
 
-Each target worktree stores one registry plus one complete family per Jira story:
+Each target worktree stores one registry plus one complete family per work item:
 
 ```text
 .knowledge-os-handoffs/
 ├── .ACTIVE.lock
 ├── .APPLY.transaction/        # only while an apply is incomplete
 ├── ACTIVE.yaml
-├── issue-3812--schema-repository/
+├── delivery-br-3812-a1b2c3d4e5--schema-repository/
     ├── handoff.yaml
     ├── START.md
-    ├── jira.md
+    ├── work-item.md
     ├── context.md
     ├── scope.md
     ├── implementation-updates.md
     └── history/
         ├── v0001.md
         └── v0002.md
-└── issue-3813--schema-repository/
+└── delivery-br-3813-f6e7d8c9b0--schema-repository/
     └── ...
 ```
 
@@ -43,12 +43,12 @@ There is no directory per revision. An agent reads stable current paths, then th
 The stable identity is:
 
 ```text
-normalized Jira site + uppercase issue key + normalized repository remote
+exact tracker ID + exact provider-native reference + normalized repository remote
 ```
 
-The visible family is `<issue-key-lower>--<repository-basename-lower>`. `handoff.yaml` stores the full SHA-256 identity and normalized remote; an existing visible family with another identity is a collision and blocks the operation.
+The visible family is `<readable-work-item-slug>-<identity-digest>--<repository-basename-lower>`. The ten-character digest is derived from the full stable identity, so different native references that normalize to the same slug remain distinct. `handoff.yaml` stores the full SHA-256 identity and normalized remote; an existing visible family with another identity is a collision and blocks the operation.
 
-Each material export compares `jira.md`, `context.md`, and `scope.md` independently:
+Each material export compares `work-item.md`, `context.md`, and `scope.md` independently:
 
 - Same semantic hashes: no new revision and no rewritten document; when the selected entry is not `active`, reactivate it without creating history.
 - One or more changed hashes: increment `vNNNN`, write only changed documents, append one event, and update `handoff.yaml` and `ACTIVE.yaml`.
@@ -98,7 +98,7 @@ Run:
   --worktree-path <absolute-worktree-path>
 ```
 
-`plan` is read-only. It resolves `repository.remote` through `90-Meta/workspace-config.py locate-repository`, verifies that the explicit path is a registered worktree under the configured root and attached to a branch, and requires the first handoff's Jira branch to match on every operation. Later handoffs preserve that anchor branch and must match the registry investigation. The plan validates current state and returns the target, branch, action, revision, changed documents, exact effects, tracked status, and a `plan_token`.
+`plan` is read-only. It resolves `repository.remote` through `90-Meta/workspace-config.py locate-repository`, verifies that the explicit path is a registered worktree under the configured root and attached to a branch, and requires the first handoff's collision-safe work-item token to match on every operation. Later handoffs preserve that anchor branch and must match the registry investigation. The plan validates current state and returns the target, branch, action, revision, changed documents, exact effects, tracked status, and a `plan_token`.
 
 For existing worktrees, `plan` may attach a new family only when `ACTIVE.yaml` names the package's investigation. It preserves the existing branch and every registered family. Present the exact registry and family effects, then apply each unchanged plan:
 

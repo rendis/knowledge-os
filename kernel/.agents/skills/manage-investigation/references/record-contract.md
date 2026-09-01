@@ -133,14 +133,16 @@ Each question records `open`, `resolved`, or `superseded` state. Keep open quest
 
 Each evidence entry states its claim, category (`fact`, `inference`, `contradiction`, or `limitation`), source, and relevant location such as file, section, page, line, URL, or revision. Link decisions and acceptance criteria to supporting identifiers when available.
 
-Each materialized development target has one stable entry under **Development handoffs**. Allocate a new `DH-NNN` for a new story-and-repository identity; update that same entry when a later materialization advances its current revision. Entries from the same investigation and repository may share an exact worktree path; their story, Jira, handoff, family, and revision identities remain distinct. Record these fields exactly:
+Each materialized development target has one stable entry under **Development handoffs**. Allocate a new `DH-NNN` for a new story-and-repository identity; update that same entry when a later materialization advances its current revision. Entries from the same investigation and repository may share an exact worktree path; their story, work-item, handoff, family, and revision identities remain distinct. Record these fields exactly:
 
 ```text
-### DH-001 — <Jira key> / <repository basename>
+### DH-001 — <tracker-id>:<work-item-reference> / <repository basename>
 
 - Story ID: <S-NNN>
-- Jira site: <canonical site>
-- Jira key: <exact key>
+- Tracker ID: <configured tracker ID>
+- Provider: <provider name>
+- Tracker URL: <canonical tracker URL>
+- Work item reference: <exact provider-native reference>
 - Repository remote: <normalized remote>
 - Worktree path: <exact absolute worktree path>
 - Handoff ID: <exact handoff ID>
@@ -152,17 +154,17 @@ Each materialized development target has one stable entry under **Development ha
 The same History event that creates or advances a binding includes one exact marker on its own two-space-indented line:
 
 ```text
-- <materialized-at> — <action in the cell note locale> development handoff `DH-001`; story `S-NNN`; Jira `<key>`; repository `<remote>`; worktree `<absolute-path>`; handoff `<handoff-id>`; revision `<vNNNN>`.
-  <!-- knowledge-os:development-handoff-binding {"dh":"DH-001","family":"<family>","handoff-id":"<handoff-id>","jira-key":"<key>","jira-site":"<site>","materialized-at":"<timestamp>","repository-remote":"<remote>","revision":"<vNNNN>","story-id":"<S-NNN>","worktree-path":"<absolute-path>"} -->
+- <materialized-at> — <action in the cell note locale> development handoff `DH-001`; story `S-NNN`; work item `<tracker-id>:<reference>`; repository `<remote>`; worktree `<absolute-path>`; handoff `<handoff-id>`; revision `<vNNNN>`.
+  <!-- knowledge-os:development-handoff-binding {"dh":"DH-001","family":"<family>","handoff-id":"<handoff-id>","materialized-at":"<timestamp>","provider":"<provider>","repository-remote":"<remote>","revision":"<vNNNN>","story-id":"<S-NNN>","tracker-id":"<tracker-id>","tracker-url":"<tracker-url>","work-item-reference":"<reference>","worktree-path":"<absolute-path>"} -->
 ```
 
-Use canonical compact UTF-8 JSON: keep the keys in the exact lexicographic order shown, omit structural whitespace, and allow no duplicate key. Reserved `knowledge-os:development-handoff-binding` markers may appear only in History. The surrounding History bullet starts with the marker's exact `materialized-at`, remains human-readable, names the action, and includes the exact `DH-NNN`, story, Jira key, repository remote, worktree path, handoff ID, and revision through the labelled fragments shown above. An incidental value occurrence inside another coordinate does not satisfy its role. Keep exactly one event and marker per materialized content revision, in actual `v0001` through current-revision order. The current marker must match every field in the current register entry; older markers preserve their observed worktree path and timestamp while retaining the stable story, Jira, repository, handoff, and family identity.
+Use canonical compact UTF-8 JSON: keep the keys in the exact lexicographic order shown, omit structural whitespace, and allow no duplicate key. Reserved `knowledge-os:development-handoff-binding` markers may appear only in History. The surrounding History bullet starts with the marker's exact `materialized-at`, remains human-readable, names the action, and includes the exact `DH-NNN`, story, work-item identity, repository remote, worktree path, handoff ID, and revision through the labelled fragments shown above. An incidental value occurrence inside another coordinate does not satisfy its role. Keep exactly one event and marker per materialized content revision, in actual `v0001` through current-revision order. The current marker must match every field in the current register entry; older markers preserve their observed worktree path and timestamp while retaining the stable story, work-item, repository, handoff, and family identity.
 
 An activation or idempotent binding retry of the exact already-recorded revision and coordinates is a byte-level case no-op: validate the existing current entry and marker, but append no History event and no duplicate marker. A same-revision observation that changes any recorded coordinate or timestamp is a conflict, not an activation.
 
 This register is the vault-owned locator for later reconciliation. Populate it only from the same vault-side materialization result after validation; do not infer it from branch names, repository messages, or a callback. History records every new or advanced binding so prior paths and revisions remain interpretable.
 
-For a reconciled implementation, keep one source implementation card and one card per directly dependent Jira story in **Affected surfaces**. Each dependent card names the exact typed-link direction, consumer contracts, what can start, remaining gaps, repository/branch/PR observations, and `ready`, `partial`, `still-blocked`, or `not-applicable` readiness. These cards are case context, not Jira status changes or production evidence.
+For a reconciled implementation, keep one source implementation card and one card per directly dependent work item in **Affected surfaces**. Each dependent card names the exact typed-relation direction, consumer contracts, what can start, remaining gaps, repository/branch/PR observations, and `ready`, `partial`, `still-blocked`, or `not-applicable` readiness. These cards are case context, not tracker status changes or production evidence.
 
 Persistent memory, another case file, and a neighboring local project are discovery aids, not evidence. Register a claim only after inspecting an explicitly in-scope source directly. Cite that observed source rather than memory, and omit any unscoped project, component, or claim from the case and its exports.
 

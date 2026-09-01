@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Plan, prepare, apply, validate, or update Jira development handoffs."""
+"""Plan, prepare, apply, validate, or update work-item development handoffs."""
 from __future__ import annotations
 
 import argparse
@@ -33,9 +33,13 @@ else:
     import fcntl
 
 
-SCHEMA_VERSION = 1
+BUNDLE_SCHEMA_VERSION = 2
+HANDOFF_SCHEMA_VERSION = 2
+HISTORY_SCHEMA_VERSION = 1
+LEGACY_ACTIVE_SCHEMA_VERSION = 1
 ACTIVE_SCHEMA_VERSION = 2
-DOCUMENTS = ("context.md", "jira.md", "scope.md")
+CONTROL_SCHEMA_VERSION = 1
+DOCUMENTS = ("context.md", "work-item.md", "scope.md")
 MANAGED_BEGIN = '<!-- knowledge-os:managed:start id="development handoff" -->'
 MANAGED_END = '<!-- knowledge-os:managed:end id="development handoff" -->'
 OBSOLETE_MANAGED_BEGIN = "<!-- BEGIN MANAGED: System A-System B DEVELOPMENT HANDOFF -->"
@@ -59,7 +63,7 @@ MAX_UPDATES_BYTES = 1_048_576
 MAX_CLOSURE_UNTRACKED_PATHS = 10_000
 REVISION_RE = re.compile(r"v([0-9]{4})")
 UPDATE_HEADING_RE = re.compile(r"^## UPD-([0-9]{3,}) — (.+)$")
-ISSUE_KEY_RE = re.compile(r"[A-Z][A-Z0-9]+-[0-9]+")
+TRACKER_NAME_RE = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
 STORY_ID_RE = re.compile(r"S-[0-9]{3,}")
 SAFE_NAME_RE = re.compile(r"[^a-z0-9]+")
 REMOTE_CONFIG_RE = re.compile(r"^remote\.([^.]+)\.url$")
@@ -162,7 +166,7 @@ class Bundle:
     root: Path
     raw_metadata: bytes
     source: dict[str, str]
-    jira: dict[str, str]
+    work_item: dict[str, str]
     repository_remote: str
     change_summary: str
     change_reasons: dict[str, str]
@@ -376,9 +380,17 @@ def expect_timestamp(value: object, *, field: str) -> str:
     return raw
 
 
-def normalize_site(value: object) -> str:
-    raw = expect_string(value, field="jira.site", maximum=512)
+def normalize_tracker_url(value: object) -> str:
+    raw = expect_string(value, field="work-item.tracker-url", maximum=512)
     parsed = urlparse(raw)
+    try:
+        port = parsed.port
+    except ValueError as error:
+        raise HandoffError(
+            "invalid_tracker_url",
+            "work-item.tracker-url contains an invalid port",
+            field="work-item.tracker-url",
+        ) from error
     if (
         parsed.scheme.casefold() != "https"
         or not parsed.hostname
@@ -388,33 +400,50 @@ def normalize_site(value: object) -> str:
         or parsed.fragment
     ):
         raise HandoffError(
-            "invalid_jira_site",
-            "jira.site must be a credential-free HTTPS base URL",
-            field="jira.site",
+            "invalid_tracker_url",
+            "work-item.tracker-url must be a credential-free HTTPS base URL",
+            field="work-item.tracker-url",
         )
     host = parsed.hostname.casefold()
-    if parsed.port:
-        host = f"{host}:{parsed.port}"
+    if port:
+        host = f"{host}:{port}"
     path = parsed.path.rstrip("/")
     return f"https://{host}{path}"
 
 
-def validate_jira_url(value: object, *, site: str, issue_key: str) -> str:
-    raw = expect_string(value, field="jira.url", maximum=1_024)
+def validate_work_item_url(value: object, *, tracker_url: str) -> str:
+    raw = expect_string(value, field="work-item.url", maximum=1_024)
     parsed = urlparse(raw)
-    site_parsed = urlparse(site)
+    tracker_parsed = urlparse(tracker_url)
+    try:
+        port = parsed.port
+        tracker_port = tracker_parsed.port
+    except ValueError as error:
+        raise HandoffError(
+            "invalid_work_item_url",
+            "work-item.url contains an invalid port",
+            field="work-item.url",
+        ) from error
+    tracker_path = tracker_parsed.path.rstrip("/")
+    item_matches_tracker_path = (
+        not tracker_path
+        or parsed.path == tracker_path
+        or parsed.path.startswith(f"{tracker_path}/")
+    )
     if (
         parsed.scheme.casefold() != "https"
         or not parsed.hostname
         or parsed.username
         or parsed.password
-        or parsed.hostname.casefold() != (site_parsed.hostname or "").casefold()
-        or issue_key.casefold() not in parsed.path.casefold()
+        or parsed.fragment
+        or parsed.hostname.casefold() != (tracker_parsed.hostname or "").casefold()
+        or (port or 443) != (tracker_port or 443)
+        or not item_matches_tracker_path
     ):
         raise HandoffError(
-            "invalid_jira_url",
-            "jira.url must be a credential-free HTTPS URL for the copied issue",
-            field="jira.url",
+            "invalid_work_item_url",
+            "work-item.url must be a credential-free HTTPS URL on its tracker host",
+            field="work-item.url",
         )
     return raw
 
@@ -530,14 +559,14 @@ def load_bundle(raw_root: str) -> Bundle:
     )
     expect_exact_keys(
         metadata,
-        {"schema-version", "source", "jira", "repository", "change"},
+        {"schema-version", "source", "work-item", "repository", "change"},
         field="bundle",
     )
-    if metadata["schema-version"] != SCHEMA_VERSION:
+    if metadata["schema-version"] != BUNDLE_SCHEMA_VERSION:
         raise HandoffError(
             "unsupported_bundle_schema",
             "The bundle schema version is unsupported",
-            expected=SCHEMA_VERSION,
+            expected=BUNDLE_SCHEMA_VERSION,
         )
 
     source_value = expect_mapping(metadata["source"], field="source")
@@ -569,69 +598,76 @@ def load_bundle(raw_root: str) -> Bundle:
             field="source.story-id",
         )
 
-    jira_value = expect_mapping(metadata["jira"], field="jira")
+    work_item_value = expect_mapping(metadata["work-item"], field="work-item")
     expect_exact_keys(
-        jira_value,
+        work_item_value,
         {
-            "site",
-            "issue-key",
+            "tracker-id",
+            "provider",
+            "tracker-url",
+            "reference",
             "url",
             "updated-at",
             "captured-at",
             "freshness",
             "snapshot-source",
         },
-        field="jira",
+        field="work-item",
     )
-    issue_key = expect_string(
-        jira_value["issue-key"],
-        field="jira.issue-key",
-        maximum=64,
+    tracker_id = expect_string(
+        work_item_value["tracker-id"], field="work-item.tracker-id", maximum=64
     )
-    if not ISSUE_KEY_RE.fullmatch(issue_key):
+    provider = expect_string(
+        work_item_value["provider"], field="work-item.provider", maximum=64
+    )
+    if TRACKER_NAME_RE.fullmatch(tracker_id) is None or TRACKER_NAME_RE.fullmatch(provider) is None:
         raise HandoffError(
-            "invalid_issue_key",
-            "jira.issue-key must use the canonical uppercase Jira key",
-            field="jira.issue-key",
+            "invalid_work_item_identity",
+            "work-item tracker-id and provider must use canonical kebab-case",
+            field="work-item",
         )
-    site = normalize_site(jira_value["site"])
+    reference = expect_string(
+        work_item_value["reference"], field="work-item.reference", maximum=200
+    )
+    tracker_url = normalize_tracker_url(work_item_value["tracker-url"])
     freshness = expect_string(
-        jira_value["freshness"],
-        field="jira.freshness",
+        work_item_value["freshness"],
+        field="work-item.freshness",
         maximum=16,
     )
     if freshness != "current":
         raise HandoffError(
-            "stale_jira_snapshot",
-            "The copied Jira snapshot must be verified current before handoff",
-            field="jira.freshness",
+            "stale_work_item_snapshot",
+            "The copied work-item snapshot must be verified current before handoff",
+            field="work-item.freshness",
         )
     snapshot_source = expect_string(
-        jira_value["snapshot-source"],
-        field="jira.snapshot-source",
+        work_item_value["snapshot-source"],
+        field="work-item.snapshot-source",
         maximum=32,
     )
     if snapshot_source not in {"connected-readback", "user-supplied-export"}:
         raise HandoffError(
-            "invalid_jira_snapshot_source",
-            "jira.snapshot-source must identify a supported exact-copy provenance",
-            field="jira.snapshot-source",
+            "invalid_work_item_snapshot_source",
+            "work-item.snapshot-source must identify a supported exact-copy provenance",
+            field="work-item.snapshot-source",
         )
-    jira = {
-        "site": site,
-        "issue-key": issue_key,
-        "url": validate_jira_url(
-            jira_value["url"],
-            site=site,
-            issue_key=issue_key,
+    work_item = {
+        "tracker-id": tracker_id,
+        "provider": provider,
+        "tracker-url": tracker_url,
+        "reference": reference,
+        "url": validate_work_item_url(
+            work_item_value["url"],
+            tracker_url=tracker_url,
         ),
         "updated-at": expect_timestamp(
-            jira_value["updated-at"],
-            field="jira.updated-at",
+            work_item_value["updated-at"],
+            field="work-item.updated-at",
         ),
         "captured-at": expect_timestamp(
-            jira_value["captured-at"],
-            field="jira.captured-at",
+            work_item_value["captured-at"],
+            field="work-item.captured-at",
         ),
         "freshness": freshness,
         "snapshot-source": snapshot_source,
@@ -687,11 +723,11 @@ def load_bundle(raw_root: str) -> Bundle:
     }
 
     documents = {name: read_document(root, name) for name in DOCUMENTS}
-    if issue_key.casefold() not in documents["jira.md"].text.casefold():
+    if reference.casefold() not in documents["work-item.md"].text.casefold():
         raise HandoffError(
-            "jira_snapshot_identity_mismatch",
-            "jira.md must identify the copied Jira issue",
-            document="jira.md",
+            "work_item_snapshot_identity_mismatch",
+            "work-item.md must identify the copied work item",
+            document="work-item.md",
         )
     total_bytes = len(raw_metadata) + sum(
         len(document.raw) for document in documents.values()
@@ -717,7 +753,7 @@ def load_bundle(raw_root: str) -> Bundle:
         root=root,
         raw_metadata=raw_metadata,
         source=source,
-        jira=jira,
+        work_item=work_item,
         repository_remote=repository_remote,
         change_summary=change_summary,
         change_reasons=change_reasons,
@@ -741,6 +777,46 @@ def resolve_vault(raw_root: str) -> Path:
             "The vault does not expose the versioned configuration helper",
         )
     return root
+
+
+def validate_tracker_binding(vault_root: Path, bundle: Bundle) -> None:
+    instance_path = vault_root / "instance.yaml"
+    if not instance_path.is_file():
+        raise HandoffError(
+            "invalid_tracker_configuration",
+            "The vault must contain a valid instance.yaml tracker registry",
+            path=str(instance_path),
+        )
+    instance, _ = load_yaml_mapping(instance_path, label="instance.yaml")
+    trackers = instance.get("trackers", [])
+    if not isinstance(trackers, list):
+        raise HandoffError(
+            "invalid_tracker_configuration",
+            "instance.yaml trackers must be a list",
+        )
+    tracker_id = bundle.work_item["tracker-id"]
+    matches = [
+        item
+        for item in trackers
+        if isinstance(item, dict) and item.get("id") == tracker_id
+    ]
+    if len(matches) != 1:
+        raise HandoffError(
+            "unknown_tracker",
+            "The work item must reference exactly one configured tracker",
+            tracker_id=tracker_id,
+        )
+    configured = matches[0]
+    if (
+        configured.get("provider") != bundle.work_item["provider"]
+        or normalize_tracker_url(configured.get("url"))
+        != bundle.work_item["tracker-url"]
+    ):
+        raise HandoffError(
+            "tracker_binding_mismatch",
+            "The work-item tracker binding does not match instance.yaml",
+            tracker_id=tracker_id,
+        )
 
 
 def resolve_repository(
@@ -1163,7 +1239,7 @@ def resolve_explicit_worktree(
     if len(relative_parts) != 2:
         raise HandoffError(
             "invalid_worktree_layout",
-            "The worktree path must use <root>/<repository>/<jira-description>",
+            "The worktree path must use <root>/<repository>/<work-item-description>",
             exit_code=3,
         )
     expected_repository = observed_repository_basename(source, normalized_remote)
@@ -1232,20 +1308,32 @@ def slug(value: str) -> str:
     return result
 
 
-def handoff_identity(
-    bundle: Bundle,
+def work_item_identity(
+    work_item: dict[str, str],
     normalized_remote: str,
-) -> tuple[str, str]:
+) -> tuple[str, str, str]:
     repository_name = normalized_remote.rsplit("/", 1)[-1]
-    family = f"{slug(bundle.jira['issue-key'])}--{slug(repository_name)}"
     identity = "|".join(
         (
-            bundle.jira["site"].casefold(),
-            bundle.jira["issue-key"],
+            work_item["tracker-id"],
+            work_item["reference"],
             normalized_remote,
         )
     )
-    return family, sha256(identity.encode("utf-8"))
+    handoff_id = sha256(identity.encode("utf-8"))
+    readable = slug(
+        f"{work_item['tracker-id']}-{work_item['reference']}"
+    )[:80].rstrip("-")
+    token = f"{readable}-{handoff_id[:10]}"
+    family = f"{token}--{slug(repository_name)}"
+    return family, handoff_id, token
+
+
+def handoff_identity(
+    bundle: Bundle,
+    normalized_remote: str,
+) -> tuple[str, str, str]:
+    return work_item_identity(bundle.work_item, normalized_remote)
 
 
 def read_asset(path: Path) -> bytes:
@@ -1861,7 +1949,7 @@ def validate_history_chain(
             ) from error
         expected_previous = f"v{number - 1:04d}" if number > 1 else None
         if (
-            event["schema-version"] != SCHEMA_VERSION
+            event["schema-version"] != HISTORY_SCHEMA_VERSION
             or event["handoff-id"] != handoff_id
             or event["revision"] != event_revision
             or event["previous"] != expected_previous
@@ -1926,9 +2014,15 @@ def read_existing_handoff(
         )
     manifest_path = family_path / MANIFEST_NAME
     manifest, _ = load_yaml_mapping(manifest_path, label=MANIFEST_NAME)
+    if manifest.get("schema-version") != HANDOFF_SCHEMA_VERSION:
+        raise HandoffError(
+            "unsupported_handoff_schema",
+            "The materialized handoff schema is unsupported; export a schema-2 work-item package",
+            expected=HANDOFF_SCHEMA_VERSION,
+            family=family,
+        )
     if (
-        manifest.get("schema-version") != SCHEMA_VERSION
-        or manifest.get("handoff-id") != handoff_id
+        manifest.get("handoff-id") != handoff_id
         or manifest.get("family") != family
     ):
         raise HandoffError(
@@ -1969,28 +2063,47 @@ def read_existing_handoff(
             "invalid_handoff_manifest",
             "handoff.yaml contains an invalid source story ID",
         )
-    story = expect_mapping(manifest.get("story"), field="manifest.story")
+    work_item = expect_mapping(
+        manifest.get("work-item"), field="manifest.work-item"
+    )
     expect_exact_keys(
-        story,
+        work_item,
         {
-            "site",
-            "issue-key",
+            "tracker-id",
+            "provider",
+            "tracker-url",
+            "reference",
             "url",
             "updated-at",
             "captured-at",
             "freshness",
             "snapshot-source",
         },
-        field="manifest.story",
+        field="manifest.work-item",
     )
-    story["issue-key"] = expect_string(
-        story["issue-key"], field="manifest.story.issue-key", maximum=64
+    work_item["tracker-id"] = expect_string(
+        work_item["tracker-id"],
+        field="manifest.work-item.tracker-id",
+        maximum=64,
     )
-    if ISSUE_KEY_RE.fullmatch(story["issue-key"]) is None:
+    work_item["provider"] = expect_string(
+        work_item["provider"], field="manifest.work-item.provider", maximum=64
+    )
+    work_item["reference"] = expect_string(
+        work_item["reference"], field="manifest.work-item.reference", maximum=200
+    )
+    if (
+        TRACKER_NAME_RE.fullmatch(work_item["tracker-id"]) is None
+        or TRACKER_NAME_RE.fullmatch(work_item["provider"]) is None
+    ):
         raise HandoffError(
             "invalid_handoff_manifest",
-            "handoff.yaml contains an invalid Jira issue key",
+            "handoff.yaml contains an invalid work-item identity",
         )
+    work_item["tracker-url"] = normalize_tracker_url(work_item["tracker-url"])
+    work_item["url"] = validate_work_item_url(
+        work_item["url"], tracker_url=work_item["tracker-url"]
+    )
     revision = manifest.get("revision")
     if not isinstance(revision, str) or REVISION_RE.fullmatch(revision) is None:
         raise HandoffError(
@@ -2035,7 +2148,7 @@ def read_active(store: Path) -> tuple[dict[str, Any] | None, bytes | None]:
         return None, None
     active, raw = load_yaml_mapping(path, label=ACTIVE_NAME)
     schema_version = active.get("schema-version")
-    if schema_version == SCHEMA_VERSION:
+    if schema_version == LEGACY_ACTIVE_SCHEMA_VERSION:
         expected = {
             "schema-version",
             "handoff-id",
@@ -2244,15 +2357,18 @@ def validate_active_entries(
             )
         updates = validate_implementation_updates(existing.family_path / UPDATES_NAME)
         validated.append((entry, existing, updates))
-    anchor_issue_key = validated[0][1].manifest["story"]["issue-key"]
+    anchor_work_item = validated[0][1].manifest["work-item"]
+    _family, _handoff_id, anchor_token = work_item_identity(
+        anchor_work_item, normalized_remote
+    )
     branch_leaf = branch.rsplit("/", 1)[-1]
-    if "/" not in branch or not branch_leaf.startswith(f"{anchor_issue_key}-"):
+    if "/" not in branch or not branch_leaf.startswith(f"{anchor_token}-"):
         raise HandoffError(
             "worktree_branch_mismatch",
             "The worktree branch no longer matches its first handoff",
             exit_code=3,
             branch=branch,
-            issue_key=anchor_issue_key,
+            work_item_token=anchor_token,
         )
     return validated
 
@@ -2408,7 +2524,7 @@ def start_apply_transaction(plan: ApplyPlan, revision: str) -> bool:
                 }
             )
         metadata = {
-            "schema-version": SCHEMA_VERSION,
+            "schema-version": CONTROL_SCHEMA_VERSION,
             "plan-token": str(plan.output["plan_token"]),
             "bundle-fingerprint": plan.bundle.fingerprint,
             "handoff-id": plan.handoff_id,
@@ -2501,7 +2617,7 @@ def load_apply_transaction(transaction: Path) -> dict[str, Any]:
         metadata["handoff-id"], field="transaction.handoff-id", maximum=64
     )
     if (
-        metadata["schema-version"] != SCHEMA_VERSION
+        metadata["schema-version"] != CONTROL_SCHEMA_VERSION
         or FAMILY_RE.fullmatch(family) is None
         or re.fullmatch(r"[a-f0-9]{64}", plan_token) is None
         or re.fullmatch(r"[a-f0-9]{64}", bundle_fingerprint) is None
@@ -2944,7 +3060,7 @@ def closure_fingerprint(target: Path, family_path: Path, active_path: Path) -> s
     return sha256(
         canonical_json(
             {
-                "schema_version": SCHEMA_VERSION,
+                "schema_version": CONTROL_SCHEMA_VERSION,
                 "handoff_family": path_fingerprint(family_path),
                 "active": path_fingerprint(active_path),
                 "repository": {
@@ -3015,6 +3131,7 @@ def build_worktree_plan(
     branch_prefix: str = "issue",
 ) -> WorktreePlan:
     bundle = load_bundle(bundle_path)
+    validate_tracker_binding(vault_root, bundle)
     source, normalized_remote = resolve_repository(
         vault_root,
         bundle.repository_remote,
@@ -3061,8 +3178,10 @@ def build_worktree_plan(
             "The branch prefix must be a non-empty relative Git ref prefix",
             field="branch_prefix",
         )
-    issue_key = bundle.jira["issue-key"]
-    branch = f"{branch_prefix}/{issue_key}-{description_slug}"
+    _family, _handoff_id, work_item_token = handoff_identity(
+        bundle, normalized_remote
+    )
+    branch = f"{branch_prefix}/{work_item_token}-{description_slug}"
     branch_check = subprocess.run(
         ["git", "check-ref-format", "--branch", branch],
         text=True,
@@ -3072,14 +3191,14 @@ def build_worktree_plan(
     if branch_check.returncode != 0:
         raise HandoffError(
             "invalid_worktree_branch",
-            "The Jira issue and description did not produce a valid Git branch",
+            "The work-item identity and description did not produce a valid Git branch",
         )
 
     repository_directory = worktree_root / observed_repository_basename(
         source,
         normalized_remote,
     )
-    path = repository_directory / f"{issue_key}-{description_slug}"
+    path = repository_directory / f"{work_item_token}-{description_slug}"
     if repository_directory.is_symlink() or (
         repository_directory.exists() and not repository_directory.is_dir()
     ):
@@ -3221,7 +3340,7 @@ def build_worktree_plan(
         )
     )
     token_payload = {
-        "schema_version": SCHEMA_VERSION,
+        "schema_version": CONTROL_SCHEMA_VERSION,
         "operation": "create-worktree",
         "bundle": bundle.fingerprint,
         "source": str(source),
@@ -3430,20 +3549,25 @@ def build_apply_plan_from_state(
     ensure_safe_directory(store, label="handoff store")
     ensure_no_pending_transaction(store)
     active, _ = read_active(store)
-    legacy_active = active is not None and active["schema-version"] == SCHEMA_VERSION
+    legacy_active = (
+        active is not None
+        and active["schema-version"] == LEGACY_ACTIVE_SCHEMA_VERSION
+    )
     if active is not None:
         active = normalize_active_registry(store, active, normalized_remote)
     branch_leaf = branch.rsplit("/", 1)[-1]
     if explicit_worktree and active is None and (
         "/" not in branch
-        or not branch_leaf.startswith(f"{bundle.jira['issue-key']}-")
+        or not branch_leaf.startswith(
+            f"{handoff_identity(bundle, normalized_remote)[2]}-"
+        )
     ):
         raise HandoffError(
             "worktree_branch_mismatch",
-            "The selected worktree branch does not match the handoff Jira issue",
+            "The selected worktree branch does not match the handoff work item",
             exit_code=3,
             branch=branch,
-            issue_key=bundle.jira["issue-key"],
+            work_item_reference=bundle.work_item["reference"],
         )
     investigation_id = bundle.source["investigation-id"]
     if active is not None and active["investigation-id"] != investigation_id:
@@ -3455,7 +3579,9 @@ def build_apply_plan_from_state(
         )
     if active is not None:
         validate_active_entries(store, active, normalized_remote, branch)
-    family, handoff_id = handoff_identity(bundle, normalized_remote)
+    family, handoff_id, _work_item_token = handoff_identity(
+        bundle, normalized_remote
+    )
     family_path = store / family
     existing = read_existing_handoff(
         family_path,
@@ -3463,6 +3589,20 @@ def build_apply_plan_from_state(
         handoff_id=handoff_id,
         normalized_remote=normalized_remote,
     )
+    if existing is not None:
+        stable_work_item = existing.manifest["work-item"]
+        stable_keys = ("tracker-id", "provider", "tracker-url", "reference")
+        if all(
+            key in stable_work_item and key in bundle.work_item
+            for key in stable_keys
+        ) and any(
+            stable_work_item[key] != bundle.work_item[key] for key in stable_keys
+        ):
+            raise HandoffError(
+                "tracker_binding_mismatch",
+                "An existing handoff cannot change its tracker binding or work-item reference",
+                family=family,
+            )
     if (
         existing is not None
         and existing.manifest["source"]["investigation-id"] != investigation_id
@@ -3596,7 +3736,7 @@ def build_apply_plan_from_state(
         "family": path_fingerprint(family_path),
     }
     token_payload = {
-        "schema_version": SCHEMA_VERSION,
+        "schema_version": CONTROL_SCHEMA_VERSION,
         "operation": "apply",
         "bundle": bundle.fingerprint,
         "target": str(target),
@@ -3665,6 +3805,7 @@ def build_apply_plan(
     worktree_path: str,
 ) -> ApplyPlan:
     bundle = load_bundle(bundle_path)
+    validate_tracker_binding(vault_root, bundle)
     target, normalized_remote, branch = resolve_handoff_target(
         vault_root,
         bundle.repository_remote,
@@ -3917,7 +4058,7 @@ def build_complete_handoff_plan(
         )
 
     token_payload = {
-        "schema_version": SCHEMA_VERSION,
+        "schema_version": CONTROL_SCHEMA_VERSION,
         "operation": "prepare-handoff",
         "worktree_plan_token": worktree.output["plan_token"],
         "materialization_plan_token": materialization.output["plan_token"],
@@ -4097,7 +4238,7 @@ def history_event_bytes(
             }
         )
     frontmatter = {
-        "schema-version": SCHEMA_VERSION,
+        "schema-version": HISTORY_SCHEMA_VERSION,
         "handoff-id": plan.handoff_id,
         "revision": revision,
         "previous": previous,
@@ -4175,7 +4316,7 @@ def manifest_bytes(
             "semantic-sha256": sha256(normalized.encode("utf-8")),
         }
     manifest = {
-        "schema-version": SCHEMA_VERSION,
+        "schema-version": HANDOFF_SCHEMA_VERSION,
         "handoff-id": plan.handoff_id,
         "family": plan.family,
         "revision": revision,
@@ -4183,7 +4324,7 @@ def manifest_bytes(
         "created-at": created_at,
         "updated-at": updated_at,
         "repository": {"remote": plan.normalized_remote},
-        "story": plan.bundle.jira,
+        "work-item": plan.bundle.work_item,
         "source": plan.bundle.source,
         "files": file_records,
         "history": {
@@ -4254,12 +4395,13 @@ def apply_plan(
     worktree_path: str,
 ) -> dict[str, Any]:
     bundle = load_bundle(bundle_path)
+    validate_tracker_binding(vault_root, bundle)
     target, normalized_remote, branch = resolve_handoff_target(
         vault_root,
         bundle.repository_remote,
         worktree_path,
     )
-    _requested_family, requested_handoff_id = handoff_identity(
+    _requested_family, requested_handoff_id, _requested_token = handoff_identity(
         bundle, normalized_remote
     )
     with handoff_store_lock(target):
@@ -4636,7 +4778,7 @@ def build_set_state_plan(
     token = sha256(
         canonical_json(
             {
-                "schema_version": SCHEMA_VERSION,
+                "schema_version": CONTROL_SCHEMA_VERSION,
                 "operation": "set-state",
                 "handoff_id": handoff_id,
                 "state": state,
@@ -4779,7 +4921,7 @@ def build_parser() -> ArgumentParser:
 
     plan_worktree = commands.add_parser(
         "plan-worktree",
-        help="Plan one persistent Jira worktree without writing",
+        help="Plan one persistent work-item worktree without writing",
     )
     plan_worktree.add_argument("--bundle", required=True)
     plan_worktree.add_argument("--base-branch", required=True)
@@ -4793,7 +4935,7 @@ def build_parser() -> ArgumentParser:
 
     create_worktree_parser = commands.add_parser(
         "create-worktree",
-        help="Create one unchanged approved Jira worktree plan",
+        help="Create one unchanged approved work-item worktree plan",
     )
     create_worktree_parser.add_argument("--bundle", required=True)
     create_worktree_parser.add_argument("--base-branch", required=True)

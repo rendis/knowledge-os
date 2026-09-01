@@ -2,6 +2,8 @@
 
 This vault is an evidence-backed map of one cell's systems. Load skills by name; do not restate them here.
 
+`tracker` means one external work-tracking instance declared in `instance.yaml`. A `work item` is one externally tracked unit identified by its exact tracker and provider-native reference.
+
 Classify the request, then select one skill. For orientation or interrogation, first hop is `90-Meta/graph-query.py` (JSON stems and edges, no note bodies). Open `instance.yaml` and `00-Home.md` for cell identity. Open `90-Meta/Alcance.md` only for cell-specific scope, allowlists, or exceptions. Open a section of `90-Meta/Convenciones.md` or `90-Meta/Auditoria - Framework.md` only when schema, node type, or an evidence gate is required. Do not load those Meta files before classifying.
 
 ## Skills
@@ -10,7 +12,7 @@ Classify the request, then select one skill. For orientation or interrogation, f
 - `configure-workspace` — sole writer of local `.knowledge-os-config.yaml`. Onboarding is demand-triggered when a skill cannot resolve repositories or the user asks whether the workspace is initialized or configured.
 - `manage-investigation` — local case files under `.investigations/`.
 - `manage-investigation-derived-learning` — assess and publish `70-Aprendizajes/` notes.
-- `manage-development-handoff` — persistent Jira worktrees and handoff files.
+- `manage-development-handoff` — persistent work-item worktrees and handoff files.
 - `reconcile-development-handoff` — pull implementation evidence from a registered worktree into its source case and coordinate completed closure.
 - `manage-git-workflow` — apply the cell's Git/GitHub policy for repository workflow and maintain that policy when requested.
 - `manage-operational-workflow` — runbooks with external effects after authorization.

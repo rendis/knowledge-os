@@ -431,6 +431,20 @@ def prompt(label: str, default: str, yes: bool) -> str:
     return value or default
 
 
+def parse_tracker(value: str) -> dict[str, str]:
+    tracker_id, separator, remainder = value.strip().partition(":")
+    provider, second_separator, url = remainder.partition(":")
+    if not separator or not second_separator or not tracker_id or not provider or not url:
+        raise InstanceError(
+            "tracker must use id:provider:https://tracker.example form"
+        )
+    return {
+        "id": tracker_id.strip(),
+        "provider": provider.strip(),
+        "url": url.strip(),
+    }
+
+
 def build_instance_from_args(args: argparse.Namespace) -> dict[str, Any]:
     systems: list[dict[str, Any]] = []
     for item in args.system or []:
@@ -448,6 +462,14 @@ def build_instance_from_args(args: argparse.Namespace) -> dict[str, Any]:
             name = (name or ident).strip()
             if ident:
                 systems.append({"id": ident, "name": name, "aliases": [ident]})
+    trackers = [parse_tracker(item) for item in (args.tracker or [])]
+    if not args.yes and not trackers:
+        raw = prompt(
+            "Trackers as id:provider:https://url, comma-separated (empty for none)",
+            "",
+            False,
+        )
+        trackers = [parse_tracker(part) for part in raw.split(",") if part.strip()]
     cell_name = args.cell_name or prompt("Cell name", "Cell", args.yes)
     purpose = args.purpose or prompt("Cell purpose (1-3 sentences)", "Describe this cell.", args.yes)
     profile = args.evidence_profile or prompt(
@@ -467,6 +489,7 @@ def build_instance_from_args(args: argparse.Namespace) -> dict[str, Any]:
         "version": 1,
         "cell": {"name": cell_name, "purpose": purpose},
         "systems": systems,
+        "trackers": trackers,
         "vault": {"remote": args.vault_remote or ""},
         "sources": {
             "github_org": args.github_org or "",
@@ -494,8 +517,17 @@ def cmd_init(args: argparse.Namespace) -> int:
             file=sys.stderr,
         )
         return 2
+    try:
+        instance = build_instance_from_args(args)
+    except InstanceError as error:
+        print(
+            json.dumps(
+                {"status": "invalid-instance", "error": str(error)},
+                indent=2,
+            )
+        )
+        return 2
     dest.mkdir(parents=True, exist_ok=True)
-    instance = build_instance_from_args(args)
     seed_skeleton(dest, instance["graph"]["enabled_types"])
     copy_kernel(dest, instance["adapters"])
     write_bootstrap(dest, instance)
@@ -655,7 +687,16 @@ def cmd_update(args: argparse.Namespace) -> int:
         print("no lock file; run init or doctor", file=sys.stderr)
         return 2
     lock = load_lock(lock_path)
-    instance = load_instance(dest / "instance.yaml")
+    try:
+        instance = load_instance(dest / "instance.yaml")
+    except InstanceError as error:
+        print(
+            json.dumps(
+                {"status": "invalid-instance", "error": str(error)},
+                indent=2,
+            )
+        )
+        return 2
     target_adapters = instance["adapters"]
     target_sources = managed_sources(target_adapters)
     previous_hashes = lock["managed_hashes"]
@@ -720,7 +761,17 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     dest = Path(args.dest).expanduser().resolve()
     state = dest_state(dest)
     payload: dict[str, Any] = {"dest": str(dest), "state": state}
+    invalid_instance = False
     if state == "installed":
+        try:
+            load_instance(dest / "instance.yaml")
+            payload["instance"] = {"status": "valid"}
+        except InstanceError as error:
+            payload["instance"] = {
+                "status": "invalid",
+                "error": str(error),
+            }
+            invalid_instance = True
         lock = load_lock(dest / LOCK_NAME)
         adapters = lock.get("adapters") or []
         current = tree_hashes(dest, adapters)
@@ -755,6 +806,8 @@ def cmd_doctor(args: argparse.Namespace) -> int:
             "start_here", ["00-Home.md", "instance.yaml"]
         )
     print(json.dumps(payload, indent=2, ensure_ascii=False))
+    if invalid_instance:
+        return 2
     return 0 if state in {"installed", "empty", "missing"} else 1
 
 
@@ -777,6 +830,7 @@ def main() -> int:
     parser.add_argument("--cell-name", default="")
     parser.add_argument("--purpose", default="")
     parser.add_argument("--system", action="append", default=[])
+    parser.add_argument("--tracker", action="append", default=[])
     parser.add_argument("--adapter", action="append", default=[])
     parser.add_argument("--evidence-profile", default="")
     parser.add_argument("--locale", default="")
