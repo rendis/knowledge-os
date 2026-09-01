@@ -42,6 +42,15 @@ class InstanceTests(unittest.TestCase):
         self.assertEqual(loaded["evidence"]["profile"], "production-gate")
         self.assertEqual(loaded["trackers"], [])
 
+    def test_malformed_yaml_is_an_instance_error(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "instance.yaml"
+            path.write_text("cell: [\n", encoding="utf-8")
+            with self.assertRaisesRegex(
+                InstanceError, "invalid instance.yaml syntax"
+            ):
+                load_instance(path)
+
     def test_tracker_roundtrip_supports_multiple_providers(self) -> None:
         data = self.sample()
         data["trackers"] = [

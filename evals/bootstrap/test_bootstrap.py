@@ -2095,6 +2095,18 @@ change:
                 missing_instance.exception.code,
                 "invalid_tracker_configuration",
             )
+            instance_path.write_text("cell: [\n", encoding="utf-8")
+            with mock.patch.object(module, "resolve_handoff_target", resolved):
+                with self.assertRaises(module.HandoffError) as malformed_instance:
+                    module.build_apply_plan(cell, str(bundles[0]), str(target))
+            self.assertEqual(
+                malformed_instance.exception.code,
+                "invalid_tracker_configuration",
+            )
+            self.assertEqual(
+                malformed_instance.exception.details["reason"],
+                "invalid instance.yaml syntax",
+            )
 
     def test_state_flow_preserves_other_handoffs_and_reopens(self) -> None:
         helper = (
@@ -2684,6 +2696,22 @@ change:
             self.assertEqual(
                 json.loads(invalid_update.stdout)["status"],
                 "invalid-instance",
+            )
+
+            instance_path.write_text("cell: [\n", encoding="utf-8")
+            malformed_doctor = run(
+                ["sh", str(INSTALL), "doctor", "--dest", str(dest)]
+            )
+            self.assertEqual(
+                malformed_doctor.returncode,
+                2,
+                malformed_doctor.stdout + malformed_doctor.stderr,
+            )
+            malformed_payload = json.loads(malformed_doctor.stdout)
+            self.assertEqual(malformed_payload["instance"]["status"], "invalid")
+            self.assertEqual(
+                malformed_payload["instance"]["error"],
+                "invalid instance.yaml syntax",
             )
 
     def test_fresh_cell_has_every_documented_local_command(self) -> None:
