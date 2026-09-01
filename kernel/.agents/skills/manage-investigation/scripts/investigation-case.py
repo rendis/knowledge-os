@@ -69,8 +69,10 @@ DEVELOPMENT_HANDOFF_SECTION_ALIASES = (
 HISTORY_SECTION_ALIASES = ("History", "Historial")
 DEVELOPMENT_HANDOFF_FIELDS = (
     "Story ID",
-    "Jira site",
-    "Jira key",
+    "Tracker ID",
+    "Provider",
+    "Tracker URL",
+    "Work item reference",
     "Repository remote",
     "Worktree path",
     "Handoff ID",
@@ -93,8 +95,10 @@ DEVELOPMENT_HANDOFF_HISTORY_MARKER_RE = re.compile(
 DEVELOPMENT_HANDOFF_HISTORY_KEYS = (
     "dh",
     "story-id",
-    "jira-site",
-    "jira-key",
+    "tracker-id",
+    "provider",
+    "tracker-url",
+    "work-item-reference",
     "repository-remote",
     "worktree-path",
     "handoff-id",
@@ -103,7 +107,7 @@ DEVELOPMENT_HANDOFF_HISTORY_KEYS = (
     "materialized-at",
 )
 STORY_ID_RE = re.compile(r"^S-[0-9]{3,}$")
-JIRA_KEY_RE = re.compile(r"^[A-Z][A-Z0-9]+-[0-9]+$")
+TRACKER_NAME_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 HANDOFF_ID_RE = re.compile(r"^[a-f0-9]{64}$")
 HANDOFF_FAMILY_RE = re.compile(
     r"^[a-z0-9]+(?:-[a-z0-9]+)*--[a-z0-9]+(?:-[a-z0-9]+)*$"
@@ -534,7 +538,7 @@ def subsection_names(
     return names
 
 
-def canonical_jira_site(value: str) -> str | None:
+def canonical_tracker_url(value: str) -> str | None:
     parsed = urlparse(value)
     if (
         parsed.scheme.casefold() != "https"
@@ -609,8 +613,10 @@ def handoff_history_binding(
     return {
         "dh": entry_id,
         "story-id": fields["Story ID"],
-        "jira-site": fields["Jira site"],
-        "jira-key": fields["Jira key"],
+        "tracker-id": fields["Tracker ID"],
+        "provider": fields["Provider"],
+        "tracker-url": fields["Tracker URL"],
+        "work-item-reference": fields["Work item reference"],
         "repository-remote": fields["Repository remote"],
         "worktree-path": fields["Worktree path"],
         "handoff-id": fields["Handoff ID"],
@@ -734,8 +740,10 @@ def validate_development_handoff_history(
             continue
         stable_pairs = (
             ("story-id", "Story ID"),
-            ("jira-site", "Jira site"),
-            ("jira-key", "Jira key"),
+            ("tracker-id", "Tracker ID"),
+            ("provider", "Provider"),
+            ("tracker-url", "Tracker URL"),
+            ("work-item-reference", "Work item reference"),
             ("repository-remote", "Repository remote"),
             ("handoff-id", "Handoff ID"),
             ("family", "Family"),
@@ -783,7 +791,10 @@ def validate_development_handoff_history(
             visible_fragments = (
                 (entry_id, target_fragment),
                 (marker["story-id"], f"story `{marker['story-id']}`"),
-                (marker["jira-key"], f"Jira `{marker['jira-key']}`"),
+                (
+                    marker["work-item-reference"],
+                    f"work item `{marker['tracker-id']}:{marker['work-item-reference']}`",
+                ),
                 (
                     marker["repository-remote"],
                     f"repository `{marker['repository-remote']}`",
@@ -905,8 +916,10 @@ def validate_development_handoffs(text: str) -> list[str]:
         if any(field not in fields for field in DEVELOPMENT_HANDOFF_FIELDS):
             continue
         story_id = fields["Story ID"]
-        jira_site = fields["Jira site"]
-        jira_key = fields["Jira key"]
+        tracker_id = fields["Tracker ID"]
+        provider = fields["Provider"]
+        tracker_url = fields["Tracker URL"]
+        work_item_reference = fields["Work item reference"]
         remote = fields["Repository remote"]
         worktree = fields["Worktree path"]
         handoff_id = fields["Handoff ID"]
@@ -916,11 +929,15 @@ def validate_development_handoffs(text: str) -> list[str]:
 
         if STORY_ID_RE.fullmatch(story_id) is None:
             errors.append(f"{entry_id} has invalid Story ID")
-        canonical_site = canonical_jira_site(jira_site)
-        if canonical_site is None or jira_site != canonical_site:
-            errors.append(f"{entry_id} has invalid canonical Jira site")
-        if JIRA_KEY_RE.fullmatch(jira_key) is None:
-            errors.append(f"{entry_id} has invalid Jira key")
+        canonical_url = canonical_tracker_url(tracker_url)
+        if canonical_url is None or tracker_url != canonical_url:
+            errors.append(f"{entry_id} has invalid canonical Tracker URL")
+        if TRACKER_NAME_RE.fullmatch(tracker_id) is None:
+            errors.append(f"{entry_id} has invalid Tracker ID")
+        if TRACKER_NAME_RE.fullmatch(provider) is None:
+            errors.append(f"{entry_id} has invalid Provider")
+        if not work_item_reference or len(work_item_reference) > 200:
+            errors.append(f"{entry_id} has invalid Work item reference")
         remote_segments = remote.split("/")
         if (
             remote != remote.casefold()
@@ -949,17 +966,19 @@ def validate_development_handoffs(text: str) -> list[str]:
             errors.append(f"{entry_id} has invalid Materialized at timestamp")
 
         repository_name = remote.rsplit("/", 1)[-1]
-        if title != f"{jira_key} / {repository_name}":
-            errors.append(f"{entry_id} heading does not match Jira and repository")
-        expected_family = f"{canonical_slug(jira_key)}--{canonical_slug(repository_name)}"
+        expected_title = f"{tracker_id}:{work_item_reference} / {repository_name}"
+        if title != expected_title:
+            errors.append(f"{entry_id} heading does not match work item and repository")
+        expected_handoff_id = hashlib.sha256(
+            "|".join((tracker_id, work_item_reference, remote)).encode("utf-8")
+        ).hexdigest()
+        readable = canonical_slug(f"{tracker_id}-{work_item_reference}")[:80].rstrip("-")
+        token = f"{readable}-{expected_handoff_id[:10]}"
+        expected_family = f"{token}--{canonical_slug(repository_name)}"
         if family != expected_family:
-            errors.append(f"{entry_id} Family does not match Jira and repository")
-        if canonical_site is not None:
-            expected_handoff_id = hashlib.sha256(
-                "|".join((canonical_site.casefold(), jira_key, remote)).encode("utf-8")
-            ).hexdigest()
-            if handoff_id != expected_handoff_id:
-                errors.append(f"{entry_id} Handoff ID does not match its identity")
+            errors.append(f"{entry_id} Family does not match work item and repository")
+        if handoff_id != expected_handoff_id:
+            errors.append(f"{entry_id} Handoff ID does not match its identity")
 
         target = (story_id, remote)
         if target in targets:

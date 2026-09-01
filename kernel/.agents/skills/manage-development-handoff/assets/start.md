@@ -2,7 +2,7 @@
 
 Use this family's `handoff.yaml` as the integrity and identity index for its repository-specific story. `ACTIVE.yaml` lists every story registered in the shared worktree and its current state.
 
-- `jira.md` is the exact copied Jira story snapshot available at export time.
+- `work-item.md` is the exact copied work-item snapshot available at export time.
 - `context.md` contains only the investigation context and dependencies relevant to this repository.
 - `scope.md` defines this repository's implementation boundary, acceptance criteria, and verification expectations.
 - The current `history/vNNNN.md` event records what changed in this revision and why.

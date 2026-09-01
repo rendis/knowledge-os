@@ -6,7 +6,7 @@ Use this contract for every assessment, including read-only or blind-test execut
 
 A learning is identified by the **problem or question plus its applicability context**. The context includes the conditions that can change the result: workload and scale, data shape, architecture, relevant versions, operational constraints, measurement method, and material exclusions.
 
-An investigation ID, Jira key, implementation branch, author, or date is provenance, not identity. Two investigations with the same question and materially equivalent context normally belong to one cumulative note. Create a context variant only when the differing condition could reasonably change the conclusion, and explain that boundary in both notes.
+An investigation ID, work-item reference, implementation branch, author, or date is provenance, not identity. Two investigations with the same question and materially equivalent context normally belong to one cumulative note. Create a context variant only when the differing condition could reasonably change the conclusion, and explain that boundary in both notes.
 
 ## Assessment outcomes
 

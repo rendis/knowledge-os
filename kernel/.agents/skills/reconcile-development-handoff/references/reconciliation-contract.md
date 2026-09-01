@@ -6,11 +6,11 @@ Load this reference after one exact `DH-NNN` investigation entry resolves to one
 
 Reconcile these three independently observed layers:
 
-1. **Exported baseline**: `jira.md`, `context.md`, `scope.md`, current `handoff.yaml`, and its referenced history event.
+1. **Exported baseline**: `work-item.md`, `context.md`, `scope.md`, current `handoff.yaml`, and its referenced history event.
 2. **Definition changelog**: every valid entry in `implementation-updates.md`, in ID order.
-3. **Current evidence**: local implementation and tests, observed remote branch and pull request, current Jira story and evidence, and direct dependent stories.
+3. **Current evidence**: local implementation and tests, observed remote branch and pull request, current work item and evidence, and direct dependent work items.
 
-The baseline and changelog are context and provenance, not proof of implementation or production. Repository, repository-host, CI, Jira, and deployment authorities establish their own current states.
+The baseline and changelog are context and provenance, not proof of implementation or production. Repository, repository-host, CI, tracker, and deployment authorities establish their own current states.
 
 ## Material-delta test
 
@@ -34,14 +34,14 @@ Never reinterpret routine progress as a scope change to make the changelog look 
 
 Pass one context object conceptually containing:
 
-- source identity: investigation ID and timestamp, story ID, Jira site/key/URL and current timestamp, handoff family/revision, repository remote;
+- source identity: investigation ID and timestamp, story ID, tracker ID/provider/URL, provider-native work-item reference and current timestamp, handoff family/revision, repository remote;
 - vault binding: `DH-NNN`, exact absolute worktree path, registered handoff ID, and the identity comparison against `ACTIVE.yaml`;
 - local snapshot binding: the `closure_fingerprint` returned before inspection and revalidated immediately before the case write;
 - baseline summary and cited current history event;
 - every changelog entry with its source, justification/agreement, optional real analysis, impact, evidence, and relationships;
 - local repository evidence: absolute worktree, branch, `HEAD`, base used for comparison, status, commits, changed surfaces, diff summary, tests and results;
 - remote/delivery evidence: observed remote ref and SHA, pull request URL/head/base/state/checks, merge state, deployment state, and observation methods;
-- current Jira delta: material field, comment, evidence, attachment, status, relationship, and timestamp changes relevant to the investigation;
+- current work-item delta: material field, comment, evidence, attachment, status, relationship, and timestamp changes relevant to the investigation;
 - direct-dependent source cards from the downstream contract;
 - contradictions, unmatched evidence, access limits, and open questions;
 - semantic case facts and affected identities: claims, evidence, decisions, criteria, questions, dependent stories, and draft identities whose meaning may have changed.
@@ -52,7 +52,7 @@ For `unlogged-material`, the deficiency card contains only:
 
 - the observed delta and why it is material;
 - the baseline identity or section it affects;
-- exact non-sensitive repository, delivery, or Jira evidence;
+- exact non-sensitive repository, delivery, or work-item evidence;
 - the missing `UPD-NNN` coverage and the readiness claims it blocks.
 
 The card never invents an update title, status, agreement, analysis, or exact entry body. Repository work owns any later changelog append.
@@ -61,7 +61,7 @@ The card never invents an update title, status, agreement, analysis, or exact en
 
 - A material delta is absent from the changelog: stop before changing the investigation.
 - The case has no unique `DH-NNN` binding or it disagrees with the selected registry handoff: stop before reading the worktree as authoritative evidence.
-- Jira cannot establish the current source story or link direction: mark the affected Jira and dependent portions blocked; do not infer.
+- The source work item is unreadable: block reconciliation. Typed relationships are `unsupported`: continue without dependent cards and record the limitation. Relationships are `unavailable`: block only the dependent portion; do not infer.
 - The remote branch cannot be observed: report only the local branch.
 - Pull-request state is unavailable: do not infer it from a branch name or commit.
 - Merge and deployment are independent; report each separately.

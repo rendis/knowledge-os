@@ -13,29 +13,29 @@ Load this reference when preparing or validating a package for `plan` or `apply`
 
 ## Authority boundary
 
-The package is a one-way, self-contained export from `manage-investigation`. The development-handoff consumer receives the package directory only; it does not read or modify the investigation case, query Jira, reconcile a story, or infer missing content.
+The package is a one-way, self-contained export from `manage-investigation`. The development-handoff consumer receives the package directory only; it does not read or modify the investigation case, query the tracker, reconcile a story, or infer missing content.
 
-Create a package only after the investigation and story are release-ready and the copied Jira snapshot is verified current. If a current exact copy is unavailable, stop at the producer and report the missing source.
+Create a package only after the investigation and story are release-ready and the copied work-item snapshot is verified current. If a current exact copy is unavailable, stop at the producer and report the missing source.
 
 ## Intake protocol
 
 Classify each materialization or activation input as exactly one state:
 
 - `exact-package`: an exact existing package directory was supplied and passes this contract; continue with consumer preflight.
-- `producer-required`: the request identifies an investigation and Jira story but no exact package directory exists. Invoke the Export route of `manage-investigation`, let that owner inspect the case and obtain the current Jira snapshot, then continue the same handoff request with every exact directory it produces. Do not ask the user to coordinate or resubmit the workflow.
+- `producer-required`: the request identifies an investigation and work item but no exact package directory exists. Invoke the Export route of `manage-investigation`, let that owner inspect the case and obtain the current work-item snapshot, then continue the same handoff request with every exact directory it produces. Do not ask the user to coordinate or resubmit the workflow.
 - `invalid-package`: an existing candidate package fails this contract. Give its exact validation failure to `manage-investigation` and stop the consumer until that owner produces a corrected package.
 
-Absence is `producer-required`, not `invalid-package`. The consumer never opens the case or Jira while resolving any state. Validation and state updates for an existing worktree do not consume a package and therefore bypass this protocol.
+Absence is `producer-required`, not `invalid-package`. The consumer never opens the case or tracker while resolving any state. Validation and state updates for an existing worktree do not consume a package and therefore bypass this protocol.
 
 ## Canonical package
 
-Create one package per Jira issue and target repository. Packages from the same investigation and repository may later share one worktree; they never share a family directory:
+Create one package per work item and target repository. Packages from the same investigation and repository may later share one worktree; they never share a family directory:
 
 ```text
 .investigations/<investigation-id>/handoffs/
-└── <issue-key-lower>--<repository-basename-lower>/
+└── <work-item-token>--<repository-basename-lower>/
     ├── bundle.yaml
-    ├── jira.md
+    ├── work-item.md
     ├── context.md
     └── scope.md
 ```
@@ -45,16 +45,18 @@ Repeating an export updates that package in place only after confirming that `re
 `bundle.yaml` uses this closed schema:
 
 ```yaml
-schema-version: 1
+schema-version: 2
 source:
   investigation-id: "20260723-092916-stale-write-acceptance"
   investigation-updated-at: "2026-07-28T12:00:00-04:00"
   story-id: "S-001"
 
-jira:
-  site: "https://example.atlassian.net"
-  issue-key: "System BR-3812"
-  url: "https://example.atlassian.net/browse/System BR-3812"
+work-item:
+  tracker-id: "delivery"
+  provider: "example"
+  tracker-url: "https://tracker.example.com"
+  reference: "BR-3812"
+  url: "https://tracker.example.com/items/BR-3812"
   updated-at: "2026-07-28T11:55:00-04:00"
   captured-at: "2026-07-28T12:01:00-04:00"
   freshness: "current"
@@ -72,17 +74,17 @@ change:
 Rules:
 
 - Quote every timestamp and include a UTC offset.
-- Use an uppercase Jira key and the investigation's stable `S-NNN` story ID.
+- Use the exact provider-native reference, the tracker binding declared in `instance.yaml`, and the investigation's stable `S-NNN` story ID.
 - Set `snapshot-source` to `connected-readback` or `user-supplied-export`. Memory, a stale published draft, and an inferred reconstruction are not sources.
-- Set `freshness: current` only after comparing the copied fields with the source represented by `jira.updated-at`.
+- Set `freshness: current` only after comparing the copied fields with the source represented by `work-item.updated-at`.
 - Resolve the target by its real Git remote. Do not put a local path in the package.
 - Write a concise `change.summary` for every export. Add a per-file reason when it explains the change more precisely; otherwise the summary is the reason for that file.
 
 ## Document roles
 
-### `jira.md`
+### `work-item.md`
 
-Copy the current Jira story without paraphrasing. Include the key, summary, description, acceptance criteria, relevant implementation fields and links, and selected clarifications that alter delivery. Preserve the source wording and field boundaries.
+Copy the current work item without paraphrasing. Include the provider-native reference, summary, description, acceptance criteria, relevant implementation fields and links, and selected clarifications that alter delivery. Preserve the source wording and field boundaries.
 
 Exclude comments, history, watchers, private contact data, and unrelated fields unless one is necessary to implement or verify the story. Record only the non-sensitive URL and timestamps in `bundle.yaml`; never copy credentials, session data, or private tokens.
 
@@ -123,7 +125,7 @@ After materialization, the implementation agent never edits these three document
 After `validate` succeeds, the consumer assembles one normalized in-memory observation from the exact package and validated repository state:
 
 - package path, investigation ID, and story ID;
-- canonical Jira site and key;
+- exact tracker ID, provider, canonical tracker URL, and provider-native reference;
 - normalized repository remote and absolute worktree path;
 - handoff ID, family, revision, and `materialized_at` derived from the validated manifest `updated-at`.
 
@@ -133,4 +135,4 @@ The case owner records only new or advanced materialized content revisions. An a
 
 ## Completion criterion
 
-The package is complete only when the schema validates, the Jira copy is current and traceable, all three documents are non-empty and secret-free, the remote identifies one configured repository, and the context and scope are specific to that repository. Package completeness alone does not make a materialization or activation complete; the post-materialization binding must also validate.
+The package is complete only when the schema validates, its tracker binding matches `instance.yaml`, the work-item copy is current and traceable, all three documents are non-empty and secret-free, the remote identifies one configured repository, and the context and scope are specific to that repository. Package completeness alone does not make a materialization or activation complete; the post-materialization binding must also validate.

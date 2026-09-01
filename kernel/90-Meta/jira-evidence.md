@@ -1,12 +1,12 @@
-# Read Jira evidence
+# Normalize Jira evidence
 
-Use this shared contract whenever a vault workflow needs current Jira evidence without creating an operational run or acquiring write authority.
+Load `work-item-evidence.md` first. This reference adds only Jira-specific identity and relationship rules to that shared read-only contract.
 
 ## Inputs
 
 Require all of the following before reading Jira:
 
-- one canonical Jira site plus exact issue key, or one canonical issue URL from which both are derived;
+- one configured Jira tracker ID plus exact issue key, or one canonical issue URL that resolves to exactly one configured Jira tracker;
 - the vault workflow and decision that require the evidence;
 - the smallest material field, comment, attachment, history, or relationship set needed for that decision;
 - an observation timestamp captured for the read.
@@ -22,9 +22,9 @@ An absent or ambiguous identity blocks the read. Do not select a site, project, 
 5. Follow at most one observed relationship hop. Read a related issue only when the caller's contract selects that exact typed edge and direction; never infer dependency from hierarchy, labels, prose, shared components, or proximity.
 6. Record unavailable fields, denied content, stale timestamps, missing link metadata, and partial reads as explicit limitations. Do not substitute cached text, a copied handoff snapshot, a case narrative, or memory for current Jira state.
 
-## Normalized in-memory snapshot
+## Jira normalization
 
-Expose only the facts required by the caller:
+Map the observed Jira item into the shared work-item snapshot. Set `tracker ID`, `provider: jira`, canonical tracker URL, and provider-native reference from the exact configured tracker and observed issue. Expose only the facts required by the caller:
 
 - canonical site, key, URL, type, status, and update timestamp;
 - requested material fields with their observed field identities;
@@ -33,7 +33,9 @@ Expose only the facts required by the caller:
 - one-hop related issue facts selected by the caller's contract;
 - observation method, timestamp, redactions, contradictions, and unavailable evidence.
 
-Keep the snapshot in the current vault-side interaction. This contract creates no Jira write, operation ledger, case patch, handoff file, cache, or second evidence store. The calling workflow decides how normalized facts affect its own state; Jira reads do not grant that workflow any external-write authority.
+Set relationships to `observed` only when the live metadata and issue-scoped direction were read successfully. Use `unavailable` for denied, partial, or directionally ambiguous Jira relationship reads. Jira supports typed relationships, so this reference never returns `unsupported` for that surface.
+
+Keep the snapshot in the current vault-side interaction. This reference creates no Jira write, operation ledger, case patch, handoff file, cache, or second evidence store. Jira reads grant no external-write authority.
 
 ## Completion criterion
 

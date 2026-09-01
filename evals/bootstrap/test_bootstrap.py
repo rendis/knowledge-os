@@ -148,6 +148,9 @@ class BootstrapEval(unittest.TestCase):
         reconcile = (
             DIST / "kernel/.agents/skills/reconcile-development-handoff/SKILL.md"
         ).read_text(encoding="utf-8")
+        operational = (
+            DIST / "kernel/.agents/skills/manage-operational-workflow/SKILL.md"
+        ).read_text(encoding="utf-8")
 
         self.assertNotIn("reconcile-development-handoff", managed_block)
         self.assertNotIn("reconcile-development-handoff", start)
@@ -158,13 +161,16 @@ class BootstrapEval(unittest.TestCase):
         self.assertIn("`ready-for-production` or `production`", managed_block)
         self.assertIn("files they affect", managed_block)
         self.assertNotIn("manage-operational-workflow", reconcile)
-        self.assertIn("90-Meta/jira-evidence.md", reconcile)
+        self.assertIn("90-Meta/work-item-evidence.md", reconcile)
+        self.assertIn("90-Meta/work-item-evidence.md", operational)
+        self.assertIn("90-Meta/jira-evidence.md", operational)
 
     def test_shared_vault_interfaces_are_kernel_owned(self) -> None:
         for relative in (
             "90-Meta/resolve-vault.py",
             "90-Meta/vault-resolution.md",
             "90-Meta/node-selection.md",
+            "90-Meta/work-item-evidence.md",
             "90-Meta/jira-evidence.md",
         ):
             self.assertTrue((DIST / "kernel" / relative).is_file(), relative)
@@ -324,7 +330,7 @@ class BootstrapEval(unittest.TestCase):
         self.assertIn("existing `DH-NNN`", owner)
         self.assertIn("separate worktree", export_contract)
         self.assertIn("shared group", consumer)
-        self.assertIn("first handoff's Jira branch", repository_state)
+        self.assertIn("collision-safe work-item token", repository_state)
         self.assertIn("selected entry is not `active`", repository_state)
         self.assertNotIn("while another family is active", repository_state)
 
@@ -343,30 +349,37 @@ class BootstrapEval(unittest.TestCase):
         spec.loader.exec_module(module)
 
         worktree = "/tmp/worktrees/repository/abc-123-change"
-        site = "https://example.atlassian.net"
+        tracker_url = "https://tracker.example.com"
+        tracker_id = "delivery"
+        provider = "example"
 
-        def entry(number: int, story: str, jira: str, remote: str) -> tuple[str, dict[str, str]]:
+        def entry(number: int, story: str, reference: str, remote: str) -> tuple[str, dict[str, str]]:
             repository = remote.rsplit("/", 1)[-1]
             handoff_id = hashlib.sha256(
-                "|".join((site.casefold(), jira, remote)).encode("utf-8")
+                "|".join((tracker_id, reference, remote)).encode("utf-8")
             ).hexdigest()
+            token = f"{tracker_id}-{reference.casefold()}-{handoff_id[:10]}"
             fields = {
                 "dh": f"DH-{number:03d}",
                 "story-id": story,
-                "jira-site": site,
-                "jira-key": jira,
+                "tracker-id": tracker_id,
+                "provider": provider,
+                "tracker-url": tracker_url,
+                "work-item-reference": reference,
                 "repository-remote": remote,
                 "worktree-path": worktree,
                 "handoff-id": handoff_id,
-                "family": f"{jira.casefold()}--{repository}",
+                "family": f"{token}--{repository}",
                 "revision": "v0001",
                 "materialized-at": f"2026-08-31T12:0{number}:00+00:00",
             }
             register = (
-                f"### {fields['dh']} — {jira} / {repository}\n\n"
+                f"### {fields['dh']} — {tracker_id}:{reference} / {repository}\n\n"
                 f"- Story ID: {story}\n"
-                f"- Jira site: {site}\n"
-                f"- Jira key: {jira}\n"
+                f"- Tracker ID: {tracker_id}\n"
+                f"- Provider: {provider}\n"
+                f"- Tracker URL: {tracker_url}\n"
+                f"- Work item reference: {reference}\n"
                 f"- Repository remote: {remote}\n"
                 f"- Worktree path: {worktree}\n"
                 f"- Handoff ID: {handoff_id}\n"
@@ -380,8 +393,8 @@ class BootstrapEval(unittest.TestCase):
             marker = json.dumps(fields, sort_keys=True, separators=(",", ":"))
             return (
                 f"- {fields['materialized-at']} — bound development handoff "
-                f"`{fields['dh']}`; story `{fields['story-id']}`; Jira "
-                f"`{fields['jira-key']}`; repository `{fields['repository-remote']}`; "
+                f"`{fields['dh']}`; story `{fields['story-id']}`; work item "
+                f"`{fields['tracker-id']}:{fields['work-item-reference']}`; repository `{fields['repository-remote']}`; "
                 f"worktree `{fields['worktree-path']}`; handoff "
                 f"`{fields['handoff-id']}`; revision `v0001`.\n"
                 f"  <!-- knowledge-os:development-handoff-binding {marker} -->\n"
@@ -461,20 +474,27 @@ class BootstrapEval(unittest.TestCase):
             )
             original = case.read_text(encoding="utf-8")
             worktree = Path(tmp) / "worktrees" / "repository" / "abc-123-change"
+            tracker_id = "delivery"
+            provider = "example"
+            tracker_url = "https://tracker.example.com"
+            reference = "ABC-123"
             handoff_id = hashlib.sha256(
-                b"https://example.atlassian.net|ABC-123|example.invalid/team/repository"
+                b"delivery|ABC-123|example.invalid/team/repository"
             ).hexdigest()
+            family = f"delivery-abc-123-{handoff_id[:10]}--repository"
             valid_register = f"""## Development handoffs
 
-### DH-001 — ABC-123 / repository
+### DH-001 — delivery:ABC-123 / repository
 
 - Story ID: S-001
-- Jira site: https://example.atlassian.net
-- Jira key: ABC-123
+- Tracker ID: delivery
+- Provider: example
+- Tracker URL: https://tracker.example.com
+- Work item reference: ABC-123
 - Repository remote: example.invalid/team/repository
 - Worktree path: {worktree}
 - Handoff ID: {handoff_id}
-- Family: abc-123--repository
+- Family: {family}
 - Revision: v0002
 - Materialized at: 2026-08-26T12:00:00+00:00
 """
@@ -504,12 +524,14 @@ class BootstrapEval(unittest.TestCase):
                 binding = {
                     "dh": "DH-001",
                     "story-id": "S-001",
-                    "jira-site": "https://example.atlassian.net",
-                    "jira-key": "ABC-123",
+                    "tracker-id": tracker_id,
+                    "provider": provider,
+                    "tracker-url": tracker_url,
+                    "work-item-reference": reference,
                     "repository-remote": "example.invalid/team/repository",
                     "worktree-path": str(worktree),
                     "handoff-id": handoff_id,
-                    "family": "abc-123--repository",
+                    "family": family,
                     "revision": revision,
                     "materialized-at": materialized_at,
                 }
@@ -526,7 +548,7 @@ class BootstrapEval(unittest.TestCase):
             ) -> str:
                 return (
                     f"- {materialized_at} — {action} development handoff `DH-001`; "
-                    "story `S-001`; Jira `ABC-123`; repository "
+                    "story `S-001`; work item `delivery:ABC-123`; repository "
                     "`example.invalid/team/repository`; worktree "
                     f"`{worktree}`; handoff `{handoff_id}`; revision `{revision}`.\n"
                     f"{marker or history_marker(revision, materialized_at)}\n"
@@ -744,7 +766,7 @@ class BootstrapEval(unittest.TestCase):
                     "bound",
                     "v0001",
                     "2026-08-26T11:00:00+00:00",
-                ).replace("Jira `ABC-123`; ", "", 1)
+                ).replace("work item `delivery:ABC-123`; ", "", 1)
                 + history_event(
                     "advanced",
                     "v0002",
@@ -857,8 +879,8 @@ class BootstrapEval(unittest.TestCase):
                 original.replace(
                     "## Development handoffs\n",
                     valid_register.replace(
-                        "https://example.atlassian.net",
-                        "https://example.atlassian.net:not-a-port",
+                        "https://tracker.example.com",
+                        "https://tracker.example.com:not-a-port",
                     ),
                     1,
                 ),
@@ -872,7 +894,7 @@ class BootstrapEval(unittest.TestCase):
                 2,
                 invalid_site.stdout + invalid_site.stderr,
             )
-            self.assertIn("invalid canonical Jira site", invalid_site.stderr)
+            self.assertIn("invalid canonical Tracker URL", invalid_site.stderr)
 
             case.write_text(
                 register_without_history.replace(
@@ -970,9 +992,16 @@ class BootstrapEval(unittest.TestCase):
                 "investigation-id": "20260831-shared-worktree",
                 "handoffs": [entry],
             }
+            anchor_id = hashlib.sha256(
+                b"delivery|ABC-123|example.invalid/team/repository"
+            ).hexdigest()
             replacements = {
                 "resolve_handoff_target": mock.Mock(
-                    return_value=(target, "example.invalid/team/repository", "issue/ABC-123-change")
+                    return_value=(
+                        target,
+                        "example.invalid/team/repository",
+                        f"issue/delivery-abc-123-{anchor_id[:10]}-change",
+                    )
                 ),
                 "prepare_instructions": mock.Mock(return_value=({}, {})),
                 "read_active": mock.Mock(return_value=(active, b"active")),
@@ -982,7 +1011,10 @@ class BootstrapEval(unittest.TestCase):
                         family_path=family_path,
                         manifest={
                             "source": {"investigation-id": active["investigation-id"]},
-                            "story": {"issue-key": "ABC-123"},
+                            "work-item": {
+                                "tracker-id": "delivery",
+                                "reference": "ABC-123",
+                            },
                         },
                     )
                 ),
@@ -1148,7 +1180,7 @@ class BootstrapEval(unittest.TestCase):
         }
         bundle = SimpleNamespace(
             source={"investigation-id": investigation},
-            jira={"issue-key": "ABC-102"},
+            work_item={"tracker-id": "delivery", "reference": "ABC-102"},
             documents={},
             fingerprint="bundle",
         )
@@ -1166,7 +1198,10 @@ class BootstrapEval(unittest.TestCase):
                     family_path=family_path,
                     manifest={
                         "source": {"investigation-id": investigation},
-                        "story": {"issue-key": "ABC-101"},
+                        "work-item": {
+                            "tracker-id": "delivery",
+                            "reference": "ABC-101",
+                        },
                     },
                 )
 
@@ -1183,16 +1218,28 @@ class BootstrapEval(unittest.TestCase):
                 "rev_parse_optional": mock.Mock(return_value="c" * 40),
                 "read_asset": mock.Mock(return_value=b"asset"),
                 "handoff_identity": mock.Mock(
-                    return_value=("abc-102--repository", "b" * 64)
+                    return_value=(
+                        "abc-102--repository",
+                        "b" * 64,
+                        "delivery-abc-102-token",
+                    )
                 ),
             }
+            anchor_id = hashlib.sha256(
+                b"delivery|ABC-101|example.invalid/team/repository"
+            ).hexdigest()
+            anchor_branch = f"issue/delivery-abc-101-{anchor_id[:10]}-first-story"
+            second_id = hashlib.sha256(
+                b"delivery|ABC-102|example.invalid/team/repository"
+            ).hexdigest()
+            second_branch = f"issue/delivery-abc-102-{second_id[:10]}-second-story"
             with mock.patch.multiple(module, **replacements):
                 plan = module.build_apply_plan_from_state(
                     bundle,
                     state_root=target,
                     target=target,
                     normalized_remote="example.invalid/team/repository",
-                    branch="issue/ABC-101-first-story",
+                    branch=anchor_branch,
                     explicit_worktree=True,
                 )
                 self.assertEqual(plan.output["action"], "create")
@@ -1204,7 +1251,7 @@ class BootstrapEval(unittest.TestCase):
                         state_root=target,
                         target=target,
                         normalized_remote="example.invalid/team/repository",
-                        branch="issue/ABC-999-unrelated",
+                        branch="issue/unrelated",
                         explicit_worktree=True,
                     )
                 self.assertEqual(
@@ -1213,20 +1260,21 @@ class BootstrapEval(unittest.TestCase):
 
                 third_bundle = SimpleNamespace(
                     source={"investigation-id": investigation},
-                    jira={"issue-key": "ABC-103"},
+                    work_item={"tracker-id": "delivery", "reference": "ABC-103"},
                     documents={},
                     fingerprint="third-bundle",
                 )
                 replacements["handoff_identity"].return_value = (
                     "abc-103--repository",
                     "c" * 64,
+                    "delivery-abc-103-token",
                 )
                 third_before_attach = module.build_apply_plan_from_state(
                     third_bundle,
                     state_root=target,
                     target=target,
                     normalized_remote="example.invalid/team/repository",
-                    branch="issue/ABC-101-first-story",
+                    branch=anchor_branch,
                     explicit_worktree=True,
                 )
                 active_after_attach = {
@@ -1261,7 +1309,10 @@ class BootstrapEval(unittest.TestCase):
                         family_path=family_path,
                         manifest={
                             "source": {"investigation-id": investigation},
-                            "story": {"issue-key": "ABC-101"},
+                            "work-item": {
+                                "tracker-id": "delivery",
+                                "reference": "ABC-101",
+                            },
                         },
                     )
 
@@ -1273,7 +1324,7 @@ class BootstrapEval(unittest.TestCase):
                     state_root=target,
                     target=target,
                     normalized_remote="example.invalid/team/repository",
-                    branch="issue/ABC-101-first-story",
+                    branch=anchor_branch,
                     explicit_worktree=True,
                 )
                 self.assertNotEqual(
@@ -1289,7 +1340,7 @@ class BootstrapEval(unittest.TestCase):
                         state_root=target,
                         target=target,
                         normalized_remote="example.invalid/team/repository",
-                        branch="issue/ABC-101-first-story",
+                        branch=anchor_branch,
                         explicit_worktree=True,
                     )
                 self.assertEqual(
@@ -1305,7 +1356,7 @@ class BootstrapEval(unittest.TestCase):
                         state_root=target,
                         target=target,
                         normalized_remote="example.invalid/team/repository",
-                        branch="issue/ABC-101-first-story",
+                        branch=anchor_branch,
                         explicit_worktree=True,
                     )
                 self.assertEqual(
@@ -1314,13 +1365,21 @@ class BootstrapEval(unittest.TestCase):
 
                 bundle.source = {"investigation-id": investigation}
                 replacements["read_active"].return_value = (None, None)
+                replacements["handoff_identity"].return_value = (
+                    "abc-102--repository",
+                    "b" * 64,
+                    f"delivery-abc-102-{second_id[:10]}",
+                )
                 replacements["read_existing_handoff"].side_effect = lambda path, **_: (
                     SimpleNamespace(
                         revision="v0001",
                         family_path=path,
                         manifest={
                             "source": {"investigation-id": "20260831-previous"},
-                            "story": {"issue-key": "ABC-102"},
+                            "work-item": {
+                                "tracker-id": "delivery",
+                                "reference": "ABC-102",
+                            },
                         },
                     )
                 )
@@ -1330,7 +1389,7 @@ class BootstrapEval(unittest.TestCase):
                         state_root=target,
                         target=target,
                         normalized_remote="example.invalid/team/repository",
-                        branch="issue/ABC-102-second-story",
+                        branch=second_branch,
                         explicit_worktree=True,
                     )
                 self.assertEqual(
@@ -1390,15 +1449,17 @@ class BootstrapEval(unittest.TestCase):
                 (bundle / "bundle.yaml").write_text(
                     "\n".join(
                         (
-                            "schema-version: 1",
+                            "schema-version: 2",
                             "source:",
                             f'  investigation-id: "{investigation}"',
                             '  investigation-updated-at: "2026-08-31T12:00:00Z"',
                             f'  story-id: "{story_id}"',
-                            "jira:",
-                            '  site: "https://example.atlassian.net"',
-                            f'  issue-key: "{issue_key}"',
-                            f'  url: "https://example.atlassian.net/browse/{issue_key}"',
+                            "work-item:",
+                            '  tracker-id: "delivery"',
+                            '  provider: "example"',
+                            '  tracker-url: "https://tracker.example.com"',
+                            f'  reference: "{issue_key}"',
+                            f'  url: "https://tracker.example.com/items/{issue_key}"',
                             '  updated-at: "2026-08-31T11:55:00Z"',
                             '  captured-at: "2026-08-31T12:01:00Z"',
                             '  freshness: "current"',
@@ -1412,8 +1473,8 @@ class BootstrapEval(unittest.TestCase):
                     ),
                     encoding="utf-8",
                 )
-                (bundle / "jira.md").write_text(
-                    f"# Jira\n\n{issue_key}\n", encoding="utf-8"
+                (bundle / "work-item.md").write_text(
+                    f"# Work item\n\n{issue_key}\n", encoding="utf-8"
                 )
                 (bundle / "context.md").write_text(
                     f"# Context\n\nContext for {issue_key}.\n", encoding="utf-8"
@@ -1425,10 +1486,25 @@ class BootstrapEval(unittest.TestCase):
 
             first_bundle = write_bundle("ABC-101", "S-001")
             second_bundle = write_bundle("ABC-102", "S-002")
+            first_id = hashlib.sha256(
+                f"delivery|ABC-101|{normalized_remote}".encode("utf-8")
+            ).hexdigest()
+            second_id = hashlib.sha256(
+                f"delivery|ABC-102|{normalized_remote}".encode("utf-8")
+            ).hexdigest()
+            first_family_name = f"delivery-abc-101-{first_id[:10]}--repository"
+            second_family_name = f"delivery-abc-102-{second_id[:10]}--repository"
             resolved = mock.Mock(
-                return_value=(target, normalized_remote, "issue/ABC-101-first")
+                return_value=(
+                    target,
+                    normalized_remote,
+                    f"issue/delivery-abc-101-{first_id[:10]}-first",
+                )
             )
-            with mock.patch.object(module, "resolve_handoff_target", resolved):
+            with (
+                mock.patch.object(module, "resolve_handoff_target", resolved),
+                mock.patch.object(module, "validate_tracker_binding"),
+            ):
                 first_plan = module.build_apply_plan(
                     DIST, str(first_bundle), str(target)
                 )
@@ -1537,12 +1613,12 @@ class BootstrapEval(unittest.TestCase):
                 self.assertEqual(shared["investigation-id"], investigation)
                 self.assertEqual(
                     [entry["family"] for entry in shared["handoffs"]],
-                    ["abc-101--repository", "abc-102--repository"],
+                    [first_family_name, second_family_name],
                 )
-                self.assertTrue((store / "abc-101--repository" / "handoff.yaml").is_file())
-                self.assertTrue((store / "abc-102--repository" / "handoff.yaml").is_file())
+                self.assertTrue((store / first_family_name / "handoff.yaml").is_file())
+                self.assertTrue((store / second_family_name / "handoff.yaml").is_file())
 
-                second_family = store / "abc-102--repository"
+                second_family = store / second_family_name
                 second_scope = second_bundle / "scope.md"
 
                 def assert_failed_apply_restores(
@@ -1706,6 +1782,9 @@ class BootstrapEval(unittest.TestCase):
                 self.assertFalse((store / module.TRANSACTION_NAME).exists())
 
                 third_bundle = write_bundle("ABC-103", "S-003")
+                third_id = hashlib.sha256(
+                    f"delivery|ABC-103|{normalized_remote}".encode("utf-8")
+                ).hexdigest()
                 third_plan = module.build_apply_plan(
                     DIST, str(third_bundle), str(target)
                 )
@@ -1728,7 +1807,10 @@ class BootstrapEval(unittest.TestCase):
                             third_plan.output["plan_token"],
                             str(target),
                         )
-                third_family = store / "abc-103--repository"
+                third_family = (
+                    store
+                    / f"delivery-abc-103-{third_id[:10]}--repository"
+                )
                 diagnostic = third_family / "diagnostic.txt"
                 diagnostic.write_text("preserve\n", encoding="utf-8")
                 with self.assertRaises(module.HandoffError) as conflict:
@@ -1806,6 +1888,205 @@ class BootstrapEval(unittest.TestCase):
             )
             close.assert_called_once()
 
+    def test_multi_provider_handoffs_in_initialized_temp_cell(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            cell = root / "cell"
+            initialized = run(
+                [
+                    str(DIST / "install.sh"),
+                    "init",
+                    "--dest",
+                    str(cell),
+                    "--cell-name",
+                    "multi-provider-eval",
+                    "--purpose",
+                    "integration test",
+                    "--system",
+                    "test-system",
+                    "--tracker",
+                    "clickup-main:clickup:https://clickup.example.com/team",
+                    "--tracker",
+                    "notion-main:notion:https://notion.example.com",
+                    "--yes",
+                ]
+            )
+            self.assertEqual(initialized.returncode, 0, initialized.stderr)
+
+            helper = (
+                cell
+                / ".agents/skills/manage-development-handoff/scripts/development-handoff.py"
+            )
+            module_name = "development_handoff_multi_provider_temp_eval"
+            spec = importlib.util.spec_from_file_location(module_name, helper)
+            self.assertIsNotNone(spec)
+            self.assertIsNotNone(spec.loader)
+            module = importlib.util.module_from_spec(spec)
+            sys.modules[module_name] = module
+            self.addCleanup(sys.modules.pop, module_name, None)
+            spec.loader.exec_module(module)
+
+            target = root / "repository"
+            target.mkdir()
+            normalized_remote = "example.invalid/team/repository"
+            remote = f"https://{normalized_remote}.git"
+            first_id = hashlib.sha256(
+                f"clickup-main|TASK-7|{normalized_remote}".encode("utf-8")
+            ).hexdigest()
+            branch = f"issue/clickup-main-task-7-{first_id[:10]}-integration"
+            self.assertEqual(
+                run(["git", "init", "-q", "-b", branch], cwd=target).returncode,
+                0,
+            )
+            (target / ".gitignore").write_text(
+                "/.knowledge-os-handoffs/\n", encoding="utf-8"
+            )
+            (target / "README.md").write_text("# Temporary repository\n", encoding="utf-8")
+            self.assertEqual(run(["git", "add", "."], cwd=target).returncode, 0)
+            committed = run(
+                [
+                    "git",
+                    "-c",
+                    "user.name=Bootstrap Eval",
+                    "-c",
+                    "user.email=bootstrap@example.invalid",
+                    "commit",
+                    "-q",
+                    "-m",
+                    "baseline",
+                ],
+                cwd=target,
+            )
+            self.assertEqual(committed.returncode, 0, committed.stderr)
+
+            def package(
+                name: str,
+                story: str,
+                tracker_id: str,
+                provider: str,
+                tracker_url: str,
+            ) -> Path:
+                bundle = root / name
+                bundle.mkdir()
+                reference = "TASK-7"
+                (bundle / "bundle.yaml").write_text(
+                    f'''schema-version: 2
+source:
+  investigation-id: "20260831-multi-provider"
+  investigation-updated-at: "2026-08-31T12:00:00Z"
+  story-id: "{story}"
+work-item:
+  tracker-id: "{tracker_id}"
+  provider: "{provider}"
+  tracker-url: "{tracker_url}"
+  reference: "{reference}"
+  url: "{tracker_url}/items/{reference}"
+  updated-at: "2026-08-31T11:55:00Z"
+  captured-at: "2026-08-31T12:01:00Z"
+  freshness: "current"
+  snapshot-source: "connected-readback"
+repository:
+  remote: "{remote}"
+change:
+  summary: "Materialize {tracker_id}:{reference}."
+''',
+                    encoding="utf-8",
+                )
+                (bundle / "work-item.md").write_text(
+                    f"# Work item\n\n{reference}\n", encoding="utf-8"
+                )
+                (bundle / "context.md").write_text(
+                    f"# Context\n\n{tracker_id}\n", encoding="utf-8"
+                )
+                (bundle / "scope.md").write_text(
+                    f"# Scope\n\n{provider}\n", encoding="utf-8"
+                )
+                return bundle
+
+            bundles = (
+                package(
+                    "clickup-package",
+                    "S-001",
+                    "clickup-main",
+                    "clickup",
+                    "https://clickup.example.com/team",
+                ),
+                package(
+                    "notion-package",
+                    "S-002",
+                    "notion-main",
+                    "notion",
+                    "https://notion.example.com",
+                ),
+            )
+            resolved = mock.Mock(
+                return_value=(target, normalized_remote, branch)
+            )
+            with mock.patch.object(module, "resolve_handoff_target", resolved):
+                for bundle in bundles:
+                    plan = module.build_apply_plan(cell, str(bundle), str(target))
+                    applied = module.apply_plan(
+                        cell,
+                        str(bundle),
+                        plan.output["plan_token"],
+                        str(target),
+                    )
+                    self.assertEqual(applied["status"], "applied")
+                validated = module.validate_repository(
+                    cell, remote, worktree_path=str(target)
+                )
+
+            self.assertEqual(validated["status"], "valid")
+            self.assertEqual(len(validated["handoffs"]), 2)
+            store = target / ".knowledge-os-handoffs"
+            active, _ = module.read_active(store)
+            families = [item["family"] for item in active["handoffs"]]
+            self.assertEqual(len(set(families)), 2)
+            manifests = [
+                module.load_yaml_mapping(store / item["manifest"], label="handoff.yaml")[0]
+                for item in active["handoffs"]
+            ]
+            self.assertEqual(
+                {manifest["work-item"]["provider"] for manifest in manifests},
+                {"clickup", "notion"},
+            )
+            self.assertTrue(
+                all((store / family / "work-item.md").is_file() for family in families)
+            )
+            instance_path = cell / "instance.yaml"
+            instance_path.write_text(
+                instance_path.read_text(encoding="utf-8")
+                .replace('provider: "notion"', 'provider: "replacement"', 1)
+                .replace(
+                    'url: "https://notion.example.com"',
+                    'url: "https://replacement.example.com"',
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            notion_metadata = bundles[1] / "bundle.yaml"
+            notion_metadata.write_text(
+                notion_metadata.read_text(encoding="utf-8")
+                .replace('provider: "notion"', 'provider: "replacement"', 1)
+                .replace(
+                    "https://notion.example.com",
+                    "https://replacement.example.com",
+                ),
+                encoding="utf-8",
+            )
+            with mock.patch.object(module, "resolve_handoff_target", resolved):
+                with self.assertRaises(module.HandoffError) as rebound:
+                    module.build_apply_plan(cell, str(bundles[1]), str(target))
+            self.assertEqual(rebound.exception.code, "tracker_binding_mismatch")
+            instance_path.rename(cell / "instance.yaml.saved")
+            with mock.patch.object(module, "resolve_handoff_target", resolved):
+                with self.assertRaises(module.HandoffError) as missing_instance:
+                    module.build_apply_plan(cell, str(bundles[0]), str(target))
+            self.assertEqual(
+                missing_instance.exception.code,
+                "invalid_tracker_configuration",
+            )
+
     def test_state_flow_preserves_other_handoffs_and_reopens(self) -> None:
         helper = (
             DIST
@@ -1859,16 +2140,22 @@ class BootstrapEval(unittest.TestCase):
                         "source": {
                             "investigation-id": active["investigation-id"]
                         },
-                        "story": {"issue-key": "ABC-101"},
+                        "work-item": {
+                            "tracker-id": "delivery",
+                            "reference": "ABC-101",
+                        },
                     },
                 )
 
+            anchor_id = hashlib.sha256(
+                b"delivery|ABC-101|example.invalid/team/repository"
+            ).hexdigest()
             replacements = {
                 "resolve_handoff_target": mock.Mock(
                     return_value=(
                         target,
                         "example.invalid/team/repository",
-                        "issue/ABC-101-first-story",
+                        f"issue/delivery-abc-101-{anchor_id[:10]}-first-story",
                     )
                 ),
                 "prepare_instructions": mock.Mock(return_value=({}, {})),
@@ -2267,6 +2554,7 @@ class BootstrapEval(unittest.TestCase):
                 "resolve-vault.py",
                 "vault-resolution.md",
                 "node-selection.md",
+                "work-item-evidence.md",
                 "jira-evidence.md",
             ):
                 self.assertTrue((dest / "90-Meta" / shared).is_file(), shared)
@@ -2303,6 +2591,90 @@ class BootstrapEval(unittest.TestCase):
             self.assertEqual(
                 info["distribution_revision_installed"],
                 info["distribution_revision_dist"],
+            )
+
+    def test_init_roundtrips_trackers_and_rejects_invalid_updates(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            invalid_dest = Path(tmp) / "invalid-cell"
+            invalid_init = run(
+                [
+                    "sh",
+                    str(INSTALL),
+                    "init",
+                    "--dest",
+                    str(invalid_dest),
+                    "--tracker",
+                    "broken",
+                    "--system",
+                    "test:Test",
+                    "--yes",
+                ]
+            )
+            self.assertEqual(invalid_init.returncode, 2, invalid_init.stdout)
+            self.assertEqual(
+                json.loads(invalid_init.stdout)["status"], "invalid-instance"
+            )
+            self.assertFalse(invalid_dest.exists())
+
+            dest = Path(tmp) / "cell"
+            initialized = run(
+                [
+                    "sh",
+                    str(INSTALL),
+                    "init",
+                    "--dest",
+                    str(dest),
+                    "--cell-name",
+                    "Multi tracker",
+                    "--purpose",
+                    "Validate work-item routing",
+                    "--system",
+                    "platform:Platform",
+                    "--tracker",
+                    "jira-core:jira:https://core.atlassian.net/",
+                    "--tracker",
+                    "clickup-product:clickup:https://app.clickup.com/123456",
+                    "--yes",
+                ]
+            )
+            self.assertEqual(
+                initialized.returncode,
+                0,
+                initialized.stdout + initialized.stderr,
+            )
+            instance_path = dest / "instance.yaml"
+            instance = instance_path.read_text(encoding="utf-8")
+            self.assertIn('id: "jira-core"', instance)
+            self.assertIn('provider: "clickup"', instance)
+            self.assertIn('url: "https://core.atlassian.net"', instance)
+
+            doctor = run(["sh", str(INSTALL), "doctor", "--dest", str(dest)])
+            self.assertEqual(doctor.returncode, 0, doctor.stdout + doctor.stderr)
+            self.assertEqual(json.loads(doctor.stdout)["instance"]["status"], "valid")
+
+            instance_path.write_text(
+                instance.replace(
+                    'url: "https://core.atlassian.net"',
+                    'url: "https://user:secret@core.atlassian.net"',
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            invalid_doctor = run(
+                ["sh", str(INSTALL), "doctor", "--dest", str(dest)]
+            )
+            self.assertEqual(invalid_doctor.returncode, 2, invalid_doctor.stdout)
+            self.assertEqual(
+                json.loads(invalid_doctor.stdout)["instance"]["status"],
+                "invalid",
+            )
+            invalid_update = run(
+                ["sh", str(INSTALL), "update", "--dest", str(dest)]
+            )
+            self.assertEqual(invalid_update.returncode, 2, invalid_update.stdout)
+            self.assertEqual(
+                json.loads(invalid_update.stdout)["status"],
+                "invalid-instance",
             )
 
     def test_fresh_cell_has_every_documented_local_command(self) -> None:

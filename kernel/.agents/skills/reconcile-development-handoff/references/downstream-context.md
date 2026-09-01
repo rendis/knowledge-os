@@ -1,10 +1,12 @@
 # Direct-dependent story context
 
-Load this reference when the source Jira story may block other stories.
+Load this reference when the source work item may block other work items.
 
 ## Select direct dependents
 
-Use exactly one Jira link hop from the source story. Include a story only when current Jira metadata and the exact observed link type and direction establish that the selected story depends on, or is blocked by, the source story. Link labels are configuration-dependent: resolve both inward and outward descriptions from Jira before interpreting the edge.
+Use exactly one relationship hop from the source work item. Include another item only when current tracker metadata and the exact observed relation type and direction establish that it depends on, or is blocked by, the source item. Provider labels are configuration-dependent: resolve their direction before interpreting the edge.
+
+Classify relationship evidence as `observed`, `unsupported`, or `unavailable`. `observed` permits one-hop selection. `unsupported` means the provider exposes no usable typed relationships and reconciliation continues with no dependent cards plus that limitation. `unavailable` means the provider normally supports the relation but the current read failed; block only the dependent portion. If the source work item itself is unreadable, block reconciliation.
 
 Do not include descendants, parents, siblings, shared-epic members, text mentions, shared labels, or transitive dependents unless they also have their own qualifying direct typed link. Do not assume that `blocks`, `is blocked by`, or any localized label has a universal direction.
 
@@ -37,7 +39,7 @@ Set readiness to exactly one of `ready`, `partial`, `still-blocked`, or `not-app
 - `still-blocked`: a required contract, implementation, remote artifact, decision, or verification remains unavailable.
 - `not-applicable`: the typed link exists, but this implementation produced no repository-specific context needed by that dependent; explain why.
 
-Readiness describes only this dependency edge. It does not change Jira status, resolve the link, prove merge/deployment, or authorize the dependent implementation.
+Readiness describes only this dependency edge. It does not change tracker status, resolve the relation, prove merge/deployment, or authorize the dependent implementation.
 
 ## Propagation
 

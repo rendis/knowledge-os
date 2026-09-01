@@ -24,6 +24,14 @@ fields:
       id: string
       name: string
       aliases: list
+  trackers:
+    type: list
+    optional: true
+    default: []
+    item:
+      id: string
+      provider: string
+      url: string
   vault.remote:
     type: string
     optional: true
