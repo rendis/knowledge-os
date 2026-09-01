@@ -31,6 +31,7 @@ MARKERS = (
     "90-Meta/Convenciones.md",
     "90-Meta/Auditoria - Framework.md",
 )
+KEBAB_CASE_RE = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
 
 
 class InstanceError(ValueError):
@@ -240,7 +241,7 @@ def validate_instance(data: dict[str, Any]) -> dict[str, Any]:
         name = str(item.get("name") or "").strip()
         if not system_id or not name:
             raise InstanceError("each system needs id and name")
-        if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", system_id):
+        if KEBAB_CASE_RE.fullmatch(system_id) is None:
             raise InstanceError(f"system id must be kebab-case: {system_id}")
         if system_id in seen:
             raise InstanceError(f"duplicate system id: {system_id}")
@@ -262,9 +263,9 @@ def validate_instance(data: dict[str, Any]) -> dict[str, Any]:
             raise InstanceError("each tracker must be a mapping with id, provider, and url")
         tracker_id = str(item.get("id") or "").strip()
         provider = str(item.get("provider") or "").strip().casefold()
-        if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", tracker_id):
+        if KEBAB_CASE_RE.fullmatch(tracker_id) is None:
             raise InstanceError(f"tracker id must be kebab-case: {tracker_id}")
-        if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", provider):
+        if KEBAB_CASE_RE.fullmatch(provider) is None:
             raise InstanceError(f"tracker provider must be kebab-case: {provider}")
         url = _canonical_tracker_url(item.get("url"))
         if tracker_id in seen_tracker_ids:

@@ -70,7 +70,7 @@ Load [the development input-bundle contract](../../manage-development-handoff/re
 └── <work-item-token>--<repository-basename-lower>/
 ```
 
-Compile `work-item.md` from the current read-only snapshot produced under `VAULT_ROOT/90-Meta/work-item-evidence.md` and its provider-specific mapping; never reconstruct it from a published local draft, copied handoff, case History, or memory. Compile `context.md` and `scope.md` from the current case, registered evidence, decisions, acceptance criteria, and the selected repository boundary. A multi-repository story must produce different context and scope whenever ownership differs.
+Compile `work-item.md` from the current read-only snapshot produced under `VAULT_ROOT/90-Meta/work-item-evidence.md`; never reconstruct it from a published local draft, copied handoff, case History, or memory. Compile `context.md` and `scope.md` from the current case, registered evidence, decisions, acceptance criteria, and the selected repository boundary. A multi-repository story must produce different context and scope whenever ownership differs.
 
 When the target story is a directly dependent story previously reconciled from another implementation, include its current dependent card in the repository-specific package. Carry the observed contracts, APIs/events/data/configuration, compatibility and verification requirements, what can start, remaining gaps, source repository remote, and observed remote branch/PR state. Re-read the dependent work item before export; do not make its implementation worktree rediscover an already captured source contract.
 
