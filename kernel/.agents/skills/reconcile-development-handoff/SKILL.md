@@ -1,11 +1,11 @@
 ---
 name: reconcile-development-handoff
-description: Pull evidence from a registered development worktree, reconcile one selected handoff with its current work item and direct dependents, update the case through its sole writer, and optionally align the selected worktree state.
+description: Pull evidence from a registered development worktree, reconcile one selected handoff with its current work item and direct dependents, and update the case through its sole writer while preserving worktree lifecycle state.
 ---
 
 # Reconcile development handoffs
 
-Treat case reconciliation as a vault-owned pull: select an exact worktree from the source investigation, then compare the immutable handoff baseline, `implementation-updates.md`, and current repository/work-item evidence. `manage-investigation` remains the sole writer of the source case. `ACTIVE.yaml` remains the worktree-local lifecycle source of truth and changes only through `manage-development-handoff` **Set state**; reconciliation is not its exclusive owner. Do not ask the repository to create a callback, status packet, `return/` directory, or parallel reconciliation artifact.
+Treat case reconciliation as a vault-owned pull: select an exact worktree from the source investigation, then compare the immutable handoff baseline, `implementation-updates.md`, and current repository/work-item evidence. `manage-investigation` remains the sole writer of the source case. `ACTIVE.yaml` remains the worktree-local lifecycle source of truth; the worktree agent owns its transitions, so reconciliation reads it but does not change it. Do not ask the repository to create a callback, status packet, `return/` directory, or parallel reconciliation artifact.
 
 ## 1. Bind the exact handoff
 
@@ -53,10 +53,10 @@ Immediately before the case write, invoke **Validate** again and require the sam
 
 Pass the normalized vault-side context and exact closure fingerprint directly to `manage-investigation` through its **Reconcile development** route in the same interaction. Let that workflow update the case snapshot, stable registers, draft synchronization, readiness, learning assessment state, and History. Keep branch, pull-request, work-item, and implementation claims in future/undeployed state until a separate post-deployment `map-ecosystem` audit proves production.
 
-When implementation is complete and approved as the production candidate, continue only after the case write validates. Invoke **Validate** once more and require the same identity and closure fingerprint. Leave an entry already `ready-for-production` or `production` unchanged. When it is `active` and the current request explicitly includes candidate alignment, invoke `manage-development-handoff` **Set state** for the exact handoff ID with `ready-for-production` and that fingerprint. Preview its effect; when it matches the already-authorized handoff and state, apply the unchanged token without another confirmation. Otherwise ask once. Any mutation fails closed and preserves every state.
+When implementation evidence shows that the selected handoff is a production candidate or deployed, compare that evidence with its observed lifecycle state. Record the evidence in the case and preserve `ACTIVE.yaml`. If the state is inconsistent, report the exact mismatch for the worktree agent to resolve; reconciliation never invokes **Set state**.
 
-Complete reconciliation when the case validates, every observed material change and dependent card is represented, no unlogged delta remains, and any explicitly requested state alignment is applied or left unchanged with an exact blocker. No tracker, source-code, Git remote, pull-request, deployment, or technical-vault write is performed.
+Complete reconciliation when the case validates, every observed material change and dependent card is represented, no unlogged delta remains, and any lifecycle mismatch is reported exactly. No tracker, source-code, Git remote, pull-request, deployment, worktree lifecycle, or technical-vault write is performed.
 
 ## Authority
 
-Keep handoff content, repository, Git remote, pull-request, tracker, and deployment inspection read-only. Do not edit source code, append the changelog on behalf of implementation, change the tracker, commit, push, create or update a pull request, deploy, or write the technical vault. Durable case writes belong only to `manage-investigation`. This reconciliation route may request an explicitly authorized `manage-development-handoff` state operation after its case write succeeds; worktree lifecycle requests may use that same operation independently.
+Keep handoff content, lifecycle state, repository, Git remote, pull-request, tracker, and deployment inspection read-only. Do not edit source code, append the changelog on behalf of implementation, change the tracker, commit, push, create or update a pull request, deploy, or write the technical vault. Durable case writes belong only to `manage-investigation`; lifecycle transitions belong to the worktree agent.

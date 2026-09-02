@@ -5,7 +5,7 @@ description: Prepare persistent work-item worktrees and materialize repository-s
 
 # Manage development handoffs
 
-Treat one persistent worktree as the implementation boundary for one repository and one investigation. `ACTIVE.yaml` is that worktree's lifecycle source of truth and lists one or more repository-specific work-item handoffs from the investigation; every handoff retains its own family directory. The helper is the sole mechanical state writer whether the request originates in the worktree or the source cell.
+Treat one persistent worktree as the implementation boundary for one repository and one investigation. `ACTIVE.yaml` is that worktree's lifecycle source of truth and lists one or more repository-specific work-item handoffs from the investigation; every handoff retains its own family directory. The worktree agent owns lifecycle transitions and the helper is its sole mechanical state writer.
 
 ## Preflight
 

@@ -155,6 +155,7 @@ class BootstrapEval(unittest.TestCase):
             DIST
             / "kernel/.agents/skills/manage-development-handoff/references/repository-state.md"
         ).read_text(encoding="utf-8")
+        router = (DIST / "kernel/AGENTS.md").read_text(encoding="utf-8")
         operational = (
             DIST / "kernel/.agents/skills/manage-operational-workflow/SKILL.md"
         ).read_text(encoding="utf-8")
@@ -163,6 +164,11 @@ class BootstrapEval(unittest.TestCase):
         self.assertNotIn("reconcile-development-handoff", start)
         self.assertIn("worktree-local lifecycle source of truth", managed_block)
         self.assertIn("current worktree and its anchor branch", managed_block)
+        self.assertIn(
+            "agent working in this worktree owns handoff lifecycle transitions",
+            managed_block,
+        )
+        self.assertNotIn("source cell", managed_block)
         self.assertIn("A state-only request", managed_block)
         self.assertIn("counts as explicit lifecycle direction", managed_block)
         self.assertIn("without another confirmation", managed_block)
@@ -179,14 +185,20 @@ class BootstrapEval(unittest.TestCase):
         self.assertIn("files they affect", managed_block)
         self.assertIn("worktree-local lifecycle source of truth", start)
         self.assertIn("**Set state**", start)
+        self.assertNotIn("source cell", start)
+        self.assertIn("without changing its lifecycle state", start)
         self.assertNotIn("updates the selected story state", start)
         self.assertNotIn("manage-operational-workflow", reconcile)
         self.assertIn("90-Meta/work-item-evidence.md", reconcile)
-        self.assertIn("already `ready-for-production` or `production`", reconcile)
-        self.assertIn("without another confirmation", reconcile)
+        self.assertIn("reconciliation reads it but does not change it", reconcile)
+        self.assertNotIn("invoke `manage-development-handoff` **Set state**", reconcile)
         self.assertNotIn("state changes belong only", reconcile)
+        self.assertIn("worktree agent owns lifecycle transitions", manage)
+        self.assertNotIn("source cell", manage)
         self.assertIn("without another confirmation", manage)
         self.assertIn("without another confirmation", repository_state)
+        self.assertIn("preserving its worktree-local lifecycle state", router)
+        self.assertNotIn("optionally align its worktree-local lifecycle state", router)
         self.assertIn("90-Meta/work-item-evidence.md", operational)
         self.assertIn("90-Meta/jira-evidence.md", operational)
 
