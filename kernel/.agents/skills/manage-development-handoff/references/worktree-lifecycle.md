@@ -81,7 +81,7 @@ Multi-repository creation is sequential and has no broad rollback. On failure, r
 
 ## Existing worktrees
 
-Refresh, attachment, validation, and state updates use the exact absolute `--worktree-path`. The helper verifies that it is under the configured root, follows `<root>/<remote-repository-basename>/<work-item-description>`, uses the canonical repository basename derived from the supplied remote, is registered to the repository resolved by that remote, and is attached to a branch. The first handoff must match the collision-safe work-item token in the branch; later handoffs reuse that branch only when `ACTIVE.yaml` names their same investigation.
+Refresh, attachment, validation, and state updates use the exact absolute `--worktree-path`. The helper verifies that it is under the configured root, follows `<root>/<remote-repository-basename>/<work-item-description>`, uses the canonical repository basename derived from the supplied remote, is registered to the repository resolved by that remote, and is attached to a branch. The first handoff defines the anchor branch and must match its collision-safe work-item token; later handoffs reuse that worktree and branch only when `ACTIVE.yaml` names their same investigation. Selecting a later handoff is not a branch operation.
 
 Every refresh, attachment, validation, and state update requires the exact absolute worktree path. A missing or non-canonical path blocks the operation; the helper does not search historical checkouts or relocate state.
 
