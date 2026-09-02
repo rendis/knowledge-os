@@ -13,7 +13,7 @@ Classify the request, then select one skill. For orientation or interrogation, f
 - `manage-investigation` — local case files under `.investigations/`.
 - `manage-investigation-derived-learning` — assess and publish `70-Aprendizajes/` notes.
 - `manage-development-handoff` — persistent work-item worktrees and handoff files.
-- `reconcile-development-handoff` — pull one selected handoff's implementation evidence into its source case and optionally align its worktree-local lifecycle state.
+- `reconcile-development-handoff` — pull one selected handoff's implementation evidence into its source case while preserving its worktree-local lifecycle state.
 - `manage-git-workflow` — analyze or maintain the cell's Git/GitHub policy, or apply it to source repositories; routine local versioning of this vault follows repository instructions.
 - `manage-operational-workflow` — runbooks with external effects after authorization.
 - `grilling` — one decision at a time.
