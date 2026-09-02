@@ -73,9 +73,9 @@ Complete validation only when every requested worktree has an observed status an
 
 ## Set state
 
-1. Select the exact handoff ID and requested state. Materialization, continued implementation, and reopening use `active`; an explicitly identified production candidate uses `ready-for-production`; verified deployment uses `production`. A lifecycle-only request does not authorize source, Git, tracker, promotion, or deployment work.
+1. Select the exact handoff ID and requested state. Materialization, continued implementation, and reopening use `active`; an explicitly identified production candidate uses `ready-for-production`; verified deployment uses `production`. An unambiguous user lifecycle statement or correction that identifies one handoff and maps to one of these states authorizes this lifecycle-only route. It does not authorize source, Git, tracker, promotion, or deployment work.
 2. `ready-for-production` requires the exact closure fingerprint from an unchanged post-write **Validate** result. `production` requires the current state to be `ready-for-production`.
-3. Run `set-state` without a token, present the single `ACTIVE.yaml` update and any policy refresh, obtain explicit authorization, then repeat with the unchanged token.
+3. Run `set-state` without a token. When the preview changes only the already-authorized handoff to the requested state, plus any policy refresh, repeat with the unchanged token without another confirmation. Otherwise present the single effect and ask once; apply only after the exact handoff and state are resolved.
 4. Confirm the selected state changed and every other entry and family remained unchanged.
 
 Complete the route only when the selected state is observed and every other entry remains intact, then stop. A changed snapshot, invalid transition, or stale plan leaves `ACTIVE.yaml` unchanged.

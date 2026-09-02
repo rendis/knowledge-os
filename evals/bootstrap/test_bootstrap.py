@@ -148,6 +148,13 @@ class BootstrapEval(unittest.TestCase):
         reconcile = (
             DIST / "kernel/.agents/skills/reconcile-development-handoff/SKILL.md"
         ).read_text(encoding="utf-8")
+        manage = (
+            DIST / "kernel/.agents/skills/manage-development-handoff/SKILL.md"
+        ).read_text(encoding="utf-8")
+        repository_state = (
+            DIST
+            / "kernel/.agents/skills/manage-development-handoff/references/repository-state.md"
+        ).read_text(encoding="utf-8")
         operational = (
             DIST / "kernel/.agents/skills/manage-operational-workflow/SKILL.md"
         ).read_text(encoding="utf-8")
@@ -157,6 +164,9 @@ class BootstrapEval(unittest.TestCase):
         self.assertIn("worktree-local lifecycle source of truth", managed_block)
         self.assertIn("current worktree and its anchor branch", managed_block)
         self.assertIn("A state-only request", managed_block)
+        self.assertIn("counts as explicit lifecycle direction", managed_block)
+        self.assertIn("without another confirmation", managed_block)
+        self.assertIn("Ask once only when", managed_block)
         self.assertIn("does not authorize implementation", managed_block)
         self.assertIn("**Set state**", managed_block)
         self.assertIn("never edited freehand", managed_block)
@@ -173,7 +183,10 @@ class BootstrapEval(unittest.TestCase):
         self.assertNotIn("manage-operational-workflow", reconcile)
         self.assertIn("90-Meta/work-item-evidence.md", reconcile)
         self.assertIn("already `ready-for-production` or `production`", reconcile)
+        self.assertIn("without another confirmation", reconcile)
         self.assertNotIn("state changes belong only", reconcile)
+        self.assertIn("without another confirmation", manage)
+        self.assertIn("without another confirmation", repository_state)
         self.assertIn("90-Meta/work-item-evidence.md", operational)
         self.assertIn("90-Meta/jira-evidence.md", operational)
 
