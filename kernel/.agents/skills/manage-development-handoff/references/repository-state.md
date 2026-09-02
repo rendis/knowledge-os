@@ -137,7 +137,7 @@ Preview one state update without a token:
   [--closure-fingerprint <sha256>]
 ```
 
-After explicit authorization, repeat with the returned `--plan-token`. A change to `ready-for-production` requires an `active` entry and the exact current closure fingerprint; `production` requires `ready-for-production`; `active` reopens any selected entry. Repeating the current state is a no-op. Apply recomputes the plan, so mutation during authorization fails as `plan_stale`. Only the selected state and any stale managed policy change; families and other registry entries remain intact.
+An unambiguous current user request that identifies one handoff and maps to the requested state authorizes that exact lifecycle change. When the preview matches it, repeat with the returned `--plan-token` without another confirmation; otherwise present the effect and ask once. A change to `ready-for-production` requires an `active` entry and the exact current closure fingerprint; `production` requires `ready-for-production`; `active` reopens any selected entry. Repeating the current state is a no-op. Apply recomputes the plan, so mutation during authorization fails as `plan_stale`. Only the selected state and any stale managed policy change; families and other registry entries remain intact.
 
 ## Completion criterion
 
