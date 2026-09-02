@@ -5,7 +5,7 @@ description: Prepare persistent work-item worktrees and materialize repository-s
 
 # Manage development handoffs
 
-Treat one persistent worktree as the implementation boundary for one repository and one investigation. `ACTIVE.yaml` lists one or more repository-specific work-item handoffs from that investigation; every handoff retains its own family directory.
+Treat one persistent worktree as the implementation boundary for one repository and one investigation. `ACTIVE.yaml` is that worktree's lifecycle source of truth and lists one or more repository-specific work-item handoffs from the investigation; every handoff retains its own family directory. The helper is the sole mechanical state writer whether the request originates in the worktree or the source cell.
 
 ## Preflight
 
@@ -29,7 +29,7 @@ Load [the worktree lifecycle](references/worktree-lifecycle.md) when preparing o
 
 ## Prepare new handoffs
 
-1. Separate the user's selection into new standalone worktrees, new shared groups, and packages that reuse an exact existing worktree. A shared group has one first package as its worktree anchor; do not plan a new worktree for its remaining packages.
+1. Separate the user's selection into new standalone worktrees, new shared groups, and packages that reuse an exact existing worktree. A shared group has one first package as its worktree and branch anchor; present that shared topology before authorization and do not plan another worktree or branch for its remaining packages. Use separate worktrees when the user requires independent per-item branches.
 2. For every standalone package and new shared-group anchor, inspect local branch candidates, ask the user to confirm the base branch, and ask for one short description used to derive `issue/<work-item-token>-<slug>`. Use `issue/` by default; pass a different validated prefix only when the user explicitly requests it.
 3. Run a provisional `plan-handoff` with `--base-source remote` only for those new-worktree targets. It may inspect a missing remote commit only in disposable temporary storage; present the exact local and remote commits, freshness classification, derived branch, canonical repository container, its `create-directory` effect when absent, absolute destination, and complete materialization effects.
 4. When the commits differ, ask whether to start from `remote` or `local`. A remote selection may fetch only that exact base ref; it never updates the local base branch. If the user wants the local branch itself updated, stop for a separately authorized repository Git workflow.
@@ -73,12 +73,12 @@ Complete validation only when every requested worktree has an observed status an
 
 ## Set state
 
-1. Select the exact handoff ID and requested state. Materialization and reopening use `active`; completed reconciliation uses `ready-for-production`; verified deployment uses `production`.
+1. Select the exact handoff ID and requested state. Materialization, continued implementation, and reopening use `active`; an explicitly identified production candidate uses `ready-for-production`; verified deployment uses `production`. A lifecycle-only request does not authorize source, Git, tracker, promotion, or deployment work.
 2. `ready-for-production` requires the exact closure fingerprint from an unchanged post-write **Validate** result. `production` requires the current state to be `ready-for-production`.
 3. Run `set-state` without a token, present the single `ACTIVE.yaml` update and any policy refresh, obtain explicit authorization, then repeat with the unchanged token.
 4. Confirm the selected state changed and every other entry and family remained unchanged.
 
-Complete the route only when the selected state is observed and every other entry remains intact. A changed snapshot, invalid transition, or stale plan leaves `ACTIVE.yaml` unchanged.
+Complete the route only when the selected state is observed and every other entry remains intact, then stop. A changed snapshot, invalid transition, or stale plan leaves `ACTIVE.yaml` unchanged.
 
 ## Authority
 

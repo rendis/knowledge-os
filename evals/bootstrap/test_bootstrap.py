@@ -137,7 +137,7 @@ class BootstrapEval(unittest.TestCase):
             self.assertEqual(invalid_payload["error"], "contract-invalid")
             self.assertIn("missing area MOC", invalid_payload["message"])
 
-    def test_development_handoff_responsibilities_are_vault_pull_based(self) -> None:
+    def test_development_handoff_responsibilities_keep_state_in_the_worktree(self) -> None:
         managed_block = (
             DIST
             / "kernel/.agents/skills/manage-development-handoff/assets/agents-managed-block.md"
@@ -154,14 +154,26 @@ class BootstrapEval(unittest.TestCase):
 
         self.assertNotIn("reconcile-development-handoff", managed_block)
         self.assertNotIn("reconcile-development-handoff", start)
-        self.assertIn("Leave `.knowledge-os-handoffs/ACTIVE.yaml` intact", managed_block)
-        self.assertIn("The vault independently resolves this worktree", managed_block)
+        self.assertIn("worktree-local lifecycle source of truth", managed_block)
+        self.assertIn("current worktree and its anchor branch", managed_block)
+        self.assertIn("A state-only request", managed_block)
+        self.assertIn("does not authorize implementation", managed_block)
+        self.assertIn("**Set state**", managed_block)
+        self.assertIn("never edited freehand", managed_block)
+        self.assertNotIn("The vault independently resolves this worktree", managed_block)
+        self.assertNotIn("owns authorized state changes", managed_block)
+        self.assertNotIn("Leave `.knowledge-os-handoffs/ACTIVE.yaml` intact", managed_block)
         self.assertIn("For each selected entry, read its `handoff.yaml`", managed_block)
         self.assertNotIn("every listed `handoff.yaml`", managed_block)
         self.assertIn("`ready-for-production` or `production`", managed_block)
         self.assertIn("files they affect", managed_block)
+        self.assertIn("worktree-local lifecycle source of truth", start)
+        self.assertIn("**Set state**", start)
+        self.assertNotIn("updates the selected story state", start)
         self.assertNotIn("manage-operational-workflow", reconcile)
         self.assertIn("90-Meta/work-item-evidence.md", reconcile)
+        self.assertIn("already `ready-for-production` or `production`", reconcile)
+        self.assertNotIn("state changes belong only", reconcile)
         self.assertIn("90-Meta/work-item-evidence.md", operational)
         self.assertIn("90-Meta/jira-evidence.md", operational)
 

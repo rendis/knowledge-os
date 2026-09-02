@@ -1,11 +1,11 @@
 ---
 name: reconcile-development-handoff
-description: Pull evidence from a registered development worktree, reconcile one selected handoff with its current work item and direct dependents, update the case through its sole writer, and mark completed implementation ready for production.
+description: Pull evidence from a registered development worktree, reconcile one selected handoff with its current work item and direct dependents, update the case through its sole writer, and optionally align the selected worktree state.
 ---
 
 # Reconcile development handoffs
 
-Treat reconciliation as a vault-owned pull: select an exact worktree from the source investigation, then compare the immutable handoff baseline, `implementation-updates.md`, and current repository/work-item evidence. `manage-investigation` remains the sole writer of the source case. Do not ask the repository to invoke this skill or create a callback, status packet, `return/` directory, or parallel reconciliation artifact.
+Treat case reconciliation as a vault-owned pull: select an exact worktree from the source investigation, then compare the immutable handoff baseline, `implementation-updates.md`, and current repository/work-item evidence. `manage-investigation` remains the sole writer of the source case. `ACTIVE.yaml` remains the worktree-local lifecycle source of truth and changes only through `manage-development-handoff` **Set state**; reconciliation is not its exclusive owner. Do not ask the repository to create a callback, status packet, `return/` directory, or parallel reconciliation artifact.
 
 ## 1. Bind the exact handoff
 
@@ -15,7 +15,7 @@ Treat reconciliation as a vault-owned pull: select an exact worktree from the so
 4. Invoke the `manage-development-handoff` **Validate** route with the registered remote and worktree path. Select exactly the entry matching the case handoff ID, family, and revision and retain its state and `closure_fingerprint`; other entries may share the worktree but cannot substitute for it.
 5. Read the selected `handoff.yaml`, referenced history event, `START.md`, `work-item.md`, `context.md`, `scope.md`, and `implementation-updates.md`. Require their investigation, story, work-item, repository, family, and revision identities to match both the case and registry entry.
 
-Complete this stage when one valid active identity, one local closure fingerprint, and every comparison input are bound; otherwise report the exact missing or conflicting invariant.
+Complete this stage when one valid selected identity, its current state, one local closure fingerprint, and every comparison input are bound; otherwise report the exact missing or conflicting invariant.
 
 ## 2. Inspect implementation and delivery evidence
 
@@ -53,10 +53,10 @@ Immediately before the case write, invoke **Validate** again and require the sam
 
 Pass the normalized vault-side context and exact closure fingerprint directly to `manage-investigation` through its **Reconcile development** route in the same interaction. Let that workflow update the case snapshot, stable registers, draft synchronization, readiness, learning assessment state, and History. Keep branch, pull-request, work-item, and implementation claims in future/undeployed state until a separate post-deployment `map-ecosystem` audit proves production.
 
-When implementation is complete and approved as the production candidate, continue only after the case write validates. Invoke **Validate** once more, require the same identity and closure fingerprint, then invoke `manage-development-handoff` **Set state** for the exact handoff ID with `ready-for-production` and that fingerprint. Preview its effect, obtain separate authorization, and apply the unchanged token. Any mutation fails closed and preserves every state.
+When implementation is complete and approved as the production candidate, continue only after the case write validates. Invoke **Validate** once more and require the same identity and closure fingerprint. Leave an entry already `ready-for-production` or `production` unchanged. When it is `active` and the current request explicitly includes candidate alignment, invoke `manage-development-handoff` **Set state** for the exact handoff ID with `ready-for-production` and that fingerprint; preview its effect, obtain separate authorization, and apply the unchanged token. Any mutation fails closed and preserves every state.
 
-Complete reconciliation when the case validates, every observed material change and dependent card is represented, no unlogged delta remains, and any requested completed implementation is either marked `ready-for-production` or left unchanged with an explicit blocker. No tracker, source-code, Git remote, pull-request, deployment, or technical-vault write is performed.
+Complete reconciliation when the case validates, every observed material change and dependent card is represented, no unlogged delta remains, and any explicitly requested state alignment is applied or left unchanged with an exact blocker. No tracker, source-code, Git remote, pull-request, deployment, or technical-vault write is performed.
 
 ## Authority
 
-Keep handoff content, repository, Git remote, pull-request, tracker, and deployment inspection read-only. Do not edit source code, append the changelog on behalf of implementation, change the tracker, commit, push, create or update a pull request, deploy, or write the technical vault. Durable case writes belong only to `manage-investigation`; state changes belong only to an explicitly authorized `manage-development-handoff` operation after that case write succeeds.
+Keep handoff content, repository, Git remote, pull-request, tracker, and deployment inspection read-only. Do not edit source code, append the changelog on behalf of implementation, change the tracker, commit, push, create or update a pull request, deploy, or write the technical vault. Durable case writes belong only to `manage-investigation`. This reconciliation route may request an explicitly authorized `manage-development-handoff` state operation after its case write succeeds; worktree lifecycle requests may use that same operation independently.

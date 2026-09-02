@@ -57,7 +57,7 @@ Each material export compares `work-item.md`, `context.md`, and `scope.md` indep
 
 `implementation-updates.md` is deliberately outside the content revision and hash chain. It is the single append-only changelog for material changes to the exported definition discovered during any later activity. Its entries use contiguous `UPD-NNN` IDs and the mandatory fields defined in the managed root-instruction block. Existing entries are never edited, deleted, reordered, or renumbered; a later entry names what it supersedes. `Analysis` is present only when analysis actually occurred. The file is created with a new family; its absence from an existing family is invalid.
 
-History events are immutable. Each `handoff.yaml` is its family's integrity index. `ACTIVE.yaml` is the worktree-local registry for one investigation and lists every handoff's exact revision and current state: `active`, `ready-for-production`, or `production`. `activated-at` records the latest materialization or state transition that placed that entry in `active`. A shared worktree never combines investigations or repositories.
+History events are immutable. Each `handoff.yaml` is its family's integrity index. `ACTIVE.yaml` is the worktree-local lifecycle source of truth for one investigation and lists every handoff's exact revision and current state: `active` permits implementation, `ready-for-production` identifies the selected production candidate, and `production` records verified deployment. `activated-at` records the latest materialization or state transition that placed that entry in `active`. A shared worktree never combines investigations or repositories.
 
 A schema-v1 `ACTIVE.yaml` is accepted only as its original single active handoff. The next materialization or state change writes the schema-v2 registry; no separate migration artifact or history is created.
 
@@ -84,7 +84,7 @@ Preserve encoding, line endings, file mode, existing separator space, symlink to
 
 Reconcile the managed block from the current bundled asset during every mutating handoff operation. Compare exact desired bytes before writing: an identical block is a no-op and must not change bytes, mtime, or Git status. A policy-only refresh is `bootstrap`, preserves the current content revision, and creates no history event.
 
-Generated baseline files are read-only to the implementation agent. `implementation-updates.md` is the only writable handoff file and records definition deltas, not routine progress or a duplicate implementation diary. Implementation evidence stays in normal repository code, tests, diff, branch, pull request, and delivery artifacts.
+Generated baseline files are read-only to the implementation agent. `ACTIVE.yaml` changes only through `set-state`; it is never edited freehand. `implementation-updates.md` is the only handoff file the implementation agent edits directly and records definition deltas, not routine progress or a duplicate implementation diary. Implementation evidence stays in normal repository code, tests, diff, branch, pull request, and delivery artifacts.
 
 ## Plan and apply
 
@@ -98,7 +98,7 @@ Run:
   --worktree-path <absolute-worktree-path>
 ```
 
-`plan` is read-only. It resolves `repository.remote` through `90-Meta/workspace-config.py locate-repository`, verifies that the explicit path is a registered worktree under the configured root and attached to a branch, and requires the first handoff's collision-safe work-item token to match on every operation. Later handoffs preserve that anchor branch and must match the registry investigation. The plan validates current state and returns the target, branch, action, revision, changed documents, exact effects, tracked status, and a `plan_token`.
+`plan` is read-only. It resolves `repository.remote` through `90-Meta/workspace-config.py locate-repository`, verifies that the explicit path is a registered worktree under the configured root and attached to a branch, and requires the first handoff's collision-safe work-item token to match on every operation. Later handoffs preserve that anchor branch and must match the registry investigation; selecting one never authorizes a branch or worktree change. The plan validates current state and returns the target, branch, action, revision, changed documents, exact effects, tracked status, and a `plan_token`.
 
 For existing worktrees, `plan` may attach a new family only when `ACTIVE.yaml` names the package's investigation. It preserves the existing branch and every registered family. Present the exact registry and family effects, then apply each unchanged plan:
 
