@@ -25,7 +25,7 @@ Complete preflight only when `VAULT_ROOT` is canonical, the local store is ignor
 - **Bind development handoff**: own the case binding decision for one validated materialization or activation result; mutate only for a new or advanced revision.
 - **Reconcile development**: consume one normalized result from `reconcile-development-handoff` and update the exact source case.
 - **Consolidate**: reconcile duplicate case files into one canonical directory while retaining retired IDs in its lineage.
-- **Validate**: apply [references/readiness-and-lifecycle.md](references/readiness-and-lifecycle.md).
+- **Validate**: assess investigation readiness or, for an exact development package, read-only implementation sufficiency.
 - **Export**: load [references/export-contract.md](references/export-contract.md) and create one or more local story drafts.
 - **Learn**: hand an exact case to `manage-investigation-derived-learning` for critical read-only assessment and optional authorized durable publication.
 - **Promote**: assess a post-deployment documentation candidate and hand it to `map-ecosystem`; this skill never writes the vault.
@@ -92,9 +92,11 @@ Complete when exactly one case directory remains for the equivalence group, its 
 
 ## Validate
 
-Run the helper's `validate` command for structural and transactional invariants, then apply the lifecycle gate from [references/readiness-and-lifecycle.md](references/readiness-and-lifecycle.md). Move backward when new evidence invalidates readiness. When a required source is unreadable, report the observable failure, set `status: blocked`, and wait for the user to decide how to proceed.
+For a request to assess whether an exact development package is complete enough to implement, read its source case and apply the [question-based implementation-sufficiency check](../manage-development-handoff/references/input-bundle.md#implementation-sufficiency). Report supported answers and concrete gaps without changing the case, package, tracker, or worktree. This assessment does not change investigation readiness or handoff lifecycle state.
 
-Complete when the status is supported by its gate, or `blocked` names the dependency, prior state, and user action required.
+For investigation readiness instead, run the helper's `validate` command for structural and transactional invariants, then apply the lifecycle gate from [references/readiness-and-lifecycle.md](references/readiness-and-lifecycle.md). Move backward when new evidence invalidates readiness. When a required source is unreadable, report the observable failure, set `status: blocked`, and wait for the user to decide how to proceed.
+
+Complete a package assessment when the supported answers and gaps are reported without writes. Complete investigation-readiness validation when the status is supported by its gate, or `blocked` names the dependency, prior state, and user action required.
 
 ## Export
 
@@ -105,7 +107,7 @@ Complete when the status is supported by its gate, or `blocked` names the depend
 5. When the user requests external publication of a release-ready draft, build the publication package defined by the export contract and hand it to `manage-operational-workflow`.
 6. Keep connector selection, external-effect authorization, publication, and read-back verification inside that operational workflow.
 7. After the handoff returns a verified result, update the local draft and History with the non-sensitive external reference and publication status.
-8. When the user requests development handoff for one or more release-ready stories, load `../../../90-Meta/work-item-evidence.md`, obtain current exact work-item snapshots, and build one repository-specific package per target from the development section of the export contract.
+8. When the user requests development handoff for one or more release-ready stories, load `../../../90-Meta/work-item-evidence.md`, obtain current exact work-item snapshots, and build one repository-specific package per target from the development section of the export contract. Complete its question-based implementation-sufficiency check before handing any package to the consumer.
 9. Treat an exact repository remote as mandatory but not sufficient for sharing. Group packages only when their story/package evidence explicitly names the same component or implementation scope; when overlap is absent or ambiguous, keep separate worktree candidates. Include compatible existing `DH-NNN` entries from this investigation as reuse candidates, using their exact worktree paths. Show the user each shared, reused, and separate option and let them choose; persist no grouping record.
 10. Hand the exact package directories, choice, and any selected existing worktree path to `manage-development-handoff`; that skill owns target resolution, preview, authorization, materialization, validation, and the required handoff to **Bind development handoff**, but must not read or change this case. When Export resolves its `producer-required` intake state, continue the initiating vault-side interaction with those exact directories.
 11. Observe the consumer's terminal state. A target is complete only after **Bind development handoff** validates its stable `DH-NNN`; `materialized-unbound` is a source-case blocker with the repository state left inspectable and active for an exact retry.
