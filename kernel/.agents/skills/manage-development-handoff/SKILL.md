@@ -69,6 +69,8 @@ No materialization or activation is complete until its exact `DH-NNN` binding pa
 
 Run `validate` for each requested remote and exact worktree path. Report `valid` with the shared investigation and every handoff's ID, family, revision, state, and implementation-update summary, `inactive` when no registry exists, or the exact failed invariant. A stale managed block is invalid; refresh it through an authorized no-content-change plan rather than editing the target manually.
 
+Describe `valid` as repository-state and package integrity, not proof that the content is sufficient to implement. When the user asks about implementation completeness, route the exact source package to the read-only **Validate** assessment in `manage-investigation`; report any materialized-content difference separately. If that source package cannot be resolved, report sufficiency as unverified with the exact missing source. Keep the consumer out of the investigation and tracker, and preserve the read-only scope.
+
 Complete validation only when every requested worktree has an observed status and no mismatch is described as usable context.
 
 ## Set state

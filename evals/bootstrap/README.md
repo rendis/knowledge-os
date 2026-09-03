@@ -12,3 +12,8 @@ python3 -B evals/sync/test_run_eval.py
 ```
 
 The synchronization checks cover the gate/projection contract, durable run state, independent units, and recovery. Their frozen criteria and ledgers live in `evals/sync/`; bootstrap ledgers remain in `evals/bootstrap/ledgers/` (gitignored results may also land in `evals/bootstrap/results/`).
+
+When changing development-package content requirements, also run the bounded
+[handoff sufficiency behavioral regression](handoff-sufficiency.md). It checks
+source-derived questions and recipient understanding; the Python integrity
+tests do not establish semantic completeness.

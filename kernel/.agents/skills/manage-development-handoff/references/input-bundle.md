@@ -8,6 +8,7 @@ Load this reference when preparing or validating a package for `plan` or `apply`
 - [Intake protocol](#intake-protocol)
 - [Canonical package](#canonical-package)
 - [Document roles](#document-roles)
+- [Implementation sufficiency](#implementation-sufficiency)
 - [Material comparison](#material-comparison)
 - [Completion criterion](#completion-criterion)
 
@@ -26,6 +27,8 @@ Classify each materialization or activation input as exactly one state:
 - `invalid-package`: an existing candidate package fails this contract. Give its exact validation failure to `manage-investigation` and stop the consumer until that owner produces a corrected package.
 
 Absence is `producer-required`, not `invalid-package`. The consumer never opens the case or tracker while resolving any state. Validation and state updates for an existing worktree do not consume a package and therefore bypass this protocol.
+
+Before materializing an exact package, require the producer's implementation-sufficiency check below for that content and source snapshot. When it has not already run in the current workflow, route the exact directory to `manage-investigation` for a read-only assessment. Return concrete gaps to that owner; a successful helper command is not a substitute for this assessment.
 
 ## Canonical package
 
@@ -112,6 +115,23 @@ Make the repository boundary executable:
 
 Do not copy another repository's implementation work into this file.
 
+## Implementation sufficiency
+
+`manage-investigation` owns this check before exporting a development package and when assessing whether an existing package is sufficient to implement. The consumer checks package and repository integrity; it does not reconstruct source coverage.
+
+1. Derive implementation questions from the current work item, applicable active decisions, acceptance criteria, registered evidence, and reconciled dependency contracts **before** evaluating the package. Questions drawn only from the package cannot reveal omitted source requirements. Adapt these prompts to the selected story and repository:
+   - What must be delivered, and what is outside scope or must remain unchanged?
+   - Which rules, formulas, units, exceptions, and agreed constraints determine behavior?
+   - Which inputs and outputs are required, where do they come from, and how are they interpreted?
+   - What already exists, what must be reused, and which dependency contracts and compatibility requirements apply?
+   - What happens in the relevant boundary and failure cases, with which expected results?
+   - How will acceptance be verified, and what evidence or test data is needed?
+   - What remains unresolved, and why does it block implementation or not?
+2. Answer each applicable question using only `work-item.md`, `context.md`, `scope.md`, and precise evidence references available to the recipient. Identify the document section or referenced path/symbol supporting each substantive answer. Conversation, memory, and facts known only from the source investigation cannot supply a missing answer. A heading or a bare link is not an answer; verify that a referenced source is accessible and supports it.
+3. Compare those answers with the source-derived requirements. Missing, ambiguous, contradictory, or unsupported answers are concrete gaps even when structural validation succeeds. Carry agreed behavior and essential exceptions in the package itself; use references for supporting technical detail. Include implementation-relevant physical details when they affect correctness, without copying whole repositories or unrelated history. Justify non-applicability; leave legitimate implementation choices open rather than treating every unspecified design detail as a blocker.
+4. During an authorized preparation or refresh, fill recoverable gaps from current registered sources and recheck the affected answers. If an essential decision or source remains unresolved, stop that target before materialization and name the question and missing evidence or decision. An assessment-only request reports gaps without modifying the package, case, or repository.
+5. Report integrity and implementation sufficiency separately. Summarize coverage and any gaps in the existing workflow response, with answer locations available for inspection; no separate questionnaire file, schema flag, or lifecycle state is required. Claim sufficiency only when every necessary question has a supported answer and remaining limitations are explicitly non-blocking. Reassess affected questions when package content or applicable source requirements change.
+
 ## Material comparison
 
 The consumer compares each document independently after Unicode normalization, line-ending normalization, removal of trailing spaces, and removal of outer blank lines. A formatting-only difference is a no-op. A material difference creates one new revision event and rewrites only the changed documents.
@@ -135,4 +155,4 @@ The case owner records only new or advanced materialized content revisions. An a
 
 ## Completion criterion
 
-The package is complete only when the schema validates, its tracker binding matches `instance.yaml`, the work-item copy is current and traceable, all three documents are non-empty and secret-free, the remote identifies one configured repository, and the context and scope are specific to that repository. Package completeness alone does not make a materialization or activation complete; the post-materialization binding must also validate.
+The package is complete only when the schema validates, its tracker binding matches `instance.yaml`, the work-item copy is current and traceable, all three documents are non-empty and secret-free, the remote identifies one configured repository, the context and scope are specific to that repository, and the producer's implementation-sufficiency check passes. Helper validation establishes structural and repository integrity, not semantic completeness. Package completeness alone does not make a materialization or activation complete; the post-materialization binding must also validate.
