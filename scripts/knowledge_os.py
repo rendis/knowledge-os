@@ -55,12 +55,43 @@ def distribution_provenance() -> tuple[str, bool]:
     if revision.returncode != 0:
         return "unversioned", True
     dirty = subprocess.run(
-        ["git", "-C", str(DIST), "status", "--porcelain", "--untracked-files=no"],
+        ["git", "-C", str(DIST), "status", "--porcelain", "--untracked-files=all"],
         text=True,
         capture_output=True,
         check=False,
     )
-    return revision.stdout.strip(), dirty.returncode != 0 or bool(dirty.stdout.strip())
+    # Ignored files are still shipped by managed_sources, so status alone is
+    # insufficient evidence that the committed revision reproduces the payload.
+    adapters = [path.name for path in (DIST / "adapters").iterdir() if path.is_dir()]
+    shipped = set(managed_sources([]).values())
+    for adapter in adapters:
+        shipped.update(managed_sources([adapter]).values())
+    committed = subprocess.run(
+        ["git", "-C", str(DIST), "ls-tree", "-rz", "HEAD"],
+        capture_output=True, check=False,
+    )
+    entries = {}
+    for entry in committed.stdout.split(b"\0"):
+        if entry:
+            metadata, path = entry.split(b"\t", 1)
+            mode, kind, oid = metadata.decode("ascii").split()
+            entries[os.fsdecode(path)] = (mode, kind, oid)
+    payload_dirty = committed.returncode != 0
+    for source in shipped:
+        entry = entries.get(source.relative_to(DIST).as_posix())
+        content = source.read_bytes()
+        if entry is None:
+            payload_dirty = True
+            continue
+        mode, kind, oid = entry
+        algorithm = "sha256" if len(oid) == 64 else "sha1"
+        blob = hashlib.new(algorithm, b"blob " + str(len(content)).encode("ascii") + b"\0" + content).hexdigest()
+        expected_mode = "100755" if source.stat().st_mode & 0o111 else "100644"
+        if kind != "blob" or blob != oid or mode != expected_mode or source.is_symlink():
+            payload_dirty = True
+    return revision.stdout.strip(), (
+        dirty.returncode != 0 or bool(dirty.stdout.strip()) or payload_dirty
+    )
 
 
 def managed_paths() -> list[str]:
@@ -193,7 +224,35 @@ def load_lock(path: Path) -> dict[str, Any]:
     }
 
 
+def preflight_kernel(dest: Path, adapters: list[str], extra_paths: list[str] | None = None) -> None:
+    sources = managed_sources(adapters)
+    extra = ["CLAUDE.md", ".claude/skills", "Arquitectura.base", "Auditoria.base",
+             "Operacion.base", "Repos.base", ".gitignore", ".obsidian/app.json", LOCK_NAME]
+    for rel in [*sources, *extra, *(extra_paths or [])]:
+        relative = Path(rel)
+        if relative.is_absolute() or ".." in relative.parts:
+            raise RuntimeError(f"unsafe managed path: {rel}")
+        parent = dest
+        for part in relative.parts[:-1]:
+            parent /= part
+            if parent.is_symlink() or (parent.exists() and not parent.is_dir()):
+                raise RuntimeError(f"managed path has an unsafe parent: {rel}")
+        target = dest / relative
+        if target.exists() and not target.is_symlink() and not target.is_file():
+            raise RuntimeError(f"managed target collision; move it explicitly before retrying: {rel}")
+        if target.is_symlink() and rel not in sources and rel not in {"CLAUDE.md", ".claude/skills"}:
+            raise RuntimeError(f"local write target is a symlink: {rel}")
+        if rel in sources:
+            source = sources[rel]
+            if source.is_symlink() or any(parent.is_symlink() for parent in source.parents if parent != DIST and DIST in parent.parents):
+                raise RuntimeError(f"managed source must be a regular file: {rel}")
+    skills = dest / ".claude/skills"
+    if skills.exists() and not skills.is_symlink():
+        raise RuntimeError(".claude/skills must be moved explicitly before installation")
+
+
 def copy_kernel(dest: Path, adapters: list[str]) -> None:
+    preflight_kernel(dest, adapters)
     kernel = DIST / "kernel"
     for rel, source in managed_sources(adapters).items():
         target = dest / rel
@@ -214,10 +273,7 @@ def copy_kernel(dest: Path, adapters: list[str]) -> None:
     claude_skills = dest / ".claude" / "skills"
     claude_skills.parent.mkdir(parents=True, exist_ok=True)
     if claude_skills.exists() or claude_skills.is_symlink():
-        if claude_skills.is_dir() and not claude_skills.is_symlink():
-            shutil.rmtree(claude_skills)
-        else:
-            claude_skills.unlink()
+        claude_skills.unlink()
     os.symlink(os.path.join("..", ".agents", "skills"), claude_skills)
 
 
@@ -527,6 +583,12 @@ def cmd_init(args: argparse.Namespace) -> int:
             )
         )
         return 2
+    bootstrap_paths = ["instance.yaml", "00-Home.md", "30-Flujos/Flujos.md",
+                       "60-Operacion/Operacion.md", "70-Aprendizajes/Aprendizajes.md"]
+    bootstrap_paths.extend(f"{child.name}/.gitkeep" for child in (DIST / "kernel").iterdir() if child.is_dir() and child.name[:2].isdigit())
+    for item in instance["systems"]:
+        bootstrap_paths.extend([f"10-Sistemas/{item['name']}.md", f"20-Repos/{item['id']}/.gitkeep"])
+    preflight_kernel(dest, instance["adapters"], bootstrap_paths)
     dest.mkdir(parents=True, exist_ok=True)
     seed_skeleton(dest, instance["graph"]["enabled_types"])
     copy_kernel(dest, instance["adapters"])
@@ -730,6 +792,7 @@ def cmd_update(args: argparse.Namespace) -> int:
             print("kernel files changed locally; add overlays or pass --force", file=sys.stderr)
             return 3
     try:
+        preflight_kernel(dest, target_adapters)
         removed = remove_retired_managed_files(dest, retired)
     except RuntimeError as error:
         print(
@@ -798,6 +861,13 @@ def cmd_doctor(args: argparse.Namespace) -> int:
             rel for rel, digest in expected.items() if current.get(rel) != digest
         ]
         payload["managed_matches_dist"] = not payload["distribution_drift"]
+        payload["topology_drift"] = [
+            relative for relative, expected_target in (
+                ("CLAUDE.md", "AGENTS.md"), (".claude/skills", "../.agents/skills")
+            )
+            if not (dest / relative).is_symlink()
+            or os.readlink(dest / relative) != expected_target
+        ]
         try:
             payload["orientation"] = orientation_status(dest)
         except InstanceError as error:
@@ -807,6 +877,14 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         )
     print(json.dumps(payload, indent=2, ensure_ascii=False))
     if invalid_instance:
+        return 2
+    if getattr(args, "strict", False) and (
+        state != "installed" or not payload.get("portable_lock")
+        or not payload.get("reproducible_distribution")
+        or payload.get("distribution_dirty_dist")
+        or payload.get("drift") or payload.get("topology_drift")
+        or not payload.get("managed_matches_dist")
+    ):
         return 2
     return 0 if state in {"installed", "empty", "missing"} else 1
 
@@ -841,6 +919,7 @@ def main() -> int:
     parser.add_argument("--disable-topics", action="store_true")
     parser.add_argument("--yes", action="store_true")
     parser.add_argument("--force", action="store_true")
+    parser.add_argument("--strict", action="store_true", help="doctor fails for invalid, unreproducible, or drifted installations")
     args = parser.parse_args()
     if not args.dest:
         args.dest = str(Path.cwd())

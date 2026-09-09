@@ -19,7 +19,7 @@ When `.knowledge-os-handoffs/ACTIVE.yaml` exists, complete these steps before pl
 
 `START.md`, `work-item.md`, `context.md`, `scope.md`, `handoff.yaml`, and `history/` are immutable inputs. `ACTIVE.yaml` is never edited freehand; **Set state** is its only writer. `implementation-updates.md` is the only handoff file you may edit directly.
 
-Append a changelog entry whenever information discovered or established in any situation—not only during refinement—changes, complements, adds to, expands, narrows, contradicts, replaces, or otherwise mutates the initial definition in `work-item.md`, `context.md`, or `scope.md`. This includes decisions and agreements reached while implementing, testing, reviewing, debugging, coordinating, inspecting the tracker, or discovering a contract, API, event, data, configuration, dependency, compatibility, verification, or downstream-consumer constraint. Do not log routine progress or implementation evidence that leaves the definition unchanged.
+Append a changelog entry whenever information discovered or established in any situation—not only during refinement—changes, complements, adds to, expands, narrows, contradicts, replaces, or otherwise mutates the initial definition in `work-item.md`, `context.md`, or `scope.md`. This includes decisions and agreements reached while implementing, testing, reviewing, debugging, coordinating, inspecting the tracker, or discovering a contract, API, event, data, configuration, dependency, compatibility, verification, or downstream-consumer constraint. Also record material implementation decisions, deviations, unresolved questions, and verification evidence, even when the immutable definition remains unchanged. Keep routine progress out.
 
 Record the entry in the same working interaction in which the material delta becomes known and before later work relies on it. Use the next contiguous ID and this exact linear format:
 
@@ -40,7 +40,16 @@ Record the entry in the same working interaction in which the material delta bec
 
 `Recorded at` through `Related entries` are mandatory. Include `Analysis` only when analysis actually occurred; Omit `Analysis` when no analysis occurred. Never invent analysis, agreement, evidence, or certainty. Never edit, delete, reorder, or renumber an earlier entry. Correct or supersede it with a new entry that names the earlier ID.
 
-Persist every material definition delta and its non-sensitive evidence reference in `implementation-updates.md`; keep implementation evidence in this repository's normal code, tests, diff, commits, pull request, and delivery workflow. The changelog records definition deltas and their justification rather than duplicating the implementation diary or claiming production state.
+Persist every material definition delta and its non-sensitive evidence reference in `implementation-updates.md`; keep implementation evidence in this repository's normal code, tests, diff, commits, pull request, and delivery workflow. The changelog records material definition and implementation findings with evidence references; production claims require deployment evidence.
 
 The vault later pulls repository evidence and reconciles its investigation. It does not administer this worktree's handoff lifecycle, and this repository task does not edit that investigation or tracker or create a callback or return package. Follow step 3 for state changes and use `production` only with verified deployment evidence. Preserve every other entry and stop after the requested state or implementation outcome.
+
+## Optional source context
+
+The essential package must answer implementation questions on its own. When a specific missing detail warrants deeper inspection, `context.md` may include an optional **Read-only source reference** containing the existing vault Git remote, exact investigation ID, and relevant section names or exact vault note paths. Keep local vault paths out of this portable anchor. Omit the reference if no verified remote exists; do not invent one.
+
+Resolve a local vault explicitly with the user-provided location or existing vault resolver and verify its remote before reading only the named case sections or notes. The reference is read-only workflow scope, not an OS sandbox permission or access guarantee. If unavailable, record the concrete question in `implementation-updates.md` and continue independent scoped work. The recipient needs no Obsidian or vault-authoring skills. The anchor does not authorize tracker access, unrelated cases, or a whole-vault scan.
+
+Record implementation modifications, decisions, deviations, questions, and evidence in the affected worktree's `implementation-updates.md`; keep source code and tests in their normal repository locations. Only the vault-side reconciliation workflow updates the canonical investigation. Existing worktrees are not traversed or refreshed automatically.
+
 <!-- knowledge-os:managed:end id="development handoff" -->

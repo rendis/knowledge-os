@@ -8,6 +8,7 @@ Use this mode only when the parent supplies one complete JSON card with this sha
 {
   "marker": "SYNC_PACKAGE_WORKER_V1",
   "role": "extractor | reviewer",
+  "evidence_profile": "production-gate | documented-source | mixed",
   "run_root": "<absolute package work path>",
   "repository": "<full repository name>",
   "source_checkout": "<absolute read-only checkout>",
@@ -24,6 +25,8 @@ Use this mode only when the parent supplies one complete JSON card with this sha
   "allowed_write": "<absolute path>"
 }
 ```
+
+Validate `evidence_profile` against the three values in `90-Meta/evidence-policy.md` and apply that policy when extracting or reviewing claims. For old cards only, an omitted profile means `production-gate`; an unknown profile is invalid.
 
 Require every path except `source_checkout`, `vault_context`, and `search_roots` to be below `run_root`. `run_root` is a package work area, never the durable run checkpoint. Require `allowed_write` to equal `analysis` for an extractor and `review` for a reviewer. Return `worker-contract-invalid` to the parent when a field is missing or inconsistent; do not start a top-level workflow.
 
@@ -45,7 +48,7 @@ Fill these closed semantic values:
 
 - Every scaffold path gets one `disposition`: `relevant`, `not-documentable`, or `blocked`, plus a non-empty reason and claim references. Only `relevant` paths reference claims.
 - Every existing checklist question gets one answer: `observed`, `not-observed`, `not-applicable`, or `blocked`, plus a non-empty dimension reason and exact `{path, anchor}` evidence. Do not add or remove questions.
-- Claims use only `claim_id`, `statement`, and `evidence`. Each claim is one atomic, independently reviewable durable assertion: removing it must not change the meaning of another claim. Keep a claim only when exact evidence proves both implementation and productive applicability; describe contradictory configuration values explicitly instead of collapsing them into one inferred effective value. Distinguish the authority or identity system for a business identifier from an operational replica, cache, event history, or state store; never collapse them into one unqualified location statement. Remove the unused scaffold prototype.
+- Claims use only `claim_id`, `statement`, and `evidence`. Each claim is one atomic, independently reviewable durable assertion: removing it must not change the meaning of another claim. Keep a claim only when exact evidence meets the frozen profile (versioned source for `documented-source`; implementation and productive applicability otherwise); describe contradictory configuration values explicitly instead of collapsing them into one inferred effective value. Distinguish the authority or identity system for a business identifier from an operational replica, cache, event history, or state store; never collapse them into one unqualified location statement. Remove the unused scaffold prototype.
 - Nodes use only `basename`, `action`, `reason`, and `claim_ids`. Include every scaffold seed and every discovered canonical node once. Actions are `create`, `update`, `consolidate`, `retire`, or `no-change`.
 - Use `documentation-change` when qualifying claims exist, `traceability-only` for a fully inspected changed repository without claims, `no-change` for a fully inspected new repository without a durable node, and `blocked` only when inspection itself could not complete. A no-claim result must explain why each observed change requires no documentation update; unavailable deployment evidence alone does not discard independently supported configuration facts.
 
@@ -55,7 +58,7 @@ The extractor writes only `analysis`. It does not finalize, check, review, check
 
 ## Reviewer
 
-Use a fresh context and no expected verdict. Read the successful `check_result`, manifest, scaffold, and analysis. Reinspect the exact evidence needed to verify path coverage, every claim, every environment config, productive applicability, and node completeness. Inspect a `not-documentable` path only when its manifest identity or content kind plausibly contradicts that disposition; deterministic structure and digest checks remain coordinator-owned.
+Use a fresh context and no expected verdict. Read the successful `check_result`, manifest, scaffold, and analysis. Reinspect the exact evidence needed to verify path coverage, every claim, every environment config, applicability required by the frozen profile, and node completeness. Inspect a `not-documentable` path only when its manifest identity or content kind plausibly contradicts that disposition; deterministic structure and digest checks remain coordinator-owned.
 
 Changed environment configuration and paths excluded solely because an external deployment body is unavailable require this omission check. Accept a no-claim result only after verifying that these paths contain no independently documentable facts under the shared evidence rule. Report omitted supported facts against the affected path or analysis result with `revise`; an empty claim list is not evidence of completeness. Preserve the one-review bound and let the coordinator report the rejected package rather than silently treating it as reviewed without necessary changes.
 

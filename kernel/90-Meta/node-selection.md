@@ -26,7 +26,7 @@ From `VAULT_ROOT`, use `90-Meta/Convenciones.md` as the only normative catalog. 
    - Curated navigation or system-wide aggregation → index or system MOC.
    - Documentation contract, validator, reusable helper, or derived view → Meta or Base.
 4. If two tests appear to match, use the distinction rules in Convenciones. Do not create a node until the ambiguity is resolved by evidence; record a business-relevant limitation in the nearest canonical node when it cannot be resolved.
-5. Select exactly one lifecycle action: create, update, consolidate/rename, retire, or no change. The production-evidence gate is a prerequisite for technical create or update; when it fails, select no change even if the candidate comes from an approved investigation or planned implementation. For a learning, defer to the domain actions `create`, `enrich`, `challenge`, `supersede`, or `none` and its independent durable-learning gate.
+5. Select exactly one lifecycle action: create, update, consolidate/rename, retire, or no change. The profile-specific policy in [[evidence-policy]] is a prerequisite for technical create or update; when it fails, select no change even if the candidate comes from an approved investigation or planned implementation. For a learning, defer to the domain actions `create`, `enrich`, `challenge`, `supersede`, or `none` and its independent durable-learning gate.
 
 ## Placement and writing
 

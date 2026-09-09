@@ -125,15 +125,25 @@ class RunEvalTests(unittest.TestCase):
     def test_finalize_distinguishes_review_completion_from_approval(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
-            digest = "a" * 64
+            snapshot = root / "snapshot"
+            (snapshot / "evals/sync").mkdir(parents=True)
+            (snapshot / "evals/sync/criteria.md").write_text("criteria")
+            manifest = [self.module.file_record(snapshot, "evals/sync/criteria.md")]
+            receipt = {"version": 1, "status": "pass", "tests": [
+                {"name": "fixture", "returncode": 0, "status": "pass"}
+            ]}
             bundle = {
-                "round": 0,
-                "candidate_tree_digest": "b" * 64,
-                "criteria_digest": "c" * 64,
-                "test_receipt_digest": "d" * 64,
+                "version": 1, "round": 0, "base_sha": "a" * 40,
+                "candidate_tree_digest": self.module.digest_json(manifest),
+                "criteria_digest": self.module.digest_bytes(b"criteria"),
+                "test_receipt_digest": self.module.digest_json(receipt),
+                "files": manifest,
             }
-            review_input = {"input_digest": digest}
+            review_input = {**bundle, "files": ["evals/sync/criteria.md"]}
+            digest = self.module.digest_json(review_input)
+            review_input["input_digest"] = digest
             (root / "bundle.json").write_text(json.dumps(bundle), encoding="utf-8")
+            (root / "test-receipt.json").write_text(json.dumps(receipt), encoding="utf-8")
             (root / "review-input.json").write_text(
                 json.dumps(review_input), encoding="utf-8"
             )

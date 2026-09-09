@@ -1387,6 +1387,130 @@ def consolidate_case(args: argparse.Namespace, root: Path) -> int:
     return 0
 
 
+def close_case(args: argparse.Namespace, root: Path) -> int:
+    for value in (args.reason, args.limitations):
+        if not value.strip() or "\n" in value or "\r" in value:
+            raise CaseError("closure_invalid", "Closure reason and limitations must be nonempty single lines")
+    timestamp = timestamp_value(args.timestamp)
+    with locked(root):
+        records = {record.case_id: record for record in load_records(root)}
+        if args.id not in records:
+            raise CaseError("case_not_found", "Exact source case does not exist")
+        record = records[args.id]
+        if (record.fields.get("purpose") != "knowledge"
+                or record.fields.get("status") == "closed"
+                or (args.decision == "complete" and record.fields.get("status") != "validating")):
+            raise CaseError("closure_gate_failed", "Completion requires validated knowledge; abandonment requires active knowledge")
+        original = record.path.read_bytes()
+        updated = replace_frontmatter_scalar(record.text, "status", "closed")
+        updated = replace_frontmatter_scalar(updated, "updated-at", timestamp)
+        if args.decision == "abandoned" and record.fields.get("vault-outcome") == "not-evaluated":
+            updated = replace_frontmatter_scalar(updated, "vault-outcome", "none")
+        event = f"- {timestamp} — Knowledge closure `{args.decision}`; reason: {args.reason}; outstanding limitations: {args.limitations}.\n"
+        history = re.search(r"(?m)^## (?:" + "|".join(map(re.escape, HISTORY_SECTION_ALIASES)) + r")\s*$", updated)
+        if history is None:
+            raise CaseError("closure_invalid", "Case is missing History")
+        position = updated.find("\n## ", history.end())
+        if position < 0:
+            position = len(updated)
+        updated = updated[:position].rstrip() + "\n\n" + event + "\n" + updated[position:]
+        try:
+            atomic_write(record.path, updated.encode("utf-8"))
+            errors, warnings = validate_root(root, ignore_lock=True)
+            if errors:
+                raise CaseError("closure_validation_failed", "Closure failed validation", errors=errors)
+        except Exception:
+            atomic_write(record.path, original)
+            raise
+    emit({"status": "closed", "id": args.id, "decision": args.decision, "warnings": warnings})
+    return 0
+
+
+def bind_case(args: argparse.Namespace, root: Path) -> int:
+    """Persist a validated vault-side observation; never access the worktree."""
+    try:
+        observation = json.loads(args.observation.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as error:
+        raise CaseError("binding_observation_invalid", str(error)) from error
+    keys = DEVELOPMENT_HANDOFF_HISTORY_KEYS[1:]
+    if (not isinstance(observation, dict) or set(observation) != set(keys)
+            or any(not isinstance(v, str) or not v or "\n" in v or "\r" in v
+                   for v in observation.values())):
+        raise CaseError("binding_observation_invalid", "Expected exact binding fields excluding dh")
+    fields = dict(zip(DEVELOPMENT_HANDOFF_FIELDS, (observation[k] for k in keys)))
+    with locked(root):
+        records = {record.case_id: record for record in load_records(root)}
+        if args.id not in records:
+            raise CaseError("case_not_found", "Exact source case does not exist")
+        record = records[args.id]
+        original = record.path.read_bytes()
+        text = original.decode("utf-8")
+        errors, warnings = validate_root(root, ignore_lock=True)
+        if errors:
+            raise CaseError("binding_validation_failed", "Source case is invalid", errors=errors)
+        stories = []
+        for draft in (record.path.parent / "exports").glob("*.md"):
+            if draft.is_symlink():
+                raise CaseError("case_symlink", "Story drafts must not be symlinks")
+            metadata = parse_frontmatter(draft.read_text(encoding="utf-8"))
+            if metadata.get("story-id") == fields["Story ID"]:
+                stories.append(metadata)
+        if len(stories) != 1 or stories[0].get("source-investigation") != args.id:
+            raise CaseError("binding_story_missing", "Source case must contain one exact story draft")
+        lines, count = development_handoff_section(text)
+        if count != 1 or lines is None:
+            raise CaseError("binding_section_missing", "Source case needs Development handoffs section")
+        content = "\n".join(lines)
+        entries = list(re.finditer(r"(?ms)^### (DH-[0-9]{3,}) — .*?(?=^### |\Z)", content))
+        target = None
+        old = None
+        for entry in entries:
+            values = dict(match.groups() for line in entry.group(0).splitlines()
+                          if (match := DEVELOPMENT_HANDOFF_FIELD_RE.fullmatch(line)))
+            if (values.get("Story ID"), values.get("Repository remote")) == (fields["Story ID"], fields["Repository remote"]):
+                target, old = entry, values
+        entry_id = target.group(1) if target else f"DH-{len(entries)+1:03d}"
+        if old == fields:
+            emit({"status": "unchanged", "id": args.id, "dh": entry_id, "warnings": warnings})
+            return 0
+        if old:
+            stable = set(DEVELOPMENT_HANDOFF_FIELDS) - {"Revision", "Materialized at"}
+            if any(old[k] != fields[k] for k in stable):
+                raise CaseError("binding_identity_mismatch", "Immutable binding coordinates changed")
+        expected = int(old["Revision"][1:]) + 1 if old else 1
+        if fields["Revision"] != f"v{expected:04d}":
+            raise CaseError("binding_revision_invalid", "Binding requires the exact next revision")
+        title = f'{fields["Tracker ID"]}:{fields["Work item reference"]} / {fields["Repository remote"].rsplit("/", 1)[-1]}'
+        block = f"### {entry_id} — {title}\n\n" + "\n".join(f"- {k}: {fields[k]}" for k in DEVELOPMENT_HANDOFF_FIELDS) + "\n\n"
+        content = (content[:target.start()] + block + content[target.end():]) if target else content.rstrip() + "\n\n" + block
+        all_lines = text.splitlines(keepends=True)
+        start = next(i for i, line in enumerate(all_lines) if line.startswith("## ") and line[3:].strip() in DEVELOPMENT_HANDOFF_SECTION_ALIASES) + 1
+        end = next((i for i in range(start, len(all_lines)) if all_lines[i].startswith("## ")), len(all_lines))
+        all_lines[start:end] = ["\n" + content.strip() + "\n\n"]
+        updated = "".join(all_lines)
+        marker = json.dumps(handoff_history_binding(entry_id, fields), ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        event = (f'- {fields["Materialized at"]} — Bound development handoff `{entry_id}`; '
+                 f'story `{fields["Story ID"]}`; work item `{fields["Tracker ID"]}:{fields["Work item reference"]}`; '
+                 f'repository `{fields["Repository remote"]}`; worktree `{fields["Worktree path"]}`; '
+                 f'handoff `{fields["Handoff ID"]}`; revision `{fields["Revision"]}`.\n'
+                 f'  <!-- {DEVELOPMENT_HANDOFF_HISTORY_MARKER_TOKEN} {marker} -->\n')
+        history = re.search(r"(?m)^## (?:" + "|".join(map(re.escape, HISTORY_SECTION_ALIASES)) + r")\s*$", updated)
+        position = updated.find("\n## ", history.end())
+        if position < 0:
+            position = len(updated)
+        updated = updated[:position].rstrip() + "\n\n" + event + "\n" + updated[position:]
+        try:
+            atomic_write(record.path, updated.encode("utf-8"))
+            errors, warnings = validate_root(root, ignore_lock=True)
+            if errors:
+                raise CaseError("binding_validation_failed", "Binding failed validation", errors=errors)
+        except Exception:
+            atomic_write(record.path, original)
+            raise
+    emit({"status": "bound", "id": args.id, "dh": entry_id, "warnings": warnings})
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", required=True, type=Path)
@@ -1435,6 +1559,17 @@ def build_parser() -> argparse.ArgumentParser:
     consolidate_parser.add_argument("--retire", required=True)
     consolidate_parser.add_argument("--timestamp")
 
+    close_parser = commands.add_parser("close", help="close a validated knowledge outcome without export")
+    close_parser.add_argument("--id", required=True)
+    close_parser.add_argument("--decision", required=True, choices=("complete", "abandoned"))
+    close_parser.add_argument("--reason", required=True)
+    close_parser.add_argument("--limitations", required=True)
+    close_parser.add_argument("--timestamp")
+
+    bind_parser = commands.add_parser("bind", help="transactionally bind one validated handoff observation")
+    bind_parser.add_argument("--id", required=True)
+    bind_parser.add_argument("--observation", required=True, type=Path)
+
     commands.add_parser("validate", help="validate case-file mechanics")
     return parser
 
@@ -1445,6 +1580,10 @@ def main(argv: list[str] | None = None) -> int:
         root = resolve_root(args.root)
         if args.command == "open":
             return open_case(args, root)
+        if args.command == "close":
+            return close_case(args, root)
+        if args.command == "bind":
+            return bind_case(args, root)
         if args.command == "consolidate":
             return consolidate_case(args, root)
         if args.command == "validate":

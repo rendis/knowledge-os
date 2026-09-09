@@ -25,7 +25,7 @@ When the request advises on, estimates, drafts, creates, updates, decomposes, co
 
 Create `.operations/<run-id>/run.md` for Execute or a Draft that must survive the current session. Resume and Close require the exact existing run record.
 
-If no runbook matches, prepare a labeled ad-hoc plan and wait for explicit approval of the complete plan before any external effect. Recommend promoting recurring behavior through the vault documentation workflow.
+If no runbook matches, prepare a labeled ad-hoc plan and verify that existing authorization covers its complete effects; request only missing authorization. Recommend promoting recurring behavior through the vault documentation workflow.
 
 **Complete when:** one branch, one exact runbook or labeled ad-hoc plan, its inputs, and its targets are identified; otherwise return the explicit blocker.
 
@@ -53,7 +53,7 @@ Before the first external write or send, present one compact preview with:
 - artifact summaries or drafts;
 - optional, irreversible, and blocked steps.
 
-Wait for explicit authorization of that preview. Advise and Draft authorize no external publication. A material change to target, recipient, content, action type, or effect order returns the run to `awaiting-approval`.
+Use existing explicit authorization when it already covers the exact preview and material effects; request approval only for uncovered scope. Advise and Draft authorize no external publication. A material change to target, recipient, content, action type, or effect order returns the run to `awaiting-approval`.
 
 For Advise or Draft with no external effects, complete this stage after confirming the effect plan contains none.
 

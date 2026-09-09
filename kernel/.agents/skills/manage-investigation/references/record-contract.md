@@ -196,3 +196,5 @@ Inspect before persisting. When a source exposes credentials, tokens, private ke
 ## Completion criterion
 
 The record conforms when identity and register meanings are immutable, the current snapshot matches the latest material evidence and decisions, registers are traceable without reused IDs, every materialized development target has one exact `DH-NNN` binding, History preserves chronology, attachment and consolidation handling is explicit, affected exports have an explicit synchronization state, and no secret value is persisted.
+
+Binding metadata does not change the case semantic `updated-at`. Its independent materialization/event timestamp preserves export freshness; material evidence or decision changes still advance `updated-at`.

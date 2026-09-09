@@ -156,3 +156,11 @@ The case owner records only new or advanced materialized content revisions. An a
 ## Completion criterion
 
 The package is complete only when the schema validates, its tracker binding matches `instance.yaml`, the work-item copy is current and traceable, all three documents are non-empty and secret-free, the remote identifies one configured repository, the context and scope are specific to that repository, and the producer's implementation-sufficiency check passes. Helper validation establishes structural and repository integrity, not semantic completeness. Package completeness alone does not make a materialization or activation complete; the post-materialization binding must also validate.
+
+## Optional source context
+
+The essential package must answer implementation questions on its own. When a specific missing detail warrants deeper inspection, `context.md` may include an optional **Read-only source reference** containing the existing vault Git remote, exact investigation ID, and relevant section names or exact vault note paths. Keep local vault paths out of this portable anchor. Omit the reference if no verified remote exists; do not invent one.
+
+Resolve a local vault explicitly with the user-provided location or existing vault resolver and verify its remote before reading only the named case sections or notes. The reference is read-only workflow scope, not an OS sandbox permission or access guarantee. If unavailable, record the concrete question in `implementation-updates.md` and continue independent scoped work. The recipient needs no Obsidian or vault-authoring skills. The anchor does not authorize tracker access, unrelated cases, or a whole-vault scan.
+
+Record implementation modifications, decisions, deviations, questions, and evidence in the affected worktree's `implementation-updates.md`; keep source code and tests in their normal repository locations. Only the vault-side reconciliation workflow updates the canonical investigation. Existing worktrees are not traversed or refreshed automatically.

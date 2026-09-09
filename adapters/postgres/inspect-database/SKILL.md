@@ -45,19 +45,17 @@ Completion criterion: every relevant static source named by the repository contr
 
 ## 4. Gate live evidence
 
-Require the user to select `dev`, `uat`, or `prod` explicitly when live evidence is necessary. Accept an environment already explicit in the current request; otherwise ask before opening a connection. Infer no environment from a port, credential, previous turn, or repository state.
-
-Require the database name as a separate explicit input. Resolve the confirmed local port through the semantic API:
+Resolve the team's executor contract:
 
 ```text
-<python> -B 90-Meta/workspace-config.py --vault-root "<VAULT_ROOT>" database-proxy-port "<ENVIRONMENT>" --format value
+<python> -B "<VAULT_ROOT>/90-Meta/cell-config.py" --vault-root "<VAULT_ROOT>" resolve --capability database-inspection
 ```
 
-If this view reports `proxy_port_not_configured`, hand the selected environment to `configure-workspace`, let it configure that one preference, and retry the same view. For any other configuration error, hand off its exact diagnostic. Do not parse `.knowledge-os-config.yaml`, invent a default, or pick another port.
+Read the returned procedure(s). If unconfigured, hand off that exact capability to `configure-workspace`; continue any independent static analysis. The procedure defines environment names, databases, target registry, executor repository/skill, authentication mechanism and required parameters. Follow its referenced source-repository instructions before accessing a live target. The kernel prescribes no environment names, proxy flags, credential file or analyzer name.
 
-Before any remote SQL, load the resolved schema repository's query-analyzer skill and follow it completely. Hand it only the explicit environment, database, and resolved port; every remote runner invocation must receive that exact value as `--proxy-port`. Do not reconstruct host, user, access, instance, proxy commands, registry paths, credential checks, or other runner behavior in this vault. The repository skill and its versioned target registry own SQL classification, target validation, proxy lifecycle, credential preflights, read-only enforcement, review evidence, timeouts, confirmations, and execution. Credentials must resolve through the user's standard `.pgpass`; do not accept password values or alternate credential files. If the analyzer is absent or a gate cannot pass, stop instead of issuing ad-hoc SQL. Keep metadata queries scoped to the required catalog fields and data queries scoped to the minimum rows and columns required by the question.
+Bind the exact environment, database and query scope from the current request or still-applicable explicit decisions. Ask only for missing consequential inputs. Use only the configured executor's read-only path and minimum metadata or rows needed. If a required port is configured locally, retrieve it through `workspace-config.py database-proxy-port`; never infer a target from a port. An absent executor, target, read-only enforcement or required authorization blocks live access. Return the gap instead of constructing an alternative connection. Preserve credentials and infrastructure; setup or mutation follows the operational workflow.
 
-Completion criterion: environment and database are explicit, the semantic port view succeeds, the repository analyzer is loaded before every remote SQL operation, every remote runner receives the resolved `--proxy-port`, all repository-owned gates pass, and no live operation runs after a failed or unavailable gate.
+Completion criterion: the configured execution contract and existing authority cover the exact live read, the executor establishes its read-only safeguards, and evidence identifies the target and observation time.
 
 ## 5. Return the evidence
 
@@ -68,6 +66,6 @@ Return the result to the primary `interrogation` recipe and distinguish:
 - live data evidence, with environment, observation time, and the minimum disclosed scope;
 - inference, contradictions, unavailable evidence, and remaining limitations.
 
-Preserve secrets and sensitive values outside the report. Keep durable vault, shared configuration, and source-repository content unchanged; handle analyzer-owned temporary evidence under its contract.
+Preserve secrets and sensitive values outside the report. Keep durable vault, shared configuration, and source-repository content unchanged; handle executor-owned temporary evidence under its contract.
 
 Completion criterion: the conclusion identifies its evidence level, every factual claim is traceable to an inspected source, current-state claims use observed live evidence, limitations are explicit, and control returns to `map-ecosystem` without a durable content change.

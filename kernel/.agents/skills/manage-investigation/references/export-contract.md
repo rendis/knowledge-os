@@ -70,7 +70,7 @@ Load [the development input-bundle contract](../../manage-development-handoff/re
 └── <work-item-token>--<repository-basename-lower>/
 ```
 
-Compile `work-item.md` from the current read-only snapshot produced under `VAULT_ROOT/90-Meta/work-item-evidence.md`; never reconstruct it from a published local draft, copied handoff, case History, or memory. Compile `context.md` and `scope.md` from the current case, registered evidence, decisions, acceptance criteria, and the selected repository boundary. A multi-repository story must produce different context and scope whenever ownership differs.
+Compile `work-item.md` from the current read-only snapshot produced under `VAULT_ROOT/90-Meta/work-item-evidence.md`; never reconstruct it from a published local draft, copied handoff, case History, or memory. Compile `context.md` using [development-context-template.md](../assets/development-context-template.md), populating its read-only source reference when the existing vault remote is verified; compile it and `scope.md` from the current case, registered evidence, decisions, acceptance criteria, and the selected repository boundary. A multi-repository story must produce different context and scope whenever ownership differs.
 
 When the target story is a directly dependent story previously reconciled from another implementation, include its current dependent card in the repository-specific package. Carry the observed contracts, APIs/events/data/configuration, compatibility and verification requirements, what can start, remaining gaps, source repository remote, and observed remote branch/PR state. Re-read the dependent work item before export; do not make its implementation worktree rediscover an already captured source contract.
 
@@ -81,3 +81,5 @@ Keep repository evidence flow one-way: hand only the exact package directories a
 ## Completion criterion
 
 A provisional export is complete when it is current, traceable, and exposes its unresolved gaps. A stale draft is only a recorded follow-up obligation. A release-ready export is complete when its audience, kind, outcome, scope, acceptance criteria, dependencies, evidence, register references, and source investigation snapshot are coherent. A publication handoff is complete when the operational workflow receives the exact current package; publication is complete only when its verified external reference is observed and recorded locally. A development handoff package is complete only when the linked input contract passes independently for every target repository; materialization or activation is complete only after its exact `DH-NNN` binding passes case validation.
+
+For an optional portable, read-only source reference in `context.md`, follow [input-bundle.md](../../manage-development-handoff/references/input-bundle.md#optional-source-context). Include essential context in the package even when an anchor is present.
