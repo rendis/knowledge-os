@@ -95,7 +95,7 @@ Version 0.6 adds optional capability bindings and transactional investigation co
 
 ## Extraction quality
 
-Map and sync share one evidence-extraction contract: diff plus direct impact, comparison against existing knowledge, independent omission review, and verified publication. New sync analyses use a provider-neutral schema-3 checklist; persisted schema-2 analyses remain readable without rewriting their artifacts. Cell procedures and observed technologies determine the concrete probes.
+Map and sync share a bounded contract: repository purpose and stack, main entrypoints through meaningful logic to connectors/effects, exact source evidence and explicit limits. README/docs contribute when consistent with implementation. Existing valid knowledge is preserved. Cross-repository/cloud reconciliation follows local maps; deployment audits are conditional. Independent review checks main-flow correctness and useful coverage without repeating extraction. Pilot model/effort choices with execution limits before a batch; persist and publish small independent groups. New sync analyses use a provider-neutral schema-3 checklist; persisted schema-2 analyses remain readable without rewriting their artifacts. Cell procedures and observed technologies determine the concrete probes.
 
 A valid initial `revise` review may receive one targeted correction through `90-Meta/sync-correction.py` before checkpointing. Original artifacts remain available; publication/recovery continues with one final package. Rejected or limited outcomes stay explicit. Repeated publication attempts never trigger fresh semantic work.
 

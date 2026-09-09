@@ -36,7 +36,7 @@ Choose the type from the observed identity. Search basename, `aliases`, `nombre-
 | `15-Arquitectura/` `tipo: servicio` | A stable capability composed of two or more repos/components | A 1:1 repo duplicate or an end-to-end sequence |
 | `15-Arquitectura/` `tipo: componente` | One repo with several deployables that have their own identity | An extra layer on the normal 1:1 repo case |
 | `15-Arquitectura/` `tipo: recurso-runtime` | Productive scheduler/function/runtime without an identifiable repo | Names seen only in templates |
-| `20-Repos/` functional `tipo` from the repository contract below | An in-scope source repository | This vault container, generic libraries, setup docs |
+| `20-Repos/` functional `tipo` from the repository contract below | An in-scope source repository, including a library or scaffold with an observed role | This vault container or an empty placeholder without an observed contract |
 | `25-Topics/` `tipo: topic` | An async contract with topology relevance (`topic` enabled) | A subscription, a test name, or HTTP |
 | `30-Flujos/` `tipo: flujo` | An end-to-end business outcome crossing two durable nodes or a system boundary | Internal methods or a service composition copy |
 | `40-Integraciones/` `tipo: integracion-externa` | An external system with a stable business role | Internal repos or isolated endpoints |
@@ -128,7 +128,7 @@ Use the repository frontmatter above. `aliases`, relationship properties, and `t
 
 ### Deployment matrix
 
-For each deployable repository, place the per-environment matrix under `Infraestructura y scheduling`. Following the existing deployment-evidence contract, record one row per observed environment and deployable, tracing:
+For an explicitly requested deployment audit, place the per-environment matrix under `Infraestructura y scheduling`. Ordinary repository maps summarize only runtime, schedules and configuration needed to understand main-flow connectors; a full matrix is not their completion gate. Preserve valid existing matrices. For the deployment audit, record one row per observed environment and deployable, tracing:
 
 | Environment / deployable | Event or manual input | Workflow / job / condition | Build artifact | Deploy action or command | Project | Platform / resource | Region or zone | Namespace / workload | Manifest, overlay, or values source |
 |---|---|---|---|---|---|---|---|---|---|

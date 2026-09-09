@@ -16,21 +16,21 @@ El vault es el grafo durable. Los scripts solo leen Markdown/frontmatter y evide
 
 Usar este orden hasta sostener la afirmación o delimitar la ausencia:
 
-1. Repo analizado: código, tests, migraciones, schemas, configs y README solo como pista.
-2. Deploy versionado: workflows, Cloud Build, Kubernetes/Kustomize, Cloud Run, Functions, Helm y Dockerfile. Para cada repo desplegable, interpretar Actions y sus referencias hasta resolver por ambiente el trigger, artefacto, proyecto, plataforma/recurso, ubicación y namespace/workload; un inventario de filenames no cierra esta evidencia.
+1. Repo analizado: código, tests, migraciones, schemas y configs. README y otra documentación aportan descripción cuando es coherente con la implementación; los títulos o plantillas vacías no prueban comportamiento.
+2. Deploy versionado: workflows, Cloud Build, Kubernetes/Kustomize, Cloud Run, Functions, Helm y Dockerfile. En un mapa inicial, consultar lo necesario para resolver conectores, triggers y configuración que altera el flujo. La cadena completa por ambiente corresponde a una auditoría de despliegue solicitada; una indirección pendiente no bloquea el mapa local.
 3. Búsqueda cross-repo en las `SOURCE_ROOTS` ordenadas del `source_context` derivado de la configuración local: módulo, repo, topic, subscription, env var, endpoint, datos, scheduler y service name. Las raíces no administradas son de solo lectura.
 4. GCP control-plane read-only: `list/describe` con salida limitada a metadata necesaria.
 5. Vault: notas auditadas, backlinks y Bases como vistas derivadas.
 
 Categorías: `verificado-codigo`, `verificado-cross-repo`, `verificado-gcp`, `verificado-vault`, `inferido` y `no-verificado`. Citar GCP como `verificado en GCP (gcloud, <project>, <date>)`.
 
-Quedan fuera del sync técnico: logs, pruebas runtime/manuales, datos productivos, Jira, Confluence y conversaciones con owners. `inspect-gcp-runtime` puede consultar estado y logs acotados como evidencia efímera de una investigación operacional; no los convierte en hechos durables ni actualiza automáticamente el grafo. Una investigación puede consultar datos productivos únicamente por la excepción explícita y read-only de `inspect-database`; ese resultado es evidencia de la investigación, no una fuente automática del sync. Tras agotar las fuentes permitidas, redactar la ausencia como “no observado en fuentes estáticas revisadas”; reservar `#por-confirmar` para límites que afectan el entendimiento de negocio.
+Quedan fuera del sync técnico: logs, pruebas runtime/manuales, datos productivos, Jira, Confluence y conversaciones con owners. `inspect-gcp-runtime` puede consultar estado y logs acotados como evidencia efímera de una investigación operacional; no los convierte en hechos durables ni actualiza automáticamente el grafo. Una investigación puede consultar datos productivos únicamente por la excepción explícita y read-only de `inspect-database`; ese resultado es evidencia de la investigación, no una fuente automática del sync. Al alcanzar el alcance acotado o un límite de acceso, redactar la ausencia como “no observado en fuentes estáticas revisadas”; reservar `#por-confirmar` para límites que afectan el entendimiento de negocio.
 
 ## Gate de realidad productiva
 
 Applicability: this section governs `production-gate` and the technical half of `mixed`. For `documented-source`, use [[evidence-policy]]: inspected versioned sources suffice for source-level assertions; actual deployment claims still require deployment evidence.
 
-For the production profiles, establish both conditions before a technical write:
+Source repository maps follow the source-map rule in [[evidence-policy]]: exact main/master code and configuration can describe purpose, main flows and connectors without asserting deployment. This exception does not promote future proposals or prove productive execution. For production assertions and investigation promotion under the production profiles, establish both conditions:
 
 1. **Implementación observada**: código, schema/migración, configuración, contrato o recurso que materializa el comportamiento.
 2. **Aplicabilidad productiva**: evidencia que vincula esa implementación con producción según su naturaleza, como la cadena de deploy por ambiente, configuración productiva versionada, metadata del control-plane, runtime identificado o estado de esquema validado mediante la autoridad de base de datos correspondiente.

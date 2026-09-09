@@ -6,9 +6,13 @@ Synchronize only on an explicit vault-update request; report mode is read-only. 
 
 The coordinator owns inventory, source binding, durable state, gate, projection, application, and closure. Extractors and reviewers own one artifact each and follow [synchronization-package-worker.md](synchronization-package-worker.md). Load [synchronization-state-machine.md](synchronization-state-machine.md) before choosing a command after any interruption or failure.
 
+## Scope and incremental delivery
+
+Apply [repository-map.md](repository-map.md) before building a worker card. The initial deliverable is a repository purpose/main-flow/connector map. Resolve cross-repository and cloud edges after local extraction. Preserve valid existing analyses and notes; instruction/model changes alone do not justify a new full scan. Select small independent inventory groups before `begin`, so one slow repository does not hold every result. Do not split or rewrite an already frozen run to claim it completed; preserve it and report its state.
+
 ## Worker execution choices
 
-Choose each worker's available model and reasoning effort for its task complexity and the consequences of an error; do not automatically inherit the root orchestrator's settings. Distinguish documentation-only inspection from business logic, data contracts, environment differences and cross-repository dependencies. Independent semantic review and targeted correction need enough reasoning for the affected meaning. Keep mechanical validation in the deterministic tools. Record the chosen model, effort and rationale with local execution evidence, without adding provider-specific fields to the semantic artifact schemas.
+Follow the bounded pilot and execution limits in repository-map.md. Record a batch ceiling, stop conditions and actual usage; dispatch no automatic escalation or correction during a pilot. Choose each worker's available model and reasoning effort for its task complexity and the consequences of an error; do not automatically inherit the root orchestrator's settings. Distinguish documentation-only inspection from business logic, data contracts, environment differences and cross-repository dependencies. Independent semantic review and targeted correction need enough reasoning for the affected meaning. Keep mechanical validation in the deterministic tools. Record the chosen model, effort and rationale with local execution evidence, without adding provider-specific fields to the semantic artifact schemas.
 
 ## Coordinator recipe
 
