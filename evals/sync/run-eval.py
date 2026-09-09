@@ -18,6 +18,7 @@ from typing import Any, NoReturn
 
 TEST_COMMANDS = (
     ("extraction-contract", "python3", "-B", "evals/sync/test_extraction_contract.py"),
+    ("review-finalization", "python3", "-B", "evals/sync/test_finalize_sync_review.py"),
     ("sync-correction", "python3", "-B", "evals/sync/test_sync_correction.py"),
     ("extraction-fixture", "python3", "-B", "evals/extraction-quality/test_fixture.py"),
     ("sync-pipeline", "python3", "-B", "evals/sync/test_sync_pipeline.py"),

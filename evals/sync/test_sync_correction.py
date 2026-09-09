@@ -44,6 +44,48 @@ class CorrectionTests(unittest.TestCase):
     def check(self):
         return self.run_cli('check', '--workspace', str(self.workspace), '--review', str(self.workspace / 'review.json'))
 
+    def fallback(self, suspect=False):
+        if suspect:
+            (self.repo / '.env').write_text('API_TOKEN=synthetic-eval-token-123456789\n')
+            (self.repo / 'component.txt').write_text('Changed public behavior.\n')
+            subprocess.run(['git', '-C', str(self.repo), 'add', '.'], check=True)
+            subprocess.run(['git', '-C', str(self.repo), 'commit', '-qm', 'fixture suspect'], check=True)
+            root = self.root / 'suspect-package'
+            root.mkdir()
+            self.paths = package_artifacts(root, self.repo, SOURCE_REPOSITORY, claim_id=SOURCE_CLAIM, requested_nodes=(NODE,), rejected_review=True)
+            self.workspace = self.paths[2].parent / 'correction-1'
+        self.paths[2].write_text('invalid agent JSON')
+        result = subprocess.run([sys.executable, '-B', str(MANIFEST), 'finalize-analysis', '--repo', str(self.repo), '--manifest', str(self.paths[0]), '--scaffold', str(self.paths[1]), '--analysis', str(self.paths[2])], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertTrue(json.loads(result.stdout)['fallback_used'])
+        analysis = json.loads(self.paths[2].read_text())
+        self.assertEqual(analysis['claims'], [])
+        manifest = json.loads(self.paths[0].read_text())
+        self.assertEqual(bool(manifest['credential_suspects']), suspect)
+        review = json.loads(self.paths[3].read_text())
+        review['analysis_digest'] = digest(analysis)
+        review['findings'][0].update(target='paths.component.txt', evidence={'path': 'component.txt', 'anchor': 'exact commit evidence'})
+        write_json(self.paths[3], review)
+        return analysis
+
+    def test_exact_fallback_prepares(self):
+        self.fallback()
+        self.assertEqual(self.prepare()[0], 0)
+
+    def test_exact_fallback_with_suspect_paths_prepares(self):
+        self.fallback(suspect=True)
+        self.assertEqual(self.prepare()[0], 0)
+
+    def test_edited_fallback_is_not_recognized_as_finalized(self):
+        analysis = self.fallback()
+        analysis['paths'][0]['reason'] = 'Arbitrary edited fallback reason.'
+        write_json(self.paths[2], analysis)
+        review = json.loads(self.paths[3].read_text())
+        review['analysis_digest'] = digest(analysis)
+        write_json(self.paths[3], review)
+        self.assertEqual(self.prepare()[1]['code'], 'analysis-not-finalized')
+        self.assertFalse(self.workspace.exists())
+
     def test_success_preserves_initial_and_closes_existing_package(self):
         self.assertEqual(self.prepare()[0], 0)
         self.repair()

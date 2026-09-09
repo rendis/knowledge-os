@@ -34,7 +34,12 @@ def validate(repo, manifest, scaffold, analysis, review, current_ref):
     m, s, a, r = [read(p) for p in (manifest, scaffold, analysis, review)]
     secrets = contract.credential_literals(repo, m)
     finalized, _ = contract.finalize_analysis_payload(a, m, secrets)
-    if finalized != a:
+    # finalize-analysis preserves this exact deterministic fallback payload.
+    existing_fallback = (
+        not contract.is_empty_new_manifest(m)
+        and a == contract.fallback_analysis_payload(s, m)
+    )
+    if not existing_fallback and finalized != a:
         raise ValueError('analysis-not-finalized')
     if contract.validate_review(r, a['repository'], m, s, a, secrets):
         raise ValueError('review-invalid-or-stale')
