@@ -13,6 +13,9 @@ python3 -B evals/sync/test_integrity.py
 python3 -B evals/sync/test_noop_integrity.py
 python3 -B evals/sync/test_sync_pipeline.py
 python3 -B evals/sync/test_sync_semantics.py
+python3 -B evals/sync/test_extraction_contract.py
+python3 -B evals/sync/test_sync_correction.py
+python3 -B evals/extraction-quality/test_fixture.py
 python3 -B evals/sync/test_sync_state.py
 python3 -B evals/sync/test_run_eval.py
 ```

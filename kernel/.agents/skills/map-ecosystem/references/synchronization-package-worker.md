@@ -26,9 +26,13 @@ Use this mode only when the parent supplies one complete JSON card with this sha
 }
 ```
 
+A correction dispatch may additionally supply `correction` with exact `receipt`, `initial_analysis`, and `initial_review` paths below `run_root`. Read them before acting; they identify the single reserved attempt and its findings. These inputs are read-only. An extractor changes only findings and connected dependencies in the seeded analysis, preserving unrelated accurate claims. A reviewer checks the repaired artifact and regressions without assuming acceptance. The coordinator validates the correction scope before closure.
+
 Validate `evidence_profile` against the three values in `90-Meta/evidence-policy.md` and apply that policy when extracting or reviewing claims. For old cards only, an omitted profile means `production-gate`; an unknown profile is invalid.
 
 Require every path except `source_checkout`, `vault_context`, and `search_roots` to be below `run_root`. `run_root` is a package work area, never the durable run checkpoint. Require `allowed_write` to equal `analysis` for an extractor and `review` for a reviewer. Return `worker-contract-invalid` to the parent when a field is missing or inconsistent; do not start a top-level workflow.
+
+Load [evidence-extraction.md](evidence-extraction.md) for scope, adaptive probes, preservation and semantic review. Apply only your assigned role; the coordinator owns any follow-up dispatch.
 
 ## Shared envelope
 
@@ -42,25 +46,25 @@ Apply evidence to the scope of each assertion: versioned production configuratio
 
 ## Extractor
 
-Inspect every manifest path once at the exact OIDs. Treat `analysis` as a semantic candidate over the immutable scaffold; the coordinator's deterministic finalizer owns canonical identity, ordering, record shape, status derivation, redaction, and result reconciliation.
+Account for every manifest path at the exact OIDs. Start with its diff, then read unchanged implementation and contracts at those OIDs when they determine impact; avoid repeated full-file reads once the relevant evidence is known. Treat `analysis` as a semantic candidate over the immutable scaffold; the coordinator's deterministic finalizer owns canonical identity, ordering, record shape, status derivation, redaction, and result reconciliation.
 
 Fill these closed semantic values:
 
 - Every scaffold path gets one `disposition`: `relevant`, `not-documentable`, or `blocked`, plus a non-empty reason and claim references. Only `relevant` paths reference claims.
 - Every existing checklist question gets one answer: `observed`, `not-observed`, `not-applicable`, or `blocked`, plus a non-empty dimension reason and exact `{path, anchor}` evidence. Do not add or remove questions.
 - Claims use only `claim_id`, `statement`, and `evidence`. Each claim is one atomic, independently reviewable durable assertion: removing it must not change the meaning of another claim. Keep a claim only when exact evidence meets the frozen profile (versioned source for `documented-source`; implementation and productive applicability otherwise); describe contradictory configuration values explicitly instead of collapsing them into one inferred effective value. Distinguish the authority or identity system for a business identifier from an operational replica, cache, event history, or state store; never collapse them into one unqualified location statement. Remove the unused scaffold prototype.
-- Nodes use only `basename`, `action`, `reason`, and `claim_ids`. Include every scaffold seed and every discovered canonical node once. Actions are `create`, `update`, `consolidate`, `retire`, or `no-change`.
+- Nodes use only `basename`, `action`, `reason`, and `claim_ids`. Include every scaffold seed and every affected canonical node once; consider unchanged consumers and preserve unrelated established facts. Justify corrections or removals from evidence, never from omission alone. Actions are `create`, `update`, `consolidate`, `retire`, or `no-change`.
 - Use `documentation-change` when qualifying claims exist, `traceability-only` for a fully inspected changed repository without claims, `no-change` for a fully inspected new repository without a durable node, and `blocked` only when inspection itself could not complete. A no-claim result must explain why each observed change requires no documentation update; unavailable deployment evidence alone does not discard independently supported configuration facts.
 
-Write the candidate once. Missing semantic decisions remain invalid and become deterministic fallback. Structural drift alone is normalized from the scaffold without another agent pass.
+Write one candidate per assigned attempt. Missing semantic decisions remain invalid and become deterministic fallback. Structural drift alone is normalized from the scaffold without another agent pass.
 
 The extractor writes only `analysis`. It does not finalize, check, review, checkpoint, reconcile the batch, query Obsidian, project, apply, or write documentation. Completion is one closed `analysis` artifact or one `worker-contract-invalid` response.
 
 ## Reviewer
 
-Use a fresh context and no expected verdict. Read the successful `check_result`, manifest, scaffold, and analysis. Reinspect the exact evidence needed to verify path coverage, every claim, every environment config, applicability required by the frozen profile, and node completeness. Inspect a `not-documentable` path only when its manifest identity or content kind plausibly contradicts that disposition; deterministic structure and digest checks remain coordinator-owned.
+Use a fresh context and no expected verdict. Read the successful `check_result`, manifest, scaffold and relevant source/context to derive material omission questions, then inspect the analysis. Reinspect the exact evidence needed to verify path coverage, every claim, every environment config, applicability required by the frozen profile, and node completeness. Inspect a `not-documentable` path only when its manifest identity or content kind plausibly contradicts that disposition; deterministic structure and digest checks remain coordinator-owned.
 
-Changed environment configuration and paths excluded solely because an external deployment body is unavailable require this omission check. Accept a no-claim result only after verifying that these paths contain no independently documentable facts under the shared evidence rule. Report omitted supported facts against the affected path or analysis result with `revise`; an empty claim list is not evidence of completeness. Preserve the one-review bound and let the coordinator report the rejected package rather than silently treating it as reviewed without necessary changes.
+Changed environment configuration and paths excluded solely because an external deployment body is unavailable require this omission check. Accept a no-claim result only after verifying that these paths contain no independently documentable facts under the shared evidence rule. Report omitted supported facts against the affected path or analysis result with `revise`; an empty claim list is not evidence of completeness. Return the finding to the coordinator; it may dispatch one targeted correction before checkpointing. A final rejected package must remain reported as rejected or partial, not as current documentation.
 
 Write exactly this review version 3 shape. Copy the repository and three digests from `check_result`; never derive or rename them. `findings` is an array, but each finding's `evidence` is one object, never an array:
 

@@ -50,7 +50,7 @@ The distribution owns the thin `AGENTS.md` router, every generic file it ships u
 
 `update` refreshes only the consumer vault; it never traverses development worktrees. An existing worktree receives the current managed instruction block during its next authorized handoff mutation.
 
-Versions 0.5 and 0.6 use work-item bundle and manifest schema 2. Jira-specific schema-1 packages or materialized families are not reinterpreted in place; configure their tracker and export a new schema-2 package. The legacy schema-1 `ACTIVE.yaml` pointer remains readable only as a registry wrapper around a current schema-2 family.
+Versions 0.5 through 0.7 use work-item bundle and handoff manifest schema 2. Jira-specific schema-1 packages or materialized families are not reinterpreted in place; configure their tracker and export a new schema-2 package. The legacy schema-1 `ACTIVE.yaml` pointer remains readable only as a registry wrapper around a current schema-2 family.
 
 When adopting or upgrading a vault, a pre-existing file that becomes distribution-owned must already match the distribution or be explicitly authorized with an overlay or `--force`. This prevents a newly managed runtime file from being overwritten silently.
 
@@ -90,3 +90,11 @@ Requires Python 3.9+ and Git. Obsidian is optional for filesystem queries. Each 
 Existing note names, relationships, investigations and handoff families are preserved by update. Optional capabilities are unconfigured until onboarding binds real procedures; selecting an adapter alone does not prove live readiness.
 
 Version 0.6 adds optional capability bindings and transactional investigation commands without changing existing note or handoff schemas. `doctor --strict` is the opt-in installation integrity gate and also detects configured adapters awaiting installation or removal. Version 0.6.1 preserves configuration during updates and aligns investigation promotion with the selected evidence profile.
+
+## Extraction quality
+
+Map and sync share one evidence-extraction contract: diff plus direct impact, comparison against existing knowledge, independent omission review, and verified publication. New sync analyses use a provider-neutral schema-3 checklist; persisted schema-2 analyses remain readable without rewriting their artifacts. Cell procedures and observed technologies determine the concrete probes.
+
+A valid initial `revise` review may receive one targeted correction through `90-Meta/sync-correction.py` before checkpointing. Original artifacts remain available; publication/recovery continues with one final package. Rejected or limited outcomes stay explicit. Repeated publication attempts never trigger fresh semantic work.
+
+`evals/extraction-quality/` prepares frozen synthetic repositories and vault context for blind production-artifact extraction. The separate semantic rubric checks recovered rules, dependent impact, justified removal, preservation and evidence precision; it is never provided to the extractor. One scenario is a regression, not a general quality or efficiency guarantee.

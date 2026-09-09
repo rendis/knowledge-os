@@ -16,7 +16,7 @@ Use this skill for a cell-vault query, documentation update, ecosystem synchroni
 - Resolve the vault before reading relative vault paths; keep remote sources read-only.
 - Write only with explicit vault-update authority and the cell evidence profile for every technical claim.
 - A package worker writes only its assigned analysis or review artifact; the coordinator alone owns checkpoints, gate, projections, units, and vault writes.
-- A synchronization run keeps one extraction and at most one semantic review per repository/OID pair. Resume recoverable work with its emitted `run_id`.
+- A synchronization package has one initial extraction/review and at most one finding-directed correction with a fresh review before checkpointing. Resume publication failures with the same `run_id` without repeating semantic work.
 - Write-ready authority requires its independent review. Markdown units target only canonical knowledge roots; source drift retracts affected applied bytes before reseal.
 
 ## Decision Gates
@@ -35,7 +35,7 @@ Use this skill for a cell-vault query, documentation update, ecosystem synchroni
 
 1. Load `../../../90-Meta/vault-resolution.md` and run `../../../90-Meta/resolve-vault.py` relative to this skill directory. Bind the resolved vault and configured source roots; a failed resolution blocks root-dependent work.
 2. Select one primary branch from the table. Load only its recipe and supporting references it explicitly requires.
-3. Before a source read or delegation, bind its checkout by configured remote identity. Before a technical write, load `../../../90-Meta/evidence-policy.md` and `../../../90-Meta/node-selection.md`.
+3. For documentation or synchronization, load `references/evidence-extraction.md` for diff-driven scope, cell-specific probes, preservation and omission review. Before a source read or delegation, bind its checkout by configured remote identity. Before a technical write, load `../../../90-Meta/evidence-policy.md` and `../../../90-Meta/node-selection.md`.
 4. For deployable repositories, load `references/deployment-evidence.md`. For synchronization, use sealed gate grants and the per-unit state contract; use `status` or `resume` rather than inferring a next step.
 5. Report inspected evidence, changes, limitations, and observed checks. Stop when the selected recipe's completion criterion is met.
 

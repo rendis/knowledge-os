@@ -4,7 +4,7 @@ These criteria freeze the public contract for the resumable synchronization
 change. They deliberately exercise the installed helper CLIs; fixtures contain
 only generic `APP00000-*` repositories and no consumer knowledge.
 
-1. A repository/OID package is extracted, finalized, and semantically reviewed at most once while its evidence remains valid.
+1. A repository/OID package has one initial extraction/review and at most one finding-directed correction with a fresh review before checkpointing. A checkpointed package is never re-extracted for a publication retry.
 2. `all-ready` is a sealed semantic checkpoint; a projection or apply failure resumes from its affected unit.
 3. Acknowledgements and each write group are independently validated and atomically applied units.
 4. Publication authority is explicit `repository + claim_id + node` lineage, never a basename substring heuristic.

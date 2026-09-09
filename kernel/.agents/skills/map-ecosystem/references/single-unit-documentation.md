@@ -4,12 +4,14 @@
 
 Accept one target repository or durable vault node and confirm that the user authorized a vault update. Load [node-selection.md](../../../../90-Meta/node-selection.md), classify the target type and lifecycle action, and state the evidence boundary. If the request is analysis or diagnosis only, return to the interrogation branch. If the target is `tipo: aprendizaje`, hand it to `manage-investigation-derived-learning`; this technical documentation recipe does not own that assessment or write.
 
+Apply [evidence-extraction.md](evidence-extraction.md) throughout extraction and verification.
+
 ## Baseline
 
 1. Read the existing note, system MOC, flows, nearby topics/integrations/glossary terms, and backlinks. For a new target, search basenames, aliases, `nombre-raw`, and backlinks before concluding that no canonical note exists.
 2. For repository targets, run `python3 90-Meta/vault-inventory.py --repo <note-or-alias> --format markdown` from `VAULT_ROOT` before cloning, fetching, or scanning. Treat this classification as the decision gate; it resolves the production branch by preferring `main` and using `master` only when `main` does not exist. The command also resolves GitHub identity without changing the global `gh` account. If it reports multiple accessible accounts, repeat it with the requested `--github-user <login>`; do not run `gh auth switch`.
 3. Act on the inventory result:
-   - `current`: stop before source scanning unless the user explicitly requested a forced audit of the unchanged commit. An explicit post-deployment production audit is such a request because productive applicability may have changed without a new source commit. Report the recorded and remote SHA when stopping; when continuing, reapply the profile-specific evidence policy and leave source traceability unchanged unless the repository was actually re-analyzed.
+   - `current`: reuse the baseline unless the request explicitly calls for auditing an unchanged commit or supplied evidence changes a dependency, profile, or previously unresolved source. Record the exact same-commit audit reason and scope. An explicit post-deployment production audit is such a request because productive applicability may have changed without a new source commit. Report the recorded and remote SHA when stopping; when continuing, reapply the profile-specific evidence policy and leave source traceability unchanged unless the repository was actually re-analyzed.
    - `changed`: record the existing `commit-analizado`, production branch, and new 12-character remote SHA, then continue with the old-to-new comparison.
    - `new`: confirm ownership via instance.yaml prefixes or an explicit allowlist in the instance catalog, plus the production branch, then continue without an old SHA.
    - `acknowledged-no-change` or `acknowledged-no-node`: report the accepted decision at the inspected SHA and stop unless the user explicitly requests re-analysis. `acknowledged-review-rejected` or `acknowledged-inspection-limited`: report the outstanding limitation and retained note baseline; a closed inspection does not establish current documentation.
@@ -28,12 +30,12 @@ For any other node, inspect only the sources that establish its selected contrac
 
 Before modeling, use the claim-level profile-specific evidence decisions required by the common contract. Re-inspect authoritative sources behind contextual inputs before relying on them.
 
-For a repository target, complete this minimum sweep:
+For a new repository, cover these dimensions; for an existing repository, focus on changed meaning and directly affected contracts, confirming which dimensions are unaffected:
 
 - **Inputs**: HTTP/OpenAPI, Pub/Sub/subscriptions, cron/CronJobs, Scheduler, Functions, Eventarc, Cloud Run, application, or user.
 - **Outputs**: publications and payload/attributes, outgoing HTTP, data writes, integrations, fire-and-forget, retries, and DLQ.
 - **Data**: engine, database/schema/dataset/bucket/collection, read/written tables, migrations/entities, and risky operations such as upsert, truncation, bulk deletion, or `synchronize: true`.
-- **Business behavior**: validations, transformations, states, country/store/BU/brand/category/vendor, flags, deduplication, and idempotency.
+- **Business behavior**: validations, transformations, states, domain-specific dimensions and identifiers, flags, deduplication, and idempotency.
 - **Infrastructure**: runtime and project by environment, deployment, schedulers/subscriptions, config maps, service accounts, and secret references without exposing their values. For every deployable, trace the versioned event or input through its workflow/job and artifact or overlay to the project, platform, resource, location, namespace/workload, and environment recorded in the deployment matrix.
 
 Search across repositories for the names, modules, endpoints, topics, subscriptions, environment variables, tables, schedulers, services, or terms relevant to the selected node. Query the GCP control plane with `list`/`describe` only when it resolves a relevant relationship or runtime.
@@ -57,7 +59,7 @@ When another repository is confirmed to write to a represented database, link th
 
 ## Verification
 
-Run the Framework gates, inspect the complete diff, and confirm that unrelated work and traceability for repositories that were not re-analyzed remain unchanged.
+Answer source-derived questions from the resulting note and verify preservation/removal decisions under [evidence-extraction.md](evidence-extraction.md). Run the Framework gates, inspect the complete diff, and confirm that unrelated work and traceability for repositories that were not re-analyzed remain unchanged.
 
 ## Completion criterion
 

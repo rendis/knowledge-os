@@ -53,8 +53,10 @@ changed bytes that cannot be safely retracted remain an explicit conflict and
 treated as source publication and remain untouched for reprojection. Unaffected validated/applied groups are
 rebound by their repositories, nodes, and grants even when deterministic group
 ordinals change. `vault-baseline-stale` preserves semantic authority and
-reprojects only the destination unit. Neither permits an additional semantic
-review when its repository/OID evidence is unchanged.
+reprojects only the destination unit. Neither permits another semantic
+pass on a checkpointed package. The optional single correction occurs only before checkpointing, under the coordinator recipe.
+
+A finding-directed correction is local package preparation, not a new run state. `sync-correction.py` preserves its first artifacts and enforces one reserved correction before the final package checkpoint. The durable run continues to own one selected finalized package per repository.
 
 ## Invariants
 

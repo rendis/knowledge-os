@@ -4,10 +4,12 @@
 
 Accept a domain, flow, or explicit unit set. Confirm write authorization, load [node-selection.md](../../../../90-Meta/node-selection.md), and define the boundary: source units, system, environments, and synthesis question.
 
+Use [evidence-extraction.md](evidence-extraction.md) as the common extraction contract.
+
 ## Per-unit analysis
 
 1. Build the initial inventory from MOCs, services, flows, operational indices, and backlinks.
-2. Split units into non-overlapping groups. For massive work, delegate complete analyses by group: source code → note → detected topics/integrations.
+2. Group units by changed contracts and direct impact; include unchanged participants when needed. Split write ownership into non-overlapping groups. For massive work, delegate complete analyses by group: source code → note → detected topics/integrations.
 3. Apply the [single-unit documentation recipe](single-unit-documentation.md) to every unit without synthesizing global relationships before local analyses are complete.
 4. Record per unit: commit/branch when applicable, contracts, data, runtime, deployment matrix by environment when applicable, observed relationships, and limitations.
 
@@ -17,7 +19,7 @@ Accept a domain, flow, or explicit unit set. Confirm write authorization, load [
 2. Resolve asynchronous edges through topics and HTTP edges through direct links.
 3. Update composite services, runtime, topics, integrations, flows, glossary, operational notes, MOCs, and indices only when the [node-selection standard](../../../../90-Meta/node-selection.md) and evidence threshold are satisfied.
 4. Detect contradictions across units; preserve both pieces of evidence and record the issue as a limitation until resolved.
-5. Run the gates once per group and again for the complete synthesis.
+5. Validate source-derived cross-unit questions against the resulting notes, then run the gates once per group and again for the complete synthesis.
 
 ## Output
 

@@ -27,7 +27,7 @@ DISPOSITIONS = {"relevant", "not-documentable", "blocked"}
 DIMENSIONS = (
     "inputs", "outputs", "data", "business-behavior", "infrastructure", "deployment",
 )
-MINIMUM_SWEEP_QUESTIONS = {
+LEGACY_SWEEP_QUESTIONS = {
     "inputs": (
         "http-openapi", "pubsub-subscriptions", "cron-cronjobs", "scheduler",
         "functions", "eventarc", "cloud-run", "application", "user",
@@ -58,6 +58,22 @@ MINIMUM_SWEEP_QUESTIONS = {
         "manifest-overlay-values",
     ),
 }
+# Provider-neutral core; concrete probes come from observed technologies and
+# the cell's configured procedures. Schema 2 remains readable for persisted runs.
+MINIMUM_SWEEP_QUESTIONS = {
+    "inputs": ("entrypoints", "producers-callers", "input-contracts"),
+    "outputs": ("consumers-destinations", "output-contracts", "delivery-failure-behavior"),
+    "data": ("resources", "read-write-paths", "schema-changes", "destructive-operations"),
+    "business-behavior": ("validations", "transformations", "states", "domain-dimensions", "flags", "deduplication-idempotency"),
+    "infrastructure": ("resources-by-environment", "identity-access", "configuration-secret-references"),
+    "deployment": ("trigger-to-artifact", "artifact-to-target", "environment-conditions", "external-indirections"),
+}
+
+
+def sweep_questions(version: int) -> dict[str, tuple[str, ...]]:
+    return LEGACY_SWEEP_QUESTIONS if version == 2 else MINIMUM_SWEEP_QUESTIONS
+
+
 CHECK_STATUSES = {"checked", "not-applicable", "blocked"}
 QUESTION_STATUSES = {"observed", "not-observed", "not-applicable", "blocked"}
 NODE_ACTIONS = {"create", "update", "consolidate", "retire", "no-change"}
@@ -103,7 +119,7 @@ SYNC_PROCESS_PATTERN = re.compile(
 )
 CONTENT_KINDS = {"text", "binary", "gitlink"}
 MANIFEST_VERSION = 1
-ANALYSIS_VERSION = 2
+ANALYSIS_VERSION = 3
 REVIEW_VERSION = 3
 GATE_VERSION = 2
 PROJECTION_VERSION = 1
@@ -2422,7 +2438,10 @@ def build_analysis_scaffold(
     manifest: dict[str, Any],
     repository: str,
     requested_nodes: list[str],
+    *, analysis_version: int = ANALYSIS_VERSION,
 ) -> dict[str, Any]:
+    if type(analysis_version) is not int or analysis_version not in {2, ANALYSIS_VERSION}:
+        raise ContractError("analysis-version-unsupported", "unsupported scaffold version")
     repository = repository.strip()
     if not repository:
         raise ContractError("repository-required", "repository must be a non-empty name")
@@ -2449,7 +2468,7 @@ def build_analysis_scaffold(
             "status": "not-applicable" if empty else "",
             "questions": {
                 question: "not-applicable" if empty else ""
-                for question in MINIMUM_SWEEP_QUESTIONS[dimension]
+                for question in sweep_questions(analysis_version)[dimension]
             },
             "reason": empty_reason if empty else "",
             "evidence": (
@@ -2474,7 +2493,7 @@ def build_analysis_scaffold(
         }
     ]
     return {
-        "version": ANALYSIS_VERSION,
+        "version": analysis_version,
         "repository": repository,
         "old_oid": manifest["old_oid"],
         "new_oid": manifest["new_oid"],
@@ -2543,6 +2562,7 @@ def validate_scaffold(
             manifest,
             repository,
             requested_nodes,
+            analysis_version=scaffold.get("version"),
         )
     except ManifestError:
         return set(), [issue("scaffold-invalid", "scaffold")]
@@ -2569,9 +2589,11 @@ def validate_analysis(
         issues.append(issue("analysis-fields-invalid", "$"))
     if (
         type(analysis.get("version")) is not int
-        or analysis.get("version") != ANALYSIS_VERSION
+        or analysis.get("version") not in {2, ANALYSIS_VERSION}
     ):
         issues.append(issue("version-unsupported", "version"))
+    if analysis.get("version") != scaffold.get("version"):
+        issues.append(issue("scaffold-version-mismatch", "version"))
     repository = analysis.get("repository")
     if not isinstance(repository, str) or not repository.strip():
         issues.append(issue("repository-required", "repository"))
@@ -2641,7 +2663,7 @@ def validate_analysis(
             if not isinstance(item["status"], str) or item["status"] not in CHECK_STATUSES:
                 issues.append(issue("invalid-check-status", f"{field}.status"))
             questions = item["questions"]
-            expected_questions = MINIMUM_SWEEP_QUESTIONS[dimension]
+            expected_questions = sweep_questions(analysis.get("version"))[dimension]
             question_statuses = []
             questions_complete = (
                 isinstance(questions, dict)
