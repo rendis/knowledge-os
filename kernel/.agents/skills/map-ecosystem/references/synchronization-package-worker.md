@@ -35,6 +35,8 @@ Remote freshness, vault resolution, repository identity, Obsidian binding, inven
 
 Inspect credential-suspect paths only through safe non-secret context. Never quote or persist a detected value. Treat an unavailable external deployment body as `not-observed` for dependent fields rather than expanding the assignment.
 
+Apply evidence to the scope of each assertion: versioned production configuration proves what is configured at the analyzed commit; observed deployment evidence is required to assert what is deployed or effective. For example, an inspected production overlay can support “the production configuration sets the inventory URL to X” while the external deployment body remains unavailable. Retain that configuration claim and state the deployment limitation separately. A branch name alone proves neither productive applicability nor deployment. Inspect production and non-production configuration separately and keep each environment explicit.
+
 ## Extractor
 
 Inspect every manifest path once at the exact OIDs. Treat `analysis` as a semantic candidate over the immutable scaffold; the coordinator's deterministic finalizer owns canonical identity, ordering, record shape, status derivation, redaction, and result reconciliation.
@@ -45,7 +47,7 @@ Fill these closed semantic values:
 - Every existing checklist question gets one answer: `observed`, `not-observed`, `not-applicable`, or `blocked`, plus a non-empty dimension reason and exact `{path, anchor}` evidence. Do not add or remove questions.
 - Claims use only `claim_id`, `statement`, and `evidence`. Each claim is one atomic, independently reviewable durable assertion: removing it must not change the meaning of another claim. Keep a claim only when exact evidence proves both implementation and productive applicability; describe contradictory configuration values explicitly instead of collapsing them into one inferred effective value. Distinguish the authority or identity system for a business identifier from an operational replica, cache, event history, or state store; never collapse them into one unqualified location statement. Remove the unused scaffold prototype.
 - Nodes use only `basename`, `action`, `reason`, and `claim_ids`. Include every scaffold seed and every discovered canonical node once. Actions are `create`, `update`, `consolidate`, `retire`, or `no-change`.
-- Use `documentation-change` when qualifying claims exist, `traceability-only` for a fully inspected changed repository without claims, `no-change` for a fully inspected new repository without a durable node, and `blocked` only when inspection itself could not complete.
+- Use `documentation-change` when qualifying claims exist, `traceability-only` for a fully inspected changed repository without claims, `no-change` for a fully inspected new repository without a durable node, and `blocked` only when inspection itself could not complete. A no-claim result must explain why each observed change requires no documentation update; unavailable deployment evidence alone does not discard independently supported configuration facts.
 
 Write the candidate once. Missing semantic decisions remain invalid and become deterministic fallback. Structural drift alone is normalized from the scaffold without another agent pass.
 
@@ -54,6 +56,8 @@ The extractor writes only `analysis`. It does not finalize, check, review, check
 ## Reviewer
 
 Use a fresh context and no expected verdict. Read the successful `check_result`, manifest, scaffold, and analysis. Reinspect the exact evidence needed to verify path coverage, every claim, every environment config, productive applicability, and node completeness. Inspect a `not-documentable` path only when its manifest identity or content kind plausibly contradicts that disposition; deterministic structure and digest checks remain coordinator-owned.
+
+Changed environment configuration and paths excluded solely because an external deployment body is unavailable require this omission check. Accept a no-claim result only after verifying that these paths contain no independently documentable facts under the shared evidence rule. Report omitted supported facts against the affected path or analysis result with `revise`; an empty claim list is not evidence of completeness. Preserve the one-review bound and let the coordinator report the rejected package rather than silently treating it as reviewed without necessary changes.
 
 Write exactly this review version 3 shape. Copy the repository and three digests from `check_result`; never derive or rename them. `findings` is an array, but each finding's `evidence` is one object, never an array:
 

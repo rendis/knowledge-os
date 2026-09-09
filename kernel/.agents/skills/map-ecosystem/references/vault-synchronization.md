@@ -34,6 +34,8 @@ The coordinator owns inventory, source binding, durable state, gate, projection,
 
 Publish only claims authorized by the sealed gate grants and supported by production evidence. `traceability-only` has no claim and therefore produces an acknowledgement, never a Markdown write group. Every granted node must be covered by the unit projection. Do not put run, review, gate, grant, package, or cursor process language in durable technical notes. An acknowledgement contains only its gate-bound closed cursor fields; it contains no claim text, findings, source bytes, or sensitive values.
 
+An accepted `traceability-only` package for an existing repository closes as `no-documentation-change` (`acknowledged-no-change` in inventory): the reviewed delta requires no documentation update and the note keeps its previous baseline. An accepted new repository without a durable node closes as `no-durable-node`. Rejected or incomplete reviews and extraction fallbacks retain `review-rejected` or `inspection-limited`; these outcomes do not establish that documentation is current. Preserve historical acknowledgements unless a newly authorized inspection supplies a new gate decision.
+
 The coordinator, kernel, and durable state share one trusted OS principal.
 Package hashes prove integrity and lineage, not authorship against that same
 principal. Write authority requires the bounded independent review artifact;
@@ -43,3 +45,5 @@ this local workflow.
 ## Completion criterion
 
 Complete only after all inventory items have a persisted decision, every unit is applied, the durable receipt exists, the second inventory has no repeated inspected SHA, relevant vault checks pass, and source checkouts remain unchanged.
+
+Report the run closure separately from its documentation outcome. For each repository, give the inspected commit and one result: documentation updated (with written paths), reviewed with no documentation change required, or inspection limited/review rejected (with the unresolved gap and retained note baseline). A zero `changed`/`new` count means no uninspected source delta; it does not mean every note was updated or every limitation resolved. Summarize accepted no-change and limited/rejected counts separately.
