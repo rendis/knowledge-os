@@ -56,7 +56,7 @@ TOKEN_LIKE_RE = re.compile(
     r"sk-(?:proj-)?[A-Za-z0-9_-]{20,})"
 )
 LOCAL_ABSOLUTE_PATH_RE = re.compile(
-    r"(?<![A-Za-z0-9._-])/(?:Users|home|private/(?:tmp|var)|tmp|var/folders|Volumes)/"
+    r"(?<![A-Za-z0-9._-])/(?:Users|home/[^/\s\'\"`,;)}\]]+|private/(?:tmp|var)|tmp|var/folders|Volumes)/"
     r"[^\s'\"`,;)}\]]+"
 )
 PACKAGE_RECEIPT_FIELDS = {
@@ -806,8 +806,7 @@ def sensitive_artifact(value: Any) -> bool:
         return any(sensitive_artifact(item) for item in value)
     if isinstance(value, str):
         return (
-            value.startswith("/")
-            or LOCAL_ABSOLUTE_PATH_RE.search(value) is not None
+            LOCAL_ABSOLUTE_PATH_RE.search(value) is not None
             or "-----BEGIN " in value
             or sensitive_assignment(value)
             or TOKEN_LIKE_RE.search(value) is not None
@@ -1250,6 +1249,7 @@ def validate_unit(args: argparse.Namespace) -> dict[str, Any]:
         "-----BEGIN " in patch_text
         or sensitive_assignment(patch_text)
         or TOKEN_LIKE_RE.search(patch_text)
+        or LOCAL_ABSOLUTE_PATH_RE.search(patch_text)
     ):
         raise ContractError(
             "checkpoint-sensitive-content", "unit patch contains credential-like material"
