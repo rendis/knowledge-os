@@ -103,7 +103,9 @@ tags: [tipo/api]
 ---
 ```
 
-`tipo` for repos: `api | bff | adapter | http-adapter | suscriptor | publicador | job | function | frontend | libreria | scaffold`.
+`tipo` for repos: `api | bff | adapter | http-adapter | suscriptor | publicador | job | function | frontend | libreria | scaffold | infraestructura`.
+
+Use `infraestructura` for repositories whose owned behavior is provisioning or configuring infrastructure (for example Terraform/Terragrunt). `scaffold` is for reusable project starters; it is not a fallback type for infrastructure code.
 
 Relational properties that point at durable notes use quoted wikilinks.
 

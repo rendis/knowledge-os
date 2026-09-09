@@ -927,6 +927,63 @@ class SyncRunStateEval(unittest.TestCase):
             self.assertEqual(self.payload(result)["code"], "state-path-invalid")
             self.assertFalse((outside / "artifact.json").exists())
 
+    def test_oidc_permission_checkpoint_and_patch_preserve_sensitive_checks(self) -> None:
+        cases = [
+            ("GitHub permissions `id-token: write`.", True),
+            ("GitHub permissions id-token: read", True),
+            ("GitHub permissions id-token: none", True),
+            ("token: write", False),
+            ("token: synthetic-secret", False),
+            ("password=id-token: write", False),
+            ("secret: id-token: none", False),
+            ("id-token: write,password=synthetic-secret", False),
+            ("id-token: none`secret:synthetic-secret", False),
+            ("id-token: nonstandard", False),
+            ("id-token: write-secret", False),
+            ("custom-id-token: write", False),
+            ("id-token: write; token: synthetic-secret", False),
+            ("id-token: write ghp_FAKEVALUE1234567890", False),
+            ("id-token: write password=synthetic-secret", False),
+        ]
+        for statement, accepted in cases:
+            with self.subTest(statement=statement), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp)
+                _, _, oids = make_repository_pair(root)
+                gate = gate_v2(oids)
+                run_id = self.begin(root, oids)
+                artifact = self.semantic_package(SOURCE_REPOSITORY, oids[SOURCE_REPOSITORY], gate)
+                artifact['analysis']['claims'][0]['statement'] = statement
+                artifact['review']['analysis_digest'] = digest(artifact['analysis'])
+                artifact['validation']['analysis_digest'] = digest(artifact['analysis'])
+                artifact['validation']['review_digest'] = digest(artifact['review'])
+                artifact_path = root / 'oidc-package.json'
+                write_json(artifact_path, artifact)
+                result = self.run_sync(
+                    'checkpoint-package', '--state-root', str(root / 'state'),
+                    '--run-id', run_id, '--repository', SOURCE_REPOSITORY,
+                    '--artifact', str(artifact_path),
+                )
+                self.assertEqual(result.returncode, 0 if accepted else 2, result.stdout + result.stderr)
+                if accepted:
+                    persisted = json.loads(Path(self.payload(result)['artifact_path']).read_text())
+                    self.assertEqual(persisted, artifact)
+                else:
+                    self.assertEqual(self.payload(result)['code'], 'checkpoint-sensitive-content')
+                patch_root = root / 'patch-case'
+                patch_root.mkdir()
+                patch_run_id = self.begin(patch_root, oids)
+                self.seal(patch_root, patch_run_id, gate)
+                _, projection_path, patch_path = self.unit_files(
+                    patch_root, gate, run_id=patch_run_id, unit_id='group-001', unit_type='write-group',
+                    path='10-Sistemas/target-service.md', before='before\n',
+                    after=statement + '\n', grants=gate['write_groups'][0]['grants'],
+                )
+                result = self.validate_unit(patch_root, patch_run_id, 'group-001', projection_path, patch_path)
+                self.assertEqual(result.returncode, 0 if accepted else 2, result.stdout + result.stderr)
+                if not accepted:
+                    self.assertEqual(self.payload(result)['code'], 'checkpoint-sensitive-content')
+
+
     def test_checkpoint_rejects_raw_token_like_claim_material(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

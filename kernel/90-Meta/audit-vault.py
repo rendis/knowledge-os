@@ -81,6 +81,7 @@ REPO_TYPES = {
     "frontend",
     "libreria",
     "scaffold",
+    "infraestructura",
 }
 COVERAGE_VALUES = {"completo", "parcial", "no-aplica", "por-confirmar"}
 COVERAGE_FIELDS = {
