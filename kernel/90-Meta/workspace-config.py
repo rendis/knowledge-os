@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import stat
 import sys
 from pathlib import Path
@@ -35,43 +36,120 @@ def _empty_data() -> dict[str, Any]:
     }
 
 
+class ConfigError(ValueError):
+    """Invalid or unsupported local configuration; never repair implicitly."""
+
+
 def parse_config_text(text: str) -> dict[str, Any]:
+    # Deliberately bounded YAML subset, independent of optional PyYAML installs.
+    # Unsupported YAML is rejected before an update can discard its values.
+    lines = []
+    for number, raw in enumerate(text.splitlines(), 1):
+        if not raw.strip() or raw.lstrip().startswith("#"):
+            continue
+        if "\t" in raw:
+            raise ConfigError(f"line {number}: tabs are unsupported")
+        lines.append((len(raw) - len(raw.lstrip()), raw.strip(), number))
+
+    def scalar(raw: str) -> Any:
+        if raw in ("[]", "{}"):
+            return json.loads(raw)
+        if raw.startswith('"'):
+            try:
+                value = json.loads(raw)
+            except ValueError as error:
+                raise ConfigError("invalid quoted scalar") from error
+            if not isinstance(value, str):
+                raise ConfigError("expected a quoted string")
+            return value
+        if raw.startswith("'"):
+            if not re.fullmatch(r"'(?:[^']|'')*'", raw):
+                raise ConfigError("invalid quoted scalar")
+            return raw[1:-1].replace("''", "'")
+        if raw == "true" or raw == "false":
+            return raw == "true"
+        if re.fullmatch(r"[0-9]+", raw):
+            return int(raw)
+        if not raw or any(c in raw for c in "[]{}#&*!|>\"'") or ": " in raw:
+            raise ConfigError("unsupported or malformed YAML scalar")
+        return raw
+
+    def block(index: int, indent: int) -> tuple[Any, int]:
+        value: Any = [] if lines[index][1].startswith("- ") else {}
+        if lines[index][1] in ("[]", "{}"):
+            return scalar(lines[index][1]), index + 1
+        while index < len(lines) and lines[index][0] >= indent:
+            level, content, number = lines[index]
+            if level != indent:
+                raise ConfigError(f"line {number}: invalid indentation")
+            if isinstance(value, list):
+                if not content.startswith("- "):
+                    raise ConfigError(f"line {number}: expected list item")
+                value.append(scalar(content[2:].strip()))
+                index += 1
+                continue
+            match = re.fullmatch(r'("(?:[^"\\]|\\.)*"|[^:]+):(?: (.*))?', content)
+            if not match:
+                raise ConfigError(f"line {number}: expected mapping entry")
+            raw_key, raw_value = match.groups()
+            key = scalar(raw_key.strip())
+            if not isinstance(key, str) or key in value:
+                raise ConfigError(f"line {number}: invalid or duplicate key")
+            index += 1
+            if raw_value is None or not raw_value.strip():
+                if index >= len(lines) or lines[index][0] <= indent:
+                    raise ConfigError(f"line {number}: missing value")
+                item, index = block(index, lines[index][0])
+            else:
+                item = scalar(raw_value.strip())
+            value[key] = item
+        return value, index
+
+    if not lines or lines[0][0] != 0:
+        raise ConfigError("configuration must be a mapping at indentation zero")
+    value, end = block(0, 0)
+    if end != len(lines):
+        raise ConfigError("unexpected trailing configuration")
+    return validate_data(value)
+
+
+def validate_data(value: Any) -> dict[str, Any]:
+    def mapping(item: Any, allowed: set[str], label: str) -> dict[str, Any]:
+        if not isinstance(item, dict) or set(item) - allowed:
+            raise ConfigError(f"{label}: expected supported mapping keys")
+        return item
+
+    value = mapping(value, {"version", "workspace", "skills"}, "config")
+    if type(value.get("version")) is not int or value["version"] != 1:
+        raise ConfigError("version must be 1")
+    workspace = mapping(value.get("workspace", {}), {"repository_roots", "managed_clone"}, "workspace")
+    skills = mapping(value.get("skills", {}), {"manage-development-handoff", "inspect-database"}, "skills")
+    roots = workspace.get("repository_roots", [])
+    if not isinstance(roots, list) or any(not isinstance(r, str) or not r or any(c in r for c in "\n\r\0") for r in roots):
+        raise ConfigError("repository_roots must be a list of nonempty paths")
+    managed = mapping(workspace.get("managed_clone", {}), {"enabled", "root"}, "managed_clone")
+    handoff = mapping(skills.get("manage-development-handoff", {}), {"worktree_root"}, "manage-development-handoff")
+    database = mapping(skills.get("inspect-database", {}), {"environments"}, "inspect-database")
+    enabled, clone, worktree = managed.get("enabled", False), managed.get("root", ""), handoff.get("worktree_root", "")
+    if type(enabled) is not bool or any(not isinstance(p, str) or any(c in p for c in "\n\r\0") for p in (clone, worktree)):
+        raise ConfigError("invalid managed clone or worktree settings")
+    ports = database.get("environments", {})
+    if not isinstance(ports, dict):
+        raise ConfigError("environments must be a mapping")
+    normalized = {}
+    for env, port in ports.items():
+        if isinstance(port, dict):
+            mapping(port, {"proxy_port"}, "environment")
+            port = port.get("proxy_port")
+        if not isinstance(env, str) or not env.strip() or any(c in env for c in "\n\r\0"):
+            raise ConfigError("environment must be a nonempty single-line name")
+        if type(port) not in (str, int) or not re.fullmatch(r"[0-9]+", str(port)) or not 1 <= int(port) <= 65535:
+            raise ConfigError(f"invalid proxy port for {env}")
+        normalized[env] = str(int(port))
     data = _empty_data()
-    roots: list[str] = []
-    clone_root = ""
-    clone_enabled = False
-    worktree = ""
-    ports: dict[str, str] = {}
-    section = ""
-    current_env = ""
-    for raw in text.splitlines():
-        line = raw.strip()
-        if line.startswith("repository_roots:"):
-            section = "roots"
-            continue
-        if line.startswith("managed_clone:"):
-            section = "clone"
-            continue
-        if line.startswith("worktree_root:"):
-            worktree = line.split(":", 1)[1].strip().strip('"')
-            continue
-        if line.startswith("environments:"):
-            section = "ports"
-            continue
-        if section == "roots" and line.startswith("- "):
-            roots.append(line[2:].strip().strip('"'))
-        if section == "clone" and line.startswith("enabled:"):
-            clone_enabled = "true" in line.lower()
-        if section == "clone" and line.startswith("root:"):
-            clone_root = line.split(":", 1)[1].strip().strip('"')
-        if section == "ports" and line.endswith(":") and not line.startswith("proxy_port"):
-            current_env = line[:-1].strip()
-        if section == "ports" and line.startswith("proxy_port:") and current_env:
-            ports[current_env] = line.split(":", 1)[1].strip()
-    data["workspace"]["repository_roots"] = [item for item in roots if item]
-    data["workspace"]["managed_clone"] = {"enabled": clone_enabled, "root": clone_root}
+    data["workspace"] = {"repository_roots": roots, "managed_clone": {"enabled": enabled, "root": clone}}
     data["skills"]["manage-development-handoff"]["worktree_root"] = worktree
-    data["skills"]["inspect-database"]["environments"] = ports
+    data["skills"]["inspect-database"]["environments"] = normalized
     return data
 
 
@@ -89,17 +167,17 @@ def dump_config(data: dict[str, Any]) -> str:
     ]
     if roots:
         for root in roots:
-            lines.append(f'    - "{root}"')
+            lines.append(f"    - {json.dumps(root, ensure_ascii=False)}")
     else:
         lines.append("    []")
     lines.extend(
         [
             "  managed_clone:",
             f'    enabled: {"true" if managed.get("enabled") else "false"}',
-            f'    root: "{managed.get("root") or ""}"',
+            f"    root: {json.dumps(managed.get('root') or '', ensure_ascii=False)}",
             "skills:",
             "  manage-development-handoff:",
-            f'    worktree_root: "{worktree}"',
+            f"    worktree_root: {json.dumps(worktree, ensure_ascii=False)}",
             "  inspect-database:",
             "    environments:",
         ]
@@ -107,7 +185,7 @@ def dump_config(data: dict[str, Any]) -> str:
     if ports:
         for env, port in ports.items():
             value = port.get("proxy_port") if isinstance(port, dict) else port
-            lines.append(f"      {env}:")
+            lines.append(f"      {json.dumps(env, ensure_ascii=False)}:")
             lines.append(f"        proxy_port: {value}")
     else:
         lines.append("      {}")
@@ -245,7 +323,8 @@ def apply_config(
     proxy_ports: dict[str, str] | None = None,
     replace: bool = False,
 ) -> dict[str, Any]:
-    data = _empty_data() if replace else (load_data(vault_root) or _empty_data())
+    existing = load_data(vault_root)  # Reject invalid existing state even for initialize.
+    data = _empty_data() if replace else (existing or _empty_data())
     if roots is not None:
         data["workspace"]["repository_roots"] = [item for item in roots if item]
     if disable_clone:
@@ -259,6 +338,7 @@ def apply_config(
     if proxy_ports:
         environments = data["skills"]["inspect-database"].setdefault("environments", {})
         environments.update(proxy_ports)
+    data = validate_data(data)
     _atomic_write(config_path(vault_root), dump_config(data))
     return load_config(vault_root)
 
@@ -367,4 +447,8 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except (ConfigError, OSError, UnicodeError) as error:
+        print(json.dumps({"status": "invalid", "error": str(error)}), file=sys.stderr)
+        sys.exit(2)

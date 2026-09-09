@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import importlib.util
+import json
+import sys
 import subprocess
 import tempfile
 import unittest
@@ -20,6 +22,61 @@ def load_module():
 
 
 class WorkspaceConfigTests(unittest.TestCase):
+    def test_environment_names_round_trip_without_changing_other_ports(self) -> None:
+        wc = load_module()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            wc.apply_config(root, roots=["/tmp/repos"], proxy_ports={"uat": "5434"})
+            for environment in ("proxy_port_test", "environments", "qa: east"):
+                wc.apply_config(root, proxy_ports={environment: "5436"})
+                self.assertEqual(wc.database_proxy_port(root, environment)["port"], "5436")
+                self.assertEqual(wc.database_proxy_port(root, "uat")["port"], "5434")
+
+    def test_invalid_or_unsupported_yaml_is_never_overwritten(self) -> None:
+        wc = load_module()
+        cases = [
+            'version: 1\nworkspace:\n  repository_roots: ["/tmp/repos"]\nskills:\n  inspect-database:\n    environments: {uat: {proxy_port: 5434}}\n',
+            'version: 1\nworkspace:\n  repository_roots:\n    - "/tmp/repos"\nbroken: [\n',
+            'version: 1\nversion: 1\n',
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            path = root / wc.CONFIG_NAME
+            for text in cases:
+                with self.subTest(text=text):
+                    path.write_text(text)
+                    for replace in (False, True):
+                        with self.assertRaises(wc.ConfigError):
+                            wc.apply_config(root, worktree_root="/tmp/trees", replace=replace)
+                        self.assertEqual(path.read_text(), text)
+                    result = subprocess.run([sys.executable, "-B", str(HERE / "workspace-config.py"), "--vault-root", str(root), "status"], capture_output=True, text=True)
+                    self.assertEqual(result.returncode, 2)
+                    self.assertEqual(json.loads(result.stderr)["status"], "invalid")
+                    self.assertEqual(path.read_text(), text)
+
+    def test_invalid_port_preserves_existing_configuration(self) -> None:
+        wc = load_module()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            wc.apply_config(root, roots=["/tmp/repos"], proxy_ports={"uat": "5434"})
+            original = (root / wc.CONFIG_NAME).read_bytes()
+            for port in ("0", "65536", "5434 # comment", "true", "5434\nworkspace:"):
+                with self.subTest(port=port), self.assertRaises(wc.ConfigError):
+                    wc.apply_config(root, proxy_ports={"prod": port})
+                self.assertEqual((root / wc.CONFIG_NAME).read_bytes(), original)
+
+    def test_emitted_empty_collections_and_escaped_paths_remain_readable(self) -> None:
+        wc = load_module()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            wc.apply_config(root, replace=True)
+            self.assertEqual(wc.load_config(root)["proxy_ports"], {})
+            roots = ['/tmp/a "quoted" path', "/tmp/a: path"]
+            wc.apply_config(root, roots=roots, worktree_root='/tmp/a "tree"')
+            status = wc.load_config(root)
+            self.assertEqual([r["path"] for r in status["source_context"]["roots"]], roots)
+            self.assertEqual(status["worktree_root"], '/tmp/a "tree"')
+
     def test_locate_repository_uses_configured_remote_before_url_rewrite(self) -> None:
         wc = load_module()
         with tempfile.TemporaryDirectory() as tmp:

@@ -14,6 +14,35 @@ installer = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(installer)
 
 class IntegrityTests(unittest.TestCase):
+    def test_strict_doctor_detects_adapter_configuration_pending_update(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            dest = Path(tmp)
+            def cli(verb):
+                return subprocess.run(['python3', '-B', str(ROOT / 'scripts/knowledge_os.py'),
+                                       verb, '--dest', tmp], check=True, capture_output=True)
+            subprocess.run(['python3', '-B', str(ROOT / 'scripts/knowledge_os.py'),
+                            'init', '--dest', tmp, '--cell-name', 'Test', '--purpose', 'Test',
+                            '--system', 'test:Test', '--yes'], check=True, capture_output=True)
+            args = SimpleNamespace(dest=tmp, strict=True)
+            def doctor():
+                lock = installer.load_lock(dest / installer.LOCK_NAME)
+                lock.update(distribution_revision='a' * 40, distribution_dirty=False)
+                (dest / installer.LOCK_NAME).write_text(installer.dump_lock(lock))
+                with patch.object(installer, 'distribution_provenance', return_value=('a' * 40, False)), contextlib.redirect_stdout(io.StringIO()):
+                    return installer.cmd_doctor(args)
+            self.assertEqual(doctor(), 0)
+            path = dest / 'instance.yaml'
+            path.write_text(path.read_text().replace('adapters: []', 'adapters: [postgres]'))
+            self.assertEqual(doctor(), 2)
+            cli('update')
+            self.assertTrue((dest / '.agents/skills/inspect-database/SKILL.md').exists())
+            self.assertEqual(doctor(), 0)
+            path.write_text(path.read_text().replace('adapters: [postgres]', 'adapters: []'))
+            self.assertEqual(doctor(), 2)
+            cli('update')
+            self.assertFalse((dest / '.agents/skills/inspect-database/SKILL.md').exists())
+            self.assertEqual(doctor(), 0)
+
     def test_real_claude_skills_preserved_before_any_copy(self):
         with tempfile.TemporaryDirectory() as tmp:
             dest = Path(tmp)

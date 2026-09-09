@@ -34,12 +34,17 @@ def bind(root: Path, capability: str, procedures: list[str]) -> dict:
         raise InstanceError("instance.yaml must be a regular file")
     original = path.read_text(encoding="utf-8")
     instance = load_instance(path)
+    existing_capabilities = instance["capabilities"].copy()
     instance["capabilities"][capability] = procedures
     instance = validate_instance(instance)
     result = resolve(root, instance, capability)
     # Change only this top-level section: preserve identity, comments and unknown cell-owned fields.
     lines = original.splitlines(keepends=True)
     starts = [i for i, line in enumerate(lines) if re.match(r"^capabilities\s*:", line)]
+    if any(re.match(r'^([\"\'])capabilities\1\s*:', line) for line in lines):
+        raise InstanceError("capabilities must use an unquoted top-level key for binding")
+    if existing_capabilities and not starts:
+        raise InstanceError("unsupported capabilities section syntax")
     if len(starts) > 1:
         raise InstanceError("duplicate capabilities sections")
     section = "capabilities:\n" + "".join(
@@ -49,6 +54,17 @@ def bind(root: Path, capability: str, procedures: list[str]) -> dict:
     if starts:
         start = starts[0]
         end = next((i for i in range(start + 1, len(lines)) if re.match(r"^[^\s#][^:]*:", lines[i])), len(lines))
+        if not re.fullmatch(r"capabilities\s*:\s*(?:#.*)?", lines[start].rstrip()):
+            raise InstanceError("binding requires a block capabilities mapping")
+        # Trailing comments belong to the following cell-owned field or EOF.
+        while end > start + 1 and (not lines[end - 1].strip() or lines[end - 1].lstrip().startswith("#")):
+            end -= 1
+        comments = []
+        for line in lines[start:end]:
+            if "#" in line:
+                # Valid capability ids and basenames cannot contain '#'.
+                comments.append("  " + line[line.index("#"):].rstrip() + "\n")
+        section = section.split("\n", 1)[0] + "\n" + "".join(comments) + section.split("\n", 1)[1]
         updated = "".join(lines[:start]) + section + "".join(lines[end:])
     else:
         updated = original + ("\n" if not original.endswith("\n") else "") + "\n" + section

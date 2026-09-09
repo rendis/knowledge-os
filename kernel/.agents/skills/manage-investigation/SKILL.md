@@ -1,6 +1,6 @@
 ---
 name: manage-investigation
-description: Maintain persistent local case files. Use when a user wants to open or resume an investigation from a request or attachment, refine it with evidence and decisions, reconcile a development handoff after implementation, consolidate duplicate cases, validate readiness, export technical or user stories or repository-specific development packages, assess investigation-derived learning, or assess a post-deployment candidate for independent promotion to the cell vault.
+description: Maintain persistent local case files. Use when a user wants to open or resume an investigation from a request or attachment, refine it with evidence and decisions, reconcile a development handoff after implementation, consolidate duplicate cases, validate readiness, export technical or user stories or repository-specific development packages, assess investigation-derived learning, or assess a documentation candidate under the cell evidence profile for independent promotion to the vault.
 ---
 
 # Manage investigations
@@ -29,7 +29,7 @@ Complete preflight only when `VAULT_ROOT` is canonical, the local store is ignor
 - **Close**: apply the knowledge closure gate in [references/readiness-and-lifecycle.md](references/readiness-and-lifecycle.md); record the explicit decision, reason, and outstanding limitations. Stories and export are optional for knowledge outcomes.
 - **Export**: load [references/export-contract.md](references/export-contract.md) and create one or more local story drafts.
 - **Learn**: hand an exact case to `manage-investigation-derived-learning` for critical read-only assessment and optional authorized durable publication.
-- **Promote**: assess a post-deployment documentation candidate and hand it to `map-ecosystem`; this skill never writes the vault.
+- **Promote**: assess a documentation candidate under the cell evidence profile and hand eligible claims to `map-ecosystem`; this skill never writes the vault.
 
 Use no parallel index. Interrogation may call `90-Meta/graph-query.py investigations --node <stem>` (on-demand scan of `investigation.md` files). That query is not a second store. Resume inside this skill still searches case files directly.
 
@@ -58,7 +58,7 @@ Complete when one case file is selected, draft freshness is known, and the next 
 3. For cell ecosystem evidence, load `map-ecosystem`, select its read-only interrogation branch, and keep resolved source repositories read-only.
 4. For current work-item evidence, load `../../../90-Meta/work-item-evidence.md` and apply its narrow read-only contract directly; do not create an operational run for evidence collection.
 5. Maintain an explicit boundary between **current productive state** and **future/proposed state**. For `purpose: development` or `mixed`, represent both independently; decisions and acceptance criteria for future work never become facts.
-6. Maintain `vault-outcome` as evidence changes. Development or undeployed behavior is `deferred-until-production`; a possible current-state fact is at most `candidate-for-audit` until `map-ecosystem` independently verifies it. In a mixed case, this field follows the current-state candidate when one exists, while the future portion remains explicitly deferred and outside the vault.
+6. Maintain `vault-outcome` as evidence changes. Apply the evidence-profile eligibility rules in **Promote**: proposals remain deferred; inspected source behavior may qualify under `documented-source` before deployment. An eligible fact is at most `candidate-for-audit` until `map-ecosystem` independently verifies it. In a mixed case, this field follows the current-state candidate when one exists, while the future portion remains explicitly deferred and outside the vault.
 7. Resolve evident defaults directly. When a material decision remains ambiguous, load [references/questioning-protocol.md](references/questioning-protocol.md).
 8. After every material finding or answer, update **Current state**, `updated-at`, the affected registers, and append one History event.
 9. Preserve stable identifiers and replacement links; never renumber, recycle, or silently change the meaning of a registered item.
@@ -128,13 +128,13 @@ Complete when the user has the explicit assessment result and action, no forbidd
 
 ## Promote
 
-1. Require an explicit candidate claim and a classified `purpose`; a development case can reach this branch only after the change is reported as deployed.
-2. Separate the candidate's observed current state from every original proposal, decision, acceptance criterion, and story. Set `vault-outcome: deferred-until-production` and stop when deployment remains pending or ambiguous.
-3. When productive implementation is plausible, set `vault-outcome: candidate-for-audit` and build a context package containing the exact candidate claims, in-scope source references, likely canonical nodes, and known limitations. Do not present the case file, a tracker, or an approval as evidence.
-4. Hand the package to `map-ecosystem` with the user's vault-write authorization as an explicit post-deployment production audit, including when the repository HEAD is unchanged since its last source analysis. That skill re-inspects authoritative code, deploy, infrastructure, database, and runtime evidence as applicable and owns the production-evidence gate, node lifecycle, write, propagation, and verification.
-5. Set `vault-outcome: documented` only after `map-ecosystem` reports that its independent production audit passed and the canonical vault either already represented the fact correctly or was updated and verified. Record canonical notes, evidence boundary, lifecycle result, and observed checks in Readiness and History. Otherwise keep `candidate-for-audit` with the exact missing productive evidence for a purported current state, set `none` when the audit disproves or removes the durable candidate, or return to `deferred-until-production` while deployment remains pending or ambiguous.
+1. Require an explicit candidate claim and a classified `purpose`. Read `../../../90-Meta/evidence-policy.md` and the cell's `evidence.profile` before deciding eligibility.
+2. Separate inspected implementation from proposals and deployment assertions. Under `documented-source`, an implemented claim at an exact inspected revision may proceed before deployment; describe only source behavior. Under `production-gate` or `mixed`, set `vault-outcome: deferred-until-production` and stop when deployment remains pending or ambiguous. Unimplemented proposals remain deferred under every profile.
+3. Set an eligible claim to `vault-outcome: candidate-for-audit` and build a context package with exact claims, source revisions, likely canonical nodes, evidence profile and limitations. Case files, trackers and approvals provide context, not technical evidence.
+4. Hand the package and explicit vault-write authorization to `map-ecosystem` for an independent profile-specific audit. An explicit post-deployment audit may recheck productive applicability even when source HEAD is unchanged. That skill owns evidence assessment, node lifecycle, writes, propagation and verification.
+5. Set `vault-outcome: documented` only after the independent audit passes and the canonical vault already represents the claim correctly or was updated and verified. Record canonical notes, evidence profile, evidence boundary, lifecycle result and observed checks in Readiness and History. Otherwise retain the exact missing evidence with `candidate-for-audit`, use `none` for a disproved or removed candidate, or defer a proposal or required deployment.
 
-Complete when every candidate has an explicit outcome, no future-state claim entered the vault, and any documented claim traces to an independent `map-ecosystem` production audit.
+Complete when every candidate has an explicit outcome and each documented claim traces to an independent audit at the cell's required evidence level. Source-only claims remain explicitly scoped to their inspected revision.
 
 ## Guardrails
 

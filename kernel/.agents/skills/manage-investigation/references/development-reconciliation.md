@@ -12,7 +12,7 @@ Do not read the handoff worktree again merely to compensate for an incomplete co
 
 Read the entire current `investigation.md`, verify the selected `DH-NNN` binding against the normalized context, then reconcile these surfaces in one coherent case update:
 
-1. **Current state**: update the current understanding and the future/proposed implementation state. Keep branch, commit, pull request, work-item, and completed code explicitly undeployed until productive evidence exists.
+1. **Current state**: update the current understanding and the future/proposed implementation state. Keep branch, commit, pull request, work-item, and completed code observations scoped to their sources; mark deployment as unverified until deployment evidence exists.
 2. **References and attachments**: register newly inspected work-item evidence or repository-host references with stable source identity and non-sensitive summaries. Do not copy private comments, raw logs, secret values, or sensitive attachments.
 3. **Evidence**: add new `E-NNN` items for observed implementation, test, remote branch, pull-request, merge, deployment, work-item, contradiction, and limitation claims. Cite exact paths, SHAs, URLs, timestamps, checks, or external keys.
 4. **Affected surfaces**: store the source implementation card and each directly dependent story card, including its readiness, consumer contracts, what can start, and remaining gaps.
@@ -29,7 +29,7 @@ Use existing stable IDs when their meaning is unchanged. Allocate the next ID fo
 
 Inspect every draft or handoff package that references affected scope, decisions, criteria, contracts, or dependencies. Reconcile a mutable draft in the same interaction or mark it `stale` with the exact reason. Keep published drafts immutable and create a replacement only through the normal export route.
 
-When material evidence or decisions could change a completed learning assessment, preserve the old assessment in History and reset `learning-outcome` to `not-evaluated`. Do not change `vault-outcome` to `documented`: branches, commits, pull requests, work items, tests, and handoff files do not pass the production gate.
+When material evidence or decisions could change a completed learning assessment, preserve the old assessment in History and reset `learning-outcome` to `not-evaluated`. Do not change `vault-outcome` to `documented`: reconciliation does not replace the independent `map-ecosystem` audit required by the cell evidence profile. Route eligible source or productive claims through **Promote**; keep proposals deferred.
 
 ## No-change handling
 

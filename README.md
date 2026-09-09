@@ -89,4 +89,4 @@ Requires Python 3.9+ and Git. Obsidian is optional for filesystem queries. Each 
 
 Existing note names, relationships, investigations and handoff families are preserved by update. Optional capabilities are unconfigured until onboarding binds real procedures; selecting an adapter alone does not prove live readiness.
 
-Version 0.6 adds optional capability bindings and transactional investigation commands without changing existing note or handoff schemas. `doctor --strict` is the opt-in installation integrity gate.
+Version 0.6 adds optional capability bindings and transactional investigation commands without changing existing note or handoff schemas. `doctor --strict` is the opt-in installation integrity gate and also detects configured adapters awaiting installation or removal. Version 0.6.1 preserves configuration during updates and aligns investigation promotion with the selected evidence profile.

@@ -44,6 +44,28 @@ class Capabilities(unittest.TestCase):
         config.bind(self.root, 'runtime-inspection', [self.note.stem])
         self.assertEqual(len(load_instance(self.path)['capabilities']), 2)
 
+    def test_rebinding_preserves_section_and_neighbor_comments(self):
+        self.path.write_text(self.path.read_text() +
+            'capabilities: # capability policy\n'
+            '  # runner rationale\n'
+            f'  database-inspection: ["{self.note.stem}"] # restricted reads\n'
+            '# owner of the following field\nteam-owner: Cedar\n')
+        config.bind(self.root, 'runtime-inspection', [self.note.stem])
+        updated = self.path.read_text()
+        for comment in ['# capability policy', '# runner rationale', '# restricted reads']:
+            self.assertIn(comment, updated)
+        self.assertTrue(updated.endswith('# owner of the following field\nteam-owner: Cedar\n'))
+        self.assertEqual(len(load_instance(self.path)['capabilities']), 2)
+
+    def test_unsupported_capability_syntax_rejects_without_writes(self):
+        original = self.path.read_text()
+        for section in ['"capabilities": {}\n', 'capabilities: {}\n']:
+            self.path.write_text(original + section)
+            before = self.path.read_bytes()
+            with self.assertRaises(InstanceError):
+                config.bind(self.root, 'runtime-inspection', [self.note.stem])
+            self.assertEqual(self.path.read_bytes(), before)
+
     def test_missing_duplicate_and_traversal_reject_without_writes(self):
         before = self.path.read_bytes()
         for name in ['Missing', '../escape']:

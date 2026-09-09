@@ -12,6 +12,10 @@ workspace:
 skills:
   manage-development-handoff:
     worktree_root: ""
+  inspect-database:
+    environments: {}
 ```
 
 Secret-bearing keys are prohibited. Discovery roots are read-only unless a development-handoff plan is authorized.
+
+The semantic CLI reads the emitted block-map/list YAML subset, quoted scalars and empty `[]`/`{}` collections without a third-party dependency. Unsupported YAML forms, unknown keys, duplicate keys and malformed data return `status: invalid` and are never overwritten, including during initialization. Proxy ports must be integers from 1 through 65535. Updates preserve other configured environments.
