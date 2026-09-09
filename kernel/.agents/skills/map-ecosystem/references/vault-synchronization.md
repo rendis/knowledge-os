@@ -6,6 +6,10 @@ Synchronize only on an explicit vault-update request; report mode is read-only. 
 
 The coordinator owns inventory, source binding, durable state, gate, projection, application, and closure. Extractors and reviewers own one artifact each and follow [synchronization-package-worker.md](synchronization-package-worker.md). Load [synchronization-state-machine.md](synchronization-state-machine.md) before choosing a command after any interruption or failure.
 
+## Worker execution choices
+
+Choose each worker's available model and reasoning effort for its task complexity and the consequences of an error; do not automatically inherit the root orchestrator's settings. Distinguish documentation-only inspection from business logic, data contracts, environment differences and cross-repository dependencies. Independent semantic review and targeted correction need enough reasoning for the affected meaning. Keep mechanical validation in the deterministic tools. Record the chosen model, effort and rationale with local execution evidence, without adding provider-specific fields to the semantic artifact schemas.
+
 ## Coordinator recipe
 
 1. **Freeze inventory and impact.** Apply [evidence-extraction.md](evidence-extraction.md). Run `90-Meta/vault-inventory.py --format markdown`. Classify each relevant repository, resolve each checkout by configured remote identity, and record its initial `git status --short`. For `changed`, bind the recorded commit and production head; for `new`, bind the empty-tree baseline and production head. An unresolved checkout, unreadable exact evidence, or ambiguous identity is a hard blocker.
