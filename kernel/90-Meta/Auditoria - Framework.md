@@ -10,7 +10,7 @@ Este framework es la fuente de verdad para evidencia, scripts y gates del mapa d
 
 El vault es el grafo durable. Los scripts solo leen Markdown/frontmatter y evidencia externa verificable para reportar estado; no mantienen relaciones paralelas. Una relación confirmada se escribe en la nota Obsidian correspondiente.
 
-`.sync-acknowledgements.json` es la única excepción procedimental versionada de la sync y no forma parte del grafo: conserva el cierre de una rama y commit exactos como `no-durable-node`, `review-rejected` o `inspection-limited`. Sólo `no-durable-node` expresa una decisión semántica aceptada; los otros dos son cursores operacionales y no alteran la trazabilidad semántica de una nota. Su nombre oculto evita incorporarlo a las vistas de Obsidian. No puede contener hechos técnicos, relaciones, hallazgos, razones libres ni secretos.
+`.sync-acknowledgements.json` is the only versioned synchronization process record and stays outside the graph. It records an exact branch and commit as `no-durable-node` (accepted new repository without a node), `no-documentation-change` (accepted existing-repository delta requiring no documentation update), `review-rejected`, or `inspection-limited`. The latter two are operational closure only. Acknowledgements preserve the note baseline and contain no technical facts, relationships, findings, free-form reasons, or secrets.
 
 ## Jerarquía de evidencia
 
@@ -38,6 +38,8 @@ Antes de crear o modificar una afirmación del grafo técnico, demostrar dos con
 Las investigaciones se clasifican como orientadas a conocimiento, desarrollo o mixtas. Pueden registrar evidencia, decisiones y candidatos documentales, pero `map-ecosystem` debe volver a inspeccionar las fuentes autoritativas después del despliegue. En una investigación mixta, únicamente el estado actual que supere este gate puede ser candidato; el estado futuro permanece fuera del vault.
 
 Si cualquiera de las dos condiciones falla, la decisión documental es **sin cambio**. `#por-confirmar` expresa una limitación sobre algo productivo ya observado; no conserva propuestas, diseños futuros ni implementaciones pendientes.
+
+For a configuration assertion, versioned production configuration satisfies applicability at the analyzed commit: describe what it configures and qualify unresolved deployment separately. Claims about effective runtime, deployed destinations, or executed behavior require evidence for those stronger assertions. An inaccessible deployment definition limits only dependent claims; it does not suppress independently observed configuration changes.
 
 ## Gate de aprendizaje durable
 
@@ -168,9 +170,9 @@ Un levantamiento o sincronización termina cuando:
 - topics, integraciones, arquitectura, flujos y MOCs afectados fueron propagados;
 - cuando cambia el dominio operacional, su índice, MOCs, Base, guías, catálogos, estándares, procedimientos, reportes, resolvedor y routing de skills fueron propagados;
 - cuando cambia el dominio de aprendizajes, su índice, contrato, routing, notas relacionadas y validator fueron propagados;
-- la trazabilidad de cada paquete aceptado coincide con su rama productiva; una review no aceptada conserva la trazabilidad semántica anterior;
-- cada repositorio inspeccionado sin paquete semántico aceptado tiene un cursor operacional coincidente con su rama y SHA; `no-durable-node` existe sólo tras una review aceptada y no coexiste con una nota;
-- cada nota de repo desplegable reanalizada conserva una fila por ambiente/deployable con la cadena de deploy resuelta o una limitación explícita;
+- each published documentation update records its analyzed production branch and commit; accepted no-change acknowledgements and unaccepted reviews preserve the note baseline;
+- each inspected repository without an accepted semantic package has an operational cursor matching its branch and SHA; `no-durable-node` follows an accepted review and cannot coexist with a note; `no-documentation-change` follows an accepted existing-repository review and requires a note;
+- each updated deployable repository note preserves one row per environment/deployable with the deployment chain resolved or explicitly limited;
 - los gates pertinentes a los archivos y contratos modificados pasan; una sync no convierte la suite completa de CI en etapas de análisis;
-- una sync consumió exactamente una extracción, una finalización con recibo y como máximo una review por repositorio/OID; una review parcial publicó únicamente sus claims no cuestionadas y cualquier paquete sin claims aceptadas terminó en `review-rejected` o `inspection-limited`, siempre sin segunda pasada; cada unidad pasó `validate-projection` y se aplicó idempotentemente mediante el mismo `run_id`;
+- a sync uses one extraction, one receipted finalization, and at most one review per repository/OID; partial review publishes only unchallenged claims; accepted no-claim packages use the appropriate accepted acknowledgement, while rejected or limited packages retain their operational cursor; every unit passes `validate-projection` and applies idempotently under the same `run_id`;
 - el reporte final distingue revisado, cambiado, sin aporte durable, límites de evidencia y pendientes reales de la ejecución, sin asignar remediaciones a los repositorios fuente.

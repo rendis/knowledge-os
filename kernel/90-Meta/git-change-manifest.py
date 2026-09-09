@@ -1295,6 +1295,17 @@ def validate_gate_for_write(
                 issues.append(issue("gate-contract-invalid", f"{field}.verdict"))
             if item.get("result") not in RESULTS:
                 issues.append(issue("gate-contract-invalid", f"{field}.result"))
+            if item.get("cursor_decision") == "no-documentation-change" and (
+                item.get("is_new") is not False
+                or item.get("result") != "traceability-only"
+                or item.get("verdict") != "accept"
+                or item.get("review_disposition") != "accept"
+                or item.get("analysis_fallback") is not False
+                or item.get("fallback_reason")
+                or accepted_claim_ids
+                or disposition != "cursor-ready"
+            ):
+                issues.append(issue("gate-contract-invalid", f"{field}.cursor_decision"))
             if not isinstance(item.get("review_disposition"), str):
                 issues.append(issue(
                     "gate-contract-invalid",
@@ -2634,7 +2645,7 @@ def validate_analysis(
             question_statuses = []
             questions_complete = (
                 isinstance(questions, dict)
-                and tuple(questions) == expected_questions
+                and set(questions) == set(expected_questions)
             )
             if not questions_complete:
                 issues.append(issue(
@@ -3254,7 +3265,9 @@ def gate_batch_sources(
         elif (
             not item["write_nodes"]
         ):
-            cursor_decision = "no-durable-node"
+            cursor_decision = (
+                "no-durable-node" if item["is_new"] else "no-documentation-change"
+            )
             disposition = "cursor-ready"
         else:
             disposition = "write-ready"
@@ -3748,6 +3761,7 @@ def check_analysis(
     return {
         "code": "ok",
         "status": "pass",
+        "repository": analysis["repository"],
         "manifest_digest": canonical_digest(manifest),
         "scaffold_digest": canonical_digest(scaffold),
         "analysis_digest": canonical_digest(analysis),

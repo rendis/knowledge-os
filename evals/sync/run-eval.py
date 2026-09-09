@@ -18,6 +18,7 @@ from typing import Any, NoReturn
 
 TEST_COMMANDS = (
     ("sync-pipeline", "python3", "-B", "evals/sync/test_sync_pipeline.py"),
+    ("sync-semantics", "python3", "-B", "evals/sync/test_sync_semantics.py"),
     ("sync-state", "python3", "-B", "evals/sync/test_sync_state.py"),
     ("eval-harness", "python3", "-B", "evals/sync/test_run_eval.py"),
     ("sync-tooling", "python3", "-B", "evals/bootstrap/test_sync_tooling.py"),

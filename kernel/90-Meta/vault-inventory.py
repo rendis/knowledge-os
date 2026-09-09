@@ -26,6 +26,7 @@ STATUSES = (
     "changed",
     "new",
     "acknowledged-no-node",
+    "acknowledged-no-change",
     "acknowledged-review-rejected",
     "acknowledged-inspection-limited",
     "container",
@@ -46,6 +47,7 @@ ACKNOWLEDGEMENT_FIELDS = {
 }
 ACKNOWLEDGEMENT_DECISIONS = {
     "no-durable-node": "acknowledged-no-node",
+    "no-documentation-change": "acknowledged-no-change",
     "review-rejected": "acknowledged-review-rejected",
     "inspection-limited": "acknowledged-inspection-limited",
 }
@@ -465,7 +467,8 @@ def build_inventory(root: Path, org: str, github: GitHubContext) -> list[dict[st
         if (
             acknowledgement_by_repo[repository]["decision"] == "no-durable-node"
             or (
-                note_by_repo[repository]["recorded_branch"]
+                acknowledgement_by_repo[repository]["decision"] != "no-documentation-change"
+                and note_by_repo[repository]["recorded_branch"]
                 == acknowledgement_by_repo[repository]["branch"]
                 and note_by_repo[repository]["recorded_sha"]
                 == acknowledgement_by_repo[repository]["analyzed_sha"]
@@ -476,6 +479,18 @@ def build_inventory(root: Path, org: str, github: GitHubContext) -> list[dict[st
         raise OperationalError(
             "repository has an incompatible vault note and sync acknowledgement: "
             + ", ".join(invalid_overlap)
+        )
+
+    missing_notes = sorted(
+        repository
+        for repository, acknowledgement in acknowledgement_by_repo.items()
+        if acknowledgement["decision"] == "no-documentation-change"
+        and repository not in note_by_repo
+    )
+    if missing_notes:
+        raise OperationalError(
+            "no-documentation-change acknowledgement requires an existing vault note: "
+            + ", ".join(missing_notes)
         )
 
     records: list[dict[str, Any]] = []
@@ -510,6 +525,10 @@ def build_inventory(root: Path, org: str, github: GitHubContext) -> list[dict[st
                 "no-durable-node": (
                     "complete tree accepted at this production-branch SHA; "
                     "no durable node selected"
+                ),
+                "no-documentation-change": (
+                    "inspection accepted at this production-branch SHA; "
+                    "no documentation change required; note baseline retained"
                 ),
                 "review-rejected": (
                     "inspection closed at this production-branch SHA; "
