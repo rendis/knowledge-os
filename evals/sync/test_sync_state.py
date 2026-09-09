@@ -929,6 +929,10 @@ class SyncRunStateEval(unittest.TestCase):
 
     def test_oidc_permission_checkpoint_and_patch_preserve_sensitive_checks(self) -> None:
         cases = [
+            ("/status responde 200.", True),
+            ("GET /home/document-summary devuelve un resumen.", True),
+            ("Archivo /home/alice/private/config.yaml", False),
+            ("Archivo /Users/alice/private/config.yaml", False),
             ("GitHub permissions `id-token: write`.", True),
             ("GitHub permissions id-token: read", True),
             ("GitHub permissions id-token: none", True),
