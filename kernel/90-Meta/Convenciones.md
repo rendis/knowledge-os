@@ -36,7 +36,7 @@ Choose the type from the observed identity. Search basename, `aliases`, `nombre-
 | `15-Arquitectura/` `tipo: servicio` | A stable capability composed of two or more repos/components | A 1:1 repo duplicate or an end-to-end sequence |
 | `15-Arquitectura/` `tipo: componente` | One repo with several deployables that have their own identity | An extra layer on the normal 1:1 repo case |
 | `15-Arquitectura/` `tipo: recurso-runtime` | Productive scheduler/function/runtime without an identifiable repo | Names seen only in templates |
-| `20-Repos/` `tipo: repositorio` | An in-scope source repository | This vault container, generic libraries, setup docs |
+| `20-Repos/` functional `tipo` from the repository contract below | An in-scope source repository | This vault container, generic libraries, setup docs |
 | `25-Topics/` `tipo: topic` | An async contract with topology relevance (`topic` enabled) | A subscription, a test name, or HTTP |
 | `30-Flujos/` `tipo: flujo` | An end-to-end business outcome crossing two durable nodes or a system boundary | Internal methods or a service composition copy |
 | `40-Integraciones/` `tipo: integracion-externa` | An external system with a stable business role | Internal repos or isolated endpoints |
@@ -107,15 +107,97 @@ tags: [tipo/api]
 
 Relational properties that point at durable notes use quoted wikilinks.
 
-## Repository note sections
+## Required note sections
 
-1. Propósito / Purpose
-2. Gatillo / Trigger
-3. Contratos
-4. Persistencia y datos
-5. Infraestructura y scheduling
-6. Relación con flujos
-7. Limitaciones
+Use the exact headings below. The current validator requires these Spanish headings even when `locale.notes` is `en`; prose follows the cell locale. Additional sections are allowed unless explicitly forbidden below. Required fields and allowed fields form closed frontmatter contracts.
+
+### Repository
+
+- Propósito
+- Gatillo
+- Qué hace
+- Entradas y salidas
+- Persistencia y datos
+- Infraestructura y scheduling
+- Relaciones
+- Limitaciones y desconocimientos
+
+Use the repository frontmatter above. `aliases`, relationship properties, and `tags` must be lists. Coverage values are `completo | parcial | no-aplica | por-confirmar`. `sistema` must link a declared system; `commit-analizado` is the observed 12-character lowercase SHA; `rama-analizada` is `main` or `master`. Both dates must be valid `YYYY-MM-DD` values. Replace the example SHA and dates with observed values.
+
+### Deployment matrix
+
+For each deployable repository, place the per-environment matrix under `Infraestructura y scheduling`. Following the existing deployment-evidence contract, record one row per observed environment and deployable, tracing:
+
+| Environment / deployable | Event or manual input | Workflow / job / condition | Build artifact | Deploy action or command | Project | Platform / resource | Region or zone | Namespace / workload | Manifest, overlay, or values source |
+|---|---|---|---|---|---|---|---|---|---|
+
+Attach source evidence or the exact unresolved indirection to the relevant row. A versioned target establishes deployment intent at the analyzed commit; current runtime existence requires reconciled control-plane evidence. After following available versioned indirections, use `no observado en fuentes estáticas revisadas` for missing values and `#por-confirmar` only when the gap affects runtime or production-baseline understanding. Keep contradictions visible and current health/logs outside this stable topology matrix. See `.agents/skills/map-ecosystem/references/deployment-evidence.md` for the evidence sequence.
+
+### Topic
+
+All four fields are required; no other fields are allowed:
+
+```yaml
+---
+tipo: topic
+nombre-raw: "<observed name>"
+sistema: "[[System]]"
+tags: []
+---
+```
+
+Required headings:
+
+- Qué representa
+- Contrato
+- Infraestructura verificada
+- Limitaciones y desconocimientos
+
+The headings `Productores`, `Consumidores`, and `Productores y consumidores` are forbidden. Derive inverse relationships through backlinks.
+
+### External integration
+
+`tipo` and `tags` are required; `aliases` is optional. No other fields are allowed:
+
+```yaml
+---
+tipo: integracion-externa
+aliases: []
+tags: []
+---
+```
+
+Required headings:
+
+- Qué es
+- Cómo se usa
+- Contratos relevantes
+- Infraestructura o ownership
+- Limitaciones y desconocimientos
+
+### Flow
+
+All three fields are required; no other fields are allowed:
+
+```yaml
+---
+tipo: flujo
+sistema: "[[System]]"
+tags: []
+---
+```
+
+Required headings:
+
+- Qué resuelve
+- Disparador
+- Paso a paso
+- Diagrama de flujo
+- Diagrama de componentes
+- Participantes
+- Pendientes
+
+Include exactly two Mermaid blocks. The block under `Diagrama de componentes` must contain `subgraph`. Populate both diagrams from observed participants and relationships.
 
 ## Relationship grammar
 

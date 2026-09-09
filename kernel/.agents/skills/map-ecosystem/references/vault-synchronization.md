@@ -32,6 +32,8 @@ The coordinator owns inventory, source binding, durable state, gate, projection,
 
 ## One targeted correction before checkpointing
 
+If reviewer prose contains a detected credential literal, preserve its original artifact and run `python3 -B 90-Meta/finalize-sync-review.py --repo <checkout> --manifest <manifest> --scaffold <scaffold> --analysis <analysis> --review <original-review> --output <safe-review>`. The checkout HEAD must still equal the analyzed commit. This helper only redacts finding reasons and evidence anchors; it preserves verdicts and all decision metadata, validates bindings and evidence, and refuses exposures elsewhere or a different existing output. Use the validated safe review for correction or closure. This is mechanical redaction, not another semantic review or a detector exemption.
+
 For a checked, finalized analysis with a valid `revise` review, run:
 
 ```text
