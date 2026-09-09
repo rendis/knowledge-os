@@ -28,6 +28,7 @@ TEST_COMMANDS = (
     ("noop-integrity", "python3", "-B", "evals/sync/test_noop_integrity.py"),
     ("eval-harness", "python3", "-B", "evals/sync/test_run_eval.py"),
     ("sync-tooling", "python3", "-B", "evals/bootstrap/test_sync_tooling.py"),
+    ("interactive-onboarding", "python3", "-B", "evals/bootstrap/test_interactive_onboarding.py"),
     ("bootstrap", "python3", "-B", "evals/bootstrap/test_bootstrap.py"),
     ("cell-capabilities", "python3", "-B", "evals/bootstrap/test_cell_capabilities.py"),
     ("investigation-transactions", "python3", "-B", "evals/bootstrap/test_investigation_transactions.py"),

@@ -29,6 +29,8 @@ An existing vault that already has `00-Home.md` and `10-Sistemas/` (no lock) is 
 
 With no arguments, the script looks at the current directory: a `.knowledge-os.lock.yaml` selects `update`; an empty destination selects `init`. Knowledge Markdown without a lock is refused. The lock is portable, contains no local paths or secrets, and must be committed with the cell so a clean clone remains an installed consumer.
 
+Interactive init collects portable cell choices. Local discovery paths and read-only versus managed source access are collected by the `configure-workspace` skill, then executed by its non-interactive CLI. Supplying `--yes` tests unattended installation, not whether an agent asks for missing onboarding decisions. Full onboarding must distinguish configured choices, explicitly deferred capabilities and source access still pending. A cancelled interactive input creates no vault.
+
 A future published tag can be installed with:
 
 ```bash

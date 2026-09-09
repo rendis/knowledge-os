@@ -24,6 +24,7 @@ Use this skill for a cell-vault query, documentation update, ecosystem synchroni
 | Request or condition | Load / action |
 | --- | --- |
 | Complete `SYNC_PACKAGE_WORKER_V1` card | Load `references/synchronization-package-worker.md`; return one bounded artifact or contract error. |
+| Full onboarding requested, or the selected task requires source access and roots/acquisition choice are missing | Use `configure-workspace` to collect unresolved decisions before source acquisition; return to the selected map branch afterward. |
 | Incomplete bootstrap or where-to-start request | Load `references/orientation.md`. |
 | Context, dependency, or impact question | Load `references/interrogation.md`. |
 | One durable node | Load `references/single-unit-documentation.md`. |

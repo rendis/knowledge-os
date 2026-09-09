@@ -9,6 +9,28 @@ Treat `<VAULT_ROOT>/.knowledge-os-config.yaml` as local state. This skill is the
 
 Only the canonical `.knowledge-os-config.yaml` is configuration. `status` and every semantic read are read-only; they neither inspect nor migrate similarly named files. Development worktree root and database proxy ports are independent capabilities; their absence does not make repository discovery incomplete.
 
+## Collect onboarding decisions
+
+For a new vault or a request for full onboarding, collect missing decisions before invoking non-interactive installers or configuration mutations. Reuse explicit user choices and valid existing configuration; ask only for missing choices. A directory's existence, its name, a sibling `repos/` or `worktrees/`, and a general request to “do everything” do not select paths or grant managed-clone authority.
+
+| Decision | Resolve before acting |
+| --- | --- |
+| Vault identity and systems | Reuse the requested destination and systems; draft a purpose consistent with the stated scope. |
+| Evidence profile and note language | Ask for missing choices, briefly explaining the proposed defaults; pass the selected values explicitly. |
+| Trackers and adapters | During full onboarding, offer selection or explicit deferral. Deferred means unconfigured, not a confirmed absence or operational readiness. |
+| Source identity and scope | Obtain the organization/remotes and exact repository scope needed for discovery; a missing inventory is not an empty successful sync. |
+| Local source roots | Obtain exact paths. Suggest an existing directory if useful, then wait for the user's selection before recording it. |
+| Source acquisition mode | Distinguish read-only existing checkouts from permission to clone/fetch in an exact managed root. Confirmation of a location alone does not enable acquisition. |
+| Development worktrees | Ask for an exact root or explicit deferral during full onboarding. Discovery-only work may defer this capability. |
+
+For an initial inventory, a supplied organization plus repository prefixes selects the matching repositories; reuse that scope unless the user narrows it or an observed ambiguity requires clarification.
+
+Group related missing choices into concise questions. Stop only the actions that depend on an unanswered choice; continue independent read-only inspection. Do not ask again for choices already supplied or reopen valid existing configuration. A specific instruction to clone the scoped repositories into an exact managed root supplies that acquisition choice; do not add another approval ceremony.
+
+`--yes` suppresses terminal prompts; it is not evidence that the user selected defaults. Use it after resolving the applicable choices. The workspace CLI is a non-interactive executor: this skill owns the conversation and supplies its parameters. Do not add a second competing configuration wizard or write configuration YAML by hand.
+
+On a missing vault, first initialize it through the distribution installer once portable identity/profile/locale and optional selections or deferrals are resolved; then use the resolver and local configuration steps below. Keep local paths in workspace configuration. Cloning, source inspection and sync wait for their source scope and access choices. External vault publication and live-environment access remain separate capabilities, required only when requested.
+
 Before reading or changing configuration, load `../../../90-Meta/vault-resolution.md` and run `../../../90-Meta/resolve-vault.py` relative to this skill directory. Pass any user-supplied path through that resolver. Bind `VAULT_ROOT` only from a single `resolved` result; an `invalid`, `ambiguous`, or `not_found` result blocks configuration.
 
 ## 1. Inspect
@@ -40,7 +62,7 @@ Refresh without wiping ports. Present only the candidate for the selected enviro
 <python> -B "<VAULT_ROOT>/90-Meta/workspace-config.py" --vault-root "<VAULT_ROOT>" update [--repository-root "<ROOT>"] [--managed-clone-root "<ROOT>" | --disable-managed-clone] [--development-worktree-root "<WORKTREE_ROOT>" | --disable-development-worktree-root] [--proxy-port "ENVIRONMENT=PORT"]
 ```
 
-Completion criterion: `status` is `initialized` and no consumer wrote the YAML by hand.
+Completion criterion: the configured values match the resolved user choices or reused existing configuration, `status` is `initialized`, and no consumer wrote the YAML by hand. Report deferred capabilities separately; do not report full onboarding or sync completion from this status alone.
 
 ## 3. Hand off
 

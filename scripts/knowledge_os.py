@@ -498,8 +498,8 @@ def prompt(label: str, default: str, yes: bool) -> str:
     suffix = f" [{default}]" if default else ""
     try:
         value = input(f"{label}{suffix}: ").strip()
-    except EOFError:
-        return default
+    except (EOFError, KeyboardInterrupt):
+        raise SystemExit("Initialization cancelled: input interrupted.") from None
     return value or default
 
 
