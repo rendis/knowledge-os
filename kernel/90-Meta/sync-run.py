@@ -29,6 +29,27 @@ SENSITIVE_PATCH_RE = re.compile(
     r"(?i)(?:password|passwd|secret|token|api[_-]?key|private[_-]?key)"
     r"\s*[:=]\s*['\"]?[^\s'\"]+"
 )
+# Only the exact GitHub permission key and standard values are non-secret.
+# Match offsets distinguish permission values from surrounding secret assignments.
+OIDC_PERMISSION_RE = re.compile(
+    r"(?<![A-Za-z0-9_.-])id-token:[ \t]*(?:write|read|none)"
+    r"(?=$|[\s`\"',;)}\]])"
+)
+
+
+def sensitive_assignment(text: str) -> bool:
+    permission_offsets = {
+        match.start() + len("id-") for match in OIDC_PERMISSION_RE.finditer(text)
+    }
+    offset = 0
+    while (match := SENSITIVE_PATCH_RE.search(text, offset)) is not None:
+        if match.start() not in permission_offsets:
+            return True
+        # Do not skip assignments embedded in an exempt match after punctuation.
+        offset = match.start() + 1
+    return False
+
+
 TOKEN_LIKE_RE = re.compile(
     r"(?:gh[pousr]_[A-Za-z0-9]{10,}|xox[baprs]-[A-Za-z0-9-]{10,}|"
     r"AKIA[0-9A-Z]{16}|Bearer\s+[A-Za-z0-9._~-]{10,}|"
@@ -788,7 +809,7 @@ def sensitive_artifact(value: Any) -> bool:
             value.startswith("/")
             or LOCAL_ABSOLUTE_PATH_RE.search(value) is not None
             or "-----BEGIN " in value
-            or SENSITIVE_PATCH_RE.search(value) is not None
+            or sensitive_assignment(value)
             or TOKEN_LIKE_RE.search(value) is not None
         )
     return False
@@ -1227,7 +1248,7 @@ def validate_unit(args: argparse.Namespace) -> dict[str, Any]:
         }
     if (
         "-----BEGIN " in patch_text
-        or SENSITIVE_PATCH_RE.search(patch_text)
+        or sensitive_assignment(patch_text)
         or TOKEN_LIKE_RE.search(patch_text)
     ):
         raise ContractError(
