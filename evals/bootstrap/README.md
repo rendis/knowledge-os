@@ -6,6 +6,11 @@ These checks are **not** installed into a cell vault.
 python3 -B kernel/90-Meta/test_instance.py
 python3 -B evals/bootstrap/test_bootstrap.py
 python3 -B evals/bootstrap/test_sync_tooling.py
+python3 -B evals/bootstrap/test_cell_capabilities.py
+python3 -B evals/bootstrap/test_investigation_transactions.py
+python3 -B evals/bootstrap/test_integrity.py
+python3 -B evals/sync/test_integrity.py
+python3 -B evals/sync/test_noop_integrity.py
 python3 -B evals/sync/test_sync_pipeline.py
 python3 -B evals/sync/test_sync_semantics.py
 python3 -B evals/sync/test_sync_state.py

@@ -26,7 +26,7 @@ The default issue prefix is `issue/`. Ask the user for the short description; do
 
 ## Base selection and freshness
 
-Inspect local branches read-only. Suggest `main` when it exists and `master` only when `main` does not; do not guess when both, neither, or deployment evidence make the baseline ambiguous. Obtain the user's base-branch confirmation.
+Inspect local branches read-only. Suggest `main` when it exists and `master` only when `main` does not; do not guess when both, neither, or deployment evidence make the baseline ambiguous. Use the user's already specified base branch; ask only when the baseline remains unresolved.
 
 Run a provisional complete remote plan to compare the exact local and remote commits and project the initial handoff files:
 
@@ -45,7 +45,7 @@ Interpret `base.freshness` as follows:
 
 When the refs differ, show both commits and ask whether to start from the exact remote commit or the exact local commit. Selecting `remote` authorizes a targeted fetch during creation when required; it does not move, merge, reset, pull, or switch the local base branch. Selecting `local` preserves its current commit. If the user wants the local base branch itself updated, stop and hand that separate Git operation to the repository's normal workflow before re-planning.
 
-Re-run `plan-handoff` with the selected `--base-source`. Plan every repository before the first persistent Git write, present the exact fetch/ref/path and materialization effects together, and obtain one explicit authorization for the complete plan. When the exact remote commit is absent locally, planning inspects it in disposable temporary storage and leaves the source repository unchanged.
+Re-run `plan-handoff` with the selected `--base-source`. Plan every repository before the first persistent Git write, present the exact fetch/ref/path and materialization effects together, and check existing authorization for the complete plan; ask only for uncovered effects. When the exact remote commit is absent locally, planning inspects it in disposable temporary storage and leaves the source repository unchanged.
 
 ## Complete preparation
 

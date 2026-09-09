@@ -84,7 +84,7 @@ Preserve encoding, line endings, file mode, existing separator space, symlink to
 
 Reconcile the managed block from the current bundled asset during every mutating handoff operation. Compare exact desired bytes before writing: an identical block is a no-op and must not change bytes, mtime, or Git status. A policy-only refresh is `bootstrap`, preserves the current content revision, and creates no history event.
 
-Generated baseline files are read-only to the implementation agent. `ACTIVE.yaml` changes only through `set-state`; it is never edited freehand. `implementation-updates.md` is the only handoff file the implementation agent edits directly and records definition deltas, not routine progress or a duplicate implementation diary. Implementation evidence stays in normal repository code, tests, diff, branch, pull request, and delivery artifacts.
+Generated baseline files are read-only to the implementation agent. `ACTIVE.yaml` changes only through `set-state`; it is never edited freehand. `implementation-updates.md` is the only handoff file the implementation agent edits directly and records definition deltas, material implementation decisions, deviations, questions, and evidence references. Implementation evidence stays in normal repository code, tests, diff, branch, pull request, and delivery artifacts.
 
 ## Plan and apply
 

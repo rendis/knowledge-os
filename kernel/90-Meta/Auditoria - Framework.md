@@ -28,7 +28,9 @@ Quedan fuera del sync técnico: logs, pruebas runtime/manuales, datos productivo
 
 ## Gate de realidad productiva
 
-Antes de crear o modificar una afirmación del grafo técnico, demostrar dos condiciones:
+Applicability: this section governs `production-gate` and the technical half of `mixed`. For `documented-source`, use [[evidence-policy]]: inspected versioned sources suffice for source-level assertions; actual deployment claims still require deployment evidence.
+
+For the production profiles, establish both conditions before a technical write:
 
 1. **Implementación observada**: código, schema/migración, configuración, contrato o recurso que materializa el comportamiento.
 2. **Aplicabilidad productiva**: evidencia que vincula esa implementación con producción según su naturaleza, como la cadena de deploy por ambiente, configuración productiva versionada, metadata del control-plane, runtime identificado o estado de esquema validado mediante la autoridad de base de datos correspondiente.

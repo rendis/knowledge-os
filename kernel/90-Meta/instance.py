@@ -189,6 +189,11 @@ def dump_instance(data: dict[str, Any]) -> str:
     lines.append(f"  profile: {evidence.get('profile') or 'production-gate'}")
     adapters = data.get("adapters") or []
     lines.append(f"adapters: [{', '.join(adapters)}]")
+    capabilities = data.get("capabilities") or {}
+    if capabilities:
+        lines.append("capabilities:")
+        for name, notes in sorted(capabilities.items()):
+            lines.append(f"  {name}: [{', '.join(_quote(note) for note in notes)}]")
     locale = data.get("locale") or {}
     lines.append("locale:")
     lines.append(f"  notes: {locale.get('notes') or 'es'}")
@@ -293,6 +298,22 @@ def validate_instance(data: dict[str, Any]) -> dict[str, Any]:
     unknown = [item for item in adapters if item not in ALLOWED_ADAPTERS]
     if unknown:
         raise InstanceError(f"unknown adapters: {unknown}")
+    capabilities = data.get("capabilities") or {}
+    if not isinstance(capabilities, dict):
+        raise InstanceError("capabilities must map capability names to procedure basenames")
+    normalized_capabilities = {}
+    for name, notes in capabilities.items():
+        if not isinstance(name, str) or KEBAB_CASE_RE.fullmatch(name) is None:
+            raise InstanceError("capability names must be kebab-case")
+        if not isinstance(notes, list) or not notes or any(
+            not isinstance(note, str) or not note.strip() or note != note.strip()
+            or any(char in note for char in ("/", "\\", "\n", "\r", "[", "]", "#"))
+            or note in {".", ".."} or note.endswith(".md") for note in notes
+        ):
+            raise InstanceError(f"capabilities.{name} must contain canonical note basenames")
+        if len(set(notes)) != len(notes):
+            raise InstanceError(f"duplicate procedure in capabilities.{name}")
+        normalized_capabilities[name] = list(notes)
     types = ((data.get("graph") or {}).get("enabled_types")) or list(DEFAULT_TYPES)
     return {
         "version": int(data.get("version") or 1),
@@ -310,6 +331,7 @@ def validate_instance(data: dict[str, Any]) -> dict[str, Any]:
         "evidence": {"profile": profile},
         "adapters": list(adapters),
         "locale": {"notes": locale},
+        "capabilities": normalized_capabilities,
     }
 
 

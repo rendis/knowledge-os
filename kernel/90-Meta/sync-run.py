@@ -1808,7 +1808,7 @@ def apply_unit(args: argparse.Namespace) -> dict[str, Any]:
         for path, record in observed.items()
         if record == (unit["result_kinds"][path], unit["result_files"][path])
     }
-    if preimage_paths and postimage_paths:
+    if (preimage_paths - postimage_paths) and (postimage_paths - preimage_paths):
         unit["status"] = "apply-failed"
         save_run(args.state_root, run)
         raise ContractError(
@@ -2042,7 +2042,12 @@ def resume(args: argparse.Namespace) -> dict[str, Any]:
                 )
                 for path in unit["result_files"]
             }
-            if any(after_matches.values()) and not all(after_matches.values()):
+            changed_matches = {
+                path: matches for path, matches in after_matches.items()
+                if (unit["base_kinds"][path], unit["base_files"][path])
+                != (unit["result_kinds"][path], unit["result_files"][path])
+            }
+            if any(changed_matches.values()) and not all(changed_matches.values()):
                 unit["status"] = "apply-failed"
                 save_run(args.state_root, run)
                 raise ContractError(

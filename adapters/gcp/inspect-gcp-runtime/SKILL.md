@@ -11,7 +11,7 @@ Treat the vault and versioned deployment evidence as the flight plan. Reach the 
 
 1. Load `../../../90-Meta/vault-resolution.md` and run `../../../90-Meta/resolve-vault.py` relative to this skill directory. Continue only with one canonical `VAULT_ROOT`, then use the `map-ecosystem` **interrogation** branch as the primary evidence workflow.
 2. Read the named or inferred flow, its participant notes, backlinks, and each participant's **Infraestructura y scheduling** section.
-3. Read `60-Operacion/GCP/GCP - Catalogo de ambientes y runtimes.md` and `60-Operacion/GCP/GCP - Inspeccion segura de runtime.md`.
+3. Resolve `runtime-inspection` with `90-Meta/cell-config.py --vault-root "<VAULT_ROOT>" resolve --capability runtime-inspection` and read the returned procedures/catalogs. A missing binding triggers `configure-workspace` for that capability only; static evidence collection can continue. Live access requires the configured target and read policy.
 4. If a deployable target is incomplete, inspect its versioned Actions, Cloud Build, manifests, overlays, or reusable deployment workflows through `map-ecosystem` before considering a live query.
 5. Produce one target-card row per component with: flow, component, environment, project, platform, resource, region or zone, namespace or workload when applicable, and evidence source.
 

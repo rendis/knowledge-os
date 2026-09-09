@@ -20,9 +20,14 @@ TEST_COMMANDS = (
     ("sync-pipeline", "python3", "-B", "evals/sync/test_sync_pipeline.py"),
     ("sync-semantics", "python3", "-B", "evals/sync/test_sync_semantics.py"),
     ("sync-state", "python3", "-B", "evals/sync/test_sync_state.py"),
+    ("installer-integrity", "python3", "-B", "evals/bootstrap/test_integrity.py"),
+    ("eval-integrity", "python3", "-B", "evals/sync/test_integrity.py"),
+    ("noop-integrity", "python3", "-B", "evals/sync/test_noop_integrity.py"),
     ("eval-harness", "python3", "-B", "evals/sync/test_run_eval.py"),
     ("sync-tooling", "python3", "-B", "evals/bootstrap/test_sync_tooling.py"),
     ("bootstrap", "python3", "-B", "evals/bootstrap/test_bootstrap.py"),
+    ("cell-capabilities", "python3", "-B", "evals/bootstrap/test_cell_capabilities.py"),
+    ("investigation-transactions", "python3", "-B", "evals/bootstrap/test_investigation_transactions.py"),
     ("instance", "python3", "-B", "kernel/90-Meta/test_instance.py"),
 )
 REVIEW_FIELDS = {
@@ -194,6 +199,50 @@ def next_round(eval_root: Path) -> int:
     return max(rounds, default=-1) + 1
 
 
+def validate_bundle(bundle_root: Path, *, require_pass: bool = False) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+    bundle = load_json(bundle_root / "bundle.json")
+    review_input = load_json(bundle_root / "review-input.json")
+    receipt = load_json(bundle_root / "test-receipt.json")
+    if not all(isinstance(value, dict) for value in (bundle, review_input, receipt)):
+        raise EvalError("evaluation bundle is invalid")
+    unsigned = {key: value for key, value in review_input.items() if key != "input_digest"}
+    if digest_json(unsigned) != review_input.get("input_digest"):
+        raise EvalError("review input digest does not match its contents")
+    for key in ("version", "round", "base_sha", "candidate_tree_digest", "criteria_digest", "test_receipt_digest"):
+        if key not in bundle or bundle[key] != review_input.get(key):
+            raise EvalError("bundle and review input are inconsistent")
+    if digest_json(receipt) != bundle["test_receipt_digest"]:
+        raise EvalError("test receipt digest does not match")
+    tests = receipt.get("tests")
+    if not isinstance(tests, list) or not tests or any(
+        not isinstance(test, dict) or type(test.get("returncode")) is not int
+        or test.get("status") != ("pass" if test["returncode"] == 0 else "fail")
+        for test in tests
+    ):
+        raise EvalError("test receipt records are invalid")
+    passed = all(test["returncode"] == 0 for test in tests)
+    if receipt.get("status") != ("pass" if passed else "fail") or (require_pass and not passed):
+        raise EvalError("evaluation requires a consistent passing test receipt")
+    manifest = bundle.get("files")
+    if not isinstance(manifest, list) or digest_json(manifest) != bundle["candidate_tree_digest"]:
+        raise EvalError("candidate manifest digest does not match")
+    if review_input.get("files") != [record["path"] for record in manifest]:
+        raise EvalError("review file list differs from candidate manifest")
+    snapshot = bundle_root / "snapshot"
+    if any(not safe_relative_file(record.get("path")) for record in manifest):
+        raise EvalError("snapshot contains an unsafe path")
+    actual_paths = {
+        path.relative_to(snapshot).as_posix() for path in snapshot.rglob("*")
+        if path.is_file() or path.is_symlink()
+    }
+    expected_paths = {record["path"] for record in manifest if record["kind"] != "deleted"}
+    if actual_paths != expected_paths or [file_record(snapshot, record["path"]) for record in manifest] != manifest:
+        raise EvalError("snapshot differs from candidate manifest")
+    if digest_bytes((snapshot / "evals/sync/criteria.md").read_bytes()) != bundle["criteria_digest"]:
+        raise EvalError("criteria differs from review input")
+    return bundle, review_input, receipt
+
+
 def prepare(args: argparse.Namespace) -> dict[str, Any]:
     root = args.repo_root.resolve()
     criteria = root / "evals/sync/criteria.md"
@@ -202,9 +251,7 @@ def prepare(args: argparse.Namespace) -> dict[str, Any]:
     bundle_root = args.eval_root.resolve() / tree_digest
     prior_round = existing_round(args.eval_root.resolve(), tree_digest)
     if prior_round is not None:
-        bundle = json.loads((bundle_root / "bundle.json").read_text(encoding="utf-8"))
-        review_input = json.loads((bundle_root / "review-input.json").read_text(encoding="utf-8"))
-        test_receipt = json.loads((bundle_root / "test-receipt.json").read_text(encoding="utf-8"))
+        bundle, review_input, test_receipt = validate_bundle(bundle_root)
         return {
             "version": 1,
             "code": "eval-bundle-ready",
@@ -218,6 +265,8 @@ def prepare(args: argparse.Namespace) -> dict[str, Any]:
         }
     round_number = prior_round if prior_round is not None else next_round(args.eval_root.resolve())
     test_receipt, outputs = run_tests(root)
+    if tree_manifest(root) != manifest:
+        raise EvalError("candidate tree changed during tests; prepare again after edits stop")
     test_receipt_digest = digest_json(test_receipt)
     base_sha = git(root, "rev-parse", "HEAD").decode("ascii").strip()
     changed = sorted(
@@ -247,6 +296,10 @@ def prepare(args: argparse.Namespace) -> dict[str, Any]:
     review_input["input_digest"] = digest_json(review_input)
     bundle_root.mkdir(parents=True, exist_ok=True)
     copy_snapshot(root, bundle_root / "snapshot", manifest)
+    if tree_manifest(root) != manifest or [
+        file_record(bundle_root / "snapshot", record["path"]) for record in manifest
+    ] != manifest:
+        raise EvalError("candidate tree changed while preparing snapshot")
     atomic_json(bundle_root / "bundle.json", bundle)
     atomic_json(bundle_root / "test-receipt.json", test_receipt)
     atomic_json(bundle_root / "review-input.json", review_input)
@@ -330,10 +383,7 @@ def load_json(path: Path) -> Any:
 
 def finalize(args: argparse.Namespace) -> dict[str, Any]:
     bundle_root = args.bundle_root.resolve()
-    bundle = load_json(bundle_root / "bundle.json")
-    review_input = load_json(bundle_root / "review-input.json")
-    if not isinstance(bundle, dict) or not isinstance(review_input, dict):
-        raise EvalError("evaluation bundle is invalid")
+    bundle, review_input, test_receipt = validate_bundle(bundle_root, require_pass=True)
     expected = review_input.get("input_digest")
     if not isinstance(expected, str) or not DIGEST_RE.fullmatch(expected):
         raise EvalError("review input digest is invalid")

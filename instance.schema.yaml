@@ -86,3 +86,9 @@ fields:
       - es
       - en
     default: es
+
+  capabilities:
+    type: object
+    optional: true
+    default: {}
+    description: Maps capability ids to canonical operational note basenames. Configure during onboarding; procedures own environments, executors, authentication and local policy.

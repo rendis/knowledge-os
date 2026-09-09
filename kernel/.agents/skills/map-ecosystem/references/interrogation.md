@@ -16,7 +16,7 @@ Accept a question, proposed change, or starting node. Resolve aliases only to fi
 ```
 
    Use `neighbors` for dependency, topic, flow, and impact. Use `hygiene` for unresolved links and orphans. Use `investigations` for vault ↔ `.investigations/` join (on-demand scan; not a second index). `manage-investigation` remains owner of the store.
-3. Open **only** the stems/paths named in the JSON. For change impact, query `neighbors` of the changed unit, then `neighbors` of its `publica-en` / `gatillado-por` / `participa-en` targets. Skip types disabled in `instance.yaml` `graph.enabled_types` (do not expand Pub/Sub when `topic` is disabled). If the question asks where a fact belongs, load [node-selection.md](../../../../90-Meta/node-selection.md) and open the candidate note, not the full Convenciones file.
+3. Open the stems/paths named in the JSON. If a node or needed relationship is absent, search the named subject in the relevant notes or configured source before concluding that it does not exist. The graph is a navigation index, not proof of completeness. For change impact, query `neighbors` of the changed unit, then `neighbors` of its `publica-en` / `gatillado-por` / `participa-en` targets. Skip types disabled in `instance.yaml` `graph.enabled_types` (do not expand Pub/Sub when `topic` is disabled). If the question asks where a fact belongs, load [node-selection.md](../../../../90-Meta/node-selection.md) and open the candidate note, not the full Convenciones file.
 4. Expand a second named note only when the JSON edge is required by the question:
    - Pub/Sub: producer → topic → consumer (only when `topic` is enabled).
    - HTTP: caller → consumed repository or integration.
@@ -50,4 +50,4 @@ Return, in this order:
 
 ## Completion criterion
 
-The question is complete when the conclusion is evidence-backed, every path that could change it has been inspected, uncertainties are separated from facts, and no durable vault, shared-configuration, or source-repository content was modified.
+The question is complete when the inspected sources support the answer and remaining uncertainties are explicit. Stop when another read cannot change the answer; preserve read-only scope and create no persistent case unless continuity was requested.

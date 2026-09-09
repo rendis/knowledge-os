@@ -4,7 +4,7 @@ This vault is an evidence-backed map of one cell's systems. Load skills by name;
 
 `tracker` means one external work-tracking instance declared in `instance.yaml`. A `work item` is one externally tracked unit identified by its exact tracker and provider-native reference.
 
-Classify the request, then select one skill. For orientation or interrogation, first hop is `90-Meta/graph-query.py` (JSON stems and edges, no note bodies). Open `instance.yaml` and `00-Home.md` for cell identity. Open `90-Meta/Alcance.md` only for cell-specific scope, allowlists, or exceptions. Open a section of `90-Meta/Convenciones.md` or `90-Meta/Auditoria - Framework.md` only when schema, node type, or an evidence gate is required. Do not load those Meta files before classifying.
+Classify the request, then select one skill. Answer bounded questions directly through `map-ecosystem`; open a persistent investigation only when the user requests one or the work needs continuity. For orientation or interrogation, first hop is `90-Meta/graph-query.py` (JSON stems and edges, no note bodies). Open `instance.yaml` and `00-Home.md` for cell identity. Open `90-Meta/Alcance.md` only for cell-specific scope, allowlists, or exceptions. Open a section of `90-Meta/Convenciones.md` or `90-Meta/Auditoria - Framework.md` only when schema, node type, or an evidence gate is required. Do not load those Meta files before classifying.
 
 ## Skills
 
@@ -33,7 +33,7 @@ Instance files (`instance.yaml`, `00-Home.md`, notes under `10/`–`70/`) are ne
 
 ## Guardrails
 
-- Production-only durable technical truth when `evidence.profile` is `production-gate` or the technical half of `mixed`. `documented-source` accepts versioned source without a deploy chain.
+- Apply `90-Meta/evidence-policy.md` when assessing a technical write. Cell identity and capability bindings come from onboarding, never inferred company conventions.
 - Evidence before inference. Separate facts, inferences, and limitations.
 - Never persist secrets.
 - Canonical wikilinks target the note basename.

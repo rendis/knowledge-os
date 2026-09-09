@@ -50,7 +50,7 @@ The distribution owns the thin `AGENTS.md` router, every generic file it ships u
 
 `update` refreshes only the consumer vault; it never traverses development worktrees. An existing worktree receives the current managed instruction block during its next authorized handoff mutation.
 
-Version 0.5 uses work-item bundle and manifest schema 2. Jira-specific schema-1 packages or materialized families are not reinterpreted in place; configure their tracker and export a new schema-2 package. The legacy schema-1 `ACTIVE.yaml` pointer remains readable only as a registry wrapper around a current schema-2 family.
+Versions 0.5 and 0.6 use work-item bundle and manifest schema 2. Jira-specific schema-1 packages or materialized families are not reinterpreted in place; configure their tracker and export a new schema-2 package. The legacy schema-1 `ACTIVE.yaml` pointer remains readable only as a registry wrapper around a current schema-2 family.
 
 When adopting or upgrading a vault, a pre-existing file that becomes distribution-owned must already match the distribution or be explicitly authorized with an overlay or `--force`. This prevents a newly managed runtime file from being overwritten silently.
 
@@ -76,3 +76,17 @@ never create a visible `plan/` directory inside a cell vault.
 ## License
 
 Apache License 2.0.
+
+## Minimal workflow
+
+Requires Python 3.9+ and Git. Obsidian is optional for filesystem queries. Each optional adapter declares its own tool dependencies.
+
+1. Initialize identity, systems, trackers, evidence profile and note locale with `init`.
+2. Use `configure-workspace` only when a task needs local source roots or an optional capability. Bind team procedures through `90-Meta/cell-config.py`; `instance.yaml` owns portable bindings, local config owns machine paths.
+3. Ask a bounded question through `map-ecosystem`; it returns sources and limitations without creating a case.
+4. Open an investigation when the work needs continuity. Close it with a reason and limitations even when no story is exported.
+5. Export a self-sufficient development package only when implementation is requested. Its source anchor permits targeted read-only context lookup; implementation deltas remain in the worktree for later vault-owned reconciliation.
+
+Existing note names, relationships, investigations and handoff families are preserved by update. Optional capabilities are unconfigured until onboarding binds real procedures; selecting an adapter alone does not prove live readiness.
+
+Version 0.6 adds optional capability bindings and transactional investigation commands without changing existing note or handoff schemas. `doctor --strict` is the opt-in installation integrity gate.
