@@ -1,35 +1,19 @@
-# Extract knowledge with bounded impact
+# Extract a useful, evidence-backed map
 
-Use this contract for single-unit, multi-unit and synchronization extraction. The transport and publication gates remain in their respective recipes.
+For repository mapping and synchronization, use [repository-map.md](repository-map.md) as the scope and sufficiency contract. Publication mechanics remain in the selected recipe.
 
-## Select the evidence boundary
+## Scope and evidence
 
-For a new repository, map its entrypoints, contracts, behavior, data and deployment/configuration sources. For a known repository, start with the frozen diff and existing canonical notes. Follow changed symbols and contracts into unchanged files at the same exact revision when needed to explain their effect. A diff selects where investigation starts; it is not the complete evidence boundary.
+For a new repository, trace main entrypoints through relevant logic to connectors and effects. For an existing map, start from the frozen diff and existing knowledge; inspect unchanged dependencies only where they explain changed meaning. Resolve each source by configured identity and exact revision. Code and configuration support source-level assertions; stronger runtime assertions need their own evidence under `90-Meta/evidence-policy.md`.
 
-Follow directly affected publishers/consumers, callers, storage and flow participants. Use graph neighbors and targeted identifier searches together: a missing graph edge does not prove a missing dependency. Freeze each additional source's remote and revision before relying on it. Cross-repository observations remain context until their owning package supplies source evidence; select an affected unchanged repository for an explicit audit when its own claims need revision.
+The existing checklist dimensions (inputs, outputs, data, business behavior, infrastructure, deployment) organize the map; they are not six exhaustive audits. Answer applicable questions to main-flow depth. Record secondary or inaccessible details as limits. Read environment configuration selectively to resolve connectors, schedules and behavior-changing flags; omit secret values rather than excluding all safe facts in the file. Preserve seeded evidence entries as bookkeeping without reconstructing every deployment chain.
 
-Reuse analysis only while its source revisions, evidence profile, selected context and unresolved-evidence state remain valid. A changed dependency, newly accessible evidence or changed profile can justify an explicit same-commit audit. Record the reason and affected scope; do not reset unrelated cursors or repeat a completed scan just because publication failed.
+## Preservation
 
-Stop expanding when each changed contract has an explained effect, direct participants have a decision, and no unanswered question can change a proposed claim or node action. A blocked dependency limits only the claims that need it.
+Compare against existing notes and reusable analysis. Preserve supported facts and relationships, including details beyond the current map scope. Missing mention, inaccessible evidence or absent search results are not proof of removal. A removed source file requires checking replacement wiring before retiring behavior. Keep conflicting environment values scoped. Instruction or model changes alone do not invalidate accurate source observations.
 
-## Ask questions appropriate to the cell
+## Review and closure
 
-The scaffold's six dimensions are the stable core: inputs, outputs, data, business behavior, infrastructure and deployment. Derive concrete probes from observed code and the procedures/capabilities configured in `instance.yaml`; the coordinator supplies relevant procedure notes as `vault_context`. Do not load every adapter or assume a cloud provider, retail vocabulary, environment name or credential mechanism.
+Apply the directed review in repository-map.md. Check material assertions and main-flow omissions, not exhaustive implementation coverage. One optional finding-directed correction preserves the original and unrelated accurate facts; sync uses `sync-correction.py`. A structural problem goes to deterministic tooling. An unresolved isolated defect limits only dependent claims. An omitted secondary detail does not establish that a valid map is wrong.
 
-Examples: a message publisher needs payload, routing and failure behavior; a batch file job needs file contract, schedule and recovery; a local library needs callers, exported behavior and state effects. Investigate only applicable technology details. Mark unsupported dimensions `not-applicable` with a reason after a bounded source check. An applicable behavior not found is `not-observed`; unreadable required evidence is `blocked`. Keep the frozen scaffold question keys unchanged and put concrete answers in reasons, claims and evidence anchors.
-
-## Reconcile against the vault
-
-Compare the evidence with the existing note and directly affected relationships. For each affected fact decide whether it is unchanged, new, corrected, contradicted or explicitly removed. Keep valid unrelated facts and relationships, including their provenance. Absence from this extraction, a missing search result or an inaccessible source is not removal evidence. A removed file alone does not prove a behavior disappeared: inspect replacements, callers and configuration before retiring its claim or node.
-
-Use existing node actions and atomic claims; do not create another persisted fact register. State material preservation/removal decisions in node reasons and the proposed diff. Keep conflicting environment values separately scoped until evidence resolves them. Follow `90-Meta/evidence-policy.md`: source behavior and effective deployment are distinct assertions.
-
-## Review both assertions and omissions
-
-Before reading the candidate claims in detail, the independent reviewer derives the few material questions raised by the changed contracts and existing notes. Then check the candidate against exact evidence: supported claims, missing rules, affected consumers, absent-versus-zero or units/state semantics when relevant, and unjustified removals. This is a bounded review of changed meaning and directly dependent knowledge, not another full repository scan.
-
-One initial review may trigger at most one targeted correction. For synchronization packages, the coordinator uses `sync-correction.py` before checkpointing. Ordinary single-unit or multi-unit mapping uses one focused revision of its existing draft without creating synchronization artifacts. Repair only findings and connected claims/dependencies, preserve the original attempt, and obtain a fresh review of the repaired artifact. A remaining defect stays explicit as limited/rejected or a safe partial outcome; never acknowledge rejected work as current documentation.
-
-## Verify the published meaning
-
-Inspect the final note diff against accepted claims and preservation decisions. Every new or corrected assertion needs evidence; every removed fact or relationship needs an explicit justified replacement or removal. For each changed business rule or contract, answer a concrete source-derived question from the resulting note and check it against the inspected source. Structural checks and valid links supplement this semantic check; they do not establish completeness.
+Before publishing, inspect the note diff against accepted evidence and preservation decisions. Verify that a reader can identify purpose, main triggers, significant effects/destinations and business conditions from the note and follow citations for detail. Check changed meaningful rules against source, plus structural/link checks. A partial map stays explicit about limits; do not claim exhaustive coverage or verified deployment.

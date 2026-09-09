@@ -9,9 +9,9 @@ Use [evidence-extraction.md](evidence-extraction.md) as the common extraction co
 ## Per-unit analysis
 
 1. Build the initial inventory from MOCs, services, flows, operational indices, and backlinks.
-2. Group units by changed contracts and direct impact; include unchanged participants when needed. Split write ownership into non-overlapping groups. For massive work, delegate complete analyses by group: source code → note → detected topics/integrations.
+2. Group units by changed contracts and direct impact; include unchanged participants when needed. Split write ownership into non-overlapping groups. For a batch, use the bounded pilot and small-group policy in repository-map.md; workers return local maps before cross-unit reconciliation.
 3. Apply the [single-unit documentation recipe](single-unit-documentation.md) to every unit without synthesizing global relationships before local analyses are complete.
-4. Record per unit: commit/branch when applicable, contracts, data, runtime, deployment matrix by environment when applicable, observed relationships, and limitations.
+4. Record per unit: commit/branch when applicable, contracts, data, stack/runtime basics, connector-relevant environment differences, observed relationships, and limitations.
 
 ## Synthesis
 
@@ -27,4 +27,4 @@ Report analyzed units, changes per node, new/modified/removed relationships, evi
 
 ## Completion criterion
 
-The unit set is complete when every unit has an individual decision, every deployable unit has a resolved or explicitly limited row for each observed environment, every cross-unit relationship was evaluated during synthesis, derived nodes were propagated, and the complete vault passes its gates.
+The unit set is complete when every unit has an individual decision, every main-flow connector has evidence or an explicit limitation, every cross-unit relationship was evaluated during synthesis, derived nodes were propagated, and the complete vault passes its gates.

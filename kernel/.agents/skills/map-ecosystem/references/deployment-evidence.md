@@ -1,6 +1,6 @@
 # Resolve deployment by environment
 
-Load this supporting reference whenever a repository analysis or synchronization covers a deployable unit. The file inventory from `static-evidence-scan.py` is a lead; completion requires interpreting the deployment chain.
+Load this reference for an explicit deployment audit, or the specific part needed to resolve a main-flow connector/trigger. Ordinary repository mapping uses repository-map.md and does not require a full deployment chain. For targeted resolution, stop at the concrete target or unresolved indirection. The full sequence and matrix below apply to the explicit deployment audit. Scanner output is a lead, not proof of deployment.
 
 ## Evidence sequence
 
