@@ -825,9 +825,10 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     state = dest_state(dest)
     payload: dict[str, Any] = {"dest": str(dest), "state": state}
     invalid_instance = False
+    instance = None
     if state == "installed":
         try:
-            load_instance(dest / "instance.yaml")
+            instance = load_instance(dest / "instance.yaml")
             payload["instance"] = {"status": "valid"}
         except InstanceError as error:
             payload["instance"] = {
@@ -837,6 +838,11 @@ def cmd_doctor(args: argparse.Namespace) -> int:
             invalid_instance = True
         lock = load_lock(dest / LOCK_NAME)
         adapters = lock.get("adapters") or []
+        payload["adapters_installed"] = adapters
+        payload["adapters_configured"] = instance["adapters"] if instance is not None else None
+        payload["adapter_configuration_drift"] = (
+            sorted(set(adapters) ^ set(instance["adapters"])) if instance is not None else []
+        )
         current = tree_hashes(dest, adapters)
         expected = distribution_hashes(adapters)
         payload["kernel_version_installed"] = lock.get("kernel_version")
@@ -883,6 +889,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         or not payload.get("reproducible_distribution")
         or payload.get("distribution_dirty_dist")
         or payload.get("drift") or payload.get("topology_drift")
+        or payload.get("adapter_configuration_drift")
         or not payload.get("managed_matches_dist")
     ):
         return 2
