@@ -85,6 +85,43 @@ def installed_command_targets(vault: Path) -> set[str]:
 
 
 class BootstrapEval(unittest.TestCase):
+    def test_init_note_locale_and_inventory_readiness(self) -> None:
+        for locale, heading, purpose in (("es", "Sistemas", "Propósito"), ("en", "Systems", "Purpose")):
+            for discovered in (False, True):
+                with self.subTest(locale=locale, discovered=discovered), tempfile.TemporaryDirectory() as tmp:
+                    root = Path(tmp)
+                    dest = root / "cell"
+                    args = ["sh", str(INSTALL), "init", "--dest", str(dest),
+                            "--cell-name", "Example", "--purpose", "Example purpose",
+                            "--system", "example:Example", "--locale", locale, "--yes"]
+                    if discovered:
+                        source = root / "source"
+                        source.mkdir()
+                        self.assertEqual(run(["git", "init", str(source)]).returncode, 0)
+                        self.assertEqual(run(["git", "-C", str(source), "remote", "add", "origin",
+                                              "https://example.com/org/source.git"]).returncode, 0)
+                        args += ["--discovery-root", str(source)]
+                    initialized = run(args)
+                    self.assertEqual(initialized.returncode, 0, initialized.stdout + initialized.stderr)
+                    home = (dest / "00-Home.md").read_text()
+                    system = (dest / "10-Sistemas/Example.md").read_text()
+                    self.assertIn("## " + heading, home)
+                    self.assertIn("## " + purpose, system)
+                    self.assertNotIn("No discovery roots were given", home)
+                    self.assertIn("workspace-config.py --vault-root . status --format json", home)
+                    self.assertNotIn("{{", home + system)
+                    resolved = run([sys.executable, "-B", str(dest / "90-Meta/resolve-vault.py"),
+                                    "--path", str(dest)])
+                    self.assertEqual(resolved.returncode, 0, resolved.stderr)
+                    orientation = json.loads(resolved.stdout)["orientation"]
+                    self.assertTrue(orientation["ready"])
+                    self.assertEqual(orientation["pending_inventory"], discovered)
+                    (dest / "00-Home.md").write_text(home + "\nCell-owned addition.\n")
+                    before = knowledge_snapshot(dest)
+                    updated = run(["sh", str(INSTALL), "update", "--dest", str(dest)])
+                    self.assertEqual(updated.returncode, 0, updated.stdout + updated.stderr)
+                    self.assertEqual(before, knowledge_snapshot(dest))
+
     def test_operational_catalog_derives_cell_area_mocs(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

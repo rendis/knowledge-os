@@ -174,6 +174,9 @@ class InstanceTests(unittest.TestCase):
         self.assertFalse(pending_inventory_listed(heading_only))
         listed = home + "\n## Pending inventory\n\n- git@example.com:org/repo.git\n\n## Indexes\n"
         self.assertTrue(pending_inventory_listed(listed))
+        self.assertTrue(pending_inventory_listed(listed.replace("Pending inventory", "Inventario pendiente")))
+        self.assertFalse(pending_inventory_listed(heading_only.replace("Pending inventory", "Inventario pendiente")))
+        self.assertFalse(pending_inventory_listed(home.replace("Pending inventory", "Inventario pendiente")))
 
 
 if __name__ == "__main__":

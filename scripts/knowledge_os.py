@@ -350,8 +350,11 @@ def seed_skeleton(dest: Path, enabled_types: list[str] | None = None) -> None:
             shutil.copy2(gitkeep, target / ".gitkeep")
 
 
-def render_template(name: str, mapping: dict[str, str]) -> str:
-    text = (DIST / "kernel" / "templates" / name).read_text(encoding="utf-8")
+def render_template(name: str, mapping: dict[str, str], locale: str = "en") -> str:
+    templates = DIST / "kernel" / "templates"
+    if locale == "es":
+        templates = templates / "es"
+    text = (templates / name).read_text(encoding="utf-8")
     for key, value in mapping.items():
         text = text.replace("{{" + key + "}}", value)
     return text
@@ -360,8 +363,13 @@ def render_template(name: str, mapping: dict[str, str]) -> str:
 def pending_inventory(instance: dict[str, Any]) -> str:
     roots = [Path(item) for item in instance["sources"]["discovery_roots"] if str(item).strip()]
     prefixes = [str(item) for item in instance["sources"]["repo_prefixes"] if str(item).strip()]
+    spanish = instance["locale"]["notes"] == "es"
+    guidance = (
+        "Consulta la configuración local vigente desde la raíz del vault con "
+        if spanish else "Check the current local configuration from the vault root with "
+    ) + "`python3 -B 90-Meta/workspace-config.py --vault-root . status --format json`.\n"
     if not roots:
-        return "_No discovery roots were given. Configure them later with `configure-workspace`._\n"
+        return guidance
     found: list[str] = []
     for root in roots:
         if not root.is_dir():
@@ -382,8 +390,14 @@ def pending_inventory(instance: dict[str, Any]) -> str:
                 continue
             found.append(f"- `{name}` — `{remote}`")
     if not found:
-        return "_Discovery roots were set, but no matching remotes were visible yet._\n"
-    return "## Pending inventory\n\nThese remotes look in-scope and are not documented yet. Do not invent repository notes without evidence.\n\n" + "\n".join(found) + "\n"
+        return guidance
+    heading = "Inventario pendiente" if spanish else "Pending inventory"
+    description = (
+        "Remotos detectados al inicializar, pendientes de documentación respaldada por evidencia."
+        if spanish else
+        "Remotes detected at initialization, awaiting evidence-backed documentation."
+    )
+    return guidance + f"\n## {heading}\n\n{description}\n\n" + "\n".join(found) + "\n"
 
 
 def write_bootstrap(dest: Path, instance: dict[str, Any]) -> None:
@@ -400,6 +414,7 @@ def write_bootstrap(dest: Path, instance: dict[str, Any]) -> None:
             "systems_list": systems_list,
             "pending_inventory": pending_inventory(instance),
         },
+        locale=instance["locale"]["notes"],
     )
     (dest / "00-Home.md").write_text(home, encoding="utf-8")
     systems_dir = dest / "10-Sistemas"
@@ -414,6 +429,7 @@ def write_bootstrap(dest: Path, instance: dict[str, Any]) -> None:
                 "cell_purpose": instance["cell"]["purpose"],
                 "aliases_yaml": "[" + ", ".join(aliases) + "]" if aliases else "[]",
             },
+            locale=instance["locale"]["notes"],
         )
         (systems_dir / f"{item['name']}.md").write_text(note, encoding="utf-8")
         (dest / "20-Repos" / item["id"]).mkdir(parents=True, exist_ok=True)

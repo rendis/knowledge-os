@@ -343,14 +343,14 @@ def load_instance(path: Path) -> dict[str, Any]:
 
 def pending_inventory_listed(home_text: str) -> bool:
     """True only when Home has a Pending inventory heading with documented remotes."""
-    marker = "## Pending inventory"
-    if marker not in home_text:
-        return False
-    section = home_text.split(marker, 1)[1].split("\n## ", 1)[0]
-    for line in section.splitlines():
-        stripped = line.strip()
-        if stripped.startswith("- ") and "No discovery roots" not in stripped:
-            return True
+    for marker in ("## Pending inventory", "## Inventario pendiente"):
+        if marker not in home_text:
+            continue
+        section = home_text.split(marker, 1)[1].split("\n## ", 1)[0]
+        for line in section.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("- ") and "No discovery roots" not in stripped:
+                return True
     return False
 
 
