@@ -983,7 +983,7 @@ def finalize_analysis_payload(
                 item["claim_ids"] = []
             elif not item.get("claim_ids"):
                 item["action"] = "no-change"
-                item["reason"] = REDACTION_REASON
+                item["reason"] = FALLBACK_REASON
 
     write_claim_ids: set[str] = set()
     if isinstance(nodes, list):
@@ -1031,7 +1031,7 @@ def finalize_analysis_payload(
                     if not new_repository and item.get("basename") == local_basename
                     else "no-change"
                 )
-                item["reason"] = REDACTION_REASON
+                item["reason"] = FALLBACK_REASON
                 item["claim_ids"] = []
         if isinstance(decisions, list):
             for item in decisions:
@@ -1870,6 +1870,8 @@ def validate_acknowledgement_projection(
     projection: dict[str, Any],
     sections: dict[str, dict[str, Any]],
     issues: list[dict[str, str]],
+    *,
+    retirement_repositories: set[str] | None = None,
 ) -> None:
     field = "projection.acknowledgements"
     section = sections.get("90-Meta/.sync-acknowledgements.json")
@@ -1899,18 +1901,32 @@ def validate_acknowledgement_projection(
         issues.append(issue("acknowledgement-content-invalid", field))
         return
     expected = dict(prior)
-    for item in gate["acknowledgements"]:
-        record_value = observed.get(item["repository"])
-        if (
-            record_value is None
-            or record_value["branch"] != item["branch"]
-            or record_value["analyzed_sha"] != item["new_oid"][:12]
-            or record_value["decision"] != item["decision"]
-            or record_value["analysis_date"] != item["analysis_date"]
-        ):
-            issues.append(issue("acknowledgement-content-invalid", field))
-            return
-        expected[item["repository"]] = record_value
+    if retirement_repositories is None:
+        for item in gate["acknowledgements"]:
+            record_value = observed.get(item["repository"])
+            if (
+                record_value is None
+                or record_value["branch"] != item["branch"]
+                or record_value["analyzed_sha"] != item["new_oid"][:12]
+                or record_value["decision"] != item["decision"]
+                or record_value["analysis_date"] != item["analysis_date"]
+            ):
+                issues.append(issue("acknowledgement-content-invalid", field))
+                return
+            expected[item["repository"]] = record_value
+    else:
+        repositories = {
+            item["repository"]: item for item in gate["repositories"]
+        }
+        for repository in retirement_repositories:
+            record_value = expected.get(repository)
+            gate_record = repositories.get(repository)
+            if (
+                record_value is not None
+                and gate_record is not None
+                and record_value["analyzed_sha"] == gate_record["new_oid"][:12]
+            ):
+                del expected[repository]
     if observed != expected:
         issues.append(issue("acknowledgement-content-invalid", field))
 
@@ -1965,6 +1981,7 @@ def validate_projection(
     unit_id = projection.get("unit_id")
     projection_grants = projection.get("grants")
     authorized_nodes: set[str] = set()
+    retirement_repositories: set[str] | None = None
     allowed_acknowledgement_path = False
     if unit_type == "acknowledgements":
         if unit_id != "acknowledgements" or not has_acknowledgements:
@@ -1985,6 +2002,7 @@ def validate_projection(
             issues.append(issue("projection-unit-invalid", "projection.unit_id"))
         else:
             authorized_nodes = set(group["nodes"])
+            retirement_repositories = set(group["repositories"])
             if projection_grants != group["grants"]:
                 issues.append(issue("projection-grants-invalid", "projection.grants"))
     else:
@@ -2033,26 +2051,34 @@ def validate_projection(
             allowed_acknowledgement_path
             and path == "90-Meta/.sync-acknowledgements.json"
             or unit_type == "write-group"
-            and path.endswith(".md")
-            and len(parsed_path.parts) >= 2
-            and parsed_path.parts[0] in KNOWLEDGE_NODE_ROOTS
-            and parsed_path.stem in authorized_nodes
+            and (
+                path == "90-Meta/.sync-acknowledgements.json"
+                or path.endswith(".md")
+                and len(parsed_path.parts) >= 2
+                and parsed_path.parts[0] in KNOWLEDGE_NODE_ROOTS
+                and parsed_path.stem in authorized_nodes
+            )
         )
         if not valid_path(path) or not allowed:
             issues.append(issue("projection-path-not-authorized", f"patch[{path}]"))
     if unit_type == "write-group" and {
         PurePosixPath(path).stem for path in patch_paths
+        if path != "90-Meta/.sync-acknowledgements.json"
     } != authorized_nodes:
         issues.append(issue(
             "projection-node-coverage-invalid",
             "projection.result_files",
         ))
-    if unit_type == "acknowledgements":
+    if unit_type == "acknowledgements" or (
+        unit_type == "write-group"
+        and "90-Meta/.sync-acknowledgements.json" in patch_paths
+    ):
         validate_acknowledgement_projection(
             gate,
             projection,
             patch_sections,
             issues,
+            retirement_repositories=retirement_repositories,
         )
     return {
         "code": "projection-valid" if not issues else "projection-invalid",

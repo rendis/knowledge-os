@@ -740,7 +740,10 @@ def public_status(state_root: Path, run: dict[str, Any]) -> dict[str, Any]:
 
 
 def begin(args: argparse.Namespace) -> dict[str, Any]:
-    require_digest(args.tool_digest, "tool_digest")
+    effective_digest = installed_tool_digest()
+    if args.tool_digest is not None and args.tool_digest != effective_digest:
+        raise ContractError("run-version-mismatch", "supplied tool digest does not match installed tools")
+    args.tool_digest = effective_digest
     require_digest(args.inventory_digest, "inventory_digest")
     packages = []
     for repository, oid in args.package:
@@ -1469,9 +1472,18 @@ def review_unit(args: argparse.Namespace) -> dict[str, Any]:
         path: "missing" if path in deleted else "file"
         for path in manifest_before["candidate_files"]
     }
+    process_path = "90-Meta/.sync-acknowledgements.json"
+    projected_base_kinds = {
+        path: kind for path, kind in unit["base_kinds"].items()
+        if path != process_path
+    }
+    projected_result_kinds = {
+        path: kind for path, kind in unit["result_kinds"].items()
+        if path != process_path
+    }
     if (
-        reviewed_base_kinds != unit["base_kinds"]
-        or reviewed_result_kinds != unit["result_kinds"]
+        reviewed_base_kinds != projected_base_kinds
+        or reviewed_result_kinds != projected_result_kinds
     ):
         raise ContractError(
             "final-note-review-kind-mismatch",
@@ -2331,9 +2343,10 @@ def close(args: argparse.Namespace) -> dict[str, Any]:
 def parser() -> StableArgumentParser:
     root = StableArgumentParser(description=__doc__)
     commands = root.add_subparsers(dest="command", required=True)
+    commands.add_parser("tool-digest")
     begin_command = commands.add_parser("begin")
     begin_command.add_argument("--state-root", type=Path, default=DEFAULT_STATE_ROOT)
-    begin_command.add_argument("--tool-digest", required=True)
+    begin_command.add_argument("--tool-digest", help="Optional assertion against the computed installed tool digest")
     begin_command.add_argument("--inventory-digest", required=True)
     begin_command.add_argument("--package", nargs=2, action="append", default=[], metavar=("REPOSITORY", "OID"))
     checkpoint = commands.add_parser("checkpoint-package")
@@ -2383,10 +2396,20 @@ def parser() -> StableArgumentParser:
     return root
 
 
+def installed_tool_digest() -> str:
+    """Bind the actual Python tool bundle, independent of checkout location."""
+    meta = Path(__file__).resolve().parent
+    return canonical_digest({
+        path.name: bytes_digest(path.read_bytes())
+        for path in sorted(meta.glob("*.py"))
+    })
+
+
 def main(argv: list[str] | None = None) -> int:
     try:
         args = parser().parse_args(argv)
         handlers = {
+            "tool-digest": lambda _: {"status": "pass", "tool_digest": installed_tool_digest()},
             "begin": begin,
             "checkpoint-package": checkpoint_package,
             "seal-gate": seal_gate,
@@ -2397,6 +2420,11 @@ def main(argv: list[str] | None = None) -> int:
             "resume": resume,
             "close": close,
         }
+        closed_replay = args.command == "close" and receipt_path(args.state_root, args.run_id).exists()
+        if args.command not in {"begin", "tool-digest", "status"} and not closed_replay:
+            run = load_run(args.state_root, args.run_id)
+            if run["tool_digest"] != installed_tool_digest():
+                raise ContractError("run-version-mismatch", "installed tools changed; restore the run's tool bundle before mutation")
         payload = handlers[args.command](args)
         emit(payload)
         if payload.get("status") == "blocked":

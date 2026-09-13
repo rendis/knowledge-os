@@ -2668,7 +2668,7 @@ change:
             self.assertNotIn('"Arquitectura.base":', lock)
             gitignore = (dest / ".gitignore").read_text(encoding="utf-8")
             self.assertNotIn(".knowledge-os.lock.yaml", gitignore)
-            self.assertIn("/.agents/state/map-ecosystem/sync/", gitignore)
+            self.assertIn("/.agents/state/map-ecosystem/", gitignore)
             self.assertIn("/.plan/", gitignore)
             self.assertNotIn("/plan/", gitignore)
             obsidian_app = json.loads(
