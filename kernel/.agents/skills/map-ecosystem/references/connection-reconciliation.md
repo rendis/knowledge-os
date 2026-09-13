@@ -4,7 +4,7 @@ Use this phase only after a service-local map has passed its independent review 
 
 ## Select and resolve
 
-1. Select only connections required for the current system map, flow or investigation. Carry forward the local claim ID, owning flow, direction, operation, protocol, resource/configuration key, environment scope, terminal behavior and unresolved question.
+1. Select only connections required for the current system map, flow or investigation. Start from the repository note's `Verificaciones pendientes` item and carry forward its local claim ID, owning flow, direction, operation, protocol, resource/configuration key, environment scope, terminal behavior, unresolved question and close condition.
 2. Search the least expensive authoritative source that can answer the question:
    - versioned sibling service or caller/consumer source;
    - source pinned by the service's dependency manifest;
@@ -15,7 +15,7 @@ Use this phase only after a service-local map has passed its independent review 
    - `resolved`: the questioned external end or resource identity is established by authoritative evidence;
    - `partial`: useful identity or behavior is established but a material environment, deployment or runtime question remains;
    - `unresolved`: inspected sources do not establish the other end.
-5. Create or update the affected repository, flow, topic, integration, data or operational nodes through the ordinary documentation recipe. Bind versioned evidence to its commit and live observations to environment and observation time. Keep configured routing, deployed resources and observed delivery or persistence as separate claims.
+5. Create or update the affected repository, flow, topic, integration, data or operational nodes through the ordinary documentation recipe. Bind versioned evidence to its commit and live observations to environment and observation time. Keep configured routing, deployed resources and observed delivery or persistence as separate claims. Remove a pending item only when its stated close condition is met; otherwise refine it with the remaining question and retain `partial` or `unresolved`.
 
 ## Boundaries
 
@@ -25,4 +25,4 @@ Do not reopen an accepted service map merely because an external end remains unk
 
 ## Completion criterion
 
-The phase is complete when every selected local connection claim has exactly one `resolved`, `partial` or `unresolved` decision, each new relationship has independently resolvable evidence, affected nodes have explicit actions, and remaining runtime questions are stated without weakening the accepted local map.
+The phase is complete when every selected local connection claim has exactly one `resolved`, `partial` or `unresolved` decision, each new relationship has independently resolvable evidence, affected nodes have explicit actions, resolved items were removed from the verification list, and partial or unresolved items state their next check and close condition without weakening the accepted local map.

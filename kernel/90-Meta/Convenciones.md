@@ -126,6 +126,14 @@ Use the exact headings below. The current validator requires these Spanish headi
 
 Use the repository frontmatter above. `aliases`, relationship properties, and `tags` must be lists. Coverage values are `completo | parcial | no-aplica | por-confirmar`. `sistema` must link a declared system; `commit-analizado` is the observed 12-character lowercase SHA; `rama-analizada` is `main` or `master`. Both dates must be valid `YYYY-MM-DD` values. Replace the example SHA and dates with observed values.
 
+Under `Limitaciones y desconocimientos`, use the optional subsection `### Verificaciones pendientes` when an accepted map has partial or unresolved `connection.*` claims. Each unchecked item uses this compact form:
+
+```markdown
+- [ ] `connection.<stable-key>` — <source, platform or database to inspect>: <exact unresolved question>. Close with: <required evidence>.
+```
+
+Record a concrete check, not a generic request to investigate. Name the environment or resource/configuration key when known. Add `#por-confirmar` only when the missing evidence affects business behavior or the runtime/production baseline. When evidence closes the question, update the relevant flow, data, infrastructure or relationship section and remove the pending item; Git retains its history. These items track knowledge verification, not implementation work or delivery ownership.
+
 ### Deployment matrix
 
 For an explicitly requested deployment audit, place the per-environment matrix under `Infraestructura y scheduling`. Ordinary repository maps summarize only runtime, schedules and configuration needed to understand main-flow connectors; a full matrix is not their completion gate. Preserve valid existing matrices. For the deployment audit, record one row per observed environment and deployable, tracing:
