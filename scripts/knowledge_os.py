@@ -287,7 +287,7 @@ def ensure_gitignore_lines(dest: Path) -> None:
     required = (
         "/.knowledge-os-config.yaml",
         "/.knowledge-os-config.*.tmp",
-        "/.agents/state/map-ecosystem/sync/",
+        "/.agents/state/map-ecosystem/",
         "/.plan/",
     )
     path = dest / ".gitignore"
@@ -301,6 +301,8 @@ def ensure_gitignore_lines(dest: Path) -> None:
             "/.knowledge-os.lock.yaml",
             "plan/",
             "/plan/",
+            "/.agents/state/map-ecosystem/sync/",
+            "/.agents/state/map-ecosystem/sync-history/",
         }
     ]
     changed = not path.is_file() or portable_lines != lines

@@ -23,7 +23,8 @@ The run progresses monotonically through `packages`, `gated`, `projecting`, and 
 
 | Command | Required public arguments | Result |
 | --- | --- | --- |
-| `begin` | `--state-root --tool-digest --inventory-digest --package REPOSITORY OID` | Creates or reuses the integrity-checked active run or closed receipt for the fingerprint. |
+| `tool-digest` | None | Computes the installed Python tool bundle identity. |
+| `begin` | `--state-root --inventory-digest --package REPOSITORY OID` | Computes tool identity and creates or reuses the integrity-checked run for the fingerprint. |
 | `checkpoint-package` | `--state-root --run-id --repository --artifact` | Persists one exact `package-closed` artifact; rejects digest-only or unverifiable receipts. |
 | `seal-gate` | `--state-root --run-id --gate` | Persists gate v2 and independent units. |
 | `status` | `--state-root --run-id` | Returns `run_id`, status, gate digest, ordered units, package counters, receipt digest, and `next_command`. |
@@ -45,7 +46,7 @@ Every command emits stable JSON. Exit `0` is success, `2` is a contract/blocking
 | Vault baseline changed for a pending unit | `stale` | Packages and gate | `resume --destination-digest PATH SHA256`; reproject only that unit. |
 | Deterministic semantic fallback | `packages` or `gated` | Finalized package and its closed fallback receipt | Continue to `checkpoint-package` or `seal-gate`; no new extractor or reviewer. |
 | Unresolved checkout/identity, unreadable exact evidence, invalid binding/integrity, or unsafe persistence | blocked | Only records proven valid by `status` | Stop and report the exact code; do not apply. |
-| Tool or schema mismatch | terminal (`run-version-mismatch`) | None for migration | Resolve the mismatch and create a compatible new run; existing state is not migrated. |
+| Tool or schema mismatch | terminal (`run-version-mismatch`) | Existing immutable artifacts | Restore the original compatible tool bundle before continuing an active run. Mutations compare actual installed bytes, including when `--tool-digest` is omitted. Status and completed-receipt replay remain available; existing identities are never rewritten. |
 | Missing active run | terminal (`run-state-missing`) | Closed receipt, if present | Inspect the receipt; otherwise report the missing state. |
 
 `source-stale` reopens only connected packages/groups. Applied affected bytes are
@@ -62,7 +63,7 @@ A finding-directed correction is local package preparation, not a new run state.
 
 ## Invariants
 
-- `acknowledgements` and every `group-NNN` are atomic, idempotent, independent units with disjoint write paths/nodes.
+- `acknowledgements` and every `group-NNN` are atomic and idempotent. A write group may also retire a prior acknowledgement for its repository at the same analyzed commit; that process-file change is applied atomically with the reviewed node update. All other write paths and nodes remain disjoint.
 - Final-note acceptance is an additional check, never a grant; missing review blocks documentation application and cannot be bypassed by resume.
 - The gate remains the only publication authority: projections must declare grants present in gate v2.
 - Markdown projections stay below canonical knowledge roots (`10-Sistemas/` through `70-Aprendizajes/`); agent, state, and metadata surfaces are never basename-authorized.

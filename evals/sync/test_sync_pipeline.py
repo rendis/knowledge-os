@@ -437,7 +437,7 @@ class ResumableSyncEval(unittest.TestCase):
             _, _, oids = make_repository_pair(root)
             arguments = (
                 "begin", "--state-root", str(root / "state"),
-                "--tool-digest", "a" * 64, "--inventory-digest", "b" * 64,
+                "--inventory-digest", "b" * 64,
                 "--package", SOURCE_REPOSITORY, oids[SOURCE_REPOSITORY],
                 "--package", TARGET_REPOSITORY, oids[TARGET_REPOSITORY],
             )

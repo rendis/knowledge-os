@@ -19,6 +19,7 @@ KNOWLEDGE_ROOTS = {
     "30-Flujos", "40-Integraciones", "50-Glosario", "60-Operacion",
     "70-Aprendizajes",
 }
+ACKNOWLEDGEMENT_PATH = "90-Meta/.sync-acknowledgements.json"
 EMPTY_DIGEST = hashlib.sha256(b"").hexdigest()
 DIGEST_RE = re.compile(r"^[0-9a-f]{64}$")
 CONNECTION_RE = re.compile(
@@ -37,7 +38,7 @@ class NoteCandidateError(ValueError):
 
 def canonical_digest(value: object) -> str:
     encoded = json.dumps(
-        value, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+        value, ensure_ascii=True, sort_keys=True, separators=(",", ":")
     ).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
 
@@ -152,7 +153,17 @@ def projection_binding(projection: object) -> tuple[dict[str, str], dict[str, st
             for key, value in mapping.items()
         ):
             raise NoteCandidateError("projection-invalid")
-    return dict(base), dict(result)
+    base_files, result_files = dict(base), dict(result)
+    if projection.get("unit_type") == "write-group":
+        acknowledgement_bound = (
+            ACKNOWLEDGEMENT_PATH in base_files,
+            ACKNOWLEDGEMENT_PATH in result_files,
+        )
+        if acknowledgement_bound[0] != acknowledgement_bound[1]:
+            raise NoteCandidateError("projection-invalid")
+        base_files.pop(ACKNOWLEDGEMENT_PATH, None)
+        result_files.pop(ACKNOWLEDGEMENT_PATH, None)
+    return base_files, result_files
 
 
 def freeze_candidate(

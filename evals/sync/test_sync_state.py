@@ -100,7 +100,7 @@ class SyncRunStateEval(unittest.TestCase):
         )
         arguments = [
             "begin", "--state-root", str(root / "state"),
-            "--tool-digest", "a" * 64, "--inventory-digest", "b" * 64,
+            "--inventory-digest", "b" * 64,
         ]
         for repository, oid in package_set:
             arguments.extend(("--package", repository, oid))
@@ -377,6 +377,8 @@ class SyncRunStateEval(unittest.TestCase):
             images = manifest_tool.complete_patch_images(section)
             self.assertIsNotNone(images)
             _, after = images
+            if relative == ACK_PATH:
+                continue
             if invert_result_kind:
                 self.assertEqual(after, b"")
             if (section["new_path"] is None) != invert_result_kind:
@@ -874,7 +876,7 @@ class SyncRunStateEval(unittest.TestCase):
             self.assertEqual(closed.returncode, 0, closed.stdout + closed.stderr)
             reused = self.run_sync(
                 "begin", "--state-root", str(root / "state"),
-                "--tool-digest", "a" * 64, "--inventory-digest", "b" * 64,
+                "--inventory-digest", "b" * 64,
                 "--package", SOURCE_REPOSITORY, oids[SOURCE_REPOSITORY],
                 "--package", TARGET_REPOSITORY, oids[TARGET_REPOSITORY],
             )
@@ -1237,7 +1239,7 @@ class SyncRunStateEval(unittest.TestCase):
                 self.apply_unit(root, run_id, unit_id, vault)
             self.assertEqual(self.run_sync("close", "--state-root", str(root / "state"), "--run-id", run_id).returncode, 0)
             original = self.run_sync(
-                "begin", "--state-root", str(root / "state"), "--tool-digest", "a" * 64,
+                "begin", "--state-root", str(root / "state"),
                 "--inventory-digest", "b" * 64, "--package", SOURCE_REPOSITORY, oids[SOURCE_REPOSITORY],
                 "--package", TARGET_REPOSITORY, oids[TARGET_REPOSITORY],
             )
@@ -1326,6 +1328,162 @@ class SyncRunStateEval(unittest.TestCase):
             )
             result = self.validate_unit(root, run_id, "acknowledgements", projection_path, patch_path)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_applied_write_group_retires_matching_prior_acknowledgement(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            _, _, oids = make_repository_pair(root)
+            gate = gate_v2(oids)
+            gate["repositories"] = [gate["repositories"][0]]
+            gate["acknowledgements"] = []
+            gate["fallback_repositories"] = []
+            run_id = self.begin(
+                root, oids,
+                packages=((SOURCE_REPOSITORY, oids[SOURCE_REPOSITORY]),),
+            )
+            self.seal(root, run_id, gate)
+            note_path = "10-Sistemas/target-service.md"
+            before_note, after_note = "before\n", "after\n"
+            stale = {
+                "repository": SOURCE_REPOSITORY,
+                "branch": "main",
+                "analyzed_sha": oids[SOURCE_REPOSITORY][:12],
+                "decision": "review-rejected",
+                "analysis_date": "2026-08-21",
+            }
+            retained = {
+                "repository": "APP00000-prior-service",
+                "branch": "main",
+                "analyzed_sha": "a" * 12,
+                "decision": "no-documentation-change",
+                "analysis_date": "2026-08-20",
+            }
+            before_ack = json.dumps(
+                {"version": 1, "repositories": sorted(
+                    [retained, stale], key=lambda item: item["repository"],
+                )},
+                sort_keys=True, separators=(",", ":"),
+            ) + "\n"
+            after_ack = json.dumps(
+                {"version": 1, "repositories": [retained]},
+                sort_keys=True, separators=(",", ":"),
+            ) + "\n"
+            vault = root / "vault"
+            (vault / "10-Sistemas").mkdir(parents=True)
+            (vault / "90-Meta").mkdir(parents=True)
+            (vault / note_path).write_text(before_note, encoding="utf-8")
+            (vault / ACK_PATH).write_text(before_ack, encoding="utf-8")
+            patch = (
+                f"--- a/{note_path}\n+++ b/{note_path}\n@@ -1 +1 @@\n"
+                f"-{before_note}+{after_note}"
+                f"--- a/{ACK_PATH}\n+++ b/{ACK_PATH}\n@@ -1 +1 @@\n"
+                f"-{before_ack}+{after_ack}"
+            )
+            projection = {
+                "version": 1,
+                "run_id": run_id,
+                "gate_digest": digest(gate),
+                "unit_id": "group-001",
+                "unit_type": "write-group",
+                "patch_digest": bytes_digest(patch),
+                "base_files": {
+                    note_path: bytes_digest(before_note),
+                    ACK_PATH: bytes_digest(before_ack),
+                },
+                "result_files": {
+                    note_path: bytes_digest(after_note),
+                    ACK_PATH: bytes_digest(after_ack),
+                },
+                "grants": gate["write_groups"][0]["grants"],
+            }
+            projection_path = root / "retirement.json"
+            patch_path = root / "retirement.patch"
+            write_json(projection_path, projection)
+            patch_path.write_text(patch, encoding="utf-8")
+            validated = self.validate_unit(
+                root, run_id, "group-001", projection_path, patch_path,
+                review=False,
+            )
+            self.assertEqual(validated.returncode, 0, validated.stdout + validated.stderr)
+            unreviewed = self.run_sync(
+                "apply-unit", "--state-root", str(root / "state"),
+                "--run-id", run_id, "--unit-id", "group-001",
+                "--vault", str(vault),
+            )
+            self.assertEqual(unreviewed.returncode, 2, unreviewed.stdout + unreviewed.stderr)
+            self.assertIn(SOURCE_REPOSITORY, (vault / ACK_PATH).read_text(encoding="utf-8"))
+            reviewed = self.review_unit(
+                root, run_id, "group-001", projection_path, patch_path,
+            )
+            self.assertEqual(reviewed.returncode, 0, reviewed.stdout + reviewed.stderr)
+            self.apply_unit(root, run_id, "group-001", vault)
+            self.assertEqual((vault / note_path).read_text(encoding="utf-8"), after_note)
+            self.assertEqual((vault / ACK_PATH).read_text(encoding="utf-8"), after_ack)
+
+    def test_write_group_rejects_unsafe_acknowledgement_removal(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            _, _, oids = make_repository_pair(root)
+            gate = gate_v2(oids)
+            candidate = {
+                "repository": TARGET_REPOSITORY,
+                "branch": "main",
+                "analyzed_sha": oids[TARGET_REPOSITORY][:12],
+                "decision": "no-documentation-change",
+                "analysis_date": "2026-08-22",
+            }
+            before_ack = json.dumps(
+                {"version": 1, "repositories": [candidate]},
+                sort_keys=True, separators=(",", ":"),
+            ) + "\n"
+            after_ack = '{"repositories":[],"version":1}\n'
+            note_path = "10-Sistemas/target-service.md"
+            before_note, after_note = "before\n", "after\n"
+            patch = (
+                f"--- a/{note_path}\n+++ b/{note_path}\n@@ -1 +1 @@\n"
+                f"-{before_note}+{after_note}"
+                f"--- a/{ACK_PATH}\n+++ b/{ACK_PATH}\n@@ -1 +1 @@\n"
+                f"-{before_ack}+{after_ack}"
+            )
+            projection = {
+                "version": 1, "run_id": "run-sync-eval-001",
+                "gate_digest": digest(gate), "unit_id": "group-001",
+                "unit_type": "write-group", "patch_digest": bytes_digest(patch),
+                "base_files": {note_path: bytes_digest(before_note), ACK_PATH: bytes_digest(before_ack)},
+                "result_files": {note_path: bytes_digest(after_note), ACK_PATH: bytes_digest(after_ack)},
+                "grants": gate["write_groups"][0]["grants"],
+            }
+            gate_path, projection_path, patch_path = root / "gate.json", root / "projection.json", root / "projection.patch"
+            write_json(gate_path, gate)
+            write_json(projection_path, projection)
+            patch_path.write_text(patch, encoding="utf-8")
+            result = self.run_manifest(
+                "validate-projection", "--gate", str(gate_path),
+                "--projection", str(projection_path), "--patch", str(patch_path),
+            )
+            self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+            self.assertEqual(self.payload(result)["code"], "projection-invalid")
+
+            metadata_path = "90-Meta/other-process-state.json"
+            metadata_patch = patch.replace(ACK_PATH, metadata_path)
+            projection["patch_digest"] = bytes_digest(metadata_patch)
+            projection["base_files"] = {
+                note_path: bytes_digest(before_note),
+                metadata_path: bytes_digest(before_ack),
+            }
+            projection["result_files"] = {
+                note_path: bytes_digest(after_note),
+                metadata_path: bytes_digest(after_ack),
+            }
+            write_json(projection_path, projection)
+            patch_path.write_text(metadata_patch, encoding="utf-8")
+            arbitrary = self.run_manifest(
+                "validate-projection", "--gate", str(gate_path),
+                "--projection", str(projection_path), "--patch", str(patch_path),
+            )
+            self.assertEqual(arbitrary.returncode, 2, arbitrary.stdout + arbitrary.stderr)
+            fields = {item["field"] for item in self.payload(arbitrary)["issues"]}
+            self.assertIn(f"patch[{metadata_path}]", fields)
 
     def test_empty_file_create_and_delete_change_path_kind(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -1524,7 +1682,7 @@ class SyncRunStateEval(unittest.TestCase):
             self.assertEqual(stale.returncode, 0, stale.stdout + stale.stderr)
             reused = self.run_sync(
                 "begin", "--state-root", str(root / "state"),
-                "--tool-digest", "a" * 64, "--inventory-digest", "b" * 64,
+                "--inventory-digest", "b" * 64,
                 "--package", SOURCE_REPOSITORY, "d" * 40,
             )
             self.assertEqual(reused.returncode, 0, reused.stdout + reused.stderr)
@@ -1933,7 +2091,7 @@ class SyncRunStateEval(unittest.TestCase):
             self.assertFalse(active.exists())
             next_run = self.run_sync(
                 "begin", "--state-root", str(root / "state"),
-                "--tool-digest", "a" * 64, "--inventory-digest", "c" * 64,
+                "--inventory-digest", "c" * 64,
                 "--package", TARGET_REPOSITORY, oids[TARGET_REPOSITORY],
             )
             self.assertEqual(next_run.returncode, 0, next_run.stdout + next_run.stderr)
