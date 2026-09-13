@@ -25,7 +25,7 @@ Accept a question, proposed change, or starting node. Resolve aliases only to fi
    - Service: `compuesto-por`; exceptional component: `implementado-por`.
    - Domain language: follow a glossary edge only when the definition changes the interpretation of a contract, rule, or flow.
    - Operation: follow the selected procedure to its linked standards; use `manage-operational-workflow` only when the user asks to execute or resume it.
-5. When the conclusion depends on a declared schema repository and `inspect-database` is enabled, load that adapter for evidence only. Keep this branch primary.
+5. When the conclusion needs database schema or live evidence and `inspect-database` is enabled, load that adapter with the exact question and any known target. Keep this branch primary.
 6. Open a Framework **section pointer** only when a claim needs the evidence hierarchy. For implementation questions outside that database handoff, resolve the target repository by remote identity under the ordered `SOURCE_ROOTS`. Treat every non-managed root as read-only. If the repository is missing or the source context is unusable, follow [vault-resolution.md](../../../../90-Meta/vault-resolution.md): repair configuration through its owner skill and never clone without configured authority in an exact `CLONE_ROOT`.
 7. Stop expanding when the next hop cannot change the decision, impact, or uncertainties of the question. Root Bases (`Repos.base`, `Auditoria.base`) are derived radar, not authority.
 

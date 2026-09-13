@@ -70,6 +70,10 @@ Resume the exact task that exposed the gap with the semantic value it needs.
 
 ## Cell capabilities
 
+For database access, `instance.yaml` may declare `database_targets`: each has a unique `id`, declared `system`, `environment`, `instance`, `database`, `schemas`, canonical access `procedure`, local `port_key`, and zero or more credential-free HTTPS `repositories`. Repositories provide optional evidence; the procedure selects the executor. Inspect through `cell-config.py database-targets` and `database-target --target <ID>`. Add or update cell-owned declarations only within user-authorized configuration work, validate with the semantic read, and preserve existing fields. Resolve procedure basenames before marking a target configured. Keep credentials out of declarations.
+
+Use the target's `port_key` with the existing `--proxy-port KEY=PORT` update and `database-proxy-port KEY` view. Preserve legacy environment keys and `sources.schema_repository` for existing consumers. An empty repository list never inherits that legacy source. Port configuration does not create an executor or establish live access.
+
 During initial onboarding, use the installer's identity/system/tracker/profile/locale options. Collect the team's optional tools, environment names, procedures and executors only when needed. The kernel has no default company, environment list, credential mechanism or procedure basename.
 
 Existing capabilities are read-only with:

@@ -83,11 +83,28 @@ def bind(root: Path, capability: str, procedures: list[str]) -> dict:
     return result
 
 
+def database_target(root: Path, instance: dict, target_id: str) -> dict:
+    targets = instance.get("database_targets", [])
+    matches = [target for target in targets if target["id"] == target_id]
+    if not matches:
+        return {"status": "not_configured", "target": target_id}
+    target = matches[0]
+    binding = resolve(
+        root,
+        {"capabilities": {"database-inspection": [target["procedure"]]}},
+        "database-inspection",
+    )
+    return {"status": "configured", "target": target, "procedures": binding["procedures"]}
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--vault-root", type=Path, required=True)
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("status")
+    commands.add_parser("database-targets")
+    target_command = commands.add_parser("database-target")
+    target_command.add_argument("--target", required=True)
     for name in ("resolve", "bind"):
         command = commands.add_parser(name)
         command.add_argument("--capability", required=True)
@@ -97,7 +114,11 @@ def main() -> int:
     root = args.vault_root.resolve()
     try:
         instance = load_instance(root / "instance.yaml")
-        if args.command == "bind":
+        if args.command == "database-targets":
+            result = {"targets": instance.get("database_targets", [])}
+        elif args.command == "database-target":
+            result = database_target(root, instance, args.target)
+        elif args.command == "bind":
             result = bind(root, args.capability, args.procedure)
         elif args.command == "resolve":
             result = resolve(root, instance, args.capability)

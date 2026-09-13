@@ -18,7 +18,7 @@ tags: [operacion, operacion/procedimiento, operacion/area/devops]
 
 `owner` identifies the accountable role or team. `por-definir` is valid only while `estado: borrador`. `canales` names neutral capabilities; connector selection happens during execution.
 
-Choose one owning area from `Base de datos`, `DevOps`, `GCP`, `Jira`, or `Reporteria` by the primary outcome and completion evidence. The directory, `area`, and area tag must agree. Use `relacionado-con` for secondary area MOCs and keep one canonical note.
+Resolve registered areas through `90-Meta/operational-catalog.py list-areas` and choose one owning area by the primary outcome and completion evidence. For a cross-system audit, prefer a registered audit area over an execution technology. The directory, `area`, and area tag must agree. Use `relacionado-con` for secondary area MOCs and keep one canonical note.
 
 ## Classes
 
@@ -46,6 +46,8 @@ The `Pasos` section must contain this table:
 ```
 
 Use stable IDs such as `DEVOPS-01`. Write `sí` only when the step creates, modifies, sends, publishes, deletes, or otherwise changes an external system. Drafting content in memory is not an external effect; saving a draft in an external system is.
+
+For an audit procedure, use the same sections and step table with read-only remote steps. Specify entity/date inputs, timezone, exact target resolution, source adapters, bounded queries or versioned scripts, correlation keys, outcome definitions, and completion evidence for each question. Define permitted terminal unknowns, such as expired retention, separately from recoverable access blockers. Distinguish current-state evidence from historical evidence and provider acceptance from verified correction. Declare local output and retention rules; domain-specific values belong here rather than in the generic orchestration skill.
 
 ### Report
 
