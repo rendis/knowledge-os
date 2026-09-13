@@ -9,7 +9,7 @@ Use [evidence-extraction.md](evidence-extraction.md) as the common extraction co
 ## Per-unit analysis
 
 1. Build the initial inventory from MOCs, services, flows, operational indices, and backlinks.
-2. Group units by changed contracts and direct impact; include unchanged participants when needed. Split write ownership into non-overlapping groups. For a batch, use the bounded pilot and small-group policy in repository-map.md; workers return local maps before cross-unit reconciliation.
+2. Group units by changed contracts and direct impact; include unchanged participants when needed. Split write ownership into non-overlapping groups. For a batch, use the bounded pilot and small-group policy in repository-map.md; dispatch one local extraction per repository and persist each reviewed result without waiting for unrelated work. Group later external resolution by authoritative repository, provider/project, cluster context or database target rather than repeating the same lookup for every service.
 3. Apply the [single-unit documentation recipe](single-unit-documentation.md) to every unit without synthesizing global relationships before local analyses are complete.
 4. Record per unit: commit/branch when applicable, contracts, data, stack/runtime basics, connector-relevant environment differences, observed relationships, and limitations.
 

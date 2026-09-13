@@ -35,6 +35,7 @@ For repository mapping and synchronization, [references/repository-map.md](refer
 | Several related units | Load `references/multi-unit-documentation.md`. |
 | Inventory, lifecycle, or sync request | Load `references/vault-synchronization.md`, then `references/synchronization-state-machine.md` for a transition or failure. |
 | An accepted local map has an unresolved external connection material to the task | Load `references/connection-reconciliation.md`; preserve the accepted local artifact and create separately reviewed external claims. |
+| External reconciliation reaches a required provider, cluster or database with missing access | Finish available static reconciliation, run the capability-scoped `operational-readiness` check, hand the exact missing local binding to `configure-workspace`, then resume the same pending connection after readiness passes. |
 | Tooling, source, or vault resolution issue | Load `references/operational-readiness.md`. |
 
 ## Execution Steps
@@ -42,7 +43,7 @@ For repository mapping and synchronization, [references/repository-map.md](refer
 1. Load `../../../90-Meta/vault-resolution.md` and run `../../../90-Meta/resolve-vault.py` relative to this skill directory. Bind the resolved vault and configured source roots; a failed resolution blocks root-dependent work.
 2. Select one primary branch from the table. Load only its recipe and supporting references it explicitly requires.
 3. For documentation or synchronization, load `references/evidence-extraction.md` for bounded main-flow scope, preservation and directed review. Before a source read or delegation, bind its checkout by configured remote identity. Before a technical write, load `../../../90-Meta/evidence-policy.md` and `../../../90-Meta/node-selection.md`.
-4. After local-map acceptance, reconcile only external connections required by the task. Load `references/deployment-evidence.md` when that reconciliation or an explicit deployment audit needs current platform evidence. For synchronization, use sealed gate grants and the per-unit state contract; use `status` or `resume` rather than inferring a next step.
+4. After local-map acceptance, reconcile only external connections required by the task. Exhaust versioned evidence before requesting a missing live capability, so the request names the exact provider/project, cluster context or database target and read-only question. After configuration, rerun readiness and resume the pending connection without remapping the repository. Load `references/deployment-evidence.md` when that reconciliation or an explicit deployment audit needs current platform evidence. For synchronization, use sealed gate grants and the per-unit state contract; use `status` or `resume` rather than inferring a next step.
 5. Report inspected evidence, changes, limitations, and observed checks. Stop when the selected recipe's completion criterion is met.
 
 ## Output Contract

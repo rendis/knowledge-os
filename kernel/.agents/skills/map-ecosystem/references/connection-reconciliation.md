@@ -2,9 +2,19 @@
 
 Use this phase only after a service-local map has passed its independent review or has an explicitly accepted partial subset. Its input is the accepted `connection.*` claims. Preserve that reviewed artifact: external evidence creates separate claims and node decisions rather than changing the completed local extraction.
 
+## Access gate
+
+Use repository, dependency, IaC and schema evidence first. When a material question still requires a live provider, cluster or database, run the capability-scoped readiness check from `operational-readiness.md` for that exact authority and target.
+
+- When ready, execute only the bounded read-only query needed by the pending item's close condition.
+- When a configured fallback can answer less, record that smaller evidence and keep the remaining question partial.
+- When access or its local binding is unavailable, complete independent static work, retain the pending item, and hand the exact capability, target and read-only question to `configure-workspace`. Ask after static evidence has narrowed the request; never ask for broad platform access without a concrete target.
+
+After the binding becomes available, rerun readiness and resume the same pending `connection.*` item. Reuse the accepted local map and prior external evidence; access acquisition does not trigger repository extraction again.
+
 ## Select and resolve
 
-1. Select only connections required for the current system map, flow or investigation. Start from the repository note's `Verificaciones pendientes` item and carry forward its local claim ID, owning flow, direction, operation, protocol, resource/configuration key, environment scope, terminal behavior, unresolved question and close condition.
+1. Select only connections required for the current system map, flow or investigation. Start from the repository note's `Verificaciones pendientes` item and carry forward its local claim ID, owning flow, direction, operation, protocol, resource/configuration key, environment scope, terminal behavior, unresolved question and close condition. Group selected connections by authoritative repository, provider/project, cluster context or database target so one bounded observation can resolve every directly supported item without repeated access.
 2. Search the least expensive authoritative source that can answer the question:
    - versioned sibling service or caller/consumer source;
    - source pinned by the service's dependency manifest;
