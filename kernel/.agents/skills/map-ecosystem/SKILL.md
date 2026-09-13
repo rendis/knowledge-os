@@ -21,7 +21,7 @@ Use this skill for a cell-vault query, documentation update, ecosystem synchroni
 
 ## Mapping scope
 
-For repository mapping and synchronization, [references/repository-map.md](references/repository-map.md) defines the default: purpose, main entrypoints → meaningful logic → connectors/effects, stack and evidence. Reuse valid existing knowledge. Cross-repository/cloud reconciliation follows local extraction.
+For repository mapping and synchronization, [references/repository-map.md](references/repository-map.md) defines the default: purpose, main entrypoints → meaningful logic → connectors/effects, stack and evidence. Reuse valid existing knowledge. Accepted local maps expose stable connection claims; resolve selected external ends afterward with [references/connection-reconciliation.md](references/connection-reconciliation.md).
 
 ## Decision Gates
 
@@ -34,6 +34,7 @@ For repository mapping and synchronization, [references/repository-map.md](refer
 | One durable node | Load `references/single-unit-documentation.md`. |
 | Several related units | Load `references/multi-unit-documentation.md`. |
 | Inventory, lifecycle, or sync request | Load `references/vault-synchronization.md`, then `references/synchronization-state-machine.md` for a transition or failure. |
+| An accepted local map has an unresolved external connection material to the task | Load `references/connection-reconciliation.md`; preserve the accepted local artifact and create separately reviewed external claims. |
 | Tooling, source, or vault resolution issue | Load `references/operational-readiness.md`. |
 
 ## Execution Steps
@@ -41,7 +42,7 @@ For repository mapping and synchronization, [references/repository-map.md](refer
 1. Load `../../../90-Meta/vault-resolution.md` and run `../../../90-Meta/resolve-vault.py` relative to this skill directory. Bind the resolved vault and configured source roots; a failed resolution blocks root-dependent work.
 2. Select one primary branch from the table. Load only its recipe and supporting references it explicitly requires.
 3. For documentation or synchronization, load `references/evidence-extraction.md` for bounded main-flow scope, preservation and directed review. Before a source read or delegation, bind its checkout by configured remote identity. Before a technical write, load `../../../90-Meta/evidence-policy.md` and `../../../90-Meta/node-selection.md`.
-4. Load `references/deployment-evidence.md` only for a deployment audit or when a concrete connector/trigger depends on unresolved deployment configuration. For synchronization, use sealed gate grants and the per-unit state contract; use `status` or `resume` rather than inferring a next step.
+4. After local-map acceptance, reconcile only external connections required by the task. Load `references/deployment-evidence.md` when that reconciliation or an explicit deployment audit needs current platform evidence. For synchronization, use sealed gate grants and the per-unit state contract; use `status` or `resume` rather than inferring a next step.
 5. Report inspected evidence, changes, limitations, and observed checks. Stop when the selected recipe's completion criterion is met.
 
 ## Output Contract
@@ -53,5 +54,6 @@ Return the resolved scope, evidence used, decisions and written paths, limitatio
 - `references/vault-synchronization.md` — coordinator recipe.
 - `references/synchronization-state-machine.md` — durable run, unit, and recovery contract.
 - `references/synchronization-package-worker.md` — bounded extractor/reviewer contract.
+- `references/connection-reconciliation.md` — resolve selected external ends after local-map acceptance.
 - `../../../90-Meta/vault-resolution.md` — vault and source binding.
 - `../../../90-Meta/node-selection.md` — canonical node and lifecycle choice.

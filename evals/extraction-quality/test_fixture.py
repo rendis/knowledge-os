@@ -20,6 +20,7 @@ class FixtureTruth(unittest.TestCase):
             card = json.loads((root/'package/worker-card.json').read_text())
             repo = root/'sources/availability-service'
             old, new = card['old_oid'], card['new_oid']
+            self.assertEqual(card['production_ref'], prepare.run('git', 'symbolic-ref', 'HEAD', cwd=repo).strip())
             def blob(oid, path):
                 return prepare.run('git', 'show', f'{oid}:{path}', cwd=repo)
             before, after = {}, {}
