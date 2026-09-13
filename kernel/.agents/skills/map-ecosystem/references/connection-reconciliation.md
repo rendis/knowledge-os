@@ -1,16 +1,17 @@
 # Reconcile external connections after local mapping
 
-Use this phase only after a service-local map has passed its independent review or has an explicitly accepted partial subset. Its input is the accepted `connection.*` claims. Preserve that reviewed artifact: external evidence creates separate claims and node decisions rather than changing the completed local extraction.
+Use this phase only after a service-local map has passed its independent review or has an explicitly accepted partial subset. Its input is the accepted `connection.*` claims. Preserve that reviewed artifact: external evidence creates separate claims and node decisions rather than changing the completed local extraction or entering its closed Git synchronization package.
 
 ## Access gate
 
-Use repository, dependency, IaC and schema evidence first. When a material question still requires a live provider, cluster or database, run the capability-scoped readiness check from `operational-readiness.md` for that exact authority and target.
+Use repository, dependency, IaC and schema evidence first. A discovered connection identifies a question and target; it grants no access. When a material question still requires a live provider, cluster or database, resolve the configured executor or adapter for that procedure and run its bounded read-only target probe. Reuse the existing authenticated identity or session selected by that procedure. The probe must establish both read-only operation and the exact authority and target before the observation proceeds.
 
-- When ready, execute only the bounded read-only query needed by the pending item's close condition.
+- When the exact probe passes, execute only the bounded read-only query needed by the pending item's close condition.
 - When a configured fallback can answer less, record that smaller evidence and keep the remaining question partial.
-- When access or its local binding is unavailable, complete independent static work, retain the pending item, and hand the exact capability, target and read-only question to `configure-workspace`. Ask after static evidence has narrowed the request; never ask for broad platform access without a concrete target.
+- When the procedure binding is missing, complete independent static work, retain the pending item, and hand the exact capability, target and read-only question to `configure-workspace`; workspace configuration binds the procedure but does not grant target access.
+- When the procedure is bound but its probe cannot use the existing authentication, ask for the exact missing executor, profile, role, session, network route or target-specific setup reported by the procedure. Keep credential values outside the vault and preserve the configured access path.
 
-After the binding becomes available, rerun readiness and resume the same pending `connection.*` item. Reuse the accepted local map and prior external evidence; access acquisition does not trigger repository extraction again.
+After the binding or access setup becomes available, rerun the same executor or adapter probe and resume the pending `connection.*` item. Reuse the accepted local map and prior external evidence; access acquisition does not trigger repository extraction again.
 
 ## Select and resolve
 
@@ -27,6 +28,12 @@ After the binding becomes available, rerun readiness and resume the same pending
    - `unresolved`: inspected sources do not establish the other end.
 5. Create or update the affected repository, flow, topic, integration, data or operational nodes through the ordinary documentation recipe. Bind versioned evidence to its commit and live observations to environment and observation time. Keep configured routing, deployed resources and observed delivery or persistence as separate claims. Remove a pending item only when its stated close condition is met; otherwise refine it with the remaining question and retain `partial` or `unresolved`.
 
+## Publication
+
+Publish external reconciliation through the ordinary [single-unit](single-unit-documentation.md) or [multi-unit](multi-unit-documentation.md) documentation recipe, outside the closed Git synchronization package. Treat that package as immutable accepted context; a later provider, cluster or database observation cannot be appended to it or presented as evidence frozen at its source revision.
+
+Before applying any note change, follow [final-note-review.md](final-note-review.md). Freeze the complete resulting bytes for every target note together with their baselines and the exact versioned or observation evidence hashes. An independent reviewer must accept that complete candidate and evidence binding. Apply only the reviewed resulting bytes; when review rejects or any baseline or evidence binding changes, preserve the current notes and prepare a fresh candidate and review. Durable notes must cite the authoritative technical evidence; ignored local candidate and review artifacts are lineage records, not the sole source for a claim.
+
 ## Boundaries
 
 A configured edge proves possible routing. It does not prove deployment, successful delivery, persistence or current data. A provider response proves only the fields and observation time actually returned. Secret values never become connection evidence; retain the secret reference or configuration key.
@@ -35,4 +42,4 @@ Do not reopen an accepted service map merely because an external end remains unk
 
 ## Completion criterion
 
-The phase is complete when every selected local connection claim has exactly one `resolved`, `partial` or `unresolved` decision, each new relationship has independently resolvable evidence, affected nodes have explicit actions, resolved items were removed from the verification list, and partial or unresolved items state their next check and close condition without weakening the accepted local map.
+The phase is complete when every selected local connection claim has exactly one `resolved`, `partial` or `unresolved` decision, each new relationship has independently resolvable evidence, affected nodes have explicit actions, every applied note exactly matches an independently accepted final candidate, resolved items were removed from the verification list, and partial or unresolved items state their next check and close condition without weakening the accepted local map.

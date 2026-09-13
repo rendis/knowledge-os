@@ -134,6 +134,14 @@ Under `Limitaciones y desconocimientos`, use the optional subsection `### Verifi
 
 Record a concrete check, not a generic request to investigate. Name the environment or resource/configuration key when known. Add `#por-confirmar` only when the missing evidence affects business behavior or the runtime/production baseline. When evidence closes the question, update the relevant flow, data, infrastructure or relationship section and remove the pending item; Git retains its history. These items track knowledge verification, not implementation work or delivery ownership.
 
+Keep the connection identity beside its description in the owning repository note, including after a pending item closes:
+
+```markdown
+<!-- connection:connection.orders.publish -->
+```
+
+Use one anchor per connection per owning note. The key identifies the local flow/connector slot, so a destination change preserves it. Other notes link to the owning note instead of owning a second copy. Initial adoption in an older note adds anchors only for the inspected scope; it does not require remapping the vault. Final-note review accounts for every old/new anchor as create, preserve, update or retire. Retirement requires evidence of the removed connection; closing a verification alone preserves the anchor. The anchor stores identity, while prose and the pending item store knowledge; there is no parallel relationship ledger.
+
 ### Deployment matrix
 
 For an explicitly requested deployment audit, place the per-environment matrix under `Infraestructura y scheduling`. Ordinary repository maps summarize only runtime, schedules and configuration needed to understand main-flow connectors; a full matrix is not their completion gate. Preserve valid existing matrices. For the deployment audit, record one row per observed environment and deployable, tracing:

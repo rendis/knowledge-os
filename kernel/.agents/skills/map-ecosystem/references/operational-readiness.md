@@ -28,20 +28,23 @@ Classify the requested operation before checking it:
 | **Vault authoring** | Create or update versioned vault content; this can proceed before closing dependencies or gates are repaired |
 | **Vault closure** | Validate an authored change through every applicable Framework gate |
 | **Synchronization** | Inventory remote repositories, detect changes, acquire required evidence, and optionally propagate vault updates |
+| **External reconciliation** | Resolve a selected provider, cluster or database question through a configured read-only procedure after static evidence is exhausted |
 
 Apply each dimension only where marked required (`R`), conditional on the concrete operation (`C`), or optional with a documented fallback (`O`). A dash means the dimension does not gate that capability.
 
-| Dimension | Vault query | Source analysis | Vault authoring | Vault closure | Synchronization | Observable signal |
-|---|:---:|:---:|:---:|:---:|:---:|---|
-| Vault resolution | R | R | R | R | R | Resolver status is `resolved`; canonical remote and markers match |
-| Source access | — | R | C | — | C | Required for update/analysis of changed sources; not for a report-only remote inventory |
-| Python 3 | R | R | R | R | R | The selected interpreter executes the resolver and applicable tooling |
-| Pinned gate dependencies | — | — | — | R | C | Installed versions satisfy `90-Meta/requirements-ci.txt`; required for update-mode closing gates, not a report-only inventory |
-| Framework gates | — | — | — | R | C | Required commands are available and applicable baseline/closing gates exit `0` |
-| Local `main` baseline | — | — | R | R | C | Required for synchronization that authors/closes vault changes; report-only inventory remains read-only |
-| Obsidian binding | O | O | O | O | O | Exact normalized vault path matches; otherwise use the documented filesystem fallback |
-| GitHub identity | — | C | C | — | R | Inventory preflight can access the organization without changing global authentication |
-| Clone authorization | — | C | C | — | C | Required only when missing or stale evidence must be cloned or fetched |
+| Dimension | Vault query | Source analysis | Vault authoring | Vault closure | Synchronization | External reconciliation | Observable signal |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|---|
+| Vault resolution | R | R | R | R | R | R | Resolver status is `resolved`; canonical remote and markers match |
+| Source access | — | R | C | — | C | C | Required when versioned evidence may answer the selected question |
+| Python 3 | R | R | R | R | R | R | The selected interpreter executes the resolver and applicable tooling |
+| Pinned gate dependencies | — | — | — | R | C | C | Required when the resulting documentation will pass closing gates |
+| Framework gates | — | — | — | R | C | C | Required when the resulting documentation will be applied and closed |
+| Local `main` baseline | — | — | R | R | C | C | Required when reconciliation will author and close vault changes |
+| Obsidian binding | O | O | O | O | O | O | Exact normalized vault path matches; otherwise use the documented filesystem fallback |
+| GitHub identity | — | C | C | — | R | C | Required only when the selected versioned evidence is remote |
+| Clone authorization | — | C | C | — | C | C | Required only when missing or stale evidence must be cloned or fetched |
+| Procedure binding | — | — | — | — | — | R | The semantic workspace view resolves the configured executor or adapter for the exact procedure and target |
+| Read-only target access | — | — | — | — | — | R | That executor or adapter proves a bounded read-only operation against the exact authority and target using existing authentication |
 
 A failure in a closing dimension does not retroactively block authoring. Report combinations explicitly, for example: `Ready for vault authoring; Blocked for vault closure: ruamel.yaml missing`.
 
@@ -92,6 +95,12 @@ Read `source_context` as defined in [vault-resolution.md](../../../../90-Meta/va
 
 `roots[].managed`, `clone_origin`, and `clone_authorized` describe acquisition authority independently from discovery. Consumers do not infer roots from the current directory or environment.
 
+### External target access
+
+The workspace view binds a team procedure to an executor or adapter; it does not authorize or prove access to the discovered connection. Resolve the binding from the semantic workspace view, then use the procedure's own status or bounded read-only probe against the exact provider/project, cluster context or database target. Reuse the existing authenticated identity or session named by the procedure. A successful probe establishes only that bounded access at the observed target and time.
+
+If no procedure is bound, hand the exact capability, target and read-only question to `configure-workspace`. If the procedure is bound but access fails, report its exact missing executor, profile, role, session, network route or target-specific setup and retry the same probe after that setup is available. Discovery, a configured connection string or secret reference, and workspace initialization alone are never a passing access signal.
+
 ## Status classification
 
 - **Ready for `<capability>`** — every required and applicable conditional dimension passes. List unavailable optional integrations as limitations without broadening the claim.
@@ -127,6 +136,8 @@ If it is not `initialized`, load `configure-workspace`. The observed gap opens d
 **Obsidian binding.** Run `check-obsidian-binding.py` before `unresolved` or `orphans`; Obsidian may print `Vault not found` with exit `0`. If no exact normalized registration matches, use `verify-links.py` and report that native backlinks/rendering were not verified.
 
 **GitHub identity.** Suggest `--github-user <login>` for a stored account, a non-interactive `GH_TOKEN`/`GITHUB_TOKEN`, or authenticating `gh` and checking SSO authorization. Never persist or print tokens.
+
+**External target access.** Preserve the configured procedure and existing authentication. Ask only for the exact missing setup emitted by its executor or adapter, then rerun the same bounded read-only probe. Infrastructure, credential, role or network changes remain separate operations requiring their own authority.
 
 ## Managed clone authority
 

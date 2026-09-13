@@ -6,7 +6,11 @@ Accept one target repository or durable vault node and confirm that the user aut
 
 Apply [evidence-extraction.md](evidence-extraction.md) throughout extraction and verification.
 
+For an external verification of an already mapped connection, reuse the repository baseline and inspect only the selected external authority. Use this documentation recipe outside the closed Git synchronization run: a provider observation is not a repository Git blob. Record the external evidence identity, environment, observation time and safe retrieval reference in the candidate note. Review and check the complete candidate through [final-note-review.md](final-note-review.md) before publishing it. Preserve source analysis metadata when the source repository was not re-analyzed. This branch may resolve a pending item even when the repository commit is unchanged; it does not alter a sync receipt or bypass a failed source review.
+
 ## Baseline
+
+For external-only reconciliation, perform step 1 and reuse the accepted source baseline; skip source inventory, acquisition and scanning in steps 2–6. Follow connection-reconciliation.md for the selected external evidence. Any discovered source contradiction becomes a separate source update, not a silent refresh of source metadata.
 
 1. Read the existing note, system MOC, flows, nearby topics/integrations/glossary terms, and backlinks. For a new target, search basenames, aliases, `nombre-raw`, and backlinks before concluding that no canonical note exists.
 2. For repository targets, run `python3 90-Meta/vault-inventory.py --repo <note-or-alias> --format markdown` from `VAULT_ROOT` before cloning, fetching, or scanning. Treat this classification as the decision gate; it resolves the production branch by preferring `main` and using `master` only when `main` does not exist. The command also resolves GitHub identity without changing the global `gh` account. If it reports multiple accessible accounts, repeat it with the requested `--github-user <login>`; do not run `gh auth switch`.
@@ -20,7 +24,7 @@ Apply [evidence-extraction.md](evidence-extraction.md) throughout extraction and
 5. For `changed`, ensure both the recorded commit and new HEAD are available. If a read-only source lacks either commit, switch to the managed `CLONE_ROOT` or request authorization; never deepen or fetch the read-only clone. In a managed clone, deepen the fetch or fetch the old commit explicitly when required. Inspect `git log --oneline <old>..<new>` and `git diff --stat <old>..<new>` before the bounded map update. Record the limitation if the remote no longer exposes the recorded commit.
 6. For repository targets, run `<python> -B 90-Meta/static-evidence-scan.py --repo <note>` from `VAULT_ROOT` as an initial sweep. Add `--source-repo "<resolved-repository-path>"` only for an exact configured checkout or the detached temporary worktree produced after fetching a managed clone. Treat the report as a sweep, not a conclusion.
 
-For a non-repository target, skip inventory and clone operations. Identify the repository notes, source clones, audited vault notes, or read-only GCP metadata that own the evidence; do not fabricate repository traceability for the target node.
+For a non-repository target, skip inventory and clone operations. Identify the repository notes, source clones, audited vault notes, or authorized read-only external metadata that own the evidence; do not fabricate repository traceability for the target node.
 
 ## Evidence interrogation
 
@@ -38,8 +42,8 @@ For a declared schema repository, distinguish a confirmed writer from a reader o
 
 1. Confirm identity, placement, lifecycle action, naming, and contract using Convenciones and [node-selection.md](../../../../90-Meta/node-selection.md).
 2. Extract the fields and sections required by the selected node contract. For repositories, include purpose, triggers, inputs/outputs, rules, data, infrastructure, countries, and relationships with supporting evidence. Use compact runtime/schedule and environment information needed for its connectors. Under `Limitaciones y desconocimientos`, project each partial or unresolved `connection.*` claim into one `Verificaciones pendientes` item with its exact check and close condition. The full deployment matrix is conditional under Convenciones.
-3. Edit the target note using the exact Convenciones contract.
-4. When publishing a repository documentation update, update `commit-analizado`, `fecha-analisis`, `rama-analizada`, and `ultima-auditoria` together. If inspection finds no necessary documentation change, use the accepted acknowledgement path in [vault-synchronization.md](vault-synchronization.md), preserving the note baseline; a metadata-only request uses that same reviewed closure.
+3. Prepare the complete candidate note outside the knowledge graph using the exact Convenciones contract. Preserve stable connection anchors for resolved as well as pending connections. Apply it only after the final-note review below accepts its exact bytes.
+4. When publishing a repository documentation update based on source re-analysis (not external-only reconciliation), update `commit-analizado`, `fecha-analisis`, `rama-analizada`, and `ultima-auditoria` together. If inspection finds no necessary documentation change, use the accepted acknowledgement path in [vault-synchronization.md](vault-synchronization.md), preserving the note baseline; a metadata-only request uses that same reviewed closure.
 5. Propagate contract changes to every node class required by [node-selection.md](../../../../90-Meta/node-selection.md), including relevant glossary and navigation nodes. Keep asynchronous topology routed through the topic.
 6. Express absence using the required Spanish wording “no observado en fuentes estáticas revisadas”; use `#por-confirmar` only when the limitation affects business understanding.
 
@@ -53,6 +57,10 @@ When another repository is confirmed to write to a represented database, link th
 
 Answer source-derived questions from the resulting note and verify preservation/removal decisions under [evidence-extraction.md](evidence-extraction.md). Run the Framework gates, inspect the complete diff, and confirm that unrelated work and traceability for repositories that were not re-analyzed remain unchanged.
 
+Use [final-note-review.md](final-note-review.md) for independent review of the complete candidate, including external evidence and connection create/preserve/update/retire decisions. For an external-only update, report external verification separately from source freshness and keep the source commit and analysis dates unchanged. Retain the pending item when its close condition is unmet.
+
 ## Completion criterion
+
+For the external-only branch, completion is the accepted final-note review, exact reviewed images published, applicable vault gates passing and each selected pending item either closed by evidence or retained with its remaining question. The unchanged-source/no-write criterion below applies only to source-inventory work, not this branch.
 
 For an unchanged repository, the unit is complete when the inventory proves that remote HEAD equals `commit-analizado`, the result is reported as `current`, and no file was modified. An accepted no-documentation-change inspection completes through the synchronization acknowledgement and receipt, with the note baseline retained and that outcome reported. For a scanned repository with a documentation update, completion requires evidence-backed identity and behavior at the declared evidence level, every written claim passing the profile-specific evidence policy, a contract-compliant note, resolved or explicitly limited main-flow connectors, an explicit decision for every affected node, traceability updated to the scanned branch and commit, and all applicable gates passing. For any other node, completion requires an evidence-backed subject and behavior at the declared evidence level, every written claim passing the same gate, a valid type and lifecycle action, canonical placement and schema, no duplicate node, explicit propagation decisions, and all applicable gates passing.
