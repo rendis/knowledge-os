@@ -51,6 +51,21 @@ fields:
     fields:
       remote: string
       note: string
+  database_targets:
+    type: list
+    optional: true
+    default: []
+    description: Portable database target identities. Procedures select executors; repositories are optional evidence and contain no credentials.
+    item:
+      id: string
+      system: string
+      environment: string
+      instance: string
+      database: string
+      schemas: list
+      repositories: list
+      procedure: string
+      port_key: string
   graph.enabled_types:
     type: list
     default:

@@ -1,15 +1,18 @@
 ---
 name: manage-operational-workflow
-description: Orchestrate documented operational runbooks across Jira, email, team messaging, and other connected capabilities, including Jira work-item estimation, decomposition, and relationships. Use to advise on, estimate, draft, decompose, create, update, or validate Jira work; draft or execute a runbook; publish a validated artifact package; resume a recorded `.operations/` run; or close it.
+description: Orchestrate documented operational runbooks and read-only audits across connected capabilities. Use to trace a flow or entity for a date, audit executions and corrections, advise on or execute a procedure, estimate, draft, decompose, create, update or validate Jira work, publish a validated artifact package, or resume and close a recorded `.operations/` run.
 ---
 
 # Manage operational workflows
 
 Treat the selected procedure in `60-Operacion/` as the runbook, connected capabilities as replaceable executors, and `.operations/` as the resumable ledger for one run.
 
+Use this skill for operational evidence about a known flow or entity: when it ran, errors and retries, submissions, reconciliation results, or observed corrections. Use `map-ecosystem` for explaining architecture or locating dependencies; use `manage-investigation` for an explicitly requested case or open-ended hypothesis tracking beyond the procedure. Audit continuity alone does not require a second investigation record. If a procedure lacks necessary system knowledge, request that bounded evidence from `map-ecosystem` and return to the same operational run.
+
 ## 1. Select the branch and source
 
 - **Advise**: explain or classify from the runbook with read-only work.
+- **Audit**: execute a bounded read-only evidence procedure, correlate observations, and record findings without triggering business processing. Load [references/read-only-audit.md](references/read-only-audit.md).
 - **Draft**: prepare artifacts and validate them against the procedure without publishing them.
 - **Execute**: open a run, authorize its external effects, and perform the approved steps.
 - **Resume**: reconcile the exact recorded run with external state, then continue its pending steps.
@@ -19,11 +22,11 @@ When the input is a validated publication package, accept its exact artifacts, s
 
 Load `../../../90-Meta/vault-resolution.md` and run `../../../90-Meta/resolve-vault.py` relative to this skill directory. Pass any user-supplied path through that resolver and continue only with one canonical `VAULT_ROOT`. Read `60-Operacion/Operacion.md`, resolve the selected note with `python3 90-Meta/operational-catalog.py resolve --basename <name>` (or `--report-id <id>`), then read only that `tipo: operacional` note and its linked dependencies.
 
-Load [references/procedure-contract.md](references/procedure-contract.md) when interpreting, authoring, or changing an operational note. For Execute, Resume, Close, or a persistent Draft, load [references/execution-record.md](references/execution-record.md). Copy [assets/operation-run-template.md](assets/operation-run-template.md) only when opening a new run.
+Load [references/procedure-contract.md](references/procedure-contract.md) when interpreting, authoring, or changing an operational note. For Audit, Execute, Resume, Close, or a persistent Draft, load [references/execution-record.md](references/execution-record.md). Resume and Close preserve the recorded branch and load its reference. Copy [assets/operation-run-template.md](assets/operation-run-template.md) only when opening a new run.
 
 When the request advises on, estimates, drafts, creates, updates, decomposes, converts, links, reparents, or validates Jira work items, load `../../../90-Meta/work-item-evidence.md`, then `../../../90-Meta/jira-evidence.md` and [references/jira-work-items.md](references/jira-work-items.md) before building the effect plan. Use the shared contract plus the Jira mapping for current read-only evidence; keep the versioned Jira notes under `60-Operacion/Jira/` as the semantic authority and this skill as the sole owner of planned Jira effects.
 
-Create `.operations/<run-id>/run.md` for Execute or a Draft that must survive the current session. Resume and Close require the exact existing run record.
+Create `.operations/<run-id>/run.md` for Audit, Execute, or a Draft that must survive the current session. Resume and Close require the exact existing run record.
 
 If no runbook matches, prepare a labeled ad-hoc plan and verify that existing authorization covers its complete effects; request only missing authorization. Recommend promoting recurring behavior through the vault documentation workflow.
 
@@ -55,13 +58,15 @@ Before the first external write or send, present one compact preview with:
 
 Use existing explicit authorization when it already covers the exact preview and material effects; request approval only for uncovered scope. Advise and Draft authorize no external publication. A material change to target, recipient, content, action type, or effect order returns the run to `awaiting-approval`.
 
-For Advise or Draft with no external effects, complete this stage after confirming the effect plan contains none.
+For Audit, Advise, or Draft with no external effects, complete this stage after confirming the effect plan contains none.
 
 **Complete when:** the approved preview exactly matches every pending external-effect step, the plan has no external effects, or the run remains `awaiting-approval`.
 
 ## 4. Execute the ledger
 
-For each external-effect step:
+For Audit, execute and record the evidence steps defined in [references/read-only-audit.md](references/read-only-audit.md), then continue to closure. Local record creation is part of the audit; publication or business processing is a separate effect requiring its own authority.
+
+For Execute, perform required read-only preparation and local steps using their owning capability contracts, recording their completion evidence. For each external-effect step:
 
 1. Reconcile its recorded and external state read-only.
 2. Perform the pending approved action once.
@@ -72,15 +77,19 @@ For each external-effect step:
 
 A success response or returned identifier is not completion evidence by itself. A missing, mismatched, inaccessible, or unverifiable created artifact or required reference moves the step to `blocked`; preserve its identifiers and reconcile before retrying. Read-only preparation may run in parallel. Preserve runbook order for external effects unless it explicitly marks steps independent. Partial success, ambiguous state, rejected authorization, missing capability, or a runbook contradiction also moves the run to `blocked` with the exact safe next action. Compensation, deletion, retraction, or overwrite requires a procedure-backed step and separate approval.
 
-When the selected branch has no approved external effects, skip execution and continue to the handoff.
+For Advise or Draft with no approved external effects, skip external execution and continue to the handoff. An Audit with no external effects still executes its read-only evidence steps.
 
 **Complete when:** every attempted step has a verified `completed`, `not-applicable`, `blocked`, or `failed` state; every created artifact and required reference has an existence, correspondence, and access result; and the evidence records the verification method.
 
 ## 5. Close and hand off
 
-Close when every required step is `completed` or procedure-backed `not-applicable`, every created artifact and required reference has passed the integrity checks, external identifiers and completion evidence are recorded, optional omissions are visible, and no approval or blocker remains pending. Return the resulting keys or links, publication timestamp, verification result, and every unresolved limitation to the caller.
+For Audit, use the evidence completion criteria in its reference. A completed audit describes what was established and what remains unknown; it does not imply that the audited flow succeeded or that a correction occurred.
+
+For Execute, close when every required step is `completed` or procedure-backed `not-applicable`, every created artifact and required reference has passed the integrity checks, external identifiers and completion evidence are recorded, optional omissions are visible, and no approval or blocker remains pending. Return the resulting keys or links, publication timestamp, verification result, and every unresolved limitation to the caller.
 
 For Advise or a non-persistent Draft, return the validated guidance or artifacts and their limitations without creating a completed run.
+
+For a persistent Draft, close when the required local artifacts are validated against the procedure and delivered, their evidence and limitations are recorded, and no required drafting step remains pending. Publication or external read-back is not a Draft completion requirement.
 
 **Complete when:** the user-facing handoff matches the completed run record, or the requested advice or draft has been delivered and validated against the runbook.
 

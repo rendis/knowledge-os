@@ -178,6 +178,15 @@ def dump_instance(data: dict[str, Any]) -> str:
     lines.append("  schema_repository:")
     lines.append(f"    remote: {_quote(schema.get('remote') or '')}")
     lines.append(f"    note: {_quote(schema.get('note') or '')}")
+    targets = data.get("database_targets", [])
+    if targets:
+        lines.append("database_targets:")
+        for target in targets:
+            lines.append(f"  - id: {_quote(target['id'])}")
+            for field in ("system", "environment", "instance", "database", "procedure", "port_key"):
+                lines.append(f"    {field}: {_quote(target[field])}")
+            for field in ("schemas", "repositories"):
+                lines.append(f"    {field}: [{', '.join(_quote(v) for v in target[field])}]")
     graph = data.get("graph") or {}
     types = graph.get("enabled_types") or list(DEFAULT_TYPES)
     lines.append("graph:")
@@ -315,6 +324,7 @@ def validate_instance(data: dict[str, Any]) -> dict[str, Any]:
             raise InstanceError(f"duplicate procedure in capabilities.{name}")
         normalized_capabilities[name] = list(notes)
     types = ((data.get("graph") or {}).get("enabled_types")) or list(DEFAULT_TYPES)
+    targets = validate_database_targets(data.get("database_targets", []), seen)
     return {
         "version": int(data.get("version") or 1),
         "cell": {"name": str(cell["name"]).strip(), "purpose": str(cell["purpose"]).strip()},
@@ -332,7 +342,44 @@ def validate_instance(data: dict[str, Any]) -> dict[str, Any]:
         "adapters": list(adapters),
         "locale": {"notes": locale},
         "capabilities": normalized_capabilities,
+        "database_targets": targets,
     }
+
+
+def validate_database_targets(targets: Any, systems: set[str]) -> list[dict[str, Any]]:
+    """Targets describe access; repositories are optional evidence, never credentials."""
+    if not isinstance(targets, list):
+        raise InstanceError("database_targets must be a list")
+    result, ids = [], set()
+    fields = {"id", "system", "environment", "instance", "database", "procedure", "port_key", "schemas", "repositories"}
+    for target in targets:
+        if not isinstance(target, dict) or set(target) - fields:
+            raise InstanceError("invalid database target fields")
+        normalized = {}
+        for field in fields - {"schemas", "repositories"}:
+            value = target.get(field)
+            if not isinstance(value, str) or not value.strip() or value != value.strip() or any(c in value for c in "\n\r\0"):
+                raise InstanceError(f"database target requires {field}")
+            normalized[field] = value
+        if KEBAB_CASE_RE.fullmatch(normalized["id"]) is None or normalized["id"] in ids:
+            raise InstanceError("database target id must be unique kebab-case")
+        if normalized["system"] not in systems:
+            raise InstanceError("database target system is not declared")
+        procedure = normalized["procedure"]
+        if any(c in procedure for c in "/\\[]#") or procedure.endswith(".md") or procedure in {".", ".."}:
+            raise InstanceError("database target procedure must be a canonical basename")
+        for field in ("schemas", "repositories"):
+            values = target.get(field, [])
+            if not isinstance(values, list) or any(not isinstance(v, str) or not v.strip() or v != v.strip() or any(c in v for c in "\n\r\0") for v in values):
+                raise InstanceError(f"database target {field} must be a list of names")
+            if len(values) != len(set(values)):
+                raise InstanceError(f"duplicate database target {field}")
+            normalized[field] = list(values)
+        for remote in normalized["repositories"]:
+            _canonical_tracker_url(remote)
+        ids.add(normalized["id"])
+        result.append(normalized)
+    return result
 
 
 def load_instance(path: Path) -> dict[str, Any]:

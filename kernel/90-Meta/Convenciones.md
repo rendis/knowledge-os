@@ -45,6 +45,8 @@ Choose the type from the observed identity. Search basename, `aliases`, `nombre-
 | `70-Aprendizajes/` `tipo: aprendizaje` | A reusable, evidence-bounded conclusion from `manage-investigation-derived-learning` | Session logs or undeployed designs |
 | `90-Meta/` or a root Base | Schema, gates, helpers, derived views | Ecosystem facts |
 
+Operational areas are discovered from `60-Operacion/<Area>/<Area>.md` and consistent `operacion/area/<slug>` tags. Classify a procedure by its primary outcome; use `relacionado-con` for other registered areas. A cross-system audit belongs in the registered audit area; access guides and corrective procedures retain their own purpose-based area. The closed operational contract is maintained in `manage-operational-workflow` under `references/procedure-contract.md`.
+
 Decision rules: update before duplicating; a service is not a flow; a business flow is not an operational procedure; a learning is not a technical production claim; runtime is not an integration; low-level tables/buckets stay as strings; ambiguity does not create a node; do not invent folder types locally.
 
 Skip types listed as disabled in `instance.yaml` `graph.enabled_types`.
