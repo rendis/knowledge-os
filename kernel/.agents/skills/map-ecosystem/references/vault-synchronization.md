@@ -8,7 +8,7 @@ The coordinator owns inventory, source binding, durable state, gate, projection,
 
 ## Scope and incremental delivery
 
-Apply [repository-map.md](repository-map.md) before building a worker card. The initial deliverable is a repository purpose/main-flow/connector map. Resolve cross-repository and cloud edges after local extraction. Preserve valid existing analyses and notes; instruction/model changes alone do not justify a new full scan. Select small independent inventory groups before `begin`, so one slow repository does not hold every result. Do not split or rewrite an already frozen run to claim it completed; preserve it and report its state.
+Apply [repository-map.md](repository-map.md) before building a worker card. The initial deliverable is a repository purpose/main-flow/connector map with stable `connection.*` claims. Preserve valid existing analyses and notes; instruction/model changes alone do not justify a new full scan. Select small independent inventory groups before `begin`, so one slow repository does not hold every result. Do not split or rewrite an already frozen run to claim it completed; preserve it and report its state. After local package acceptance, resolve only material external ends through [connection-reconciliation.md](connection-reconciliation.md) as separately reviewed claims and node decisions; never append them to the closed local package.
 
 ## Worker execution choices
 
