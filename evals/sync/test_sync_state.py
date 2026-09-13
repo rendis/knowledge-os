@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import copy
 import hashlib
+import importlib.util
 import json
 import shutil
 import subprocess
@@ -30,9 +31,14 @@ from fixtures import (
 DIST = Path(__file__).resolve().parents[2]
 SYNC_RUN = DIST / "kernel" / "90-Meta" / "sync-run.py"
 MANIFEST = DIST / "kernel" / "90-Meta" / "git-change-manifest.py"
+NOTE_REVIEW = DIST / "kernel" / "90-Meta" / "review-note-candidate.py"
 ACK_PATH = "90-Meta/.sync-acknowledgements.json"
 SECOND_REPOSITORY = "APP00000-zobserver-service"
 SECOND_NODE = "observer-service"
+
+_manifest_spec = importlib.util.spec_from_file_location("sync_state_manifest", MANIFEST)
+manifest_tool = importlib.util.module_from_spec(_manifest_spec)
+_manifest_spec.loader.exec_module(manifest_tool)
 
 
 def bytes_digest(value: str) -> str:
@@ -331,12 +337,151 @@ class SyncRunStateEval(unittest.TestCase):
         unit_id: str,
         projection_path: Path,
         patch_path: Path,
+        *,
+        review: bool = True,
     ) -> subprocess.CompletedProcess[str]:
-        return self.run_sync(
+        result = self.run_sync(
             "validate-unit", "--state-root", str(root / "state"), "--run-id", run_id,
             "--unit-id", unit_id, "--projection", str(projection_path),
             "--patch", str(patch_path),
         )
+        if result.returncode == 0 and review:
+            projection = json.loads(projection_path.read_text(encoding="utf-8"))
+            if projection["unit_type"] == "write-group":
+                reviewed = self.review_unit(root, run_id, unit_id, projection_path, patch_path)
+                self.assertEqual(reviewed.returncode, 0, reviewed.stdout + reviewed.stderr)
+        return result
+
+    def review_unit(
+        self,
+        root: Path,
+        run_id: str,
+        unit_id: str,
+        projection_path: Path,
+        patch_path: Path,
+        *,
+        invert_result_kind: bool = False,
+    ) -> subprocess.CompletedProcess[str]:
+        candidate = root / f"candidate-{unit_id}"
+        evidence = root / f"evidence-{unit_id}"
+        shutil.rmtree(candidate, ignore_errors=True)
+        shutil.rmtree(evidence, ignore_errors=True)
+        candidate.mkdir()
+        evidence.mkdir()
+        (root / "vault").mkdir(parents=True, exist_ok=True)
+        patch_text = patch_path.read_text(encoding="utf-8")
+        sections, issues = manifest_tool.projected_patch_sections(patch_text)
+        self.assertEqual(issues, [])
+        deleted = []
+        for relative, section in sections.items():
+            images = manifest_tool.complete_patch_images(section)
+            self.assertIsNotNone(images)
+            _, after = images
+            if invert_result_kind:
+                self.assertEqual(after, b"")
+            if (section["new_path"] is None) != invert_result_kind:
+                deleted.append(relative)
+            else:
+                target = candidate / relative
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(after)
+        (evidence / "record.json").write_text(
+            '{"kind":"synthetic-final-note-evidence"}\n', encoding="utf-8"
+        )
+        manifest_path = root / f"note-manifest-{unit_id}.json"
+        freeze_arguments = [
+                sys.executable, "-B", str(NOTE_REVIEW), "freeze",
+                "--vault", str(root / "vault"),
+                "--candidate", str(candidate),
+                "--evidence-root", str(evidence),
+                "--evidence", "record.json",
+                "--projection", str(projection_path),
+                "--output", str(manifest_path),
+        ]
+        for relative in deleted:
+            freeze_arguments.extend(("--delete", relative))
+        frozen = subprocess.run(
+            freeze_arguments,
+            cwd=str(DIST), text=True, capture_output=True, check=False,
+        )
+        self.assertEqual(frozen.returncode, 0, frozen.stdout + frozen.stderr)
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        decisions = {}
+        for relative, images in manifest["connections"].items():
+            before, after = set(images["base"]), set(images["candidate"])
+            for connection_id in before | after:
+                action = (
+                    "preserve" if connection_id in before and connection_id in after
+                    else "create" if connection_id in after else "retire"
+                )
+                decisions[f"{relative}#{connection_id}"] = {
+                    "action": action,
+                    "reason": "Synthetic fixture transition was reviewed.",
+                }
+        review_path = root / f"note-review-{unit_id}.json"
+        write_json(review_path, {
+            "version": 1,
+            "manifest_digest": digest(manifest),
+            "verdict": "accept",
+            "findings": [],
+            "connection_decisions": decisions,
+        })
+        return self.run_sync(
+            "review-unit", "--state-root", str(root / "state"), "--run-id", run_id,
+            "--unit-id", unit_id, "--vault", str(root / "vault"),
+            "--candidate", str(candidate), "--evidence-root", str(evidence),
+            "--manifest", str(manifest_path), "--review", str(review_path),
+        )
+
+    def test_documentation_apply_requires_bound_final_note_review(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            _, _, oids = make_repository_pair(root)
+            gate = gate_v2(oids)
+            run_id = self.begin(root, oids)
+            self.seal(root, run_id, gate)
+            vault, projection_path, patch_path = self.unit_files(
+                root, gate, run_id=run_id, unit_id="group-001",
+                unit_type="write-group", path="10-Sistemas/target-service.md",
+                before="before\n", after="after\n",
+                grants=gate["write_groups"][0]["grants"],
+            )
+            validated = self.validate_unit(
+                root, run_id, "group-001", projection_path, patch_path, review=False,
+            )
+            self.assertEqual(validated.returncode, 0, validated.stdout + validated.stderr)
+            _, ack_projection, ack_patch = self.unit_files(
+                root, gate, run_id=run_id, unit_id="acknowledgements",
+                unit_type="acknowledgements", path=ACK_PATH, before="",
+                after=self.acknowledgement_payload(gate), grants=[],
+            )
+            ack_validated = self.validate_unit(
+                root, run_id, "acknowledgements", ack_projection, ack_patch,
+            )
+            self.assertEqual(
+                ack_validated.returncode, 0, ack_validated.stdout + ack_validated.stderr,
+            )
+            self.apply_unit(root, run_id, "acknowledgements", vault)
+            status = self.status(root, run_id)
+            self.assertEqual(status["next_command"], "review-unit")
+            blocked = self.run_sync(
+                "apply-unit", "--state-root", str(root / "state"),
+                "--run-id", run_id, "--unit-id", "group-001", "--vault", str(vault),
+            )
+            self.assertEqual(blocked.returncode, 2, blocked.stdout + blocked.stderr)
+            self.assertEqual(self.payload(blocked)["code"], "final-note-review-required")
+            target = vault / "10-Sistemas/target-service.md"
+            target.write_text("after\n", encoding="utf-8")
+            resumed = self.run_sync(
+                "resume", "--state-root", str(root / "state"), "--run-id", run_id,
+            )
+            self.assertEqual(resumed.returncode, 2, resumed.stdout + resumed.stderr)
+            self.assertEqual(self.payload(resumed)["code"], "final-note-review-required")
+            target.write_text("before\n", encoding="utf-8")
+            reviewed = self.review_unit(root, run_id, "group-001", projection_path, patch_path)
+            self.assertEqual(reviewed.returncode, 0, reviewed.stdout + reviewed.stderr)
+            self.assertTrue(self.payload(reviewed)["receipt_digest"])
+            self.apply_unit(root, run_id, "group-001", vault)
 
     def apply_unit(self, root: Path, run_id: str, unit_id: str, vault: Path) -> dict[str, Any]:
         result = self.run_sync(
@@ -1204,6 +1349,52 @@ class SyncRunStateEval(unittest.TestCase):
             self.assertEqual(self.validate_unit(root, run_id, "group-001", projection_path, patch_path).returncode, 0)
             self.apply_unit(root, run_id, "group-001", vault)
             self.assertTrue((vault / path).is_file())
+
+    def test_review_rejects_empty_file_deletion_kind_mismatch(self) -> None:
+        for delete in (True, False):
+            with self.subTest(delete=delete), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp)
+                _, _, oids = make_repository_pair(root)
+                gate = gate_v2(oids)
+                run_id = self.begin(root, oids)
+                self.seal(root, run_id, gate)
+                path = "10-Sistemas/target-service.md"
+                target = root / "vault" / path
+                target.parent.mkdir(parents=True)
+                target.write_bytes(b"")
+                new_path = "/dev/null" if delete else f"b/{path}"
+                patch = f"--- a/{path}\n+++ {new_path}\n@@ -0,0 +0,0 @@\n"
+                projection = {
+                    "version": 1, "run_id": run_id, "gate_digest": digest(gate),
+                    "unit_id": "group-001", "unit_type": "write-group",
+                    "patch_digest": bytes_digest(patch),
+                    "base_files": {path: bytes_digest("")},
+                    "result_files": {path: bytes_digest("")},
+                    "grants": gate["write_groups"][0]["grants"],
+                }
+                projection_path, patch_path = root / "kind.json", root / "kind.patch"
+                write_json(projection_path, projection)
+                patch_path.write_text(patch, encoding="utf-8")
+                validated = self.validate_unit(
+                    root, run_id, "group-001", projection_path, patch_path, review=False,
+                )
+                self.assertEqual(validated.returncode, 0, validated.stdout)
+                rejected = self.review_unit(
+                    root, run_id, "group-001", projection_path, patch_path,
+                    invert_result_kind=True,
+                )
+                self.assertEqual(rejected.returncode, 2, rejected.stdout)
+                self.assertEqual(self.payload(rejected)["code"], "final-note-review-kind-mismatch")
+                blocked = self.run_sync(
+                    "apply-unit", "--state-root", str(root / "state"), "--run-id", run_id,
+                    "--unit-id", "group-001", "--vault", str(root / "vault"),
+                )
+                self.assertEqual(self.payload(blocked)["code"], "final-note-review-required")
+                self.assertTrue(target.is_file())
+                accepted = self.review_unit(root, run_id, "group-001", projection_path, patch_path)
+                self.assertEqual(accepted.returncode, 0, accepted.stdout)
+                self.apply_unit(root, run_id, "group-001", root / "vault")
+                self.assertEqual(target.exists(), not delete)
 
     def test_malformed_unit_inputs_use_retryable_projection_envelope(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

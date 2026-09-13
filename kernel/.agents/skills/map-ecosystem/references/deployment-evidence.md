@@ -5,10 +5,10 @@ Load this reference for an explicit deployment audit, or the specific part neede
 ## Evidence sequence
 
 1. Inspect `.github/workflows/`, including called reusable workflows, event filters, branch or tag conditions, matrices, environments, inputs, and job dependencies.
-2. Follow referenced Cloud Build files, deployment scripts, Dockerfiles, Helm values, Kubernetes or Kustomize overlays, Cloud Run or Functions descriptors, and infrastructure-as-code modules.
+2. Follow the referenced build and deployment definitions, container files, workload manifests and infrastructure-as-code modules. Cloud Build, Helm/Kustomize, Cloud Run/Functions, AWS CloudFormation/ECS/Lambda and Azure deployment definitions are examples, not an exhaustive platform list. Include other cloud and on-premises targets when observed.
 3. Resolve versioned variables that identify project, platform, resource, region or zone, namespace, workload, artifact, and environment. Record secret names only as unresolved indirection; never infer their values.
 4. Inspect an accessible pinned reusable action or cross-repository deployment definition when the local workflow delegates target selection to it. Otherwise record the external definition as an exact unresolved indirection, answer dependent fields as “no observado en fuentes estáticas revisadas”, and withhold only claims that require the unavailable body. The unresolved indirection does not make the repository analysis or synchronization incomplete.
-5. Use bounded GCP `list` or `describe` metadata only to reconcile a concrete static target, never to search blindly for a deployment.
+5. Follow the access gate in connection-reconciliation.md before a bounded read-only metadata query against the concrete static target. Use the configured provider or infrastructure executor; platform examples confer no authorization. Keep missing access as an actionable pending verification.
 
 ## Per-environment chain
 
@@ -20,7 +20,7 @@ event or manual input
 → environment condition
 → build artifact
 → deploy action or command
-→ GCP project
+→ provider account/project/subscription or on-premises authority
 → platform and resource
 → location
 → namespace or workload, when applicable

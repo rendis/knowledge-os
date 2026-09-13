@@ -12,13 +12,14 @@ Use this contract after a synchronization interruption, validation failure, or s
 | Closed package | `active/<run_id>/packages/<repository>/artifact.json` | Exact `package-closed` semantic product: finalized manifest, scaffold, analysis, independent review for write authority or deterministic cursor fallback, single-package gate, and recomputable lineage digests. |
 | Sealed authority | `active/<run_id>/gate.json` | Gate schema v2; its digest and accepted grants bind every projection. |
 | Unit projection and patch | Paths emitted by `status` | Projection schema v1: `version`, `run_id`, `gate_digest`, `unit_id`, `unit_type`, `patch_digest`, `base_files`, `result_files`, and `grants`. |
+| Final-note review receipt | `active/<run_id>/units/<unit_id>/note-review.json` | Binds accepted review and manifest digests to the validated projection; required before applying a documentation unit. |
 | Safe completion receipt | `receipts/<run_id>.json` plus `receipts/fingerprints/<fingerprint>.json` | Closed statuses, identities, OIDs, and digests only. The fingerprint index reuses the completed current identity even when source drift changed it during the supervised run. |
 
 The active checkpoint contains only finalized, validated, redacted package artifacts, validated contracts, digests, and closed receipts. It must be safely persisted atomically before a transition is reported.
 
 ## States and commands
 
-The run progresses monotonically through `packages`, `gated`, `projecting`, and `closing`; the closed receipt reports `complete`. A unit moves from `pending` to `validated` to `applied`. Its recoverable states are `projection-invalid`, `apply-failed`, and `stale`. Durable `stale_reason` distinguishes `source`, `source-retracted`, and `destination`; recovery never guesses the cause from bytes alone.
+The run progresses monotonically through `packages`, `gated`, `projecting`, and `closing`; the closed receipt reports `complete`. A unit moves from `pending` to `validated` to `applied`. A documentation unit additionally requires a bound final-note review receipt before application; structural validation alone is insufficient. Its recoverable states are `projection-invalid`, `apply-failed`, and `stale`. Durable `stale_reason` distinguishes `source`, `source-retracted`, and `destination`; recovery never guesses the cause from bytes alone.
 
 | Command | Required public arguments | Result |
 | --- | --- | --- |
@@ -27,7 +28,8 @@ The run progresses monotonically through `packages`, `gated`, `projecting`, and 
 | `seal-gate` | `--state-root --run-id --gate` | Persists gate v2 and independent units. |
 | `status` | `--state-root --run-id` | Returns `run_id`, status, gate digest, ordered units, package counters, receipt digest, and `next_command`. |
 | `validate-unit` | `--state-root --run-id --unit-id --projection --patch` | Records the selected unit as validated or projection-invalid. |
-| `apply-unit` | `--state-root --run-id --unit-id --vault` | Applies one validated unit idempotently; a mixed preimage/postimage is never completed forward. |
+| `review-unit` | `--state-root --run-id --unit-id --vault --candidate --evidence-root --manifest --review` | Checks independent final-note acceptance against the stored projection and records its bound receipt. |
+| `apply-unit` | `--state-root --run-id --unit-id --vault` | Applies one validated unit idempotently, requiring a final-note review for documentation units; a mixed preimage/postimage is never completed forward. |
 | `resume` | `--state-root --run-id` | Returns the exact next command plus invalidated, reused, reconciled, and retracted units/packages. |
 | `close` | `--state-root --run-id` | Requires all units applied, writes the durable receipt, and removes only `active/<run_id>/`. A retry with an existing valid receipt idempotently retires a matching orphan active checkpoint. |
 
@@ -61,6 +63,7 @@ A finding-directed correction is local package preparation, not a new run state.
 ## Invariants
 
 - `acknowledgements` and every `group-NNN` are atomic, idempotent, independent units with disjoint write paths/nodes.
+- Final-note acceptance is an additional check, never a grant; missing review blocks documentation application and cannot be bypassed by resume.
 - The gate remains the only publication authority: projections must declare grants present in gate v2.
 - Markdown projections stay below canonical knowledge roots (`10-Sistemas/` through `70-Aprendizajes/`); agent, state, and metadata surfaces are never basename-authorized.
 - The coordinator uses the same emitted `run_id` for recoverable work. It preserves all still-valid package and gate digests.

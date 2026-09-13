@@ -328,10 +328,15 @@ def load_run(state_root: Path, run_id: str) -> dict[str, Any]:
         "stale_reason",
         "failed_patch_digests", "gate_digest", "projection_digest", "patch_digest",
         "base_files", "result_files", "base_kinds", "result_kinds",
-        "receipt_digest",
+        "note_review_digest", "receipt_digest",
     }
     unit_names = []
     for unit in run["units"]:
+        legacy_unit_fields = unit_fields - {"note_review_digest"}
+        if isinstance(unit, dict) and set(unit) == legacy_unit_fields:
+            # Legacy pending documentation units require a review receipt.
+            # Already-applied units retain their pre-upgrade publication status.
+            unit["note_review_digest"] = ""
         if (
             not isinstance(unit, dict)
             or set(unit) != unit_fields
@@ -357,7 +362,8 @@ def load_run(state_root: Path, run_id: str) -> dict[str, Any]:
                 or value and DIGEST_RE.fullmatch(value) is None
                 for value in (
                     unit.get("gate_digest"), unit.get("projection_digest"),
-                    unit.get("patch_digest"), unit.get("receipt_digest"),
+                    unit.get("patch_digest"), unit.get("note_review_digest"),
+                    unit.get("receipt_digest"),
                 )
             )
             or not all(
@@ -453,6 +459,32 @@ def load_run(state_root: Path, run_id: str) -> dict[str, Any]:
             or projection.get("gate_digest") != unit["gate_digest"]
         ):
             raise ContractError("unit-checkpoint-invalid", "validated unit digest does not match")
+        if unit["note_review_digest"]:
+            review_receipt = read_json(directory / "note-review.json")
+            expected_review = {
+                "version", "code", "status", "run_id", "unit_id",
+                "gate_digest", "projection_digest", "manifest_digest", "review_digest",
+            }
+            if (
+                not isinstance(review_receipt, dict)
+                or set(review_receipt) != expected_review
+                or review_receipt.get("version") != RUN_VERSION
+                or review_receipt.get("code") != "note-unit-reviewed"
+                or review_receipt.get("status") != "pass"
+                or review_receipt.get("run_id") != run_id
+                or review_receipt.get("unit_id") != unit["unit_id"]
+                or review_receipt.get("gate_digest") != unit["gate_digest"]
+                or review_receipt.get("projection_digest") != unit["projection_digest"]
+                or any(
+                    not isinstance(review_receipt.get(field), str)
+                    or DIGEST_RE.fullmatch(review_receipt[field]) is None
+                    for field in ("manifest_digest", "review_digest")
+                )
+                or canonical_digest(review_receipt) != unit["note_review_digest"]
+            ):
+                raise ContractError(
+                    "unit-checkpoint-invalid", "final-note review receipt is invalid"
+                )
         try:
             unit_gate = read_json(root / "gates" / f"{unit['gate_digest']}.json")
         except SyncError as error:
@@ -525,6 +557,13 @@ def next_command(run: dict[str, Any]) -> str:
         for unit in run["units"]
     ):
         return "validate-unit"
+    if any(
+        unit["unit_type"] == "write-group"
+        and unit["status"] in {"validated", "apply-failed"}
+        and not unit["note_review_digest"]
+        for unit in run["units"]
+    ):
+        return "review-unit"
     if any(unit["status"] in {"validated", "apply-failed"} for unit in run["units"]):
         return "apply-unit"
     if run["units"] and all(unit["status"] == "applied" for unit in run["units"]):
@@ -558,6 +597,7 @@ def receipt_view(run: dict[str, Any]) -> dict[str, Any]:
                 "gate_digest": unit["gate_digest"],
                 "projection_digest": unit["projection_digest"],
                 "patch_digest": unit["patch_digest"],
+                "note_review_digest": unit["note_review_digest"],
                 "receipt_digest": unit["receipt_digest"],
             }
             for unit in run["units"]
@@ -621,13 +661,14 @@ def validate_closed_receipt(
     ):
         raise ContractError("run-receipt-invalid", "closed package identity differs from its fingerprint")
     units = receipt.get("units")
-    unit_fields = {
+    legacy_unit_fields = {
         "unit_id", "unit_type", "status", "gate_digest", "projection_digest",
         "patch_digest", "receipt_digest",
     }
+    unit_fields = legacy_unit_fields | {"note_review_digest"}
     if not isinstance(units, list) or any(
         not isinstance(item, dict)
-        or set(item) != unit_fields
+        or frozenset(item) not in {frozenset(legacy_unit_fields), frozenset(unit_fields)}
         or not valid_name(item.get("unit_id"))
         or item.get("unit_type") not in {"acknowledgements", "write-group"}
         or item.get("status") != "applied"
@@ -635,6 +676,14 @@ def validate_closed_receipt(
             not isinstance(item.get(field), str)
             or DIGEST_RE.fullmatch(item[field]) is None
             for field in ("gate_digest", "projection_digest", "patch_digest", "receipt_digest")
+        )
+        or "note_review_digest" in item
+        and (
+            not isinstance(item["note_review_digest"], str)
+            or item["note_review_digest"]
+            and DIGEST_RE.fullmatch(item["note_review_digest"]) is None
+            or item["unit_type"] == "acknowledgements"
+            and item["note_review_digest"] != ""
         )
         for item in units
     ):
@@ -663,6 +712,7 @@ def public_status(state_root: Path, run: dict[str, Any]) -> dict[str, Any]:
             "gate_digest": unit["gate_digest"],
             "projection_digest": unit["projection_digest"],
             "patch_digest": unit["patch_digest"],
+            "note_review_digest": unit["note_review_digest"],
             "receipt_digest": unit["receipt_digest"],
             "projection_path": str(directory / "projection.json"),
             "patch_path": str(directory / "unit.patch"),
@@ -1010,6 +1060,7 @@ def new_unit(unit_id: str, unit_type: str, repositories: list[str], nodes: list[
         "result_files": {},
         "base_kinds": {},
         "result_kinds": {},
+        "note_review_digest": "",
         "receipt_digest": "",
     }
 
@@ -1079,6 +1130,15 @@ def rebind_unit_checkpoint(
     target = unit_dir(state_root, run["run_id"], fresh["unit_id"])
     atomic_state_json(state_root, target / "projection.json", projection)
     atomic_state_bytes(state_root, target / "unit.patch", patch)
+    if previous["note_review_digest"]:
+        review_receipt = read_json(source / "note-review.json")
+        review_receipt["unit_id"] = fresh["unit_id"]
+        review_receipt["gate_digest"] = gate_digest
+        review_receipt["projection_digest"] = rebound["projection_digest"]
+        rebound["note_review_digest"] = canonical_digest(review_receipt)
+        atomic_state_json(state_root, target / "note-review.json", review_receipt)
+    else:
+        rebound["note_review_digest"] = ""
     return rebound
 
 
@@ -1323,6 +1383,7 @@ def validate_unit(args: argparse.Namespace) -> dict[str, Any]:
     directory = unit_dir(args.state_root, args.run_id, args.unit_id)
     atomic_state_json(args.state_root, directory / "projection.json", projection)
     atomic_state_bytes(args.state_root, directory / "unit.patch", patch)
+    remove_state_file(args.state_root, directory / "note-review.json")
     unit["status"] = "validated"
     unit["stale_reason"] = ""
     unit["gate_digest"] = run["gate_digest"]
@@ -1339,10 +1400,105 @@ def validate_unit(args: argparse.Namespace) -> dict[str, Any]:
         path: "missing" if section[1] else "file"
         for path, section in sections.items()
     }
+    unit["note_review_digest"] = ""
     unit["receipt_digest"] = ""
     run["status"] = "projecting"
     save_run(args.state_root, run)
     return {**payload, "run_id": args.run_id, "unit_id": args.unit_id, "reused": False}
+
+
+def review_unit(args: argparse.Namespace) -> dict[str, Any]:
+    run = load_run(args.state_root, args.run_id)
+    unit = find_unit(run, args.unit_id)
+    if unit["unit_type"] != "write-group":
+        raise ContractError(
+            "note-review-not-required", "acknowledgement units contain no technical prose"
+        )
+    if unit["status"] not in {"validated", "apply-failed"}:
+        raise ContractError(
+            "projection-validation-required", "unit must have a validated projection"
+        )
+    directory = unit_dir(args.state_root, args.run_id, args.unit_id)
+    manifest_before = read_json(args.manifest)
+    review_before = read_json(args.review)
+    helper = Path(__file__).with_name("review-note-candidate.py")
+    command = [
+        sys.executable, "-B", str(helper), "check",
+        "--vault", str(args.vault),
+        "--candidate", str(args.candidate),
+        "--evidence-root", str(args.evidence_root),
+        "--manifest", str(args.manifest),
+        "--review", str(args.review),
+        "--projection", str(directory / "projection.json"),
+    ]
+    try:
+        checked = subprocess.run(
+            command, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            text=True, check=False,
+        )
+    except OSError as error:
+        raise OperationalError(
+            "note-review-unavailable", "final-note review helper could not run"
+        ) from error
+    try:
+        payload = json.loads(checked.stdout, object_pairs_hook=reject_duplicate_keys)
+    except (json.JSONDecodeError, DuplicateJsonKey) as error:
+        raise OperationalError(
+            "note-review-output-invalid", "final-note review helper returned invalid output"
+        ) from error
+    if checked.returncode or not isinstance(payload, dict) or payload.get("status") != "pass":
+        raise ContractError("final-note-review-required", "final-note review did not pass")
+    manifest_after = read_json(args.manifest)
+    review_after = read_json(args.review)
+    manifest_digest = canonical_digest(manifest_before)
+    if (
+        manifest_after != manifest_before
+        or review_after != review_before
+        or payload.get("manifest_digest") != manifest_digest
+        or manifest_before.get("projection_digest") != unit["projection_digest"]
+    ):
+        raise ContractError("final-note-review-stale", "final-note review inputs changed")
+    # Empty bytes and absence share a digest; bind path kind independently.
+    base_present = set(manifest_before["base_present"])
+    deleted = set(manifest_before["deleted_files"])
+    reviewed_base_kinds = {
+        path: "file" if path in base_present else "missing"
+        for path in manifest_before["base_files"]
+    }
+    reviewed_result_kinds = {
+        path: "missing" if path in deleted else "file"
+        for path in manifest_before["candidate_files"]
+    }
+    if (
+        reviewed_base_kinds != unit["base_kinds"]
+        or reviewed_result_kinds != unit["result_kinds"]
+    ):
+        raise ContractError(
+            "final-note-review-kind-mismatch",
+            "reviewed file presence must match the validated patch",
+        )
+    receipt = {
+        "version": RUN_VERSION,
+        "code": "note-unit-reviewed",
+        "status": "pass",
+        "run_id": args.run_id,
+        "unit_id": args.unit_id,
+        "gate_digest": unit["gate_digest"],
+        "projection_digest": unit["projection_digest"],
+        "manifest_digest": manifest_digest,
+        "review_digest": canonical_digest(review_before),
+    }
+    receipt_digest = canonical_digest(receipt)
+    if unit["note_review_digest"]:
+        if unit["note_review_digest"] != receipt_digest:
+            raise ContractError(
+                "final-note-review-conflict", "unit already has a different final-note review"
+            )
+        return {**receipt, "receipt_digest": receipt_digest, "reused": True}
+    atomic_state_json(args.state_root, directory / "note-review.json", receipt)
+    unit["note_review_digest"] = receipt_digest
+    save_run(args.state_root, run)
+    return {**receipt, "receipt_digest": receipt_digest, "reused": False}
 
 
 def safe_target(vault: Path, relative: str) -> Path:
@@ -1536,6 +1692,7 @@ def write_unit_receipt(state_root: Path, run: dict[str, Any], unit: dict[str, An
         "result_files": unit["result_files"],
         "base_kinds": unit["base_kinds"],
         "result_kinds": unit["result_kinds"],
+        "note_review_digest": unit["note_review_digest"],
         "status": "applied",
     }
     unit["receipt_digest"] = canonical_digest(receipt)
@@ -1774,6 +1931,11 @@ def apply_unit(args: argparse.Namespace) -> dict[str, Any]:
         return {"version": RUN_VERSION, "code": "unit-applied", "status": "pass", "run_id": args.run_id, "unit_id": args.unit_id, "receipt_digest": unit["receipt_digest"], "reused": True}
     if unit["status"] not in {"validated", "apply-failed"}:
         raise ContractError("unit-not-validated", "unit must validate before apply")
+    if unit["unit_type"] == "write-group" and not unit["note_review_digest"]:
+        raise ContractError(
+            "final-note-review-required",
+            "documentation unit must pass final-note review before apply",
+        )
     directory = unit_dir(args.state_root, args.run_id, args.unit_id)
     projection = read_json(directory / "projection.json")
     try:
@@ -2076,6 +2238,11 @@ def resume(args: argparse.Namespace) -> dict[str, Any]:
                     "unit has a mixed preimage/postimage and cannot roll forward",
                 )
             if all(after_matches.values()):
+                if unit["unit_type"] == "write-group" and not unit["note_review_digest"]:
+                    raise ContractError(
+                        "final-note-review-required",
+                        "documentation postimage cannot be reconciled without final-note review",
+                    )
                 unit["status"] = "applied"
                 write_unit_receipt(args.state_root, run, unit)
                 reconciled.append(unit["unit_id"])
@@ -2187,6 +2354,15 @@ def parser() -> StableArgumentParser:
     validate.add_argument("--unit-id", required=True)
     validate.add_argument("--projection", type=Path, required=True)
     validate.add_argument("--patch", type=Path, required=True)
+    review = commands.add_parser("review-unit")
+    review.add_argument("--state-root", type=Path, default=DEFAULT_STATE_ROOT)
+    review.add_argument("--run-id", required=True)
+    review.add_argument("--unit-id", required=True)
+    review.add_argument("--vault", type=Path, required=True)
+    review.add_argument("--candidate", type=Path, required=True)
+    review.add_argument("--evidence-root", type=Path, required=True)
+    review.add_argument("--manifest", type=Path, required=True)
+    review.add_argument("--review", type=Path, required=True)
     apply = commands.add_parser("apply-unit")
     apply.add_argument("--state-root", type=Path, default=DEFAULT_STATE_ROOT)
     apply.add_argument("--run-id", required=True)
@@ -2216,6 +2392,7 @@ def main(argv: list[str] | None = None) -> int:
             "seal-gate": seal_gate,
             "status": status,
             "validate-unit": validate_unit,
+            "review-unit": review_unit,
             "apply-unit": apply_unit,
             "resume": resume,
             "close": close,
