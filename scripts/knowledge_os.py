@@ -581,7 +581,7 @@ def build_instance_from_args(args: argparse.Namespace) -> dict[str, Any]:
     locale = args.locale or prompt("Note locale (es|en)", "es", args.yes)
     adapters = list(args.adapter or [])
     if not args.yes and not adapters:
-        raw = prompt("Adapters (gcp,postgres,reports — empty for none)", "", False)
+        raw = prompt("Adapters (reports — empty for none)", "", False)
         adapters = [part.strip() for part in raw.split(",") if part.strip()]
     types = list(DEFAULT_TYPES)
     if args.disable_topics:
@@ -808,8 +808,8 @@ def cmd_update(args: argparse.Namespace) -> int:
     target_sources = managed_sources(target_adapters)
     previous_hashes = lock["managed_hashes"]
     retired = sorted(set(previous_hashes) - set(target_sources))
-    current = tree_hashes(dest, lock["adapters"])
-    owned = set(managed_sources(lock["adapters"]))
+    current = tree_hashes(dest, target_adapters)
+    owned = set(target_sources)
     drifted = [
         rel
         for rel, digest in previous_hashes.items()
@@ -899,8 +899,9 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         payload["adapter_configuration_drift"] = (
             sorted(set(adapters) ^ set(instance["adapters"])) if instance is not None else []
         )
-        current = tree_hashes(dest, adapters)
-        expected = distribution_hashes(adapters)
+        available_adapters = [name for name in adapters if (DIST / "adapters" / name).is_dir()]
+        current = tree_hashes(dest, available_adapters)
+        expected = distribution_hashes(available_adapters)
         payload["kernel_version_installed"] = lock.get("kernel_version")
         payload["kernel_version_dist"] = dist_version()
         payload["lock_version"] = lock.get("version")

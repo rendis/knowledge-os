@@ -4,6 +4,8 @@
 
 Accept a domain, flow, or explicit unit set. Confirm write authorization, load [node-selection.md](../../../../90-Meta/node-selection.md), and define the boundary: source units, system, environments, and synthesis question.
 
+Route any Git/GitHub policy change to `manage-git-workflow`; keep it outside this technical publication batch and preserve its existing note as context.
+
 Use [evidence-extraction.md](evidence-extraction.md) as the common extraction contract.
 
 ## Per-unit analysis

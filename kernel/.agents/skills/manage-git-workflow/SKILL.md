@@ -68,4 +68,6 @@ Execution is complete only when the requested result is observed and every addit
 
 ## Ownership
 
+This skill owns the Git/GitHub policy note and its index link, as well as authorized repository operations. Policy rules come from the applicable normative authority and do not require implementation or production evidence. Technical mapping consumes the policy without rewriting it. Preserve the operational note format and canonical links when maintaining policy.
+
 Route persistent work-item worktree creation, attachment, materialization, and handoff state through `manage-development-handoff`. This skill may operate inside an existing repository or worktree, but it does not change `.knowledge-os-handoffs/` or investigation records.

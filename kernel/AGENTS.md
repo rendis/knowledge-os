@@ -13,14 +13,15 @@ Before using an existing case as context, use the read-only case load in `manage
 ## Skills
 
 - `evidence-driven-analysis` — proportional search, diagnosis and audit; conclusions with evidence and limits, with or without a case.
-- `map-ecosystem` — query, document, synchronize, confirm tooling readiness, or answer where a fact belongs. First step is **orientation** when bootstrap is incomplete.
+- `map-ecosystem` — query, document, synchronize, check prerequisites for a specified map operation, or answer where a fact belongs. First step is **orientation** when bootstrap is incomplete.
 - `configure-workspace` — sole writer of local `.knowledge-os-config.yaml`. Onboarding is demand-triggered when a skill cannot resolve repositories or the user asks whether the workspace is initialized or configured.
 - `manage-investigation` — versionable cases under `investigations/` with optional private overlays.
 - `manage-investigation-derived-learning` — assess and publish `70-Aprendizajes/` notes.
 - `manage-development-handoff` — persistent work-item worktrees and handoff files.
 - `reconcile-development-handoff` — pull one selected handoff's implementation evidence into its source case while preserving its worktree-local lifecycle state.
-- `manage-git-workflow` — analyze or maintain the cell's Git/GitHub policy, or apply it to source repositories; routine local versioning of this vault follows repository instructions.
+- `manage-git-workflow` — own analysis and publication of the cell's Git/GitHub policy, or apply it to source repositories; routine local versioning of this vault follows repository instructions.
 - `manage-operational-workflow` — audit flow executions or an entity by date through read-only evidence; draft or execute operational procedures; resume runs in `.operations/`. Uses inspection adapters for access and queries; business actions and publication require matching authorization.
+- `inspect-database` — engine-neutral database evidence through the target’s configured runbook.
 - `grilling` — one decision at a time.
 - `obsidian-cli`, `obsidian-markdown`, `obsidian-bases` — user-invoked Obsidian helpers.
 
@@ -28,9 +29,9 @@ For mapping closure or pending-work status, follow the skill's [mapping completi
 
 Adapters (only if listed in `instance.yaml` `adapters`):
 
-- `inspect-gcp-runtime` with `gcloud` leaf syntax.
-- `inspect-database` for a database target and its available evidence sources; schema repositories are optional.
 - `generate-reports` for registered operational report recipes.
+
+Provider-specific skills are selected and installed by the developer in the destination vault. Resolve their access through configured procedures; the kernel does not install provider tooling.
 
 ## Layout
 

@@ -7,6 +7,8 @@ description: "Trigger: onboard cell identity/capabilities or inspect and change 
 
 Treat `<VAULT_ROOT>/.knowledge-os-config.yaml` as local state. This skill is the sole writer of local workspace configuration. Portable identity, evidence profile and procedure bindings live in `instance.yaml`; local roots and access preferences stay in `.knowledge-os-config.yaml`. Use the semantic CLI; never edit the YAML directly.
 
+This skill reports stored identity, capability bindings and local configuration; it does not certify that an operation can execute. Return the configuration result to the initiating workflow. Checks for a specific map operation remain in `map-ecosystem` readiness; query orientation remains in its orientation branch.
+
 Only the canonical `.knowledge-os-config.yaml` is configuration. `status` and every semantic read are read-only; they neither inspect nor migrate similarly named files. Development worktree root and database proxy ports are independent capabilities; their absence does not make repository discovery incomplete.
 
 ## Collect onboarding decisions
@@ -70,9 +72,9 @@ Resume the exact task that exposed the gap with the semantic value it needs.
 
 ## Cell capabilities
 
-For database access, `instance.yaml` may declare `database_targets`: each has a unique `id`, declared `system`, `environment`, `instance`, `database`, `schemas`, canonical access `procedure`, local `port_key`, and zero or more credential-free HTTPS `repositories`. Repositories provide optional evidence; the procedure selects the executor. Inspect through `cell-config.py database-targets` and `database-target --target <ID>`. Add or update cell-owned declarations only within user-authorized configuration work, validate with the semantic read, and preserve existing fields. Resolve procedure basenames before marking a target configured. Keep credentials out of declarations.
+For database access, `instance.yaml` may declare `database_targets`: each has a unique `id`, declared `system`, `environment`, `instance`, `database`, `schemas`, canonical access `procedure`, optional local `port_key`, and zero or more credential-free HTTPS `repositories`. Repositories provide optional evidence; the procedure selects the executor. Inspect through `cell-config.py database-targets` and `database-target --target <ID>`. Add or update cell-owned declarations only within user-authorized configuration work, validate with the semantic read, and preserve existing fields. Resolve procedure basenames before marking a target configured. Keep credentials out of declarations.
 
-Use the target's `port_key` with the existing `--proxy-port KEY=PORT` update and `database-proxy-port KEY` view. Preserve legacy environment keys and `sources.schema_repository` for existing consumers. An empty repository list never inherits that legacy source. Port configuration does not create an executor or establish live access.
+When the runbook requires a local proxy port, use the target's `port_key` with the existing `--proxy-port KEY=PORT` update and `database-proxy-port KEY` view. Preserve legacy environment keys and `sources.schema_repository` for existing consumers. An empty repository list never inherits that legacy source. Port configuration does not create an executor or establish live access.
 
 During initial onboarding, use the installer's identity/system/tracker/profile/locale options. Collect the team's optional tools, environment names, procedures and executors only when needed. The kernel has no default company, environment list, credential mechanism or procedure basename.
 

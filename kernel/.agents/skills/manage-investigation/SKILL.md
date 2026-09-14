@@ -104,7 +104,7 @@ Complete when exactly one case directory remains for the equivalence group, its 
 
 ## Validate
 
-For a request to assess whether an exact development package is complete enough to implement, read its source case and apply the [question-based implementation-sufficiency check](../manage-development-handoff/references/input-bundle.md#implementation-sufficiency). Report supported answers and concrete gaps without changing the case, package, tracker, or worktree. This assessment does not change investigation readiness or handoff lifecycle state.
+For a request to assess whether an exact development package is complete enough to implement, read its source case and apply the [question-based implementation-sufficiency check](references/implementation-sufficiency.md). Report supported answers and concrete gaps without changing the case, package, tracker, or worktree. This assessment does not change investigation readiness or handoff lifecycle state.
 
 For investigation readiness instead, run the helper's `validate` command for structural and transactional invariants, then apply the lifecycle gate from [references/readiness-and-lifecycle.md](references/readiness-and-lifecycle.md). Keep `investigating` while useful work remains. When a required source prevents useful progress on the global objective, report the observable failure and invoke the helper's `transition --to blocked` command with `blocked-on`, a portable source, reason, and the current public SHA-256. A target-specific gap does not block the whole case when other useful work can continue.
 

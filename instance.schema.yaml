@@ -65,7 +65,7 @@ fields:
       schemas: list
       repositories: list
       procedure: string
-      port_key: string
+      port_key: optional string
   graph.enabled_types:
     type: list
     default:
@@ -92,8 +92,6 @@ fields:
     type: list
     default: []
     values:
-      - gcp
-      - postgres
       - reports
   locale.notes:
     type: enum

@@ -10,8 +10,8 @@ estado: borrador      # borrador | vigente | retirado
 owner: por-definir
 ultima-verificacion: 2026-07-23
 area: "[[DevOps]]"
-relacionado-con: ["[[Jira]]"] # optional
-canales: [jira, correo, mensajeria-equipo]
+relacionado-con: ["[[Delivery]]"] # optional
+canales: [tracker, correo, mensajeria-equipo]
 tags: [operacion, operacion/procedimiento, operacion/area/devops]
 ---
 ```
@@ -51,7 +51,7 @@ For an audit procedure, use the same sections and step table with read-only remo
 
 ### Report
 
-Use `clase: reporte` for one implemented report contract. Add one globally unique lowercase kebab-case `report-id` and require: Propósito, Audiencia y decisiones, Definiciones y grano, Fuente y alcance, Período, filtros y exclusiones, Salida, Validación, Mantenimiento, and Limitaciones. Keep execution mechanics in the shared report skill and its matching recipe.
+Use `clase: reporte` for one implemented report contract. Add one globally unique lowercase kebab-case `report-id` and require: Propósito, Audiencia y decisiones, Definiciones y grano, Fuente y alcance, Período, filtros y exclusiones, Salida, Validación, Mantenimiento, and Limitaciones. Link the execution procedure or implementation from the source or maintenance section. The destination owns its executor, parameters and output-specific validation; the shared report skill coordinates the requested mode.
 
 ## Lifecycle
 

@@ -30,6 +30,15 @@ class DatabaseTargetsTests(unittest.TestCase):
             self.assertEqual(sources, reread["database_targets"][0]["repositories"])
             self.assertEqual(data["sources"]["schema_repository"], reread["sources"]["schema_repository"])
 
+    def test_target_without_proxy_roundtrips(self):
+        data = fixture()
+        del data["database_targets"][0]["port_key"]
+        data["database_targets"][0]["schemas"] = []
+        validated = validate_instance(data)
+        reread = validate_instance(_parse_minimal_yaml(dump_instance(validated)))
+        self.assertEqual(validated, reread)
+        self.assertNotIn("port_key", reread["database_targets"][0])
+
     def test_legacy_without_targets(self):
         data = fixture()
         del data["database_targets"]

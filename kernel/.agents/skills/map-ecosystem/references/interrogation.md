@@ -4,7 +4,7 @@
 
 Accept a question, proposed change, or starting node. Resolve aliases only to find a note; navigate and report using canonical basenames. Keep this branch entirely read-only.
 
-Apply [evidence-driven-analysis](../../evidence-driven-analysis/SKILL.md) when obtaining or evaluating evidence. This reference owns navigation and source identity; the shared method does not restart routing. If called as an auxiliary by another workflow, return observations, sources and limits to that owner.
+Reuse the analysis method when it is already active. Otherwise, load [evidence-driven-analysis](../../evidence-driven-analysis/SKILL.md) only when evidence needs to be obtained or evaluated; navigation alone does not require another analysis pass. This reference owns navigation and source identity; the shared method does not restart routing. If called as an auxiliary by another workflow, return observations, sources and limits to that owner.
 
 ## Navigation
 
@@ -27,7 +27,7 @@ Apply [evidence-driven-analysis](../../evidence-driven-analysis/SKILL.md) when o
    - Service: `compuesto-por`; exceptional component: `implementado-por`.
    - Domain language: follow a glossary edge only when the definition changes the interpretation of a contract, rule, or flow.
    - Operation: follow the selected procedure to its linked standards; use `manage-operational-workflow` only when the user asks to execute or resume it.
-5. When the conclusion needs database schema or live evidence and `inspect-database` is enabled, load that adapter with the exact question and any known target. Keep this branch primary.
+5. When the conclusion needs database schema or live evidence, load `inspect-database` with the exact question and any known target. Keep this branch primary.
 6. Open a Framework **section pointer** only when a claim needs the evidence hierarchy. For implementation questions outside that database handoff, resolve the target repository by remote identity under the ordered `SOURCE_ROOTS`. Treat every non-managed root as read-only. If the repository is missing or the source context is unusable, follow [vault-resolution.md](../../../../90-Meta/vault-resolution.md): repair configuration through its owner skill and never clone without configured authority in an exact `CLONE_ROOT`.
 7. Stop expanding when the next hop cannot change the decision, impact, or uncertainties of the question. Root Bases (`Repos.base`, `Auditoria.base`) are derived radar, not authority.
 
@@ -38,7 +38,7 @@ Apply [evidence-driven-analysis](../../evidence-driven-analysis/SKILL.md) when o
 - **Change impact**: start from the changed unit; inspect input/output contracts, topics, callers/callees, data, runtime, and flows; enumerate every node whose contract or behavior may require a change.
 - **Dependencies**: distinguish HTTP from messaging; use backlinks for inverse relationships instead of rebuilding manual lists.
 - **Data**: identify the resource, read/write mode, transformation rules, and participants; retain low-level strings when no durable node exists.
-- **Infrastructure**: separate versioned deployment evidence from GCP metadata; record environment, region, and date when querying GCP.
+- **Infrastructure**: separate versioned deployment evidence from live provider metadata; record the exact target, environment, location, and observation time.
 - **Flow**: traverse the numbered steps and both diagrams; verify that every relevant edge appears in participant notes.
 
 ## Output

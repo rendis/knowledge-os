@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
-ALLOWED_ADAPTERS = ("gcp", "postgres", "reports")
+ALLOWED_ADAPTERS = ("reports",)
 ALLOWED_PROFILES = ("production-gate", "documented-source", "mixed")
 ALLOWED_LOCALES = ("es", "en")
 DEFAULT_TYPES = (
@@ -184,7 +184,8 @@ def dump_instance(data: dict[str, Any]) -> str:
         for target in targets:
             lines.append(f"  - id: {_quote(target['id'])}")
             for field in ("system", "environment", "instance", "database", "procedure", "port_key"):
-                lines.append(f"    {field}: {_quote(target[field])}")
+                if field in target:
+                    lines.append(f"    {field}: {_quote(target[field])}")
             for field in ("schemas", "repositories"):
                 lines.append(f"    {field}: [{', '.join(_quote(v) for v in target[field])}]")
     graph = data.get("graph") or {}
@@ -357,6 +358,8 @@ def validate_database_targets(targets: Any, systems: set[str]) -> list[dict[str,
             raise InstanceError("invalid database target fields")
         normalized = {}
         for field in fields - {"schemas", "repositories"}:
+            if field == "port_key" and field not in target:
+                continue
             value = target.get(field)
             if not isinstance(value, str) or not value.strip() or value != value.strip() or any(c in value for c in "\n\r\0"):
                 raise InstanceError(f"database target requires {field}")
