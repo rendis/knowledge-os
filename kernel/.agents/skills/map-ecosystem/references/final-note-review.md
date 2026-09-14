@@ -37,7 +37,9 @@ The reviewer writes:
 }
 ```
 
-Use `revise` with specific findings (`{"reason": "<evidence-backed defect>"}` per finding) for incorrect prose, lost knowledge or unsupported closure. One directed correction and verification are allowed; freeze a new manifest after any candidate/evidence change and preserve the rejected attempt. An unavailable source leaves the dependent pending item open.
+Use `revise` with specific findings (`{"reason": "<evidence-backed defect>"}` per finding) for incorrect prose, lost knowledge or unsupported closure. Correct actionable findings within the existing candidate and evidence scope, preserving each rejected attempt. Before each correction, identify the exact defect and its available authoritative evidence; after any candidate/evidence change, freeze a new manifest and obtain an independent review bound to it. Verify cited revisions and paths before review; changing a citation also requires checking that its content supports the claim.
+
+Continue targeted corrections while distinct findings can be resolved from available evidence without expanding the task. Stop the affected publication when the same defect survives a correction, the scope must expand, or required evidence is unavailable; report the precise remaining defect and retain reusable work. An unavailable source leaves the dependent pending item open. A second review finding alone does not require a new cycle, extraction or user approval. This final-note repair policy does not change the separate source-package correction limit enforced by `sync-correction.py`.
 
 ## Check and publish
 
