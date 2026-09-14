@@ -6,7 +6,7 @@ Use this contract before declaring an authorized system map or synchronization c
 
 After accepted local maps are published, make one bounded reconciliation pass over their pending connections and the directly affected flow notes. Service-local completion does not establish cross-repository completion. Reuse the accepted maps and frozen source revisions; preserve closed packages and receipts.
 
-1. Collect the in-scope questions, their connection IDs, exact targets, environments, and close conditions. Group duplicates only when the target, operation, environment and question match. Preserve links to every affected note; a count of checkboxes is not a count of independent tasks.
+1. Apply [evidence-sufficiency.md](evidence-sufficiency.md) to reassess existing close conditions; exclude optional functional validation and confirmed legacy from current mapping work with explicit dispositions. Preserve evidence and distinguish retired demands from questions answered by new evidence. Collect the in-scope questions, their connection IDs, exact targets, environments, and close conditions. Group duplicates only when the target, operation, environment and question match. Preserve links to every affected note; a count of checkboxes is not a count of independent tasks.
 2. Check the related accepted vault notes first, following their cited evidence. If they do not answer the question, inspect the exact related repository, pinned dependency, schema or deployment manifest. A note is a navigation aid; an unsupported assertion or a similarly named resource is not closure evidence.
 3. Split mixed questions into what static evidence establishes and what remains unknown. Classify each remaining question by its next required evidence source:
 

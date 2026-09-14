@@ -138,7 +138,7 @@ Under `Limitaciones y desconocimientos`, use the optional subsection `### Verifi
 - [ ] `connection.<stable-key>` — <source, platform or database to inspect>: <exact unresolved question>. Close with: <required evidence>.
 ```
 
-Record a concrete check, not a generic request to investigate. Name the environment or resource/configuration key when known. Add `#por-confirmar` only when the missing evidence affects business behavior or the runtime/production baseline. When evidence closes the question, update the relevant flow, data, infrastructure or relationship section and remove the pending item; Git retains its history. These items track knowledge verification, not implementation work or delivery ownership.
+Apply `.agents/skills/map-ecosystem/references/evidence-sufficiency.md` before creating or retaining these items: record only material questions for the requested scope, and explicitly retire obsolete demands without claiming functional success. Unverified delivery, traffic or business rows are limitations unless the task requires that verification. Record a concrete check, not a generic request to investigate. Name the environment or resource/configuration key when known. Add `#por-confirmar` only when the missing evidence affects business behavior or the runtime/production baseline. When evidence closes the question, update the relevant flow, data, infrastructure or relationship section and remove the pending item; Git retains its history. These items track knowledge verification, not implementation work or delivery ownership.
 
 Keep the connection identity beside its description in the owning repository note, including after a pending item closes:
 

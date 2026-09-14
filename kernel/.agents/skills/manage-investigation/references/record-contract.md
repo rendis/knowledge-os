@@ -60,7 +60,7 @@ learning-outcome: not-evaluated
 
 - `not-evaluated`: evidence is not yet sufficient to assess a current-state candidate; allowed while investigating or blocked, but not for a completed closure.
 - `none`: no durable technical fact is a candidate.
-- `deferred-until-production`: the only candidate is a proposal or lacks deployment required by the cell evidence profile. Implemented source behavior may qualify before deployment under `documented-source`.
+- `deferred-until-production`: the only candidate is a proposal or lacks deployment required by the cell evidence profile. Implemented source behavior may qualify before deployment under `documented-source`; corrections of existing source maps follow the source-map rule in `90-Meta/evidence-policy.md` under every profile, as bounded by [map-correction.md](map-correction.md).
 - `candidate-for-audit`: a fact may qualify under the cell evidence profile, but `map-ecosystem` has not independently applied that profile's evidence gate.
 - `documented`: `map-ecosystem` independently verified the fact at the cell's required evidence level and confirmed that the canonical vault already represented it correctly or updated and verified the affected notes. Record the canonical notes, lifecycle result, evidence boundary, and observed checks in Readiness and History.
 
