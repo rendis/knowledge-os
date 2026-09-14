@@ -21,7 +21,7 @@ From `VAULT_ROOT`, use `90-Meta/Convenciones.md` as the only normative catalog. 
    - System, provider, platform, or API outside the cell boundary → external integration.
    - End-to-end sequence with a business outcome → flow.
    - Shared domain term needed to interpret nodes or a critical contract → glossary.
-   - Human/team guide, catalog, standard, ordered procedure, or individual report contract → operational; place it under the single owning area and represent secondary areas with typed links.
+   - Human/team guide, catalog, standard, ordered procedure, or individual report contract → operational; place it under the single owning area and represent secondary areas with typed links. Git/GitHub policy maintenance belongs to `manage-git-workflow`, including its policy note and index link; technical mapping recipes consume that policy as context rather than rewriting it.
    - Reusable, evidence-bounded conclusion derived from an investigation → learning; route assessment and publication to `manage-investigation-derived-learning`.
    - Curated navigation or system-wide aggregation → index or system MOC.
    - Documentation contract, validator, reusable helper, or derived view → Meta or Base.

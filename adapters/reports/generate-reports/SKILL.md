@@ -1,46 +1,46 @@
 ---
 name: generate-reports
-description: "Trigger: list, generate, or validate a registered report from a versioned recipe. Hand publication to manage-operational-workflow."
+description: List, generate or validate a registered report using its destination-owned execution procedure. Return local artifacts and verification; external publication belongs to manage-operational-workflow.
 ---
 
 # Generate registered reports
 
-Resolve report semantics from the vault and execute only the matching bundled recipe. Do not accept arbitrary SQL or targets.
+The report note owns meaning; its linked execution procedure owns the source, parameters, executor and output format. This skill coordinates generation without shipping a query engine or renderer.
 
-## 1. Resolve
+## 1. Resolve the report and mode
 
-1. Load `../../../90-Meta/vault-resolution.md` and run `../../../90-Meta/resolve-vault.py` relative to this skill directory. Continue only with one canonical `VAULT_ROOT`.
-2. Run `python3 90-Meta/operational-catalog.py list-reports` or `resolve --report-id <id>`.
-3. Read the resolved report note and [references/report-contract.md](references/report-contract.md).
-4. If the matching recipe directory contains an extra note, read it; do not assume a product-specific report-id.
+Resolve `VAULT_ROOT` through `../../../90-Meta/vault-resolution.md`. Keep the calling workflow as owner when invoked as an auxiliary.
 
-Require the user-facing start and end months as inclusive `YYYY-MM` values. Ask for either missing value and carry both unchanged into the command; the runner alone derives the exclusive BigQuery boundary. Complete when one documented `report-id`, its recipe, both months, output directory, and effect boundary are exact. Return `unsupported-report-id` for no match.
+- **List:** run `python3 90-Meta/operational-catalog.py list-reports` from the resolved vault and return the catalog. No period, executor or live access is required.
+- **Generate:** resolve one exact `report-id` through `90-Meta/operational-catalog.py resolve --report-id <id>`, read its note and [report contract](references/report-contract.md).
+- **Validate:** resolve the report contract and exact existing artifacts; require only the validation inputs named by its procedure.
 
-## 2. Select the execution branch
+Complete when the selected mode and report are unambiguous, or the requested catalog has been returned.
 
-- **List**: run `scripts/run_report.py list`; remain read-only.
-- **Fixture generation**: pass `--input-csv`; do not contact BigQuery.
-- **Live generation**: use the bundled query and the already-active `bq` identity; require user authorization before the productive query.
-- **Validate**: run `scripts/run_report.py validate --workbook <path> --manifest <path>`.
-- **Publish or schedule**: hand the generated artifact package to `manage-operational-workflow`; this skill stops before the external effect.
+## 2. Bind the execution contract
 
-Complete when exactly one branch owns the requested outcome.
+Read the report’s source and maintenance sections and follow its linked execution procedure. Resolve the actual executor, source identity, input parameters, output format, validation and access requirements. Reuse the developer-selected installed capability or referenced implementation; its mere presence does not prove current access.
 
-## 3. Generate
+Resolve periods, dimensions, filters and destinations from the report contract. Ask only for missing consequential inputs. A report may use dates, snapshots or other parameters; no calendar grain or file format is imposed by this skill.
 
-Use Python 3.9 or newer with the interpreter prepared from `scripts/requirements.txt`:
+If no executor or validation procedure exists, return the exact capability gap. Configuration guidance does not authorize installation, source mutation or infrastructure setup.
 
-```text
-<python> scripts/run_report.py generate --report-id <id> --output-dir <dir> --start-month YYYY-MM --end-month YYYY-MM [--input-csv <fixture>]
-```
+Complete when the selected mode has a usable execution or validation contract and all required inputs, or a precise blocker.
 
-The live branch always performs a dry-run, enforces the recipe caps, executes the fixed query with parameters, normalizes the schema required by the named renderer, creates the artifact, validates provenance and totals, then atomically publishes the artifact and non-sensitive manifest. The bundled `monthly-event-excel` renderer owns its four-column event aggregate and PivotTable contract; read the reference before using or extending it. Do not accept arbitrary SQL, project, dataset, table, exclusions, or renderer overrides.
+## 3. Generate or validate
 
-Complete when the `.xlsx` and manifest exist, snapshot/query/recipe/implementation/workbook hashes and totals reconcile, all expected year sheets and PivotTables validate, and temporary extraction files were removed. A failed run leaves neither final file. For the same normalized input and implementation, the workbook SHA-256 must repeat; execution timestamps may differ in the manifest.
+Follow the selected procedure within the caller’s authorization. For live extraction, verify exact source identity, bounded scope and read-only access; perform cost previews or other preflight checks when the executor requires them. For supplied input, establish its identity and completeness without contacting a live source unnecessarily.
 
-## Guardrails
+Generate into the designated local output location outside the knowledge graph. Apply the report’s checks for grain, totals, exclusions, completeness and required presentation. Preserve existing artifacts; distinguish incomplete outputs from verified deliverables.
 
-- Consume the active identity; preserve authentication and gcloud configuration.
-- Keep queries bounded, aggregated, parameterized, dry-run first, and below the versioned byte cap.
-- Keep data, generated workbooks, manifests, and temporaries outside the vault.
-- Treat the report note as semantic authority and the recipe as its one implementation.
+Validation of existing artifacts does not trigger extraction or regeneration. Report failed checks and leave the original artifacts intact.
+
+Complete when the requested artifacts have passed the report-specific checks, or failures and incomplete outputs are explicit.
+
+## 4. Return artifacts
+
+Return the artifact paths, report identity, actual input parameters, source revision or observation time, checks observed and limitations. Preserve sensitive source data according to the execution procedure’s retention rules.
+
+External publication, scheduling or sending requires `manage-operational-workflow`. If that workflow is already the caller, return the package to its current run rather than opening another run.
+
+Completion means verified local generation or validation. It does not establish external delivery.

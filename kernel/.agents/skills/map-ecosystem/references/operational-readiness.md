@@ -1,21 +1,19 @@
 # Ecosystem tooling readiness
 
-Load this branch when the user asks whether the vault, repository, or ecosystem-map tooling is initialized, prepared, or ready for a specific operation. It defines a capability-scoped preflight; it does not establish whether cell runtimes are healthy.
+Load this branch to check prerequisites for a specific vault query, source analysis, authoring, closure, synchronization or external reconciliation. Questions about stored configuration, initialization choices or source roots belong to `configure-workspace`; reuse its result here only when the requested operation needs it. It defines a capability-scoped preflight; it does not establish whether cell runtimes are healthy.
 
 The readiness check itself is read-only and non-publishing: do not change versioned content, source working trees, external systems, Git authentication, or user configuration. When it exposes a workspace-configuration gap, hand off to `configure-workspace`; that skill may write local configuration only after its confirmation gate, then control returns here for a fresh preflight. Python checks use `-B` to avoid bytecode caches, Git checks use `--no-optional-locks`, and tooling tests may create and remove disposable fixtures under the host temporary directory.
 
 ## When to run
 
-Run this branch after **attempting** vault resolution with the resolver bundled in the installed skill directory. A readiness-only request selects **operational readiness** as its primary branch. If resolution is not `resolved`, classify the requested capability as blocked, report the resolver status and smallest remediation, and stop every check that depends on `VAULT_ROOT`.
+Run this branch after **attempting** vault resolution with the resolver bundled in the installed skill directory. A readiness request naming a specific operation selects **operational readiness** as its primary branch. Resolve which operation an ambiguous “ready?” refers to before selecting checks. If resolution is not `resolved`, classify the requested capability as blocked, report the resolver status and smallest remediation, and stop every check that depends on `VAULT_ROOT`.
 
 This branch may also support another primary branch when that branch observes a signal that can block its requested capability: unavailable source evidence, clone authority mismatching required acquisition, a required gate failure, or a GitHub identity error. An unavailable optional integration does not trigger the full preflight by itself; report its fallback and limitation.
 
 Typical requests include:
 
-- "is the repo initialized / set up / bootstrapped?"
-- "is the vault tooling ready / good to go / can we start?"
 - "can we query / analyze / author / close / synchronize the ecosystem map?"
-- "why can't the tooling find the source repos / vault / Obsidian / GitHub identity?"
+- "which prerequisite prevents this requested synchronization or closure?"
 
 ## Capabilities and dimensions
 

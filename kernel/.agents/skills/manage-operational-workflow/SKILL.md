@@ -1,6 +1,6 @@
 ---
 name: manage-operational-workflow
-description: Orchestrate documented operational runbooks and read-only audits across connected capabilities. Use to trace a flow or entity for a date, audit executions and corrections, advise on or execute a procedure, estimate, draft, decompose, create, update or validate Jira work, publish a validated artifact package, or resume and close a recorded `.operations/` run.
+description: Orchestrate documented operational runbooks and read-only audits across connected capabilities. Use to trace a flow or entity for a date, audit executions and corrections, advise on or execute a procedure, estimate, draft, decompose, create, update or validate work items, publish a validated artifact package, or resume and close a recorded `.operations/` run.
 ---
 
 # Manage operational workflows
@@ -26,7 +26,7 @@ Load `../../../90-Meta/vault-resolution.md` and run `../../../90-Meta/resolve-va
 
 Load [references/procedure-contract.md](references/procedure-contract.md) when interpreting, authoring, or changing an operational note. For Audit, Execute, Resume, Close, or a persistent Draft, load [references/execution-record.md](references/execution-record.md). Resume and Close preserve the recorded branch and load its reference. Copy [assets/operation-run-template.md](assets/operation-run-template.md) only when opening a new run.
 
-When the request advises on, estimates, drafts, creates, updates, decomposes, converts, links, reparents, or validates Jira work items, load `../../../90-Meta/work-item-evidence.md`, then `../../../90-Meta/jira-evidence.md` and [references/jira-work-items.md](references/jira-work-items.md) before building the effect plan. Use the shared contract plus the Jira mapping for current read-only evidence; keep the versioned Jira notes under `60-Operacion/Jira/` as the semantic authority and this skill as the sole owner of planned Jira effects.
+When the request concerns work items, load `../../../90-Meta/work-item-evidence.md` and [references/work-items.md](references/work-items.md). Resolve provider-specific field mappings, hierarchy, estimation and naming rules from the selected destination’s configured runbook. This workflow owns planned external effects; it consumes validated source packages without reopening their source cases.
 
 Create `.operations/<run-id>/run.md` for Audit, Execute, or a Draft that must survive the current session. Resume and Close require the exact existing run record.
 
@@ -100,4 +100,4 @@ For a persistent Draft, close when the required local artifacts are validated ag
 - Operational notes define expected behavior; connected systems define current external state; the run record captures one execution.
 - Store only non-sensitive summaries and external identifiers. Keep credentials, tokens, cookies, private contact details, and sensitive message bodies outside `.operations/`.
 - Keep `.operations/` ignored and uncommitted.
-- Vault-edit authorization does not authorize Jira changes, email sends, team messages, or any other external effect.
+- Vault-edit authorization does not authorize work-item changes, email sends, team messages, or any other external effect.

@@ -664,31 +664,6 @@ def audit_operational_topology(root: Path, paths: list[Path]) -> list[str]:
     for report_id, owners in sorted(report_ids.items()):
         if len(owners) > 1:
             issues.append(f"60-Operacion: duplicate report-id {report_id}: {owners}")
-    recipes_root = root / ".agents/skills/generate-reports/scripts/reports"
-    if recipes_root.is_dir():
-        recipe_paths = [
-            path
-            for path in recipes_root.glob("*/report.json")
-            if not path.parent.name.startswith("sample-")
-        ]
-        recipe_ids = {path.parent.name for path in recipe_paths}
-        contract_ids = set(report_ids)
-        if recipe_ids != contract_ids:
-            issues.append(
-                "60-Operacion: report contracts and recipes differ: "
-                f"contracts={sorted(contract_ids)} recipes={sorted(recipe_ids)}"
-            )
-        for path in sorted(recipe_paths):
-            try:
-                recipe = json.loads(path.read_text(encoding="utf-8"))
-            except (OSError, json.JSONDecodeError) as error:
-                issues.append(f"{rel(path, root)}: invalid recipe JSON: {error}")
-                continue
-            if recipe.get("report_id") != path.parent.name:
-                issues.append(f"{rel(path, root)}: report_id must match recipe directory")
-            owners = report_ids.get(path.parent.name, [])
-            if len(owners) == 1 and Path(owners[0]).stem != recipe.get("contract_basename"):
-                issues.append(f"{rel(path, root)}: contract_basename does not match report note")
     return issues
 
 

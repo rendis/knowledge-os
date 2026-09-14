@@ -1,6 +1,6 @@
 ---
 name: map-ecosystem
-description: "Trigger: query, document, synchronize, or check readiness of a cell knowledge vault. Orient first when bootstrap is incomplete."
+description: "Trigger: query, document, synchronize, or check prerequisites for a specific cell-vault operation. Orient first when bootstrap is incomplete."
 license: Apache-2.0
 metadata:
   author: documentation-vault maintainers
@@ -9,7 +9,7 @@ metadata:
 
 ## Activation Contract
 
-Use this skill for a cell-vault query, documentation update, ecosystem synchronization, or readiness check. A `SYNC_PACKAGE_WORKER_V1` card selects the package-worker path only.
+Use this skill for a cell-vault query, documentation update, ecosystem synchronization, or preflight for a specified operation. Workspace configuration status and repair belong to `configure-workspace`; Git policy maintenance belongs to `manage-git-workflow`. A `SYNC_PACKAGE_WORKER_V1` card selects the package-worker path only.
 
 ## Hard Rules
 

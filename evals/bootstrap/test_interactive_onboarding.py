@@ -16,7 +16,7 @@ from instance import load_instance
 PROMPTS = ['Systems as', 'Trackers as', 'Cell name', 'Cell purpose',
            'Evidence profile', 'Note locale', 'Adapters (']
 ANSWERS = ['orders:Orders', 'work:github:https://example.org/issues',
-           'Commerce', 'Order fulfillment.', 'documented-source', 'en', 'postgres,reports']
+           'Commerce', 'Order fulfillment.', 'documented-source', 'en', 'reports']
 
 
 def snapshot(root):
@@ -73,7 +73,7 @@ class InteractiveOnboardingTests(unittest.TestCase):
         self.assertEqual(instance['trackers'], [{'id': 'work', 'provider': 'github', 'url': 'https://example.org/issues'}])
         self.assertEqual(instance['evidence']['profile'], 'documented-source')
         self.assertEqual(instance['locale']['notes'], 'en')
-        self.assertEqual(instance['adapters'], ['postgres', 'reports'])
+        self.assertEqual(instance['adapters'], ['reports'])
         self.assertEqual(instance['sources']['discovery_roots'], [str(discovery)])
         self.assertEqual(snapshot(discovery), before)
         self.assertFalse((self.dest / '.knowledge-os-config.yaml').exists())

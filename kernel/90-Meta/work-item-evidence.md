@@ -8,7 +8,9 @@ Read `instance.yaml` and require one exact configured tracker plus one exact pro
 
 The tracker binding is its exact `id`, `provider`, and canonical URL. Once a case or handoff references that ID, a different provider or URL is a different tracker and requires a new ID or an explicit migration.
 
-Require a credential-free HTTPS item URL on the resolved tracker's exact origin. Then load `90-Meta/<provider>-evidence.md` when that provider mapping exists; it may impose stricter identity, URL-membership, field, or relationship rules. Without a mapping, preserve the exact generic identity and mark relationships `unsupported`.
+Require a credential-free HTTPS item URL on the resolved tracker's exact origin. Resolve optional destination mappings through `cell-config.py --vault-root "<VAULT_ROOT>" resolve --capability work-item-evidence`. When configured, read the returned procedures and select the one that explicitly covers the exact tracker; an ambiguous or invalid binding blocks only the evidence that depends on it. The destination owns provider URL-membership rules, field mappings and relationship semantics. The kernel supplies no provider mapping.
+
+Without a configured mapping, use the connected capability’s observed identity and metadata. Accept a relationship only when its type, endpoints and direction are established by that surface. Mark relationships `unsupported` only when the capability does not expose them; use `unavailable` when support or semantics cannot be established from the available evidence. Never invent a provider-specific URL path, hierarchy or dependency meaning.
 
 ## Read-only procedure
 

@@ -1,15 +1,15 @@
-# Report execution contract
+# Report contract
 
-Resolve each report through `90-Meta/operational-catalog.py`. Require exactly one `clase: reporte` note and one recipe directory named with the same `report-id`.
+Resolve one canonical `clase: reporte` note with a unique `report-id` through `90-Meta/operational-catalog.py`. The note defines purpose, audience, metrics, grain, scope, input parameters, exclusions, output, validation, maintenance and limitations.
 
-The note owns purpose, audience, metric, grain, scope, period, exclusions, output, validation, maintenance, and limitations. The recipe owns only executable details: fixed source, query, byte cap, normalized schema, renderer, and implementation version.
+Its source or maintenance section links the destination-owned execution procedure or implementation. That procedure identifies the executor and version, exact source, authentication references, read-only checks, parameter semantics, resource limits, output destination and validation commands. Reuse installed tools; this contract requires no plugin interface, directory layout, query language or renderer.
 
-The bundled `monthly-event-excel` renderer is one concrete report shape. It requires the exact normalized schema `event_month`, `country`, `event_name`, `event_count`; the first field is a calendar month and the final field is a non-negative integer. A different schema requires a new renderer implementation and tests behind the same recipe interface. The generic skill does not reinterpret another shape as monthly events.
+For generation, resolve → bind inputs and access → execute → validate → deliver locally. For listing or validation, perform only that mode’s required steps.
 
-Execution stages are fixed: resolve → confirm inclusive period → dry-run → extract → normalize → render → inject PivotTables → validate → manifest → atomic publish. Both months are mandatory; only the runner derives the exclusive query bound. A failure leaves no final artifact package.
+## Evidence and completion
 
-The manifest identifies the data snapshot, recipe, query, implementation and workbook with SHA-256 values and records the UTC extraction time. The workbook embeds its report, inclusive period and dataset hash as custom properties. An identical normalized input under one implementation produces a byte-identical workbook; the manifest remains an execution record and therefore carries its actual extraction time.
+The returned package records report identity, actual parameters, input identity or observation time, artifact paths and checks observed. Record hashes, reconciliation totals or other reproducibility evidence when required by the report. Distinguish observed completeness from a sampled or truncated result. Output-specific properties belong to the report contract, not this shared method.
 
-Stable errors: `unsupported-report-id`, `invalid-period`, `query-cap-exceeded`, `source-schema-invalid`, `dataset-invalid`, `renderer-unavailable`, and `artifact-invalid`.
+A missing implementation is a capability gap, not permission to invent queries or publish an unverified result. The executor owns cleanup and atomic delivery when the report requires them. Failed or partial generation must not be presented as a complete artifact.
 
-Adding a report with an already-supported renderer requires one report note, one recipe directory, and tests. Add an adapter or renderer when a concrete report introduces a new source or normalized shape; never create a separate skill or central semantic registry.
+Existing cell-owned recipes may remain where their developer installed them. The vault auditor validates report-note identity and uniqueness; the execution procedure validates implementation and output.

@@ -74,7 +74,7 @@ never create a visible `plan/` directory inside a cell vault.
 |---|---|
 | `install.sh` | init / update / doctor |
 | `kernel/` | Files copied into a cell vault |
-| `adapters/` | Optional GCP, database, and report engines |
+| `adapters/` | Optional report workflow |
 | `evals/` | Bootstrap and adversarial checks; never installed |
 | `instance.schema.yaml` | Contract for `instance.yaml` |
 | `MANAGED_PATHS` | Update allowlist |
@@ -102,9 +102,11 @@ Installed cells receive the same command and configuration; see
 
 Existing note names, relationships, investigations and handoff families are preserved by update. Optional capabilities are unconfigured until onboarding binds real procedures; selecting an adapter alone does not prove live readiness.
 
-Cells may declare credential-free `database_targets` in `instance.yaml` when one database capability has several explicit destinations. Each target binds a system, environment, instance, database, schemas, optional evidence repositories, procedure basename and local proxy-port key. The target identifies where evidence belongs; its procedure and adapter still establish read-only access.
+Cells may declare credential-free `database_targets` in `instance.yaml` when one database capability has several explicit destinations. Each target binds a system, environment, instance, database, schemas, optional evidence repositories, procedure basename and an optional local proxy-port key. The target identifies where evidence belongs; its procedure and adapter still establish read-only access.
 
 Version 0.6 adds optional capability bindings and transactional investigation commands without changing existing note or handoff schemas. `doctor --strict` is the opt-in installation integrity gate and also detects configured adapters awaiting installation or removal. Version 0.6.1 preserves configuration during updates and aligns investigation promotion with the selected evidence profile.
+
+For retired provider-pack migration and developer-owned integrations, see [adapters](adapters/README.md).
 
 ## Extraction quality
 

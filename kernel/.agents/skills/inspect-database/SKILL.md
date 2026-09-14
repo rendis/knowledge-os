@@ -1,13 +1,13 @@
 ---
 name: inspect-database
-description: "Trigger: inspect database schemas or live evidence for a selected target, from knowledge questions or operational audits. Repositories are optional evidence sources."
+description: "Trigger: inspect database schemas or live evidence for a selected target, for any database engine, from questions or operational audits. Repositories are optional evidence sources."
 ---
 
 # Inspect database evidence
 
 ## 1. Bind the question
 
-Accept a handoff from `map-ecosystem` or `manage-operational-workflow` with the resolved `VAULT_ROOT`, primary branch, exact question and authorized scope. Return findings to that branch. If vault identity is missing, load `../../../90-Meta/vault-resolution.md` and resolve it before continuing.
+Accept a handoff from the current primary workflow with the resolved `VAULT_ROOT`, primary branch, exact question and authorized scope. Return findings to that branch. If vault identity is missing, load `../../../90-Meta/vault-resolution.md` and resolve it before continuing.
 
 Classify the request as static evidence, live metadata or live data. Bind the exact target and period from still-applicable user decisions. Static questions do not require a live connection.
 
@@ -22,7 +22,7 @@ python3 -B 90-Meta/cell-config.py --vault-root "<VAULT_ROOT>" database-targets
 python3 -B 90-Meta/cell-config.py --vault-root "<VAULT_ROOT>" database-target --target "<TARGET_ID>"
 ```
 
-Select by explicit domain/environment/database or target ID, never by local port. If several targets fit, ask only for the missing discriminator. Read the returned procedure: it owns executor selection and access requirements. A configured target is not proof of connectivity or authorization.
+Select by explicit domain/environment/database or target ID, never by local port. If several targets fit, ask only for the missing discriminator. Read the returned procedure: it owns engine and version identification, executor selection, authentication, read-only checks, query dialect and engine-specific catalog commands. Use the destination’s runbook for that engine; this skill ships no drivers or connection recipes. A configured target is not proof of connectivity or authorization.
 
 Each target has zero or more `repositories`. Resolve relevant remotes through `workspace-config.py locate-repository`, then read their applicable instructions. Repositories, documentation and live catalogs are distinct evidence sources. Missing repositories limit static claims; they do not prevent authorized live inspection with a valid executor. Do not substitute the legacy repository for a target whose repository list is empty.
 
@@ -32,7 +32,7 @@ Complete when the requested target or legacy route is unambiguous, and available
 
 ## 3. Inspect the minimum evidence
 
-Use static evidence when it answers the question. For live evidence, retrieve the local port using the target's `port_key` through `workspace-config.py database-proxy-port`; legacy routes use the key specified by their procedure. The port is a local preference, not destination identity.
+Use static evidence when it answers the question. For live evidence, resolve connection requirements from the runbook. Retrieve a local port through `workspace-config.py database-proxy-port` only when that executor requires one, using the target's `port_key` or the legacy procedure's key. Direct connections, sockets and API executors do not require a proxy port. The port is a local preference, not destination identity.
 
 Follow the resolved procedure's executor contract. Confirm environment, instance, database, schemas, read-only identity, credential mechanism and query scope. Use minimum metadata or rows; preserve timestamps and distinguish current snapshots from historical evidence. An absent executor, invalid destination, unavailable read-only enforcement or missing authorization blocks only dependent live work. Never replace these with an improvised connection or a different target.
 

@@ -74,7 +74,7 @@ Compile `work-item.md` from the current read-only snapshot produced under `VAULT
 
 When the target story is a directly dependent story previously reconciled from another implementation, include its current dependent card in the repository-specific package. Carry the observed contracts, APIs/events/data/configuration, compatibility and verification requirements, what can start, remaining gaps, source repository remote, and observed remote branch/PR state. Re-read the dependent work item before export; do not make its implementation worktree rediscover an already captured source contract.
 
-Before delivering each exact package, perform the [question-based implementation-sufficiency check](../../manage-development-handoff/references/input-bundle.md#implementation-sufficiency). Complete recoverable source-to-package omissions during this export; pass only packages whose necessary questions have supported answers. Structural validity or successful materialization does not establish this result.
+Before delivering each exact package, perform the [question-based implementation-sufficiency check](implementation-sufficiency.md). Complete recoverable source-to-package omissions during this export; pass only packages whose necessary questions have supported answers. Structural validity or successful materialization does not establish this result.
 
 Keep repository evidence flow one-way: hand only exact package directories and the user's worktree choice to `manage-development-handoff`. After repository-state validation, it passes one normalized in-memory observation per handoff to **Bind development handoff**. The observation persists repository and branch identity; the validated local path remains in memory.
 

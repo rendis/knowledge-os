@@ -237,7 +237,8 @@ class BootstrapEval(unittest.TestCase):
         self.assertIn("preserving its worktree-local lifecycle state", router)
         self.assertNotIn("optionally align its worktree-local lifecycle state", router)
         self.assertIn("90-Meta/work-item-evidence.md", operational)
-        self.assertIn("90-Meta/jira-evidence.md", operational)
+        self.assertNotIn("90-Meta/jira-evidence.md", operational)
+        self.assertIn("references/work-items.md", operational)
 
     def test_shared_vault_interfaces_are_kernel_owned(self) -> None:
         for relative in (
@@ -245,7 +246,6 @@ class BootstrapEval(unittest.TestCase):
             "90-Meta/vault-resolution.md",
             "90-Meta/node-selection.md",
             "90-Meta/work-item-evidence.md",
-            "90-Meta/jira-evidence.md",
         ):
             self.assertTrue((DIST / "kernel" / relative).is_file(), relative)
         for relative in (
@@ -2712,7 +2712,6 @@ change:
                 "vault-resolution.md",
                 "node-selection.md",
                 "work-item-evidence.md",
-                "jira-evidence.md",
             ):
                 self.assertTrue((dest / "90-Meta" / shared).is_file(), shared)
             self.assertFalse(
@@ -2880,10 +2879,6 @@ change:
                     "Shared operational knowledge",
                     "--system",
                     "operations:Operations",
-                    "--adapter",
-                    "gcp",
-                    "--adapter",
-                    "postgres",
                     "--adapter",
                     "reports",
                     "--yes",
@@ -3069,18 +3064,16 @@ change:
                     "--system",
                     "runtime:Runtime",
                     "--adapter",
-                    "gcp",
+                    "reports",
                     "--yes",
                 ]
             )
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertTrue((dest / ".agents" / "skills" / "inspect-gcp-runtime" / "SKILL.md").is_file())
-            self.assertTrue((dest / ".agents" / "skills" / "gcloud" / "SKILL.md").is_file())
-            self.assertFalse((dest / ".agents" / "skills" / "inspect-database").exists())
-            gcp_skill = (
-                dest / ".agents" / "skills" / "inspect-gcp-runtime" / "SKILL.md"
-            ).read_text(encoding="utf-8")
-            self.assertIn("database-evidence-adapter-unavailable", gcp_skill)
+            self.assertTrue((dest / ".agents/skills/generate-reports/SKILL.md").is_file())
+            self.assertTrue((dest / ".agents/skills/inspect-database/SKILL.md").is_file())
+            for name in ("inspect-gcp-runtime", "gcloud", "cloud-logging-query-generation",
+                         "cloud-monitoring-metric-selection"):
+                self.assertFalse((dest / ".agents/skills" / name).exists())
 
     def test_adopt_preserves_knowledge_and_extras(self) -> None:
         sys.path.insert(0, str(DIST / "kernel" / "90-Meta"))
