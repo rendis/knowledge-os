@@ -11,13 +11,15 @@ Treat case reconciliation as a vault-owned pull: select an exact worktree from t
 
 1. Load `../../../90-Meta/vault-resolution.md` and run `../../../90-Meta/resolve-vault.py` relative to this skill directory. Continue only with one canonical `VAULT_ROOT`.
 2. Load [references/reconciliation-contract.md](references/reconciliation-contract.md), [references/downstream-context.md](references/downstream-context.md), and `../../../90-Meta/work-item-evidence.md`.
-3. Require one selected source investigation and story. Read the entire case and select exactly one current `DH-NNN` entry. Bind its tracker identity, repository remote, branch, handoff ID, family, and revision. A local path or completion claim cannot replace this register.
+3. Require one selected source investigation and story. Use `../manage-investigation/scripts/investigation-case.py --root <VAULT_ROOT>/investigations load --id <id>` to read the entire public case and discover its optional private overlay by ID. Keep private provenance restricted and supplementary. Select exactly one current `DH-NNN` entry and bind its tracker identity, repository remote, branch, handoff ID, family, and revision. A local path or completion claim cannot replace this register.
 4. Invoke the `manage-development-handoff` **Resolve branch** route with the registered remote and branch. It derives a candidate from local configuration and validates repository and branch through Git. Stop with an explicit unavailable result when the worktree is absent; a derived path alone is not evidence. Then invoke **Validate** on the resolved path and select the exact handoff identity.
 5. Read the selected `handoff.yaml`, referenced history event, `START.md`, `work-item.md`, `context.md`, `scope.md`, and `implementation-updates.md`. Require their investigation, story, work-item, repository, family, and revision identities to match both the case and registry entry.
 
 Complete this stage when one valid selected identity, its current state, one local closure fingerprint, and every comparison input are bound; otherwise report the exact missing or conflicting invariant.
 
 ## 2. Inspect implementation and delivery evidence
+
+Apply [evidence-driven-analysis](../evidence-driven-analysis/SKILL.md) to disputed claims or contradictory observations, keeping this reconciliation as the owner. Its conclusions feed the comparison contract; they do not bypass changelog coverage, snapshot validation or the case writer.
 
 1. Keep the worktree read-only during reconciliation. Inspect its current branch, `HEAD`, status, changed paths, commits and diff against the observed delivery base, relevant contracts/configuration, and the tests or checks actually run.
 2. Distinguish local branch state from an observed remote ref. Obtain the remote branch and SHA through a current read-only Git or repository-host query when available.

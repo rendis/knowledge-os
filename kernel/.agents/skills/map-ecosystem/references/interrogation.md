@@ -4,6 +4,8 @@
 
 Accept a question, proposed change, or starting node. Resolve aliases only to find a note; navigate and report using canonical basenames. Keep this branch entirely read-only.
 
+Apply [evidence-driven-analysis](../../evidence-driven-analysis/SKILL.md) when obtaining or evaluating evidence. This reference owns navigation and source identity; the shared method does not restart routing. If called as an auxiliary by another workflow, return observations, sources and limits to that owner.
+
 ## Navigation
 
 1. If orientation may be incomplete, run `graph-query.py orientation` (or the equivalent `instance.orientation_status`). If `ready` is false, load [orientation.md](orientation.md) and stop. Do not read Home, Convenciones, or Framework as a prelude to classifying a dependency question.
@@ -15,7 +17,7 @@ Accept a question, proposed change, or starting node. Resolve aliases only to fi
 <python> "<VAULT_ROOT>/90-Meta/graph-query.py" --root "<VAULT_ROOT>" investigations --node "<stem>"
 ```
 
-   Use `neighbors` for dependency, topic, flow, and impact. Use `hygiene` for unresolved links and orphans. Use `investigations` for vault ↔ `investigations/` join (on-demand public-case scan; not a second index). `manage-investigation` remains owner of the store.
+   Use `neighbors` for dependency, topic, flow, and impact. Use `hygiene` for unresolved links and orphans. Use `investigations` for vault ↔ `investigations/` join (on-demand public-case scan; not a second index). When consulting a case, use the read-only loading mechanism in `manage-investigation` to discover its overlay by ID; preserve private provenance and disclosure restrictions. `manage-investigation` remains owner of the store.
 3. Open the stems/paths named in the JSON. If a node or needed relationship is absent, search the named subject in the relevant notes or configured source before concluding that it does not exist. The graph is a navigation index, not proof of completeness. For change impact, query `neighbors` of the changed unit, then `neighbors` of its `publica-en` / `gatillado-por` / `participa-en` targets. Skip types disabled in `instance.yaml` `graph.enabled_types` (do not expand Pub/Sub when `topic` is disabled). If the question asks where a fact belongs, load [node-selection.md](../../../../90-Meta/node-selection.md) and open the candidate note, not the full Convenciones file.
 4. Expand a second named note only when the JSON edge is required by the question:
    - Pub/Sub: producer → topic → consumer (only when `topic` is enabled).
@@ -41,14 +43,7 @@ Accept a question, proposed change, or starting node. Resolve aliases only to fi
 
 ## Output
 
-Return, in this order:
-
-1. Actionable conclusion.
-2. Inspected scope and starting node.
-3. Affected nodes and flows.
-4. Evidence supporting the conclusion.
-5. Uncertainties and evidence limitations.
-6. Minimum recommended note/source-code context package for implementation.
+Return the conclusion, decisive evidence and material limits. Include affected nodes and flows for impact questions, and the minimum note/source context package only when implementation context is requested. Scale the answer to the question.
 
 ## Completion criterion
 

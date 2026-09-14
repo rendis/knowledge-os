@@ -12,6 +12,8 @@ Build one candidate containing both deltas. For every changed claim or register 
 
 Review the entire combined candidate, not only conflict hunks. Re-run public/private classification and the credential exclusion gate. The reviewer may be a human or an explicitly assigned agent, but the reviewer must see the common base and both deltas.
 
+When resolving a disputed claim requires evaluating additional evidence, apply [evidence-driven-analysis](../../evidence-driven-analysis/SKILL.md) as an auxiliary method. Return its supported conclusions and limits to this review; it cannot accept the merge, decide on behalf of contributors, or bypass the current-snapshot save and lifecycle gates.
+
 ## Acceptance
 
 Record one concise History event identifying both source revisions, the reviewed semantic conflicts, and their explicit resolutions, including the agreed lifecycle disposition. Separate that disposition from the content candidate: keep `status`, `blocked-on`, `closure-outcome`, and `resume-to` identical to canonical current when calling `save`. Apply the content with the SHA-256 of canonical current, both revisions as the portable source, and every affected stable ID as a target. The helper attributes the reconciliation to the effective Git recorder; that identity is not approval.

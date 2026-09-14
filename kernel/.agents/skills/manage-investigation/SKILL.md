@@ -7,6 +7,8 @@ description: Maintain shareable investigation case files with an optional privat
 
 Treat `investigations/<id>/investigation.md` as the canonical, versionable case. An optional `.investigations-private/<id>/private.md` may add necessary sensitive context but never overrides public status, evidence, decisions, acceptance criteria, or history.
 
+Own documentary persistence and traceability, not the general inquiry method. Answering a question does not require a case. Open only when the user requests one or accepts a recommendation; recommend one when continuity or collaboration would benefit from retained evidence, decisions, or pending work. For already-supported updates, proceed directly to the documentary checks. Consult [evidence-driven-analysis](../evidence-driven-analysis/SKILL.md) only when evidence still needs to be obtained or evaluated; retain this workflow as owner and consume its result without routing back.
+
 ## Preflight
 
 1. Load `../../../90-Meta/vault-resolution.md` and run `../../../90-Meta/resolve-vault.py` relative to this skill directory. Bind one canonical `VAULT_ROOT`; use `VAULT_ROOT/investigations/` as the public root.
@@ -23,7 +25,7 @@ Complete preflight when the public root is trackable, private and legacy roots a
 - **Resume**: find a case file by exact `id`, then `consolidated-from`, source reference, title, or keywords. Present candidates only when several match.
 - **Migrate**: when explicitly requested, load [references/migration.md](references/migration.md); convert prior public lifecycle states and transform selected ignored legacy cases without changing their sources.
 - **Reconcile collaboration**: before accepting concurrent contributions, load [references/investigation-reconciliation.md](references/investigation-reconciliation.md).
-- **Investigate**: gather evidence, refine the current understanding, resolve contradictions, and record decisions.
+- **Update case**: persist supported findings, decisions, questions, and changes to the current understanding; obtain missing analysis through the shared method only when needed.
 - **Bind development handoff**: own the case binding decision for one validated materialization or activation result; mutate only for a new or advanced revision.
 - **Reconcile development**: consume one normalized result from `reconcile-development-handoff` and update the exact source case.
 - **Consolidate**: reconcile duplicate case files into one canonical directory while retaining retired IDs in its lineage.
@@ -53,26 +55,24 @@ Complete when the case has no equivalent active case, has a unique ID, professio
 4. Reconstruct authoritative state from the public frontmatter and **Current state**; use public **History** only for provenance.
 5. Report the status, closure outcome when closed, purpose, independent outcomes, current understanding, blockers, open questions, handoffs, stale drafts, private-overlay availability, and next useful action.
 
+For a question about an existing case, use the same load and overlay discovery, then answer only the requested scope without writes, lifecycle transitions, or a mandatory full status report. Read-only lookup does not require Git author identity or the mutating preflight. Public/shareable responses exclude restricted details; an authorized local response may use necessary private context with its provenance identified.
+
 Complete when one case file is selected, draft freshness is known, and the next action follows the current state without reviving superseded understanding.
 
-## Investigate
+## Update case
 
 1. Before writing, classify every proposed item: put relevant shareable knowledge in public; put only necessary sensitive context in private; omit irrelevant process chatter; exclude credential values from both. When a person's, customer organization's, or tenant's identity is not established as shareable, generalize it in public and retain the exact value privately only when continuation needs it. Prefer a safe abstraction in public over moving ordinary investigation content to private. Profanity, sarcasm, frustration, and unsupported personal accusations are omitted rather than moved private; preserve only the technical requirement, impact, uncertainty, or material disagreement. An independent auditor is optional when classification remains ambiguous.
 2. Rewrite informal input as concise professional findings, decisions, questions, and history. Use the smallest complete set: one source entry, only independent evidence, only questions that change the next action, only decisions actually made for this case, and only criteria needed to test the objective. Do not register obvious arithmetic as a separate inference or turn this skill's policy into a case decision. Keep each detail in one register, Current state as a brief synthesis, and History about changes rather than restating the case. Never persist raw conversation, hidden reasoning, embarrassment-prone phrasing, or a verbatim user request.
-3. Prefer repository evidence, supplied sources, and available domain procedures over recall. Separate facts, inferences, contradictions, and limitations.
-4. Treat persistent memory, prior cases, and neighboring workspaces only as discovery leads. Before using their content, confirm the source is explicitly in scope, inspect it directly, and register the verified evidence.
-5. For cell ecosystem evidence, load `map-ecosystem`, select its read-only interrogation branch, and keep resolved source repositories read-only.
-6. For current work-item evidence, load `../../../90-Meta/work-item-evidence.md` and apply its narrow read-only contract directly.
-7. Maintain an explicit boundary between **current productive state** and **future/proposed state**.
-8. Maintain `vault-outcome` as evidence changes. A case is context and provenance, never proof of productive behavior.
-9. Resolve evident defaults directly. When a material decision remains ambiguous, load [references/questioning-protocol.md](references/questioning-protocol.md).
-10. After every material finding or answer, prepare complete reviewed candidate snapshots and invoke `save` with the SHA-256 values returned by `load`, one portable `--source`, every affected public stable ID as repeated `--target` arguments, and only IDs whose restricted context changed as repeated `--private-target` arguments. Never edit a case in place. The helper resolves the effective Git identity, appends the attributed History events, advances timestamps, rejects stale inputs, and rolls back a failed coordinated write. Do not create a private candidate unless it contains necessary material.
-11. Compare the proposed snapshots with the loaded bytes before saving. Repeated input with no new material keeps both snapshots byte-identical; the helper returns `unchanged` and adds no timestamp or History event.
-12. Preserve stable identifiers and replacement links; never renumber, recycle, or silently change meaning.
-13. Reconcile or mark every affected draft stale in the same interaction.
-14. When new evidence could change a completed learning assessment, preserve the old assessment in History and reset `learning-outcome` to `not-evaluated`.
+3. Consume supported conclusions with their sources, limits, and unresolved questions. Keep facts, inferences, contradictions, and decisions distinct in the existing registers. Do not repeat a sufficient analysis simply to persist it. If support is missing, use the shared method before recording the claim as established.
+4. Preserve the boundary between **current productive state** and **future/proposed state**. Maintain `vault-outcome` as evidence changes; a case is context and provenance, never proof of productive behavior.
+5. When a material documentary decision remains ambiguous, use [references/questioning-protocol.md](references/questioning-protocol.md).
+6. For each authorized material update, prepare complete reviewed candidate snapshots and invoke `save` with the SHA-256 values returned by `load`, one portable `--source`, every affected public stable ID as repeated `--target` arguments, and only IDs whose restricted context changed as repeated `--private-target` arguments. Never edit a case in place. The helper resolves the effective Git identity, appends the attributed History events, advances timestamps, rejects stale inputs, and rolls back a failed coordinated write. Do not create a private candidate unless it contains necessary material.
+7. Compare the proposed snapshots with the loaded bytes before saving. Repeated input with no new material keeps both snapshots byte-identical; the helper returns `unchanged` and adds no timestamp or History event.
+8. Preserve stable identifiers and replacement links; never renumber, recycle, or silently change meaning.
+9. Reconcile or mark every affected draft stale in the same interaction.
+10. When new evidence could change a completed learning assessment, preserve the old assessment in History and reset `learning-outcome` to `not-evaluated`.
 
-Complete the iteration when every new material fact, inference, contradiction, question, decision, and scope change is represented in both the current state and chronology, current and future states remain separated, `vault-outcome` is accurate, `learning-outcome` reflects the current evidence snapshot, and every affected draft has an explicit synchronization state.
+Complete the iteration when each material change has one canonical register entry, Current state briefly reflects the result, History identifies the affected IDs without duplicating their contents, independent outcomes reflect the evidence snapshot, and affected drafts have an explicit synchronization state.
 
 ## Bind development handoff
 

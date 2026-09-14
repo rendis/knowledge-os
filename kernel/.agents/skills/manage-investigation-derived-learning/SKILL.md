@@ -10,7 +10,7 @@ Turn completed or sufficiently evidenced investigation work into bounded, cumula
 ## Preflight
 
 1. Load `../../../90-Meta/vault-resolution.md` and run `../../../90-Meta/resolve-vault.py` relative to this skill directory before reading any vault-relative path. Require one canonical remote- and marker-verified result, then bind every path below to its `VAULT_ROOT`; an unresolved or ambiguous vault blocks the workflow.
-2. Resolve the exact `VAULT_ROOT/investigations/<id>/investigation.md`. Read the complete public case and the optional matching private overlay when available; keep their authority distinct.
+2. Resolve the exact case ID and invoke `../manage-investigation/scripts/investigation-case.py --root <VAULT_ROOT>/investigations load --id <id>`. Read the complete returned public path and the private path when `private.available` is true, even when the user did not mention an overlay; keep their authority distinct. Loading is read-only and does not enter a case-update route.
 3. Treat the case as collaborative provenance and a source map, never as proof of production behavior by itself. Do not expose private-overlay content in the learning output.
 4. Load [references/assessment-contract.md](references/assessment-contract.md), [references/learning-note-contract.md](references/learning-note-contract.md), `VAULT_ROOT/90-Meta/Convenciones.md`, and the **Gate de aprendizaje durable** in `VAULT_ROOT/90-Meta/Auditoria - Framework.md`.
 5. Load `../../../90-Meta/node-selection.md` before selecting or planning a durable target. When the conclusion depends on cell implementation context or source repositories, also load the `map-ecosystem` read-only interrogation branch and resolve every source repository through that workflow before inspecting it.
@@ -23,6 +23,8 @@ Assessment is always read-only: do not edit the investigation, create a draft, o
 **Complete when:** one canonical `VAULT_ROOT`, one exact case, and one mode are selected, the required contracts are loaded, and every source path to be inspected has an explicit authority boundary.
 
 ## Assess
+
+When a candidate requires additional evidence or inference review, apply [evidence-driven-analysis](../evidence-driven-analysis/SKILL.md) as an auxiliary method. Return to this assessment's outcome and publication gates; already supported inputs do not require repeating analysis. Neither the method nor navigation helpers change the investigation or publish learning.
 
 1. State the stable problem or question and the applicability context independently of the investigation title, story, implementation, or session.
 2. Trace every candidate claim to directly inspected evidence. Use the case to locate experiments, measurements, stories, implementation revisions, deployments, and prior decisions; do not cite its narrative as a substitute for those sources. Versioning the public case makes its provenance reviewable, not its behavioral claims true. Locate a durable primary source or reproducible versioned tooling for the decisive claim; when the case narrative or a private/local artifact is the only support, select `insufficient-evidence`.

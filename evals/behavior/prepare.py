@@ -125,11 +125,19 @@ if __name__ == '__main__':
  parser=argparse.ArgumentParser(description="Create one offline, synthetic blind-evaluation fixture")
  parser.add_argument('--distribution', type=Path, required=True)
  parser.add_argument('--output', type=Path, required=True)
- parser.add_argument('--scenario', choices=['workflow','onboarding','lifecycle'], required=True)
+ parser.add_argument('--scenario', choices=['workflow','onboarding','lifecycle','analysis'], required=True)
+ parser.add_argument('--evaluation-output', type=Path, help='Separate evaluator-only directory (required for analysis)')
  args=parser.parse_args()
  DIST=args.distribution.resolve(); out=args.output.resolve(); BASE=out.parent
+ if args.scenario == 'analysis':
+  if args.evaluation_output is None: parser.error('--evaluation-output is required for analysis')
+  evaluator=args.evaluation_output.resolve()
+  if evaluator == out or out in evaluator.parents or evaluator.exists(): parser.error('Use a fresh evaluator directory outside --output')
  BASE.mkdir(parents=True, exist_ok=True)
  setup(out.name, DIST)
  if args.scenario == 'onboarding': onboarding(out, DIST)
  if args.scenario == 'lifecycle': lifecycle(out, DIST)
+ if args.scenario == 'analysis':
+  from prepare_analysis import prepare
+  prepare(out, args.evaluation_output)
  print(out/'task.txt')

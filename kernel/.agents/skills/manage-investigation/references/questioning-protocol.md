@@ -2,10 +2,10 @@
 
 Load this reference only when a material decision cannot be resolved from available facts.
 
-1. Search the environment and supplied sources for facts before involving the user.
-2. Choose the simplest option that clearly satisfies the stated goal and constraints. Record it without asking when alternatives do not create a material difference.
-3. Ask only when the answer changes behavior, scope, persistence, security, cost, architecture, acceptance, or an irreversible action.
-4. Load `grilling` when available. Ask one decision at a time, state the recommended option first, and explain the material tradeoff compactly.
-5. After the answer, update the current snapshot, the relevant question and decision entries, `updated-at`, and History before continuing.
+Use the facts-before-questions method in [evidence-driven-analysis](../../evidence-driven-analysis/SKILL.md) when the missing item requires inquiry. Keep this skill as the documentary owner; no mandatory interview skill or exhaustive decision tree is required.
 
-Complete when facts have been exhausted, every remaining question is materially decision-bearing, and each received answer is persisted before the next question.
+Ask only about a consequential choice not settled by the request or inspected sources. State the concrete tradeoff and recommended option when useful. A recommendation is not authorization to create a case or publish information.
+
+For an existing case update, formalize a material answer in the relevant question/decision register and persist it through **Update case**, preserving source, attribution, snapshot checks, and no-op behavior. Do not turn a read-only conversation into a write merely because a question was answered.
+
+Complete when the unresolved choice is explicit and any authorized material answer is traceable without repeating the analysis or transcript.
