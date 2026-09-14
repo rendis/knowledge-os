@@ -44,6 +44,10 @@ Instance files (`instance.yaml`, `00-Home.md`, notes under `10/`–`70/`) are ne
 - Business flows live in `30-Flujos/`; human procedures live in `60-Operacion/`.
 - Author skills and this file with `writing-for-agents`. Keep harness-portable: no provider-specific metadata.
 
+## Distribution changes
+
+Treat the distributed kernel and skills as managed dependencies. When a vault task requires changing them, diagnose the problem and present the proposed change and its impact for user approval before implementation. Completing the task or fixing its checks does not authorize distribution changes, even when a local distribution checkout is available. With explicit authorization already covering the change, proceed without asking again: prepare a PR to the distribution repository and keep integration and propagation within the authorized scope. Continue independent vault work while approval is pending.
+
 ## Personal instructions
 
 - Load @AGENTS.personal.md from the vault root before classifying requests, if present. Absence is valid.
