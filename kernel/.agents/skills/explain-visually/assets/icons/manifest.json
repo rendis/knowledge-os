@@ -1,0 +1,22 @@
+{
+  "package": "lucide-static",
+  "version": "1.46.0",
+  "source": "https://registry.npmjs.org/lucide-static/-/lucide-static-1.46.0.tgz",
+  "integrity": "sha512-kq1lP/78BxG28VG3Ut2FxMeQElereTrrRwTBeXH7+olxATGcDbsuKRB/v/VKLhPrEu8BvNi6Uh2GvbH3pQcYhg==",
+  "modifications": "none; selected SVG files copied verbatim",
+  "icons": {
+    "database": "cb6e163564b1afdbd40ef45753cffd9c3b1cc3f3d879f67bca3985b76ff015e8",
+    "network": "54b53adf698a105bf6ccf0d767908b7f22179705f963af39e11720565f9dec3d",
+    "shield": "f2fd5ad159c52fe8e17b28b535ae1e74b4ef4a637c4fe12112235dc64528460f",
+    "lock-keyhole": "8b44d8c3d29e92764bb93c20a1ae170f03ce3c35f8fbc4f6c15564fbcf5ed197",
+    "server": "cbd7f3b900551c67d02e803ba49d9f1eb85b3de8fd07ed321e5e54fe1d740808",
+    "cpu": "9c6593f058dc8c8538104c84423e696b5538f941c0c15f89a8d19018e9870fdc",
+    "user": "67a0a93df57bb0d0971685a99d8d3fc588ed404d73d68883b35fbe09c5960c39",
+    "file-text": "829ab7c924368e95a4aae152f89da49dde06ec209f4d598810c92c6908f87be8",
+    "list-ordered": "330075de6d45fa61727a98ee239c93dab44d543db6f1fd2816f3d7017ea964b2",
+    "cloud": "5c524665cb2b0b662f7b78a883a620826ddb42071689d0f468940b1a909081d9",
+    "search": "3fd087a7cf6f163f60ca1de7680fc5fe84e6624d1621a39c435a617daad0c336",
+    "image": "efda6036f19b7aebd5272f7e68f1f2b5d84372b468e8fb3804608026e2890286",
+    "scroll-text": "2acef8e46c6cd4cc704de9d894eb41bd028d624398f322cf6d261f337989080d"
+  }
+}
