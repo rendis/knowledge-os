@@ -39,6 +39,8 @@ The continuity trace captures successful function invocation but no numeric stdo
 
 Independent contexts reviewed implementation and observed behavior separately. The implementation reviewer found no actionable kernel/helper/schema regression. The behavioral reviewer rejected contaminated/bypassed/repetitive executions, then accepted the corrected scenarios after inspecting actual operations, artifacts, and full initial-file hashes. Possible stylistic shortening is not treated as a defect where the agreed semantic-concision criterion is satisfied.
 
+The final combined reviewer found no blocking finding, matched all 18 retained turn hashes to the raw traces, checked the 85-test receipts and both clean installation receipts, and accepted the bounded implementation/evaluation evidence. The coordinator also persisted the original-isolation comparison. Consumer test worktrees and their temporary branches were removed after that review; final delivery additionally removes the distribution worktree and execution scratch while retaining the implementation branch.
+
 ## Controlled comparisons
 
 Same model (`gpt-6-astra`), low effort, sandbox, natural prompts and source fixtures within each pair:
@@ -64,7 +66,7 @@ Initial fingerprints covered **4,047 Cell A files** and **1,006 Cells B/C files*
 
 The user explicitly confirmed that other tasks were active in the originals, so preservation means isolation from this execution, not freezing their work. Cell A advanced `a6ca7e1 → 69c4e66`; Cells B/C advanced `ec501b1 → 97288ef` during the first check. Tracked differences correspond to their concurrent map/knowledge commits; ignored Obsidian/map-plan state also continued evolving. Nothing was restored or incorporated into this task's consumer changes.
 
-Observed invariants: original Git status and local configuration hashes unchanged; no changes to investigations, legacy/private investigations, instance identity or local workspace/personal configuration; both originals still at 0.7.23 without `evidence-driven-analysis`. Main remained clean and received no analysis commit. Rebase affected only the local issue branch to retain the concurrent distribution change.
+Observed invariants: original Git status and local Git configuration hashes unchanged; no changes to investigations, legacy/private investigations, instance identity or local workspace configuration; both originals still at 0.7.23 without `evidence-driven-analysis`. Concurrent personal guidance also changed during the later observation; its contents were neither copied nor restored. Main remained clean and received no analysis commit. Rebase affected only the local issue branch to retain the concurrent distribution change. The persisted isolation receipt records the observations without requiring other tasks to stop.
 
 ## Sources and delivery boundary
 
