@@ -46,7 +46,9 @@ Instance files (`instance.yaml`, `00-Home.md`, notes under `10/`–`70/`) are ne
 
 ## Personal instructions
 
-Before classifying a request, load @AGENTS.personal.md when it exists and apply its local instructions within this router's guardrails. `AGENTS.personal.md` owns environment-specific working agreements: local tool and agent selection; delegation, monitoring, resumption and verification workflows; user behavior and writing preferences; and local connection or access procedures. Within these guardrails, the current user request takes precedence, then personal instructions take precedence over generic skill guidance and workflow defaults. When the user asks to persist one of those settings, create or update the personal file, even when it does not yet exist. If the setting specializes a workflow already covered by a versioned skill, preserve that skill and record the specialization only in the personal file. Keep credentials in their proper secret store and record only the way to use them. Keep `AGENTS.personal.md` ignored and untracked; its absence is valid and does not require creating it. This `AGENTS.md` remains distribution-owned.
+- Load @AGENTS.personal.md from the vault root before classifying requests, if present. Absence is valid.
+- Within this router's guardrails, apply current user direction first, personal instructions second, and generic skill guidance and workflow defaults third.
+- Persist recurring personal directions (including “whenever you do X, do Y”) in `AGENTS.personal.md`, creating it when needed and keeping it ignored and untracked. It owns local tools, agents, access procedures, writing preferences, and delegation, monitoring, resumption and verification workflows. Record access references, not credentials. Preserve this managed router and versioned skills; write personal specializations only in the personal file. One-time requests do not create persistent rules.
 
 ## Investigation and local stores
 

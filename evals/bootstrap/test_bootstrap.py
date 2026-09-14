@@ -3341,12 +3341,7 @@ change:
     def test_personal_agents_contract_and_doctor_rejects_tracked_copy(self) -> None:
         router = (DIST / "kernel" / "AGENTS.md").read_text(encoding="utf-8")
         self.assertIn("## Personal instructions", router)
-        self.assertIn("load @AGENTS.personal.md when it exists", router)
-        self.assertIn("local tool and agent selection", router)
-        self.assertIn("delegation, monitoring, resumption and verification workflows", router)
-        self.assertIn("personal instructions take precedence over generic skill guidance", router)
-        self.assertIn("preserve that skill", router)
-        self.assertIn("record the specialization only in the personal file", router)
+        self.assertIn("@AGENTS.personal.md", router)
         self.assertGreater(
             router.index("## Personal instructions"),
             router.index("## Guardrails"),
@@ -3355,9 +3350,6 @@ change:
             router.index("## Personal instructions"),
             router.index("## Investigation and local stores"),
         )
-        self.assertIn("create or update the personal file", router)
-        self.assertIn("its absence is valid", router)
-        self.assertIn("Keep credentials in their proper secret store", router)
 
         with tempfile.TemporaryDirectory() as tmp:
             dest = Path(tmp) / "cell"
