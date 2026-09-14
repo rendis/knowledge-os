@@ -15,5 +15,3 @@ Store only sensitive context that is necessary to continue the investigation and
 Record protected source locations and access limitations without credential values.
 
 ## History
-
-- <timestamp> — Private overlay created.
