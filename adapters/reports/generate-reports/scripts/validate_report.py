@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import json
 import re
-import xml.etree.ElementTree as ET
 import zipfile
 from pathlib import Path
 from typing import Any, Optional
 
-from pivot_ooxml import workbook_sheet_paths, worksheet_chart_paths, worksheet_drawing_path
+from defusedxml import ElementTree as ET
+from defusedxml.common import DefusedXmlException
+
+from pivot_ooxml import parse_xml, workbook_sheet_paths, worksheet_chart_paths, worksheet_drawing_path
 from report_engine import ReportError, sha256
 
 MAIN = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
@@ -18,8 +20,8 @@ DRAWING = "http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing"
 CUSTOM = "http://schemas.openxmlformats.org/officeDocument/2006/custom-properties"
 
 
-def workbook_sheets(archive: zipfile.ZipFile) -> list[str]:
-    root = ET.fromstring(archive.read("xl/workbook.xml"))
+def workbook_sheets(files: dict[str, bytes]) -> list[str]:
+    root = parse_xml(files["xl/workbook.xml"])
     return [sheet.attrib["name"] for sheet in root.findall(f".//{{{MAIN}}}sheet")]
 
 
@@ -28,13 +30,13 @@ def validate_workbook(path: Path, expected_rows: Optional[int] = None) -> dict[s
         with zipfile.ZipFile(path) as archive:
             names = set(archive.namelist())
             files = {name: archive.read(name) for name in names}
-            sheets = workbook_sheets(archive)
+            sheets = workbook_sheets(files)
             years = [name for name in sheets if re.fullmatch(r"\d{4}", name)]
             if sheets != ["Resumen", *years, "Datos"] or not years:
                 raise ReportError("artifact-invalid", f"unexpected sheets: {sheets}")
             if "docProps/custom.xml" not in names:
                 raise ReportError("artifact-invalid", "workbook provenance properties missing")
-            custom = ET.fromstring(files["docProps/custom.xml"])
+            custom = parse_xml(files["docProps/custom.xml"])
             properties = {
                 item.attrib["name"]: next(iter(item)).text or ""
                 for item in custom.findall(f"{{{CUSTOM}}}property")
@@ -47,8 +49,8 @@ def validate_workbook(path: Path, expected_rows: Optional[int] = None) -> dict[s
                 raise ReportError("artifact-invalid", "one native pivot per year is required")
             if "xl/pivotCache/pivotCacheDefinition1.xml" not in names or "xl/pivotCache/pivotCacheRecords1.xml" not in names:
                 raise ReportError("artifact-invalid", "shared native pivot cache missing")
-            cache = archive.read("xl/pivotCache/pivotCacheDefinition1.xml").decode()
-            records = archive.read("xl/pivotCache/pivotCacheRecords1.xml").decode()
+            cache = files["xl/pivotCache/pivotCacheDefinition1.xml"].decode()
+            records = files["xl/pivotCache/pivotCacheRecords1.xml"].decode()
             record_match = re.search(r'recordCount="(\d+)"', cache)
             record_count = int(record_match.group(1)) if record_match else -1
             if expected_rows is not None and record_count != expected_rows:
@@ -56,7 +58,7 @@ def validate_workbook(path: Path, expected_rows: Optional[int] = None) -> dict[s
             if f'count="{record_count}"' not in records:
                 raise ReportError("artifact-invalid", "pivot cache records mismatch")
             for year, pivot_path in zip(years, pivot_tables):
-                pivot = archive.read(pivot_path).decode()
+                pivot = files[pivot_path].decode()
                 if f'name="PivotEventos{year}"' not in pivot or 'showDrill="1"' not in pivot:
                     raise ReportError("artifact-invalid", f"invalid pivot for {year}")
                 if 'axis="axisRow"' not in pivot or '<rowFields count="2">' not in pivot or 'sd="0"' not in pivot:
@@ -67,13 +69,13 @@ def validate_workbook(path: Path, expected_rows: Optional[int] = None) -> dict[s
             if chart_count != 1 + 2 * len(years):
                 raise ReportError("artifact-invalid", "unexpected chart count")
             sheet_paths = workbook_sheet_paths(files)
-            summary = ET.fromstring(files[sheet_paths["Resumen"]])
+            summary = parse_xml(files[sheet_paths["Resumen"]])
             summary_unfrozen = summary.find(f".//{{{MAIN}}}pane") is None
             if not summary_unfrozen:
                 raise ReportError("artifact-invalid", "Resumen must not contain frozen panes")
             if summary.find(f'.//{{{MAIN}}}c[@r="A22"]') is None:
                 raise ReportError("artifact-invalid", "Resumen table must start at A22")
-            summary_drawing = ET.fromstring(files[worksheet_drawing_path(files, sheet_paths["Resumen"])])
+            summary_drawing = parse_xml(files[worksheet_drawing_path(files, sheet_paths["Resumen"])])
             chart_end_rows = [
                 int(node.text)
                 for node in summary_drawing.findall(f".//{{{DRAWING}}}to/{{{DRAWING}}}row")
@@ -83,7 +85,7 @@ def validate_workbook(path: Path, expected_rows: Optional[int] = None) -> dict[s
             if not summary_chart_clearance:
                 raise ReportError("artifact-invalid", "Resumen chart overlaps its table")
             summary_charts = worksheet_chart_paths(files, sheet_paths["Resumen"])
-            if any(ET.fromstring(files[chart_path]).find(f"{{{CHART}}}pivotSource") is not None for chart_path in summary_charts):
+            if any(parse_xml(files[chart_path]).find(f"{{{CHART}}}pivotSource") is not None for chart_path in summary_charts):
                 raise ReportError("artifact-invalid", "Resumen chart must remain a regular chart")
             pivot_chart_count = 0
             for year in years:
@@ -92,7 +94,7 @@ def validate_workbook(path: Path, expected_rows: Optional[int] = None) -> dict[s
                     raise ReportError("artifact-invalid", f"two PivotCharts are required for {year}")
                 expected_source = f"{year}!PivotEventos{year}"
                 for chart_path in chart_paths:
-                    chart = ET.fromstring(files[chart_path])
+                    chart = parse_xml(files[chart_path])
                     pivot_source = chart.find(f"{{{CHART}}}pivotSource")
                     source_name = pivot_source.find(f"{{{CHART}}}name") if pivot_source is not None else None
                     format_id = pivot_source.find(f"{{{CHART}}}fmtId") if pivot_source is not None else None
@@ -120,7 +122,7 @@ def validate_workbook(path: Path, expected_rows: Optional[int] = None) -> dict[s
                 "summary_unfrozen": summary_unfrozen,
                 "summary_chart_clearance": summary_chart_clearance,
             }
-    except (KeyError, zipfile.BadZipFile, ET.ParseError) as error:
+    except (KeyError, zipfile.BadZipFile, ET.ParseError, DefusedXmlException) as error:
         raise ReportError("artifact-invalid", str(error)) from error
 
 

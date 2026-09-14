@@ -143,9 +143,8 @@ def validate_property_reference(
     note_properties: set[str],
     formulas: set[str],
 ) -> list[str]:
-    if not nonempty_string(value):
+    if not isinstance(value, str) or not value:
         return [f"{location} must be a non-empty property reference"]
-    assert isinstance(value, str)
     if value.startswith("formula."):
         formula = value.removeprefix("formula.")
         if formula not in formulas:

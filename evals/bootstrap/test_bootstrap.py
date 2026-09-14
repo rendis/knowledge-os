@@ -2733,6 +2733,7 @@ change:
             self.assertIn("/.agents/state/map-ecosystem/", gitignore)
             self.assertIn("/AGENTS.personal.md", gitignore)
             self.assertIn("/.plan/", gitignore)
+            self.assertIn("/.venv/", gitignore)
             self.assertIn("/.investigations/", gitignore)
             self.assertIn("/.investigations-private/", gitignore)
             self.assertNotIn("/investigations/", gitignore)
@@ -2908,9 +2909,34 @@ change:
                     checked.stdout + checked.stderr,
                 )
 
+    def test_quality_gate_normalizes_signal_return_codes(self) -> None:
+        helper = DIST / "kernel/90-Meta/check-code-quality.py"
+        spec = importlib.util.spec_from_file_location("code_quality", helper)
+        self.assertIsNotNone(spec)
+        self.assertIsNotNone(spec.loader)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+
+        cases = (
+            ((0, 0, 0), 0),
+            ((1, 0, 0), 1),
+            ((2, 1, 0), 2),
+            ((-9, 0, 0), 137),
+            ((-2, 1, 0), 130),
+        )
+        for return_codes, expected in cases:
+            with (
+                self.subTest(return_codes=return_codes),
+                mock.patch.object(module.importlib.util, "find_spec", return_value=object()),
+                mock.patch.object(module, "run", side_effect=return_codes) as run_mock,
+                mock.patch.object(sys, "argv", [str(helper), "--root", str(DIST)]),
+            ):
+                self.assertEqual(module.main(), expected)
+                self.assertEqual(run_mock.call_count, 3)
+
     def test_kernel_has_no_product_leak(self) -> None:
         leaks = []
-        skip = {".git", "evals", "plan", "__pycache__"}
+        skip = {".git", ".venv", "evals", "plan", "__pycache__"}
         for path in DIST.rglob("*"):
             if not path.is_file():
                 continue
@@ -3163,6 +3189,7 @@ change:
             self.assertIn("/custom-ignore", gitignore)
             self.assertNotIn(".knowledge-os.lock.yaml", gitignore)
             self.assertIn("/.plan/", gitignore)
+            self.assertIn("/.venv/", gitignore)
             self.assertIn("/AGENTS.personal.md", gitignore)
             self.assertNotIn("/plan/", gitignore)
             obsidian_app = json.loads(

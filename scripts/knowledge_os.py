@@ -293,6 +293,7 @@ def ensure_gitignore_lines(dest: Path) -> None:
         "/.knowledge-os-config.*.tmp",
         "/.agents/state/map-ecosystem/",
         "/.plan/",
+        "/.venv/",
     )
     path = dest / ".gitignore"
     lines = path.read_text(encoding="utf-8").splitlines() if path.is_file() else []

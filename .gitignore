@@ -15,4 +15,5 @@ evals/bootstrap/results/
 evals/graph-economy/results/
 __pycache__/
 *.pyc
+.venv/
 .python-version

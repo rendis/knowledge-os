@@ -518,11 +518,11 @@ def main() -> int:
     except SourceAmbiguityError as error:
         parser.error(str(error))
     notes = selected_notes(args)
-    print(f"# Static evidence scan")
+    print("# Static evidence scan")
     print()
     print(f"- Notas seleccionadas: {len(notes)}")
     print(f"- Repos fuente disponibles: {len(repositories)}")
-    print(f"- Modo: solo lectura; no usa logs, pruebas ni fuentes externas no versionadas")
+    print("- Modo: solo lectura; no usa logs, pruebas ni fuentes externas no versionadas")
     for warning in [*resolver_warnings, *duplicate_warnings]:
         print(f"- Advertencia de fuentes: {warning}")
     print()

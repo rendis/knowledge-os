@@ -5,16 +5,27 @@ from __future__ import annotations
 import posixpath
 import shutil
 import tempfile
-import xml.etree.ElementTree as ET
 import zipfile
 from pathlib import Path, PurePosixPath
 from typing import Optional
 from xml.sax.saxutils import escape, quoteattr
 
+from defusedxml import ElementTree as ET
+
 MAIN = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
 REL = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
 PKG_REL = "http://schemas.openxmlformats.org/package/2006/relationships"
 CHART = "http://schemas.openxmlformats.org/drawingml/2006/chart"
+
+
+def parse_xml(content: bytes):
+    """Parse one OOXML member while rejecting DTD and entity declarations."""
+    return ET.fromstring(
+        content,
+        forbid_dtd=True,
+        forbid_entities=True,
+        forbid_external=True,
+    )
 
 
 def append_before_close(xml: str, local_name: str, fragment: str) -> str:
@@ -33,8 +44,8 @@ def col_name(number: int) -> str:
 
 
 def workbook_sheet_paths(files: dict[str, bytes]) -> dict[str, str]:
-    workbook = ET.fromstring(files["xl/workbook.xml"])
-    relationships = ET.fromstring(files["xl/_rels/workbook.xml.rels"])
+    workbook = parse_xml(files["xl/workbook.xml"])
+    relationships = parse_xml(files["xl/_rels/workbook.xml.rels"])
     targets = {
         rel.attrib["Id"]: rel.attrib["Target"].lstrip("/")
         for rel in relationships
@@ -60,7 +71,7 @@ def relationships_path(part_path: str) -> str:
 
 def worksheet_drawing_path(files: dict[str, bytes], sheet_path: str) -> str:
     sheet_rels_path = relationships_path(sheet_path)
-    sheet_rels = ET.fromstring(files[sheet_rels_path])
+    sheet_rels = parse_xml(files[sheet_rels_path])
     drawing_relationship = next(
         relationship
         for relationship in sheet_rels
@@ -71,8 +82,8 @@ def worksheet_drawing_path(files: dict[str, bytes], sheet_path: str) -> str:
 
 def worksheet_chart_paths(files: dict[str, bytes], sheet_path: str) -> list[str]:
     drawing_path = worksheet_drawing_path(files, sheet_path)
-    drawing = ET.fromstring(files[drawing_path])
-    drawing_rels = ET.fromstring(files[relationships_path(drawing_path)])
+    drawing = parse_xml(files[drawing_path])
+    drawing_rels = parse_xml(files[relationships_path(drawing_path)])
     chart_targets = {
         relationship.attrib["Id"]: related_part(drawing_path, relationship.attrib["Target"])
         for relationship in drawing_rels

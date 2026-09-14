@@ -87,6 +87,13 @@ Apache License 2.0.
 
 Requires Python 3.9+ and Git. Obsidian is optional for filesystem queries. Each optional adapter declares its own tool dependencies.
 
+For a provider-independent local Python gate, create `.venv`, install the
+fully locked `kernel/90-Meta/requirements-ci.txt`, and run
+`python -B kernel/90-Meta/check-code-quality.py --root .` with that interpreter.
+Ruff and Bandit load their standard configuration files from `90-Meta`.
+Installed cells receive the same command and configuration; see
+`90-Meta/code-quality.md` for setup and scope.
+
 1. Initialize identity, systems, trackers, evidence profile and note locale with `init`.
 2. Use `configure-workspace` only when a task needs local source roots or an optional capability. Bind team procedures through `90-Meta/cell-config.py`; `instance.yaml` owns portable bindings, local config owns machine paths.
 3. Ask a bounded question through `map-ecosystem`; it returns sources and limitations without creating a case.
