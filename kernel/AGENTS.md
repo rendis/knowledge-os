@@ -42,7 +42,7 @@ Instance files (`instance.yaml`, `00-Home.md`, notes under `10/`–`70/`) are ne
 ## Guardrails
 
 - Apply `90-Meta/evidence-policy.md` when assessing a technical write. Cell identity and capability bindings come from onboarding, never inferred company conventions.
-- Evidence before inference. Separate facts, inferences, and limitations.
+- Before a material conclusion, inspect relevant available sources and verify that they support the precise claim. Distinguish observations, inferences, and proposals. Check alternative explanations when they could change the conclusion. When evidence is insufficient, limit the claim and name the missing verification. Scale inquiry to uncertainty and impact; reuse valid evidence.
 - Never persist secrets.
 - Canonical wikilinks target the note basename.
 - Persist one durable relationship direction; use backlinks for the inverse.
