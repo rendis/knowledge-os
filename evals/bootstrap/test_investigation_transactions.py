@@ -204,10 +204,24 @@ class Transactions(unittest.TestCase):
 
     def test_close_rejects_history_only_evidence_reference(self):
         before = self.case.read_bytes()
-        self.case.write_text(before.decode().replace(
+        history_only = before.decode().replace(
             '## History\n',
-            '## History\n\n- 2026-09-10T10:00:00+00:00 — Mentioned `E-999`; recorded by Test Recorder <recorder@example.invalid>; source: synthetic note.\n',
-        ))
+            '## History\n\n- E-999: fabricated History-only evidence reference.\n',
+        )
+        candidate = Path(self.tmp.name) / 'history-only-target.md'
+        candidate.write_text(history_only)
+        rejected_save = self.run_cli(
+            'save', '--id', self.case_id,
+            '--public-candidate', str(candidate),
+            '--expected-public-sha256', hashlib.sha256(before).hexdigest(),
+            '--private-root', str(Path(self.tmp.name) / '.investigations-private'),
+            '--source', 'synthetic History-only target', '--target', 'E-999',
+            ok=False,
+        )
+        self.assertIn('Every affected register ID must exist', rejected_save.stderr)
+        self.assertEqual(before, self.case.read_bytes())
+
+        self.case.write_text(history_only)
         current = self.case.read_bytes()
         rejected = self.run_cli(
             'close', '--id', self.case_id, '--decision', 'complete',
@@ -218,6 +232,35 @@ class Transactions(unittest.TestCase):
         )
         self.assertIn('existing register IDs', rejected.stderr)
         self.assertEqual(current, self.case.read_bytes())
+
+    def test_story_evidence_must_belong_to_the_same_investigation(self):
+        export = self.case.parent / 'exports' / 'S-001-story.md'
+        export.write_text(
+            '---\nstory-id: S-001\nsource-investigation: another-case\n---\n# Story\n',
+            encoding='utf-8',
+        )
+        before = self.case.read_bytes()
+        rejected = self.run_cli(
+            'close', '--id', self.case_id, '--decision', 'complete',
+            '--reason', 'Story prepared', '--limitations', 'none',
+            '--source', 'synthetic closure review', '--evidence', 'S-001',
+            '--expected-public-sha256', hashlib.sha256(before).hexdigest(),
+            ok=False,
+        )
+        self.assertIn('existing register IDs', rejected.stderr)
+        self.assertEqual(before, self.case.read_bytes())
+
+        export.write_text(
+            f'---\nstory-id: S-001\nsource-investigation: {self.case_id}\n---\n# Story\n',
+            encoding='utf-8',
+        )
+        self.run_cli(
+            'close', '--id', self.case_id, '--decision', 'complete',
+            '--reason', 'Story prepared', '--limitations', 'none',
+            '--source', 'synthetic closure review', '--evidence', 'S-001',
+            '--expected-public-sha256', hashlib.sha256(before).hexdigest(),
+        )
+        self.assertIn('closure-outcome: completed', self.case.read_text())
 
     def test_legacy_states_and_invalid_lifecycle_metadata_are_rejected(self):
         original = self.case.read_bytes()
