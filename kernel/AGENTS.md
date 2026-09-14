@@ -8,6 +8,8 @@ Classify the request, then select one primary skill. Use `evidence-driven-analys
 
 Answer questions without a persistent record by default. Recommend an investigation when preserving evidence, decisions or pending questions would make continuation or sharing easier; open it through `manage-investigation` only when the user requests it or accepts the recommendation. A declined recommendation leaves the conversation unrecorded. An explicitly requested operational audit retains its `.operations/` workflow, not a second investigation.
 
+Before using an existing case as context, use the read-only case load in `manage-investigation` to discover its private overlay by ID, even for an informational query. Public search results locate cases; they are not a substitute for loading their context. Preserve the returned private provenance and disclosure restrictions.
+
 ## Skills
 
 - `evidence-driven-analysis` — proportional search, diagnosis and audit; conclusions with evidence and limits, with or without a case.
