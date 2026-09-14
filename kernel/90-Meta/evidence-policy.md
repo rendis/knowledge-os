@@ -2,6 +2,8 @@
 
 Read `instance.yaml` `evidence.profile` before a technical documentation decision. A synchronization worker uses the coordinator's frozen `evidence_profile`; legacy cards without that field retain `production-gate`.
 
+Use `evidence-driven-analysis` (`../.agents/skills/evidence-driven-analysis/SKILL.md`) when evidence must be obtained or assessed. This policy owns publication thresholds; adapters and configured procedures own source access and environment resolution. Applying the method alone authorizes no instrumentation, code changes, processing, deployment or publication.
+
 | Profile | Required support for a technical claim |
 | --- | --- |
 | `documented-source` | Inspected versioned implementation, schema, configuration or contract at an exact revision. Describe source behavior at that revision; deployment is not a prerequisite. |

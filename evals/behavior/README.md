@@ -6,9 +6,14 @@ Create the same synthetic fixture from each distribution under anonymous run nam
 python3 -B evals/behavior/prepare.py --distribution /path/to/distribution --output /tmp/run-a --scenario workflow
 python3 -B evals/behavior/prepare.py --distribution /path/to/distribution --output /tmp/run-b --scenario onboarding
 python3 -B evals/behavior/prepare.py --distribution /path/to/distribution --output /tmp/run-c --scenario lifecycle
+python3 -B evals/behavior/prepare.py --distribution /path/to/distribution --output /tmp/run-d --scenario analysis --evaluation-output /tmp/evaluator-d
 ```
 
 Each output is private evaluation scratch. Start a fresh agent in that output directory, without parent history, and pass only `task.txt`. Use the same supported model, effort, and tool permissions for both variants. Never point these tasks at a real consumer. Fixture setup requires Python 3.9+ and Git and refuses an existing output.
+
+For `analysis`, select one natural request from `tasks/` per fresh fixture and agent. Only the three numbered continuity tasks share a fixture and conversation. The separate evaluator directory contains the rubric, baseline file hashes, and coordinator protocol; never give it to an executor. The absent-overlay variant requires the coordinator to remove the synthetic overlay before the fresh execution. Use the same current generator with `--distribution` pointing at either revision to keep source content and prompts constant. Sources include a local Git repository, simulated paginated cloud output, and a valid public/private case. No live cloud execution is needed. The linked-workflow prompt checks routing only; use the focused handoff/reconciliation/learning tests for execution guarantees. Run `python3 -B evals/behavior/test_analysis_fixture.py` to verify setup isolation, reproducible prompts, overlay discovery, and the synthetic code behavior.
+
+The repository has a synthetic origin and workspace roots configured through the installed CLI, so identity-based resolution is exercised. The `operational` task explicitly executes a registered offline audit and should create its `.operations/` ledger; its procedure defines unavailable second-page and receipt evidence as terminal unknowns for this bounded export. The separate `cloud` task is informational and should not create that ledger.
 
 For the recorded comparison, each independent worker used `codex exec --ephemeral --skip-git-repo-check --ignore-user-config -m gpt-6-astra -c 'model_reasoning_effort="low"' -c 'approval_policy="never"' -s workspace-write --json --output-last-message result.md - < task.txt > events.jsonl`. CLI availability and host permissions are external prerequisites. Do not pass audit conclusions or another worker's results.
 
