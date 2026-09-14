@@ -22,6 +22,7 @@ from urllib.parse import urlparse
 
 ID_PATTERN = re.compile(r"^\d{8}-\d{6}-[a-z0-9]+(?:-[a-z0-9]+)*(?:-\d{2})?$")
 KEY_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+REGISTER_ID_PATTERN = re.compile(r"^(?:E|A|Q|D|AC|S|DH)-[0-9]{3,}$")
 SECRET_PATTERN = re.compile(
     r"PRIVATE KEY-----|"
     r"\b(?:password|passwd|pwd|secret|token|api[-_]?key)\s*[:=]\s*\S+|"
@@ -190,6 +191,16 @@ class CaseRecord:
         return [str(item) for item in value] if isinstance(value, list) else []
 
 
+@dataclass(frozen=True)
+class GitIdentity:
+    name: str
+    email: str
+
+    @property
+    def display(self) -> str:
+        return f"{self.name} <{self.email}>"
+
+
 def emit(payload: dict[str, Any], *, stream: Any = sys.stdout) -> None:
     print(json.dumps(payload, indent=2, sort_keys=True), file=stream)
 
@@ -210,6 +221,69 @@ def reject_secret_input(*values: str) -> None:
             "secret_input",
             "Secret-bearing input cannot be persisted in an investigation",
         )
+
+
+def effective_git_identity(vault_root: Path) -> GitIdentity:
+    values: dict[str, str] = {}
+    for field in ("user.name", "user.email"):
+        result = subprocess.run(
+            ["git", "-C", str(vault_root), "config", "--get", field],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        value = result.stdout.strip()
+        if result.returncode != 0 or not value or "\n" in value or "\r" in value:
+            raise CaseError(
+                "git_identity_missing",
+                "Attributed investigation writes require effective Git user.name and user.email",
+                field=field,
+            )
+        values[field] = value
+    reject_secret_input(values["user.name"], values["user.email"])
+    return GitIdentity(values["user.name"], values["user.email"])
+
+
+def notes_locale(vault_root: Path) -> str:
+    instance = vault_root / "instance.yaml"
+    try:
+        text = instance.read_text(encoding="utf-8")
+    except OSError:
+        return "en"
+    match = re.search(r"(?m)^locale:\s*$\n(?:^[ \t].*\n)*?^  notes:\s*([^#\s]+)", text)
+    return match.group(1).casefold() if match else "en"
+
+
+def record_locale(text: str) -> str:
+    return "es" if re.search(r"(?m)^## Historial\s*$", text) else "en"
+
+
+def append_history_event(text: str, event: str) -> str:
+    history = re.search(
+        r"(?m)^## (?:" + "|".join(map(re.escape, HISTORY_SECTION_ALIASES)) + r")\s*$",
+        text,
+    )
+    if history is None:
+        raise CaseError("history_missing", "Case is missing History")
+    position = text.find("\n## ", history.end())
+    if position < 0:
+        position = len(text)
+    return text[:position].rstrip() + "\n\n" + event.rstrip() + "\n\n" + text[position:].lstrip("\n")
+
+
+def attributed_event(
+    timestamp: str,
+    action: str,
+    identity: GitIdentity,
+    source: str,
+    locale: str = "en",
+) -> str:
+    recorder_label = "registrado por" if locale.startswith("es") else "recorded by"
+    source_label = "fuente" if locale.startswith("es") else "source"
+    return (
+        f"- {timestamp} — {action}; {recorder_label} {identity.display}; "
+        f"{source_label}: {source}."
+    )
 
 
 def public_content_errors(case_dir: Path) -> list[str]:
@@ -418,11 +492,11 @@ def match_records(
     return list(definite.values())
 
 
-def render_case(args: argparse.Namespace, timestamp: str) -> str:
+def render_case(args: argparse.Namespace, timestamp: str, identity: GitIdentity) -> str:
     template = (
         Path(__file__).resolve().parents[1] / "assets" / "investigation-template.md"
     ).read_text(encoding="utf-8")
-    primary_source = args.source_ref[0] if args.source_ref else "unknown"
+    primary_source = args.source_ref[0] if args.source_ref else "direct user request"
     replacements = {
         "id: <investigation-id>": f"id: {args.id}",
         "title: <title>": f"title: {json.dumps(args.title, ensure_ascii=False)}",
@@ -455,7 +529,13 @@ def render_case(args: argparse.Namespace, timestamp: str) -> str:
         ): f"learning-outcome: {args.learning_outcome}",
         "# <Title>": f"# {args.title}",
         "<Formalize the relevant request without preserving the conversation transcript.>": args.request_summary,
-        "- <timestamp> — Case file created.": f"- {timestamp} — Case file created.",
+        "- <timestamp> — Case file created.": attributed_event(
+            timestamp,
+            "Expediente creado" if args.note_locale.startswith("es") else "Case file created",
+            identity,
+            primary_source,
+            args.note_locale,
+        ),
     }
     for old, new in replacements.items():
         template = template.replace(old, new)
@@ -471,6 +551,30 @@ def render_case(args: argparse.Namespace, timestamp: str) -> str:
             f"## References and attachments\n\n{references}\n",
             1,
         )
+    if args.note_locale.startswith("es"):
+        headings = {
+            "## Request summary": "## Resumen de la solicitud",
+            "## Current state": "## Estado actual",
+            "### Objective": "### Objetivo",
+            "### Scope": "### Alcance",
+            "### Out of scope": "### Fuera de alcance",
+            "### Current productive state": "### Estado productivo actual",
+            "### Future/proposed state": "### Estado futuro o propuesto",
+            "## References and attachments": "## Referencias y adjuntos",
+            "## Evidence": "## Evidencia",
+            "### Facts": "### Hechos",
+            "### Inferences": "### Inferencias",
+            "### Contradictions": "### Contradicciones",
+            "## Affected surfaces": "## Superficies afectadas",
+            "## Development handoffs": "## Handoffs de desarrollo",
+            "## Open questions": "## Preguntas abiertas",
+            "## Decisions": "## Decisiones",
+            "## Acceptance criteria": "## Criterios de aceptación",
+            "## Readiness": "## Preparación",
+            "## History": "## Historial",
+        }
+        for original, translated in headings.items():
+            template = template.replace(original, translated)
     return template
 
 
@@ -532,7 +636,7 @@ def open_case(args: argparse.Namespace, root: Path) -> int:
             (staging / "handoffs").mkdir(mode=0o700)
             atomic_write(
                 staging / "investigation.md",
-                render_case(args, timestamp).encode("utf-8"),
+                render_case(args, timestamp, args.identity).encode("utf-8"),
             )
             os.replace(staging, target)
         finally:
@@ -540,6 +644,64 @@ def open_case(args: argparse.Namespace, root: Path) -> int:
                 shutil.rmtree(staging)
 
     emit({"status": "created", "id": args.id, "path": str(target)})
+    return 0
+
+
+def load_case(args: argparse.Namespace, root: Path) -> int:
+    records = load_records(root)
+    matches = [
+        record
+        for record in records
+        if args.id == record.case_id or args.id in record.consolidated_from
+    ]
+    if len(matches) != 1:
+        raise CaseError(
+            "case_not_found" if not matches else "case_ambiguous",
+            "Exactly one public investigation must resolve from the supplied ID",
+            matches=[record.case_id for record in matches],
+        )
+    record = matches[0]
+    public_errors = public_content_errors(record.path.parent)
+    if public_errors:
+        raise CaseError(
+            "public_validation_failed",
+            "Public investigation is unsafe to load",
+            errors=public_errors,
+        )
+    private_path = root.parent / ".investigations-private" / record.case_id / "private.md"
+    if private_path.is_symlink() or private_path.parent.is_symlink():
+        raise CaseError("case_symlink", "Private overlay paths must not be symlinks")
+    private_exists = private_path.is_file()
+    private_bytes = private_path.read_bytes() if private_exists else None
+    if private_bytes is not None:
+        try:
+            private_text = private_bytes.decode("utf-8")
+        except UnicodeDecodeError as error:
+            raise CaseError("private_validation_failed", "Private overlay must be UTF-8") from error
+        private_errors = validate_private_text(private_text, record.case_id)
+        if SECRET_PATTERN.search(private_text):
+            private_errors.append("private overlay contains a credential-like value")
+        if private_errors:
+            raise CaseError(
+                "private_validation_failed",
+                "Private overlay is unsafe or invalid",
+                errors=private_errors,
+            )
+    emit(
+        {
+            "status": "loaded",
+            "id": record.case_id,
+            "public": {
+                "path": str(record.path),
+                "sha256": digest_bytes(record.path.read_bytes()),
+            },
+            "private": {
+                "available": private_exists,
+                "path": str(private_path) if private_exists else None,
+                "sha256": digest_bytes(private_bytes),
+            },
+        }
+    )
     return 0
 
 
@@ -1259,6 +1421,15 @@ def save_case(args: argparse.Namespace, root: Path) -> int:
     except UnicodeDecodeError as error:
         raise CaseError("candidate_invalid", "Public candidate must be UTF-8") from error
     reject_secret_input(public_text)
+    if not args.source.strip() or "\n" in args.source or "\r" in args.source:
+        raise CaseError("source_invalid", "Save source must be one nonempty line")
+    reject_secret_input(args.source)
+    if LOCAL_PATH_PATTERN.search(args.source):
+        raise CaseError("source_invalid", "Save source must be portable")
+    all_targets = args.target + args.private_target
+    invalid_targets = [target for target in all_targets if REGISTER_ID_PATTERN.fullmatch(target) is None]
+    if invalid_targets:
+        raise CaseError("target_invalid", "Save targets must be existing register IDs", targets=invalid_targets)
 
     private_candidate: bytes | None = None
     private_text: str | None = None
@@ -1314,9 +1485,74 @@ def save_case(args: argparse.Namespace, root: Path) -> int:
                 current_sha256=digest_bytes(original_private),
             )
 
+        public_changed = candidate != original_public
+        private_changed = (
+            (private_candidate is not None and private_candidate != original_private)
+            or (args.delete_private and original_private is not None)
+        )
+        if not public_changed and not private_changed:
+            emit(
+                {
+                    "status": "unchanged",
+                    "id": args.id,
+                    "public_sha256": digest_bytes(original_public),
+                    "private_sha256": digest_bytes(original_private),
+                }
+            )
+            return 0
+        if public_changed and not args.target:
+            raise CaseError(
+                "traceability_target_missing",
+                "A material public write requires at least one affected public register ID",
+            )
+        if private_changed and not args.private_target:
+            raise CaseError(
+                "traceability_target_missing",
+                "A material private write requires at least one affected private register ID",
+            )
+
         candidate_fields = parse_frontmatter(public_text)
         if candidate_fields.get("id") != args.id:
             raise CaseError("candidate_invalid", "Public candidate id does not match the target")
+        missing_targets = [target for target in all_targets if target not in public_text]
+        if missing_targets:
+            raise CaseError(
+                "traceability_target_missing",
+                "Every affected register ID must exist in the public candidate",
+                targets=missing_targets,
+            )
+
+        timestamp = timestamp_value(args.timestamp)
+        locale = record_locale(public_text)
+        if public_changed or (args.delete_private and original_private is not None):
+            public_text = replace_frontmatter_scalar(public_text, "updated-at", timestamp)
+            targets = args.private_target if args.delete_private else args.target
+            if locale == "es":
+                verb = "Complemento privado eliminado para" if args.delete_private else "Registros actualizados"
+            else:
+                verb = "Removed private overlay linked to" if args.delete_private else "Updated registers"
+            action = verb + " " + ", ".join(f"`{target}`" for target in targets)
+            public_text = append_history_event(
+                public_text,
+                attributed_event(timestamp, action, args.identity, args.source, locale),
+            )
+            candidate = public_text.encode("utf-8")
+        if private_candidate is not None and private_candidate != original_private:
+            assert private_text is not None
+            private_text = replace_frontmatter_scalar(private_text, "updated-at", timestamp)
+            private_locale = record_locale(private_text)
+            action = (
+                "Contexto privado actualizado para "
+                if private_locale == "es"
+                else "Updated private context for "
+            ) + ", ".join(
+                f"`{target}`" for target in args.private_target
+            )
+            private_text = append_history_event(
+                private_text,
+                attributed_event(timestamp, action, args.identity, args.source, private_locale),
+            )
+            private_candidate = private_text.encode("utf-8")
 
         created_private_root = False
         created_private_dir = False
@@ -1556,11 +1792,24 @@ def consolidate_case(args: argparse.Namespace, root: Path) -> int:
                 learning_event = (
                     f"learning assessment preserved as `{prior_learning_outcome}`"
                 )
-            updated = updated.rstrip()
-            updated += (
-                f"\n\n- {timestamp} — Consolidated `{args.retire}`; "
-                f"archive `artifacts/consolidated/{args.retire}/`; "
-                f"mapping `artifacts/{mapping.name}`; {learning_event}.\n"
+            locale = record_locale(updated)
+            consolidation_action = (
+                f"Consolidado `{args.retire}`; archivo "
+                if locale == "es"
+                else f"Consolidated `{args.retire}`; archive "
+            )
+            updated = append_history_event(
+                updated,
+                attributed_event(
+                    timestamp,
+                    consolidation_action
+                    +
+                    f"`artifacts/consolidated/{args.retire}/`; mapping "
+                    f"`artifacts/{mapping.name}`; {learning_event}",
+                    args.identity,
+                    f"semantic mapping `artifacts/{mapping.name}`",
+                    locale,
+                ),
             )
             atomic_write(canonical.path, updated.encode("utf-8"))
             shutil.rmtree(retiring_dir)
@@ -1611,14 +1860,22 @@ def close_case(args: argparse.Namespace, root: Path) -> int:
         updated = replace_frontmatter_scalar(updated, "updated-at", timestamp)
         if args.decision == "abandoned" and record.fields.get("vault-outcome") == "not-evaluated":
             updated = replace_frontmatter_scalar(updated, "vault-outcome", "none")
-        event = f"- {timestamp} — Knowledge closure `{args.decision}`; reason: {args.reason}; outstanding limitations: {args.limitations}.\n"
-        history = re.search(r"(?m)^## (?:" + "|".join(map(re.escape, HISTORY_SECTION_ALIASES)) + r")\s*$", updated)
-        if history is None:
-            raise CaseError("closure_invalid", "Case is missing History")
-        position = updated.find("\n## ", history.end())
-        if position < 0:
-            position = len(updated)
-        updated = updated[:position].rstrip() + "\n\n" + event + "\n" + updated[position:]
+        locale = record_locale(updated)
+        closure_action = (
+            f"Cierre de conocimiento `{args.decision}`; razón: {args.reason}; "
+            f"limitaciones pendientes: {args.limitations}"
+            if locale == "es"
+            else f"Knowledge closure `{args.decision}`; reason: {args.reason}; "
+            f"outstanding limitations: {args.limitations}"
+        )
+        event = attributed_event(
+            timestamp,
+            closure_action,
+            args.identity,
+            "explicit closure decision",
+            locale,
+        )
+        updated = append_history_event(updated, event)
         try:
             atomic_write(record.path, updated.encode("utf-8"))
             errors, warnings = validate_root(root, ignore_lock=True)
@@ -1695,10 +1952,15 @@ def bind_case(args: argparse.Namespace, root: Path) -> int:
         all_lines[start:end] = ["\n" + content.strip() + "\n\n"]
         updated = "".join(all_lines)
         marker = json.dumps(handoff_history_binding(entry_id, fields), ensure_ascii=False, sort_keys=True, separators=(",", ":"))
-        event = (f'- {fields["Materialized at"]} — Bound development handoff `{entry_id}`; '
+        locale = record_locale(updated)
+        bound_action = "Vinculado" if locale == "es" else "Bound"
+        recorder_label = "registrado por" if locale == "es" else "recorded by"
+        source_label = "fuente" if locale == "es" else "source"
+        event = (f'- {fields["Materialized at"]} — {bound_action} development handoff `{entry_id}`; '
                  f'story `{fields["Story ID"]}`; work item `{fields["Tracker ID"]}:{fields["Work item reference"]}`; '
                  f'repository `{fields["Repository remote"]}`; branch `{fields["Branch"]}`; '
-                 f'handoff `{fields["Handoff ID"]}`; revision `{fields["Revision"]}`.\n'
+                 f'handoff `{fields["Handoff ID"]}`; revision `{fields["Revision"]}`; '
+                 f'{recorder_label} {args.identity.display}; {source_label}: validated handoff observation.\n'
                  f'  <!-- {DEVELOPMENT_HANDOFF_HISTORY_MARKER_TOKEN} {marker} -->\n')
         history = re.search(r"(?m)^## (?:" + "|".join(map(re.escape, HISTORY_SECTION_ALIASES)) + r")\s*$", updated)
         position = updated.find("\n## ", history.end())
@@ -1757,6 +2019,12 @@ def build_parser() -> argparse.ArgumentParser:
     open_parser.add_argument("--request-summary", required=True)
     open_parser.add_argument("--timestamp")
 
+    load_parser = commands.add_parser(
+        "load",
+        help="resolve one public case and discover its optional private overlay",
+    )
+    load_parser.add_argument("--id", required=True)
+
     consolidate_parser = commands.add_parser(
         "consolidate",
         help="archive and retire one semantically reconciled duplicate",
@@ -1789,6 +2057,10 @@ def build_parser() -> argparse.ArgumentParser:
     save_parser.add_argument("--private-candidate", type=Path)
     save_parser.add_argument("--delete-private", action="store_true")
     save_parser.add_argument("--expected-private-sha256", default="absent")
+    save_parser.add_argument("--source", required=True)
+    save_parser.add_argument("--target", action="append", default=[])
+    save_parser.add_argument("--private-target", action="append", default=[])
+    save_parser.add_argument("--timestamp")
 
     commands.add_parser("validate", help="validate case-file mechanics")
     return parser
@@ -1798,8 +2070,13 @@ def main(argv: list[str] | None = None) -> int:
     try:
         args = build_parser().parse_args(argv)
         root = resolve_root(args.root, create=args.command == "open")
+        if args.command in {"open", "save", "consolidate", "close", "bind"}:
+            args.identity = effective_git_identity(root.parent)
+            args.note_locale = notes_locale(root.parent)
         if args.command == "open":
             return open_case(args, root)
+        if args.command == "load":
+            return load_case(args, root)
         if args.command == "close":
             return close_case(args, root)
         if args.command == "bind":

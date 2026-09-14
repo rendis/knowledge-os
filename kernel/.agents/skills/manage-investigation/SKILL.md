@@ -12,7 +12,8 @@ Treat `investigations/<id>/investigation.md` as the canonical, versionable case.
 1. Load `../../../90-Meta/vault-resolution.md` and run `../../../90-Meta/resolve-vault.py` relative to this skill directory. Bind one canonical `VAULT_ROOT`; use `VAULT_ROOT/investigations/` as the public root.
 2. Require `investigations/` to be eligible for tracking. Require both `.investigations-private/` and the legacy `.investigations/` to be ignored and absent from `git ls-files` when they exist.
 3. Load [references/record-contract.md](references/record-contract.md) before creating or changing a case file.
-4. Resolve `scripts/investigation-case.py` relative to this skill. Use it for Open, Save, Consolidate, Bind, Close, and validation; do not reproduce its locking or rollback logic manually.
+4. Resolve `scripts/investigation-case.py` relative to this skill. Use it for Open, Load, Save, Consolidate, Bind, Close, and validation; do not reproduce its discovery, locking, attribution, or rollback logic manually.
+5. Before a mutating route, confirm that the vault checkout has effective Git `user.name` and `user.email`. The helper enforces this gate and never changes Git configuration.
 
 Complete preflight when the public root is trackable, private and legacy roots are ignored, and the record contract is loaded.
 
@@ -46,7 +47,7 @@ Complete when the case has no equivalent active case, has a unique ID, professio
 ## Resume
 
 1. Search `investigations/` first. If only `.investigations/` contains the match, read it as legacy and require **Migrate** before any mutation.
-2. Read the entire public `investigation.md`. If the matching private overlay exists, read it too, label its provenance, and treat it as supplementary and non-authoritative. Absence of private context must not make the public case unintelligible.
+2. Invoke `load --id <id>` after selecting the case. Read the entire returned public path and, when `private.available` is true, the returned private path. This lookup is mandatory even when the user does not mention private context. Label private provenance and keep it supplementary and non-authoritative. When it is absent, state that the requested private fact is unavailable instead of inferring it; the public case must remain intelligible.
 3. When `exports/` contains drafts, load [references/export-contract.md](references/export-contract.md) and inspect their source timestamps and register references.
 4. Reconstruct authoritative state from the public frontmatter and **Current state**; use public **History** only for provenance.
 5. Report the active status, purpose, outcomes, current understanding, blockers, open questions, handoffs, stale drafts, private-overlay availability, and next useful action.
@@ -55,8 +56,8 @@ Complete when one case file is selected, draft freshness is known, and the next 
 
 ## Investigate
 
-1. Before writing, classify every proposed item: put relevant shareable knowledge in public; put only necessary sensitive context in private; omit irrelevant process chatter; exclude credential values from both. Prefer a safe abstraction in public over moving ordinary investigation content to private. An independent auditor is optional when classification remains ambiguous.
-2. Rewrite informal input as concise professional findings, decisions, questions, and history. Never persist raw conversation, hidden reasoning, embarrassment-prone phrasing, or a verbatim user request.
+1. Before writing, classify every proposed item: put relevant shareable knowledge in public; put only necessary sensitive context in private; omit irrelevant process chatter; exclude credential values from both. When a person's, customer organization's, or tenant's identity is not established as shareable, generalize it in public and retain the exact value privately only when continuation needs it. Prefer a safe abstraction in public over moving ordinary investigation content to private. Profanity, sarcasm, frustration, and unsupported personal accusations are omitted rather than moved private; preserve only the technical requirement, impact, uncertainty, or material disagreement. An independent auditor is optional when classification remains ambiguous.
+2. Rewrite informal input as concise professional findings, decisions, questions, and history. Use the smallest complete set: one source entry, only independent evidence, only questions that change the next action, only decisions actually made for this case, and only criteria needed to test the objective. Do not register obvious arithmetic as a separate inference or turn this skill's policy into a case decision. Keep each detail in one register, Current state as a brief synthesis, and History about changes rather than restating the case. Never persist raw conversation, hidden reasoning, embarrassment-prone phrasing, or a verbatim user request.
 3. Prefer repository evidence, supplied sources, and available domain procedures over recall. Separate facts, inferences, contradictions, and limitations.
 4. Treat persistent memory, prior cases, and neighboring workspaces only as discovery leads. Before using their content, confirm the source is explicitly in scope, inspect it directly, and register the verified evidence.
 5. For cell ecosystem evidence, load `map-ecosystem`, select its read-only interrogation branch, and keep resolved source repositories read-only.
@@ -64,10 +65,11 @@ Complete when one case file is selected, draft freshness is known, and the next 
 7. Maintain an explicit boundary between **current productive state** and **future/proposed state**.
 8. Maintain `vault-outcome` as evidence changes. A case is context and provenance, never proof of productive behavior.
 9. Resolve evident defaults directly. When a material decision remains ambiguous, load [references/questioning-protocol.md](references/questioning-protocol.md).
-10. After every material finding or answer, prepare complete reviewed candidate snapshots and invoke `save` with the SHA-256 values observed when public and private were read. Never edit a case in place. The helper rejects stale inputs and rolls back a failed coordinated write. Do not create a private candidate unless it contains necessary material.
-11. Preserve stable identifiers and replacement links; never renumber, recycle, or silently change meaning.
-12. Reconcile or mark every affected draft stale in the same interaction.
-13. When new evidence could change a completed learning assessment, preserve the old assessment in History and reset `learning-outcome` to `not-evaluated`.
+10. After every material finding or answer, prepare complete reviewed candidate snapshots and invoke `save` with the SHA-256 values returned by `load`, one portable `--source`, every affected public stable ID as repeated `--target` arguments, and only IDs whose restricted context changed as repeated `--private-target` arguments. Never edit a case in place. The helper resolves the effective Git identity, appends the attributed History events, advances timestamps, rejects stale inputs, and rolls back a failed coordinated write. Do not create a private candidate unless it contains necessary material.
+11. Compare the proposed snapshots with the loaded bytes before saving. Repeated input with no new material keeps both snapshots byte-identical; the helper returns `unchanged` and adds no timestamp or History event.
+12. Preserve stable identifiers and replacement links; never renumber, recycle, or silently change meaning.
+13. Reconcile or mark every affected draft stale in the same interaction.
+14. When new evidence could change a completed learning assessment, preserve the old assessment in History and reset `learning-outcome` to `not-evaluated`.
 
 Complete the iteration when every new material fact, inference, contradiction, question, decision, and scope change is represented in both the current state and chronology, current and future states remain separated, `vault-outcome` is accurate, `learning-outcome` reflects the current evidence snapshot, and every affected draft has an explicit synchronization state.
 
@@ -145,6 +147,7 @@ Complete when every candidate has an explicit outcome and each documented claim 
 - Keep `investigations/` versionable. Keep `.investigations-private/` and legacy `.investigations/` local and ignored.
 - Use the cell's configured note locale for records and drafts; keep this skill and its references in English.
 - Public is the sole source of investigation knowledge and decisions. Private is exceptional, supplementary, and safe to omit when sharing.
+- Git identity names the recorder only. Record the decision-maker or approver separately only when an inspected source establishes that role; never infer approval from the recorder.
 - Persist secret existence, location, and behavior only with values redacted. Stop before copying sensitive values into the case file.
 - Treat the investigation as context and provenance, never as evidence that a behavior exists in production.
 - Route publication, ticket creation, and other external writes through `manage-operational-workflow`; keep commits, pushes, and pull requests behind their own explicit authorization.

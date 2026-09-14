@@ -115,7 +115,7 @@ Keep these sections in this order, translated to the user's working language whe
 10. Readiness
 11. History
 
-**Current state** is the consumable snapshot. Update it in place. A development or mixed case must keep **Current productive state** and **Future/proposed state** as separate subsections; a future proposal may cite current facts for context but must not blur their status. **History** is append-only and records material inputs, findings, state changes, decision changes, attachment outcomes, exports, and publications with timestamps.
+**Current state** is the brief consumable snapshot. Update it in place and keep detail in its single register entry. A development or mixed case must keep **Current productive state** and **Future/proposed state** as separate subsections; a future proposal may cite current facts for context but must not blur their status. **History** is append-only and records material changes without repeating the resulting snapshot.
 
 ## Registers and traceability
 
@@ -130,6 +130,10 @@ Assign stable identifiers:
 - Development handoffs: `DH-001`, `DH-002`, ...
 
 An identifier is immutable after assignment. Never renumber, recycle, delete, or change the meaning of an existing identifier. A materially different claim, question, decision, criterion, attachment, or export receives the next available identifier. Preserve inactive entries with their state and replacement or resolution links so older History events and exports remain interpretable.
+
+Every material write is attributed to the vault checkout's effective Git `user.name` and `user.email`, an offset timestamp, a portable source, and all affected stable IDs. The transactional helper writes that compact History attribution. It identifies the recorder, not the person who decided, agreed, approved, or supplied the evidence. Record those roles in the relevant register only when the cited source establishes them. A migrated historical entry with no attributable source remains explicitly `recorder not recorded`; the migrator is recorded only for the migration event and is never assigned as the historical author.
+
+Before calling `save`, provide every added or changed public register ID with repeated `--target` arguments, only IDs whose restricted context changed with `--private-target`, and one `--source` that another collaborator can resolve without a local absolute path. A repeated input that changes no material meaning preserves the loaded candidate bytes exactly and produces the helper's `unchanged` result. A single new fact updates only its register, the brief Current state when needed, and one attributed History event.
 
 Each question records `open`, `resolved`, or `superseded` state. Keep open questions first. Retain resolved and superseded questions in a clearly labeled subsection of **Open questions**, with the resolving decision or evidence; a replacement question receives a new ID and reciprocal `supersedes`/`superseded-by` links.
 

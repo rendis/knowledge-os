@@ -525,6 +525,9 @@ class BootstrapEval(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "investigations"
             root.mkdir()
+            self.assertEqual(run(["git", "init", "-q", tmp]).returncode, 0)
+            self.assertEqual(run(["git", "-C", tmp, "config", "user.name", "Test Recorder"]).returncode, 0)
+            self.assertEqual(run(["git", "-C", tmp, "config", "user.email", "recorder@example.invalid"]).returncode, 0)
             opened = run(
                 [
                     sys.executable,

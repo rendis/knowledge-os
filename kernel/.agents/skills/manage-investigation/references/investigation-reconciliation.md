@@ -14,6 +14,6 @@ Review the entire combined candidate, not only conflict hunks. Re-run public/pri
 
 ## Acceptance
 
-Record one History event identifying both source revisions, the reviewed semantic conflicts, and their explicit resolutions. Apply the candidate with the helper's `save` command using the SHA-256 of canonical current. A stale-snapshot result restarts reconciliation from the new canonical snapshot.
+Record one concise History event identifying both source revisions, the reviewed semantic conflicts, and their explicit resolutions. Apply the candidate with the helper's `save` command using the SHA-256 of canonical current, both revisions as the portable source, and every affected stable ID as a target. The helper attributes the reconciliation to the effective Git recorder; that identity is not approval. A stale-snapshot result restarts reconciliation from the new canonical snapshot.
 
 Reconciliation is complete only when the full combined case validates, all contradictions have an explicit disposition, public remains understandable without private context, and no source delta was accepted merely because the textual merge was clean.
