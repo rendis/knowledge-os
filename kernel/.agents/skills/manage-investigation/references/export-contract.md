@@ -61,12 +61,12 @@ When no compatible integration exists, deliver the local Markdown draft without 
 
 A development handoff is separate from publication. Require a release-ready development or mixed story, one exact current work-item snapshot, and an explicit target remote for every repository that owns implementation work.
 
-Before materialization, require an exact repository remote and explicit overlap in the named component or implementation scope before proposing a shared worktree. A common remote alone is not enough; when overlap is absent or ambiguous, recommend a separate worktree. Compare new packages with both the current selection and existing `DH-NNN` entries from this investigation. Show compatible existing worktree paths and let the user choose reuse, a new shared worktree, or separate worktrees. Persist no grouping artifact: each story keeps its package and later `DH-NNN` identity.
+Before materialization, require an exact repository remote and explicit overlap in the named component or implementation scope before proposing a shared worktree. A common remote alone is not enough; otherwise use a separate worktree. Compare new packages with existing `DH-NNN` entries by repository and branch. Resolve a selected branch to a local path only at runtime; persist no grouping or local-path artifact.
 
 Load [the development input-bundle contract](../../manage-development-handoff/references/input-bundle.md) and create one canonical package per target under:
 
 ```text
-.investigations/<investigation-id>/handoffs/
+investigations/<investigation-id>/handoffs/
 └── <work-item-token>--<repository-basename-lower>/
 ```
 
@@ -76,7 +76,7 @@ When the target story is a directly dependent story previously reconciled from a
 
 Before delivering each exact package, perform the [question-based implementation-sufficiency check](../../manage-development-handoff/references/input-bundle.md#implementation-sufficiency). Complete recoverable source-to-package omissions during this export; pass only packages whose necessary questions have supported answers. Structural validity or successful materialization does not establish this result.
 
-Keep repository evidence flow one-way: hand only the exact package directories and the user's worktree choice to `manage-development-handoff`; the repository persists its state and evidence under `.knowledge-os-handoffs/` and sends no callback or reconciliation package. The consumer must not read or modify the investigation case, refresh the tracker, or reinterpret the story. After repository-state validation, it passes one normalized in-memory observation per handoff to the **Bind development handoff** route of `manage-investigation`. That owner alone creates or advances each stable `DH-NNN`; several entries may record the same exact worktree path while retaining distinct story and handoff identities.
+Keep repository evidence flow one-way: hand only exact package directories and the user's worktree choice to `manage-development-handoff`. After repository-state validation, it passes one normalized in-memory observation per handoff to **Bind development handoff**. The observation persists repository and branch identity; the validated local path remains in memory.
 
 ## Completion criterion
 

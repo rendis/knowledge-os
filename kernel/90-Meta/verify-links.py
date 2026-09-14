@@ -18,7 +18,7 @@ def visible_files(root: Path, pattern: str) -> list[Path]:
     files: list[Path] = []
     for path in root.rglob(pattern):
         relative = path.relative_to(root)
-        if any(part.startswith(".") for part in relative.parts):
+        if any(part.startswith(".") or part == "investigations" for part in relative.parts):
             continue
         if relative.as_posix() in EXCLUDED_ROOT_FILES:
             continue

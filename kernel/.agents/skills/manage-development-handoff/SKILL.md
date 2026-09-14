@@ -23,6 +23,7 @@ Complete preflight only when the vault, every input required by the selected rou
 - **Refresh or attach**: reuse one exact existing worktree and plan a no-op, activation, bootstrap, selective update, or a new family from the same investigation.
 - **Bind development handoff**: after validation, pass one normalized materialization observation to the case-owning route in `manage-investigation`; never write the case here.
 - **Validate**: verify an active or inactive handoff in one exact worktree without writing.
+- **Resolve branch**: map portable repository and branch identity to a locally verified worktree without writing.
 - **Set state**: update one exact handoff to `active`, `ready-for-production`, or `production` without removing it or changing another handoff.
 
 Load [the worktree lifecycle](references/worktree-lifecycle.md) when preparing or selecting worktrees. Load [the repository-state contract](references/repository-state.md) before planning, applying, validating, or changing materialized state.
@@ -68,6 +69,8 @@ No materialization or activation is complete until its exact `DH-NNN` binding pa
 ## Validate
 
 Run `validate` for each requested remote and exact worktree path. Report `valid` with the shared investigation and every handoff's ID, family, revision, state, and implementation-update summary, `inactive` when no registry exists, or the exact failed invariant. A stale managed block is invalid; refresh it through an authorized no-content-change plan rather than editing the target manually.
+
+For a portable investigation binding, first run `resolve-branch --repository-remote <remote> --branch <branch>`. A returned `derived_path` is diagnostic only; use a path only when availability is `local-verified`. Persist remote and branch back to the investigation, never the local path.
 
 Describe `valid` as repository-state and package integrity, not proof that the content is sufficient to implement. When the user asks about implementation completeness, route the exact source package to the read-only **Validate** assessment in `manage-investigation`; report any materialized-content difference separately. If that source package cannot be resolved, report sufficiency as unverified with the exact missing source. Keep the consumer out of the investigation and tracker, and preserve the read-only scope.
 

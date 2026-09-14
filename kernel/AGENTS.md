@@ -10,7 +10,7 @@ Classify the request, then select one primary skill. Use `map-ecosystem` for kno
 
 - `map-ecosystem` — query, document, synchronize, confirm tooling readiness, or answer where a fact belongs. First step is **orientation** when bootstrap is incomplete.
 - `configure-workspace` — sole writer of local `.knowledge-os-config.yaml`. Onboarding is demand-triggered when a skill cannot resolve repositories or the user asks whether the workspace is initialized or configured.
-- `manage-investigation` — local case files under `.investigations/`.
+- `manage-investigation` — versionable cases under `investigations/` with optional private overlays.
 - `manage-investigation-derived-learning` — assess and publish `70-Aprendizajes/` notes.
 - `manage-development-handoff` — persistent work-item worktrees and handoff files.
 - `reconcile-development-handoff` — pull one selected handoff's implementation evidence into its source case while preserving its worktree-local lifecycle state.
@@ -44,9 +44,9 @@ Instance files (`instance.yaml`, `00-Home.md`, notes under `10/`–`70/`) are ne
 - Business flows live in `30-Flujos/`; human procedures live in `60-Operacion/`.
 - Author skills and this file with `writing-for-agents`. Keep harness-portable: no provider-specific metadata.
 
-## Local stores (Git-ignored)
+## Investigation and local stores
 
-`.investigations/` · `.operations/` · `.knowledge-os-handoffs/` · `.plan/` · `.knowledge-os-config.yaml`
+`investigations/` is versionable but excluded from the knowledge graph. Local ignored stores are `.investigations-private/` · legacy `.investigations/` · `.operations/` · `.knowledge-os-handoffs/` · `.plan/` · `.knowledge-os-config.yaml`.
 
 Local implementation plans belong only in `.plan/`. Never create a visible
 `plan/` directory inside a cell vault: Obsidian indexes it as graph content.

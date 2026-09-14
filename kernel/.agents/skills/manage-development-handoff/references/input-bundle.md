@@ -35,7 +35,7 @@ Before materializing an exact package, require the producer's implementation-suf
 Create one package per work item and target repository. Packages from the same investigation and repository may later share one worktree; they never share a family directory:
 
 ```text
-.investigations/<investigation-id>/handoffs/
+investigations/<investigation-id>/handoffs/
 └── <work-item-token>--<repository-basename-lower>/
     ├── bundle.yaml
     ├── work-item.md
@@ -146,7 +146,7 @@ After `validate` succeeds, the consumer assembles one normalized in-memory obser
 
 - package path, investigation ID, and story ID;
 - exact tracker ID, provider, canonical tracker URL, and provider-native reference;
-- normalized repository remote and absolute worktree path;
+- normalized repository remote and exact branch for persistence, plus the validated absolute worktree path only as runtime context;
 - handoff ID, family, revision, and `materialized_at` derived from the validated manifest `updated-at`.
 
 Pass that observation to the **Bind development handoff** route of `manage-investigation`. The consumer never opens or edits the case, and the repository neither returns evidence nor invokes a case workflow: it only persists inspectable evidence under `.knowledge-os-handoffs/`. A repository-side lifecycle request may use `manage-development-handoff` **Set state** because that operation writes only the selected worktree registry entry; it does not bind or reconcile the case. If the case owner cannot validate the binding, classify the target as `materialized-unbound`, preserve its active materialized state, and stop before claiming completion. Retry binding only from a new successful repository-state validation; do not persist a return package or infer identity from branch names or messages.

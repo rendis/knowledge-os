@@ -17,7 +17,7 @@ Select exactly one:
 | `extractable` | The durable-learning gate passes and the candidate adds a non-obvious, reusable, bounded conclusion. | Select `create`, `enrich`, `challenge`, or `supersede`. |
 | `no-learning` | The relevant sources and context are sufficient, but the resolved result is trivial, purely case-specific, only restates a delivery fact, or does not improve a future decision. | `none`. |
 | `already-covered` | A canonical note already contains the same teaching, applicability boundary, and materially equivalent evidence or stronger evidence. | `none`; identify the note and why the new material adds nothing. |
-| `insufficient-evidence` | A required source is missing or unreadable, the investigation is unfinished, the comparison is not reproducible, context is too incomplete, decisive evidence exists only under `.investigations/` or another transient/local location, or a possible contradiction lacks enough support to qualify as a durable challenge. | `none`; name the exact missing source or context and the retry condition. |
+| `insufficient-evidence` | A required source is missing or unreadable, the investigation is unfinished, the comparison is not reproducible, context is too incomplete, decisive evidence exists only in investigation narrative or another transient/local location, or a possible contradiction lacks enough support to qualify as a durable challenge. | `none`; name the exact missing source or context and the retry condition. |
 
 Do not collapse `insufficient-evidence` into `no-learning`: the former is retryable; the latter is a substantive conclusion after sufficient review. Do not collapse `already-covered` into `no-learning`: deduplication is useful evidence that the knowledge system worked.
 
@@ -62,7 +62,7 @@ Evaluate the candidate against:
 
 The investigation may organize those references, but its prose, a story, an approval, or an undeployed commit does not independently satisfy the gate.
 
-A reproducible method qualifies only when its procedure, inputs, and criteria are preserved in a durable/versioned source or can be rerun from versioned tooling. Content under ignored local workspaces — including `.investigations/`, `.operations/`, `.knowledge-os-handoffs/`, and `.plan/` — is provenance or working state; it cannot occupy `Fuentes durables` or independently support `extractable`.
+A reproducible method qualifies only when its procedure, inputs, and criteria are preserved in a durable/versioned source or can be rerun from versioned tooling. Investigation narrative and ignored local workspaces — including `.investigations-private/`, legacy `.investigations/`, `.operations/`, `.knowledge-os-handoffs/`, and `.plan/` — cannot independently support `extractable`.
 
 ## Required response
 

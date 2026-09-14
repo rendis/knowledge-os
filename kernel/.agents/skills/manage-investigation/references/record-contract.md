@@ -7,13 +7,15 @@ Load this reference before creating or changing an investigation.
 Generate an immutable ID as `YYYYMMDD-HHmmss-<slug>` in local time. Normalize the slug to lowercase ASCII words separated by hyphens. If the directory exists, append `-02`, `-03`, and the first available two-digit suffix.
 
 ```text
-.investigations/
+investigations/
 └── <investigation-id>/
     ├── investigation.md
     ├── artifacts/
     ├── exports/
     └── handoffs/
 ```
+
+The public directory is canonical and versionable. A necessary private overlay may exist at `.investigations-private/<investigation-id>/private.md`; it is ignored, supplementary, and may contain only `id`, `authority: private-overlay`, `updated-at`, and the ordered sections **Sensitive context**, **Private references**, and **History**. It must not restate or override public decisions, evidence, status, scope, acceptance criteria, or history. Do not create an empty overlay.
 
 Do not maintain a separate index. Resume by searching `investigation.md` frontmatter and content in this order: exact `id`, exact entry in `consolidated-from`, exact `source-ref`, then title or keywords. Require user selection only for multiple matches.
 
@@ -93,7 +95,7 @@ After its exact snapshot, unique artifacts, drafts, and register mapping are pre
 
 Keep these sections in this order, translated to the user's working language when instantiated:
 
-1. Original request
+1. Request summary
 2. Current state
    - Objective
    - Scope
@@ -133,7 +135,7 @@ Each question records `open`, `resolved`, or `superseded` state. Keep open quest
 
 Each evidence entry states its claim, category (`fact`, `inference`, `contradiction`, or `limitation`), source, and relevant location such as file, section, page, line, URL, or revision. Link decisions and acceptance criteria to supporting identifiers when available.
 
-Each materialized development target has one stable entry under **Development handoffs**. Allocate a new `DH-NNN` for a new story-and-repository identity; update that same entry when a later materialization advances its current revision. Entries from the same investigation and repository may share an exact worktree path; their story, work-item, handoff, family, and revision identities remain distinct. Record these fields exactly:
+Each materialized development target has one stable entry under **Development handoffs**. Allocate a new `DH-NNN` for a new story-and-repository identity; update that same entry when a later materialization advances its current revision. Entries from the same investigation and repository may share a branch; their story, work-item, handoff, family, and revision identities remain distinct. Record these fields exactly:
 
 ```text
 ### DH-001 — <tracker-id>:<work-item-reference> / <repository basename>
@@ -144,7 +146,7 @@ Each materialized development target has one stable entry under **Development ha
 - Tracker URL: <canonical tracker URL>
 - Work item reference: <exact provider-native reference>
 - Repository remote: <normalized remote>
-- Worktree path: <exact absolute worktree path>
+- Branch: <exact Git branch>
 - Handoff ID: <exact handoff ID>
 - Family: <exact family>
 - Revision: <vNNNN>
@@ -154,15 +156,15 @@ Each materialized development target has one stable entry under **Development ha
 The same History event that creates or advances a binding includes one exact marker on its own two-space-indented line:
 
 ```text
-- <materialized-at> — <action in the cell note locale> development handoff `DH-001`; story `S-NNN`; work item `<tracker-id>:<reference>`; repository `<remote>`; worktree `<absolute-path>`; handoff `<handoff-id>`; revision `<vNNNN>`.
-  <!-- knowledge-os:development-handoff-binding {"dh":"DH-001","family":"<family>","handoff-id":"<handoff-id>","materialized-at":"<timestamp>","provider":"<provider>","repository-remote":"<remote>","revision":"<vNNNN>","story-id":"<S-NNN>","tracker-id":"<tracker-id>","tracker-url":"<tracker-url>","work-item-reference":"<reference>","worktree-path":"<absolute-path>"} -->
+- <materialized-at> — <action in the cell note locale> development handoff `DH-001`; story `S-NNN`; work item `<tracker-id>:<reference>`; repository `<remote>`; branch `<branch>`; handoff `<handoff-id>`; revision `<vNNNN>`.
+  <!-- knowledge-os:development-handoff-binding {"branch":"<branch>","dh":"DH-001","family":"<family>","handoff-id":"<handoff-id>","materialized-at":"<timestamp>","provider":"<provider>","repository-remote":"<remote>","revision":"<vNNNN>","story-id":"<S-NNN>","tracker-id":"<tracker-id>","tracker-url":"<tracker-url>","work-item-reference":"<reference>"} -->
 ```
 
-Use canonical compact UTF-8 JSON: keep the keys in the exact lexicographic order shown, omit structural whitespace, and allow no duplicate key. Reserved `knowledge-os:development-handoff-binding` markers may appear only in History. The surrounding History bullet starts with the marker's exact `materialized-at`, remains human-readable, names the action, and includes the exact `DH-NNN`, story, work-item identity, repository remote, worktree path, handoff ID, and revision through the labelled fragments shown above. An incidental value occurrence inside another coordinate does not satisfy its role. Keep exactly one event and marker per materialized content revision, in actual `v0001` through current-revision order. The current marker must match every field in the current register entry; older markers preserve their observed worktree path and timestamp while retaining the stable story, work-item, repository, handoff, and family identity.
+Use canonical compact UTF-8 JSON: keep the keys in the exact lexicographic order shown, omit structural whitespace, and allow no duplicate key. Reserved `knowledge-os:development-handoff-binding` markers may appear only in History. The surrounding History bullet starts with the marker's exact `materialized-at`, remains human-readable, names the action, and includes the exact `DH-NNN`, story, work-item identity, repository remote, branch, handoff ID, and revision through the labelled fragments shown above. Keep exactly one event and marker per materialized content revision, in actual `v0001` through current-revision order. The current marker must match every field in the current register entry; older markers preserve their observed branch and timestamp while retaining stable identity.
 
 An activation or idempotent binding retry of the exact already-recorded revision and coordinates is a byte-level case no-op: validate the existing current entry and marker, but append no History event and no duplicate marker. A same-revision observation that changes any recorded coordinate or timestamp is a conflict, not an activation.
 
-This register is the vault-owned locator for later reconciliation. Populate it only from the same vault-side materialization result after validation; do not infer it from branch names, repository messages, or a callback. History records every new or advanced binding so prior paths and revisions remain interpretable.
+This register is the vault-owned locator for later reconciliation. Populate it only from the same vault-side materialization result after validation; do not infer availability from a branch name, repository message, or callback. History records every new or advanced binding so prior branches and revisions remain interpretable.
 
 For a reconciled implementation, keep one source implementation card and one card per directly dependent work item in **Affected surfaces**. Each dependent card names the exact typed-relation direction, consumer contracts, what can start, remaining gaps, repository/branch/PR observations, and `ready`, `partial`, `still-blocked`, or `not-applicable` readiness. These cards are case context, not tracker status changes or production evidence.
 
@@ -174,7 +176,7 @@ Treat decision statements as immutable. A decision records date, state (`active`
 
 ## Attachments
 
-Prefer an exact byte-for-byte copy in `artifacts/`, named `A-<number>-<safe-original-name>`. Record original name, origin, capture time, copied path, and SHA-256 when the environment can calculate it.
+Classify an attachment before copying it. Put an exact byte-for-byte copy in public `artifacts/` only after reviewing that the entire file is shareable and contains no credential value or local-environment detail. For sensitive necessary material, keep only a protected reference in the private overlay; otherwise omit it. Name public copies `A-<number>-<safe-original-name>` and record a portable origin, capture time, repository-relative copied path, and SHA-256.
 
 If copying fails but reading succeeds, offer a source summary created from [../assets/source-summary-template.md](../assets/source-summary-template.md). Mark it explicitly as a summary and record:
 
@@ -189,9 +191,20 @@ For a large source, summarize the material relevant to the investigation objecti
 
 If reading fails, record only observable metadata and the access failure, move to `blocked`, and ask the user to grant access, upload again, replace, remove, or explicitly continue without the source. Do not infer or summarize unread content.
 
+## Persistence classification
+
+Before every write, classify proposed content:
+
+- Public: relevant, shareable, professionally worded investigation knowledge needed to understand state, evidence, decisions, or next steps.
+- Private: only sensitive context necessary to continue the case that cannot be safely generalized in public. It is never authoritative.
+- Omit: transcripts, hidden reasoning, incidental local details, informal phrasing, and process chatter that do not improve the investigation.
+- Forbidden: credentials, tokens, private keys, cookies, and equivalent secret values in either store.
+
+Use repository remote and branch as portable development identity. Record an observed commit only when it identifies the exact evidence behind a claim. Never persist an absolute worktree path. A derived location is only a candidate until current Git inspection proves the repository and branch are present there.
+
 ## Sensitive material
 
-Inspect before persisting. When a source exposes credentials, tokens, private keys, cookies, or equivalent secrets, record only their redacted existence, location, and behavioral relevance. Keep the value out of case files, artifacts, summaries, exports, logs, and responses.
+Inspect before persisting. When a source exposes credentials, tokens, private keys, cookies, or equivalent secrets, record only their redacted existence, protected location, and behavioral relevance. Keep the value out of public and private case files, artifacts, summaries, exports, logs, and responses.
 
 ## Completion criterion
 

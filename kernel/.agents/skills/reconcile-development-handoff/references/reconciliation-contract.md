@@ -35,7 +35,7 @@ Never reinterpret routine progress as a scope change to make the changelog look 
 Pass one context object conceptually containing:
 
 - source identity: investigation ID and timestamp, story ID, tracker ID/provider/URL, provider-native work-item reference and current timestamp, handoff family/revision, repository remote;
-- vault binding: `DH-NNN`, exact absolute worktree path, registered handoff ID, and the identity comparison against `ACTIVE.yaml`;
+- vault binding: `DH-NNN`, repository remote, branch, registered handoff ID, and the identity comparison against `ACTIVE.yaml`; the resolved local path is runtime-only;
 - local snapshot binding: the `closure_fingerprint` returned before inspection and revalidated immediately before the case write;
 - baseline summary and cited current history event;
 - every changelog entry with its source, justification/agreement, optional real analysis, impact, evidence, and relationships;

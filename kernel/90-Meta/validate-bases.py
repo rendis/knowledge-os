@@ -95,7 +95,7 @@ def collect_note_properties(root: Path) -> set[str]:
     for path in root.rglob("*.md"):
         relative_path = path.relative_to(root)
         if (
-            any(part.startswith(".") for part in relative_path.parts)
+            any(part.startswith(".") or part == "investigations" for part in relative_path.parts)
             or (relative_path.parts and relative_path.parts[0] == "plan")
         ):
             continue

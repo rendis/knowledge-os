@@ -30,7 +30,7 @@ LINK_FIELDS = (
     "aplica-a",
     "sistema",
 )
-SKIP_PARTS = {".git", ".agents", ".obsidian", ".operations", "plan"}
+SKIP_PARTS = {".git", ".agents", ".obsidian", ".operations", "investigations", "plan"}
 
 
 def _load_verify():
@@ -116,7 +116,7 @@ def hygiene(root: Path) -> dict[str, Any]:
 
 def investigations(root: Path, node: str) -> dict[str, Any]:
     matches: list[dict[str, str]] = []
-    store = root / ".investigations"
+    store = root / "investigations"
     if not store.is_dir():
         return {"node": node, "investigations": []}
     needle = node.casefold()

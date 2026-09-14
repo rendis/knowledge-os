@@ -1,26 +1,27 @@
 ---
 name: manage-investigation
-description: Maintain persistent local case files. Use when a user wants to open or resume an investigation from a request or attachment, refine it with evidence and decisions, reconcile a development handoff after implementation, consolidate duplicate cases, validate readiness, export technical or user stories or repository-specific development packages, assess investigation-derived learning, or assess a documentation candidate under the cell evidence profile for independent promotion to the vault.
+description: Maintain shareable investigation case files with an optional private overlay. Use when a user wants to open, resume, migrate, reconcile, merge, validate, export, learn from, or promote an investigation.
 ---
 
 # Manage investigations
 
-Treat each investigation as a durable case file: keep its current understanding ready to consume and its chronology append-only.
+Treat `investigations/<id>/investigation.md` as the canonical, versionable case. An optional `.investigations-private/<id>/private.md` may add necessary sensitive context but never overrides public status, evidence, decisions, acceptance criteria, or history.
 
 ## Preflight
 
-1. Load `../../../90-Meta/vault-resolution.md` and run `../../../90-Meta/resolve-vault.py` relative to this skill directory. Bind one canonical `VAULT_ROOT`; use only `VAULT_ROOT/.investigations/` as the case-file root.
-2. Before the first write, run `git check-ignore .investigations/` from `VAULT_ROOT` and require output proving the path is ignored.
-3. From `VAULT_ROOT`, run `git ls-files '.investigations/**'` and require empty output. Stop and report any tracked path.
-4. Load [references/record-contract.md](references/record-contract.md) before creating or changing a case file.
-5. Resolve `scripts/investigation-case.py` relative to this skill. Use it for Open, Consolidate, and mechanical validation; do not reproduce its locking, archive, or rollback logic manually.
+1. Load `../../../90-Meta/vault-resolution.md` and run `../../../90-Meta/resolve-vault.py` relative to this skill directory. Bind one canonical `VAULT_ROOT`; use `VAULT_ROOT/investigations/` as the public root.
+2. Require `investigations/` to be eligible for tracking. Require both `.investigations-private/` and the legacy `.investigations/` to be ignored and absent from `git ls-files` when they exist.
+3. Load [references/record-contract.md](references/record-contract.md) before creating or changing a case file.
+4. Resolve `scripts/investigation-case.py` relative to this skill. Use it for Open, Save, Consolidate, Bind, Close, and validation; do not reproduce its locking or rollback logic manually.
 
-Complete preflight only when `VAULT_ROOT` is canonical, the local store is ignored, no investigation file is tracked, and the record contract is loaded.
+Complete preflight when the public root is trackable, private and legacy roots are ignored, and the record contract is loaded.
 
 ## Route the request
 
 - **Open**: create a case file from a message, bug, ticket, issue, or attachment.
 - **Resume**: find a case file by exact `id`, then `consolidated-from`, source reference, title, or keywords. Present candidates only when several match.
+- **Migrate**: when explicitly requested, load [references/migration.md](references/migration.md) and transform selected legacy cases without changing them.
+- **Reconcile collaboration**: before accepting concurrent contributions, load [references/investigation-reconciliation.md](references/investigation-reconciliation.md).
 - **Investigate**: gather evidence, refine the current understanding, resolve contradictions, and record decisions.
 - **Bind development handoff**: own the case binding decision for one validated materialization or activation result; mutate only for a new or advanced revision.
 - **Reconcile development**: consume one normalized result from `reconcile-development-handoff` and update the exact source case.
@@ -37,48 +38,51 @@ Use no parallel index. Interrogation may call `90-Meta/graph-query.py investigat
 
 1. Load [references/deduplication-and-consolidation.md](references/deduplication-and-consolidation.md), derive the immutable ID and stable `dedupe-key`, classify `purpose`, set the initial `vault-outcome` and `learning-outcome: not-evaluated`, then invoke the helper's `open` command.
 2. Resolve semantic ambiguity before invoking the helper. Route `definite_match` to **Resume** and continue only from `created`.
-3. Preserve the original request when safe, capture its source, and process attachments under the record contract.
+3. Formalize only the relevant request. Do not preserve the conversation transcript or literal informal wording. Capture a durable source reference when available and process attachments under the record contract.
 4. Set `status: intake`. Resolve `purpose: undecided` before moving to `investigating`; `vault-outcome: not-evaluated` may remain while the investigation still lacks the evidence needed to assess a durable current-state candidate.
 
-Complete when the case file has no equivalent active case, has a unique ID, original request, source, objective, scope, purpose, initial vault and learning outcomes, attachment decisions, and its creation event in History, and the open gate is released.
+Complete when the case has no equivalent active case, has a unique ID, professional request summary, source, objective, scope, purpose, initial outcomes, attachment decisions, and creation history.
 
 ## Resume
 
-1. Read the entire matching `investigation.md` before acting.
-2. When `exports/` contains drafts, load [references/export-contract.md](references/export-contract.md) and inspect their source timestamps and register references.
-3. Reconstruct the current state from frontmatter and **Current state**; use **History** only for provenance.
-4. Report the active status, purpose, vault outcome, learning outcome, current understanding, blockers, open questions, registered development handoffs, stale drafts, and next useful action.
+1. Search `investigations/` first. If only `.investigations/` contains the match, read it as legacy and require **Migrate** before any mutation.
+2. Read the entire public `investigation.md`. If the matching private overlay exists, read it too, label its provenance, and treat it as supplementary and non-authoritative. Absence of private context must not make the public case unintelligible.
+3. When `exports/` contains drafts, load [references/export-contract.md](references/export-contract.md) and inspect their source timestamps and register references.
+4. Reconstruct authoritative state from the public frontmatter and **Current state**; use public **History** only for provenance.
+5. Report the active status, purpose, outcomes, current understanding, blockers, open questions, handoffs, stale drafts, private-overlay availability, and next useful action.
 
 Complete when one case file is selected, draft freshness is known, and the next action follows the current state without reviving superseded understanding.
 
 ## Investigate
 
-1. Prefer repository evidence, supplied sources, and available domain procedures over recall. Separate facts, inferences, contradictions, and limitations.
-2. Treat persistent memory, prior cases, and neighboring workspaces only as discovery leads. Before using their content, confirm the source is explicitly in scope, inspect it directly, and register the verified evidence. Never treat memory, path proximity, or an unrelated local project as evidence or authorization.
-3. For cell ecosystem evidence, load `map-ecosystem`, select its read-only interrogation branch, and keep resolved source repositories read-only.
-4. For current work-item evidence, load `../../../90-Meta/work-item-evidence.md` and apply its narrow read-only contract directly; do not create an operational run for evidence collection.
-5. Maintain an explicit boundary between **current productive state** and **future/proposed state**. For `purpose: development` or `mixed`, represent both independently; decisions and acceptance criteria for future work never become facts.
-6. Maintain `vault-outcome` as evidence changes. Apply the evidence-profile eligibility rules in **Promote**: proposals remain deferred; inspected source behavior may qualify under `documented-source` before deployment. An eligible fact is at most `candidate-for-audit` until `map-ecosystem` independently verifies it. In a mixed case, this field follows the current-state candidate when one exists, while the future portion remains explicitly deferred and outside the vault.
-7. Resolve evident defaults directly. When a material decision remains ambiguous, load [references/questioning-protocol.md](references/questioning-protocol.md).
-8. After every material finding or answer, update **Current state**, `updated-at`, the affected registers, and append one History event.
-9. Preserve stable identifiers and replacement links; never renumber, recycle, or silently change the meaning of a registered item.
-10. When existing drafts reference changed material, load [references/export-contract.md](references/export-contract.md) and reconcile or mark every affected draft stale in the same interaction. Record the outcome in History.
-11. When new evidence, context, or a decision could change a completed learning assessment, preserve that assessment in History and reset `learning-outcome` to `not-evaluated`.
+1. Before writing, classify every proposed item: put relevant shareable knowledge in public; put only necessary sensitive context in private; omit irrelevant process chatter; exclude credential values from both. Prefer a safe abstraction in public over moving ordinary investigation content to private. An independent auditor is optional when classification remains ambiguous.
+2. Rewrite informal input as concise professional findings, decisions, questions, and history. Never persist raw conversation, hidden reasoning, embarrassment-prone phrasing, or a verbatim user request.
+3. Prefer repository evidence, supplied sources, and available domain procedures over recall. Separate facts, inferences, contradictions, and limitations.
+4. Treat persistent memory, prior cases, and neighboring workspaces only as discovery leads. Before using their content, confirm the source is explicitly in scope, inspect it directly, and register the verified evidence.
+5. For cell ecosystem evidence, load `map-ecosystem`, select its read-only interrogation branch, and keep resolved source repositories read-only.
+6. For current work-item evidence, load `../../../90-Meta/work-item-evidence.md` and apply its narrow read-only contract directly.
+7. Maintain an explicit boundary between **current productive state** and **future/proposed state**.
+8. Maintain `vault-outcome` as evidence changes. A case is context and provenance, never proof of productive behavior.
+9. Resolve evident defaults directly. When a material decision remains ambiguous, load [references/questioning-protocol.md](references/questioning-protocol.md).
+10. After every material finding or answer, prepare complete reviewed candidate snapshots and invoke `save` with the SHA-256 values observed when public and private were read. Never edit a case in place. The helper rejects stale inputs and rolls back a failed coordinated write. Do not create a private candidate unless it contains necessary material.
+11. Preserve stable identifiers and replacement links; never renumber, recycle, or silently change meaning.
+12. Reconcile or mark every affected draft stale in the same interaction.
+13. When new evidence could change a completed learning assessment, preserve the old assessment in History and reset `learning-outcome` to `not-evaluated`.
 
 Complete the iteration when every new material fact, inference, contradiction, question, decision, and scope change is represented in both the current state and chronology, current and future states remain separated, `vault-outcome` is accurate, `learning-outcome` reflects the current evidence snapshot, and every affected draft has an explicit synchronization state.
 
 ## Bind development handoff
 
-1. Accept only one normalized in-memory observation assembled by `manage-development-handoff` after its repository-state validation succeeds. Require the exact package path, investigation ID and `S-NNN`, tracker ID, provider, canonical tracker URL, provider-native work-item reference, normalized repository remote, absolute worktree path, handoff ID, family, revision, and materialization timestamp. This is vault-side workflow context, not a repository callback or durable return package.
+1. Accept only one normalized in-memory observation assembled by `manage-development-handoff` after repository-state validation succeeds. Require the package identity, investigation and story, tracker identity, normalized repository remote, exact branch, handoff ID, family, revision, and materialization timestamp. Never persist the local worktree path.
 2. Resolve the exact source case from the investigation ID, read the entire current case, and verify that the package source identity and story still match it. Reject a missing case, missing story, mismatched work-item identity, or a story-and-repository identity already bound to different immutable coordinates.
-3. Serialize the validated observation as JSON using the record contract's binding marker fields except `dh`. Invoke `scripts/investigation-case.py --root "$VAULT_ROOT/.investigations" bind --id <case-id> --observation <local-json-path>`. The public command owns locking, contiguous allocation, immutable coordinate checks, next-revision enforcement, validation, rollback, and byte-level same-revision no-op on an exact retry. Never hold the open gate around this command.
+3. Serialize the validated observation as JSON using the record contract's binding marker fields except `dh`. Invoke `scripts/investigation-case.py --root "$VAULT_ROOT/investigations" bind --id <case-id> --observation <local-json-path>`. The helper owns locking, validation, rollback, and exact-retry no-op.
 4. Binding changes only the handoff register and its History event. Preserve the case's semantic `updated-at` so registering unchanged exported content does not stale its own package or stories. The manifest timestamp remains the binding's `Materialized at` and event time. Report any binding failure to the initiating workflow; keep the materialized worktree available for exact retry.
 
 Complete only when the canonical case contains exactly one mechanically valid binding for the observed story-and-repository identity and its ordered History records every materialized content revision once. This route never reads or writes repository state, a tracker, remote Git, or the technical vault.
 
 ## Reconcile development
 
-1. Accept only one complete normalized in-memory context assembled by `reconcile-development-handoff`; require the exact case, `DH-NNN`, story, work item, repository, worktree, handoff ID, family, revision, and validated local closure fingerprint.
+1. Accept only one complete normalized in-memory context assembled by `reconcile-development-handoff`; require the exact case, `DH-NNN`, story, work item, repository, branch, handoff ID, family, revision, and validated local closure fingerprint.
 2. Load [references/development-reconciliation.md](references/development-reconciliation.md), read the entire current case, and reject any identity mismatch or missing comparison surface.
 3. Apply the assembled baseline deltas, changelog provenance, implementation/delivery/work-item evidence, and direct-dependent cards to Current state and the stable registers without re-reading or mutating the worktree. Record the closure fingerprint in the single reconciliation History event as the local snapshot binding.
 4. Reconcile affected drafts, reset a stale learning assessment when required, append one material History event, and run the case validator. Preserve a byte-level no-op when nothing in the case changed.
@@ -109,8 +113,8 @@ Complete a package assessment when the supported answers and gaps are reported w
 6. Keep connector selection, external-effect authorization, publication, and read-back verification inside that operational workflow.
 7. After the handoff returns a verified result, update the local draft and History with the non-sensitive external reference and publication status.
 8. When the user requests development handoff for one or more release-ready stories, load `../../../90-Meta/work-item-evidence.md`, obtain current exact work-item snapshots, and build one repository-specific package per target from the development section of the export contract. Complete its question-based implementation-sufficiency check before handing any package to the consumer.
-9. Treat an exact repository remote as mandatory but not sufficient for sharing. Group packages only when their story/package evidence explicitly names the same component or implementation scope; when overlap is absent or ambiguous, keep separate worktree candidates. Include compatible existing `DH-NNN` entries from this investigation as reuse candidates, using their exact worktree paths. Show the user each shared, reused, and separate option and let them choose; persist no grouping record.
-10. Hand the exact package directories, choice, and any selected existing worktree path to `manage-development-handoff`; that skill owns target resolution, preview, authorization, materialization, validation, and the required handoff to **Bind development handoff**, but must not read or change this case. When Export resolves its `producer-required` intake state, continue the initiating vault-side interaction with those exact directories.
+9. Treat an exact repository remote as mandatory but not sufficient for sharing. Require overlap in the named component or implementation scope. Include compatible existing `DH-NNN` entries as reuse candidates using repository and branch identity; never persist a local path.
+10. Hand the exact package directories, choice, and selected branch to `manage-development-handoff`; that skill resolves the local path from configuration and validates Git before use.
 11. Observe the consumer's terminal state. A target is complete only after **Bind development handoff** validates its stable `DH-NNN`; `materialized-unbound` is a source-case blocker with the repository state left inspectable and active for an exact retry.
 
 Complete when each draft is current and traces to the case file and evidence, every requested external publication has either been handed off with an exact current package or observed with a verified reference recorded locally, and every materialized development target has one current package plus one exact `DH-NNN` binding or an explicit source blocker.
@@ -138,8 +142,9 @@ Complete when every candidate has an explicit outcome and each documented claim 
 
 ## Guardrails
 
-- Keep `.investigations/` local and ignored.
-- Preserve source language and use the user's working language for generated records and drafts.
+- Keep `investigations/` versionable. Keep `.investigations-private/` and legacy `.investigations/` local and ignored.
+- Use the cell's configured note locale for records and drafts; keep this skill and its references in English.
+- Public is the sole source of investigation knowledge and decisions. Private is exceptional, supplementary, and safe to omit when sharing.
 - Persist secret existence, location, and behavior only with values redacted. Stop before copying sensitive values into the case file.
 - Treat the investigation as context and provenance, never as evidence that a behavior exists in production.
 - Route publication, ticket creation, and other external writes through `manage-operational-workflow`; keep commits, pushes, and pull requests behind their own explicit authorization.

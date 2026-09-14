@@ -18,7 +18,7 @@ A closed investigation reopens only through an explicit user decision, transitio
 
 ### Intake to investigating
 
-- Original request and source are captured.
+- Request summary and source are captured without preserving a transcript.
 - Objective and initial scope are usable.
 - Every supplied attachment has a copy, summary, pending action, or explicit exclusion.
 - `purpose` is `knowledge`, `development`, or `mixed`; `undecided` cannot leave intake.
@@ -67,6 +67,6 @@ A closed investigation reopens only through an explicit user decision, transitio
 
 A status is valid only when its gate is satisfied. Use the earliest valid state; move backward when evidence invalidates a later gate.
 
-After recording the knowledge readiness evidence and explicit decision, run `investigation-case.py --root "$VAULT_ROOT/.investigations" close --id <id> --decision <complete|abandoned> --reason "<reason>" --limitations "<limitations or none>"`. This transactional command validates the case and records closure without requiring stories or exports.
+After recording the knowledge readiness evidence and explicit decision, run `investigation-case.py --root "$VAULT_ROOT/investigations" close --id <id> --decision <complete|abandoned> --reason "<formalized reason>" --limitations "<formalized limitations or none>"`. This transactional command validates the case and records closure without requiring stories or exports.
 
 An explicit `abandoned` decision may close knowledge work from any active state, including intake or blocked. Record reason and limitations; an unevaluated vault outcome becomes `none` (no promotion requested), while existing candidate/deferred outcomes are preserved. Completed outcomes still require validation.

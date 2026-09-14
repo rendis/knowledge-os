@@ -285,6 +285,8 @@ def _copytree(src: Path, dst: Path) -> None:
 
 def ensure_gitignore_lines(dest: Path) -> None:
     required = (
+        "/.investigations/",
+        "/.investigations-private/",
         "/.knowledge-os-config.yaml",
         "/.knowledge-os-config.*.tmp",
         "/.agents/state/map-ecosystem/",
@@ -331,6 +333,8 @@ def ensure_obsidian_ignore_filters(dest: Path) -> None:
     filters = [item for item in raw_filters if item not in {"plan/", "/plan/"}]
     if ".plan/" not in filters:
         filters.append(".plan/")
+    if "investigations/" not in filters:
+        filters.append("investigations/")
     payload["userIgnoreFilters"] = filters
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
@@ -451,6 +455,7 @@ def write_bootstrap(dest: Path, instance: dict[str, Any]) -> None:
                 ".obsidian/workspace.json",
                 ".obsidian/workspace-mobile.json",
                 "/.investigations/",
+                "/.investigations-private/",
                 "/.operations/",
                 "/.knowledge-os-config.yaml",
                 "/.knowledge-os-config.*.tmp",

@@ -10,8 +10,8 @@ Turn completed or sufficiently evidenced investigation work into bounded, cumula
 ## Preflight
 
 1. Load `../../../90-Meta/vault-resolution.md` and run `../../../90-Meta/resolve-vault.py` relative to this skill directory before reading any vault-relative path. Require one canonical remote- and marker-verified result, then bind every path below to its `VAULT_ROOT`; an unresolved or ambiguous vault blocks the workflow.
-2. Resolve the exact `VAULT_ROOT/.investigations/<id>/investigation.md`. Read the complete case, not only its current summary or last History entry.
-3. From `VAULT_ROOT`, confirm `.investigations/` is ignored with `git check-ignore .investigations/` and that `git ls-files '.investigations/**'` is empty. Treat the case as local provenance and a source map, never as durable proof by itself.
+2. Resolve the exact `VAULT_ROOT/investigations/<id>/investigation.md`. Read the complete public case and the optional matching private overlay when available; keep their authority distinct.
+3. Treat the case as collaborative provenance and a source map, never as proof of production behavior by itself. Do not expose private-overlay content in the learning output.
 4. Load [references/assessment-contract.md](references/assessment-contract.md), [references/learning-note-contract.md](references/learning-note-contract.md), `VAULT_ROOT/90-Meta/Convenciones.md`, and the **Gate de aprendizaje durable** in `VAULT_ROOT/90-Meta/Auditoria - Framework.md`.
 5. Load `../../../90-Meta/node-selection.md` before selecting or planning a durable target. When the conclusion depends on cell implementation context or source repositories, also load the `map-ecosystem` read-only interrogation branch and resolve every source repository through that workflow before inspecting it.
 6. Identify the requested mode:
@@ -25,7 +25,7 @@ Assessment is always read-only: do not edit the investigation, create a draft, o
 ## Assess
 
 1. State the stable problem or question and the applicability context independently of the investigation title, story, implementation, or session.
-2. Trace every candidate claim to directly inspected evidence. Use the case to locate experiments, measurements, stories, implementation revisions, deployments, and prior decisions; do not cite its narrative as a substitute for those sources. No file under `VAULT_ROOT/.investigations/` may fill `Fuentes durables`, including a manifest, runner, hash, or result bundle. The same prohibition applies to ignored local execution, handoff, and plan workspaces such as `.operations/`, `.knowledge-os-handoffs/`, and `.plan/`. Locate a durable/versioned source or reproducible versioned tooling for the decisive claim; when the local artifact is the only support, select `insufficient-evidence`.
+2. Trace every candidate claim to directly inspected evidence. Use the case to locate experiments, measurements, stories, implementation revisions, deployments, and prior decisions; do not cite its narrative as a substitute for those sources. Versioning the public case makes its provenance reviewable, not its behavioral claims true. Locate a durable primary source or reproducible versioned tooling for the decisive claim; when the case narrative or a private/local artifact is the only support, select `insufficient-evidence`.
 3. Search `70-Aprendizajes/` by question, context, `aplica-a`, dimensions, aliases in prose, and backlinks. Compare the candidate with the full existing note, including its limits and evidence entries.
 4. Apply the durable-learning gate claim by claim. Distinguish missing evidence from a fully evidenced conclusion that has no reusable teaching.
 5. Select exactly one assessment outcome and one lifecycle action from the assessment contract.

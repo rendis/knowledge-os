@@ -285,7 +285,8 @@ INVESTIGATION_ID = re.compile(
     r"^\d{8}-\d{6}-[a-z0-9]+(?:-[a-z0-9]+)*(?:-\d{2})?$"
 )
 LOCAL_IGNORED_REFERENCE = re.compile(
-    r"(?:\.investigations|\.operations|\.knowledge-os-handoffs)[/\\]"
+    r"(?:\.investigations|\.investigations-private|\.operations|\.knowledge-os-handoffs)[/\\]"
+    r"|(?<![A-Za-z0-9_.-])investigations[/\\]"
     r"|(?<![A-Za-z0-9_-])\.plan[/\\]"
 )
 LEARNING_EVIDENCE_FIELDS = (
@@ -931,6 +932,7 @@ def audit_forbidden_files(root: Path) -> list[str]:
         relative_path = path.relative_to(root)
         if (
             path.is_dir()
+            or (relative_path.parts and relative_path.parts[0] == "investigations")
             or any(part.startswith(".") for part in relative_path.parts)
         ):
             continue

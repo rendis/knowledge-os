@@ -21,7 +21,7 @@ Record:
 - exact names, schemas, payload shapes, endpoints, flags, ordering/idempotency/error behavior, migrations, and version constraints when observed and relevant;
 - what the dependent can start now without another repository investigation;
 - remaining gaps, owner/source for each gap, and the observable condition that releases it;
-- source repository normalized remote and local worktree path;
+- source repository normalized remote and branch; keep any local worktree path in runtime memory only;
 - local branch and `HEAD`;
 - observed remote branch name, remote ref and SHA, and observation method;
 - pull request URL, pull request head, base, and state, checks, and observation time when one exists;

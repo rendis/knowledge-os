@@ -1,7 +1,7 @@
 ---
 artifact-id: A-001
 kind: source-summary
-source: <path, URL, or source reference>
+source: <URL, repository-relative path with remote and revision, or durable source reference>
 original-name: <original name>
 captured-at: <ISO-8601 timestamp>
 copy-status: unavailable
