@@ -1640,7 +1640,8 @@ def save_case(args: argparse.Namespace, root: Path) -> int:
             )
             candidate = public_text.encode("utf-8")
         if private_candidate is not None and private_candidate != original_private:
-            assert private_text is not None
+            if private_text is None:
+                raise CaseError("candidate_invalid", "Private candidate must be UTF-8")
             private_text = replace_frontmatter_scalar(private_text, "updated-at", timestamp)
             private_locale = record_locale(private_text)
             action = (

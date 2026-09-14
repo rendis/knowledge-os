@@ -25,6 +25,10 @@ Schema for a cell knowledge vault. Cell identity, systems, and source prefixes l
 
 `.agents/` holds skills and stays outside the Obsidian graph. Versioned `investigations/` is also excluded from the graph: it is collaborative provenance, not canonical technical truth. Local ignored stores (`.investigations-private/`, legacy `.investigations/`, `.operations/`, `.knowledge-os-handoffs/`, `.knowledge-os-config.yaml`, `.plan/`) are not graph sources. Local plans must live in `.plan/`; never create a visible `plan/` directory in a cell vault.
 
+For the provider-independent Python lint and security gate, follow
+[[code-quality]]. It applies to maintained tooling code and complements the
+functional validators described in this document.
+
 ## Node selection
 
 Choose the type from the observed identity. Search basename, `aliases`, `nombre-raw`, and backlinks before creating a node.

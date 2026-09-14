@@ -14,7 +14,7 @@ _META = Path(__file__).resolve().parent
 if str(_META) not in sys.path:
     sys.path.insert(0, str(_META))
 
-from vault_frontmatter import read_frontmatter
+from vault_frontmatter import read_frontmatter  # noqa: E402
 
 WIKILINK = re.compile(r"\[\[([^\]|#]+)(?:#[^\]|]*)?(?:\|[^\]]*)?\]\]")
 LINK_FIELDS = (

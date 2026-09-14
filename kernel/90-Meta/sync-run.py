@@ -423,7 +423,7 @@ def load_run(state_root: Path, run_id: str) -> dict[str, Any]:
         history_path = root / "gates" / f"{run['gate_digest']}.json"
         try:
             gate = read_json(root / "gate.json")
-        except SyncError as error:
+        except SyncError:
             try:
                 gate = read_json(history_path)
             except SyncError as history_error:
@@ -1238,7 +1238,6 @@ def seal_gate(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def status(args: argparse.Namespace) -> dict[str, Any]:
-    active = run_path(args.state_root, args.run_id)
     closed = receipt_path(args.state_root, args.run_id)
     if closed.is_symlink() or closed.is_file():
         return validate_closed_receipt(args.state_root, closed, args.run_id)

@@ -2900,7 +2900,11 @@ def restore_apply_transaction(
     for relative, existed, backup, postimage in records:
         original = None
         if existed:
-            assert backup is not None
+            if backup is None:
+                raise HandoffError(
+                    "invalid_transaction_state",
+                    "An existing handoff transaction path requires a backup",
+                )
             backup_path = transaction / backup
             original = read_optional_file(backup_path, label=backup)
             if original is None:
@@ -2920,7 +2924,12 @@ def restore_apply_transaction(
         path = target / relative
         if existed:
             raw = preimages[relative]
-            assert raw is not None
+            if raw is None:
+                raise HandoffError(
+                    "invalid_transaction_state",
+                    "A required handoff transaction preimage is missing",
+                    path=relative,
+                )
             atomic_write(path, raw)
         elif path.exists() or path.is_symlink():
             if path.is_symlink() or not path.is_file():
@@ -4283,11 +4292,8 @@ def history_event_bytes(
 ) -> bytes:
     changed: list[dict[str, object]] = []
     for name in plan.changed_documents:
-        old_semantic: str | None = None
         previous_hash: str | None = None
         if plan.existing is not None:
-            old_raw = (plan.existing.family_path / name).read_bytes()
-            old_semantic = semantic_text(old_raw.decode("utf-8-sig"))
             previous_hash = plan.existing.manifest["files"][name][
                 "semantic-sha256"
             ]
@@ -4956,7 +4962,13 @@ def set_state(
             )
         active = plan["active"]
         entry = active_entry(active, handoff_id)
-        assert entry is not None
+        if entry is None:
+            raise HandoffError(
+                "plan_stale",
+                "The handoff was removed after the state update was planned",
+                exit_code=3,
+                handoff_id=handoff_id,
+            )
         entry["state"] = state
         if state == "active":
             entry["activated-at"] = now_utc()
