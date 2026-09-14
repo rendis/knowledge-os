@@ -53,3 +53,5 @@ Return, in this order:
 ## Completion criterion
 
 The question is complete when the inspected sources support the answer and remaining uncertainties are explicit. Stop when another read cannot change the answer; preserve read-only scope and create no persistent case unless continuity was requested.
+
+If this read-only inquiry establishes a material error or omission in a canonical map during an investigation, return the exact discrepancy and evidence to `manage-investigation` and its `references/map-correction.md` route. The query itself grants no write authority; an authorized correction switches explicitly to the ordinary documentation and independent-review recipe without repeating extraction.
