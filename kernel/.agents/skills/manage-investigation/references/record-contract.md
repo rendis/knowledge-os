@@ -25,6 +25,10 @@ Development reconciliation creates no reverse package under `handoffs/` or elsew
 
 ## Frontmatter
 
+Use the canonical restricted YAML form shown below: one unquoted lowercase key per
+line, with the colon immediately after the key. This keeps the helper and other
+YAML readers from assigning different meanings to ambiguous or duplicate keys.
+
 Required fields:
 
 ```yaml

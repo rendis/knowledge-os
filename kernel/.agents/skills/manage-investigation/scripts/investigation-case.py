@@ -379,8 +379,14 @@ def parse_frontmatter(text: str) -> dict[str, Any]:
         line = lines[index]
         match = re.match(r"^([a-z][a-z0-9-]*):(?:\s*(.*))?$", line)
         if match is None:
-            index += 1
-            continue
+            if not line.strip():
+                index += 1
+                continue
+            raise CaseError(
+                "frontmatter_invalid",
+                "Frontmatter must use one canonical unquoted key per line",
+                line=index + 1,
+            )
         key, raw_value = match.group(1), match.group(2) or ""
         if key in fields:
             raise CaseError(
@@ -2116,8 +2122,25 @@ def close_case(args: argparse.Namespace, root: Path) -> int:
         if args.id not in records:
             raise CaseError("case_not_found", "Exact source case does not exist")
         record = records[args.id]
-        if record.fields.get("status") == "closed":
+        current_status = str(record.fields.get("status", ""))
+        if current_status == "closed":
             raise CaseError("closure_gate_failed", "Investigation is already closed")
+        lifecycle_metadata_valid = (
+            current_status in {"investigating", "blocked"}
+            and "resume-to" not in record.fields
+            and not record.fields.get("closure-outcome")
+            and (
+                (current_status == "blocked" and bool(record.fields.get("blocked-on")))
+                or (current_status == "investigating" and not record.fields.get("blocked-on"))
+            )
+        )
+        if not lifecycle_metadata_valid:
+            raise CaseError(
+                "closure_gate_failed",
+                "Investigation lifecycle must be valid and prior public states must be "
+                "migrated to investigating before closure",
+                current=current_status,
+            )
         original = record.path.read_bytes()
         if digest_bytes(original) != args.expected_public_sha256:
             raise CaseError(

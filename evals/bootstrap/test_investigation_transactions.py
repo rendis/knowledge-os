@@ -202,6 +202,22 @@ class Transactions(unittest.TestCase):
         self.assertIn('frontmatter repeats status', rejected_duplicate.stderr)
         self.assertEqual(before, self.case.read_bytes())
 
+        semantic_duplicate = Path(self.tmp.name) / 'semantic-duplicate-status.md'
+        semantic_duplicate.write_bytes(before.replace(
+            b'status: investigating',
+            b'status: investigating\nstatus : closed',
+        ))
+        rejected_semantic_duplicate = self.run_cli(
+            'save', '--id', self.case_id,
+            '--public-candidate', str(semantic_duplicate),
+            '--expected-public-sha256', hashlib.sha256(before).hexdigest(),
+            '--private-root', str(Path(self.tmp.name) / '.investigations-private'),
+            '--source', 'synthetic YAML key ambiguity attempt', '--target', 'Q-001',
+            ok=False,
+        )
+        self.assertIn('canonical unquoted key', rejected_semantic_duplicate.stderr)
+        self.assertEqual(before, self.case.read_bytes())
+
     def test_close_rejects_history_only_evidence_reference(self):
         before = self.case.read_bytes()
         history_only = before.decode().replace(
@@ -248,6 +264,21 @@ class Transactions(unittest.TestCase):
             ok=False,
         )
         self.assertIn('existing register IDs', rejected.stderr)
+        self.assertEqual(before, self.case.read_bytes())
+
+        export.write_text(
+            f'---\nstory-id: S-001\nsource-investigation: {self.case_id}\n'
+            'source-investigation : another-case\n---\n# Story\n',
+            encoding='utf-8',
+        )
+        ambiguous = self.run_cli(
+            'close', '--id', self.case_id, '--decision', 'complete',
+            '--reason', 'Story prepared', '--limitations', 'none',
+            '--source', 'synthetic closure review', '--evidence', 'S-001',
+            '--expected-public-sha256', hashlib.sha256(before).hexdigest(),
+            ok=False,
+        )
+        self.assertIn('existing register IDs', ambiguous.stderr)
         self.assertEqual(before, self.case.read_bytes())
 
         export.write_text(
@@ -309,6 +340,30 @@ class Transactions(unittest.TestCase):
         self.assertIn('"migration": true', converted.stdout)
         self.assertIn('Migrated prior state `ready-to-export`', second.read_text())
         self.run_cli('validate')
+
+    def test_close_cannot_bypass_prior_public_lifecycle_migration(self):
+        original = self.case.read_bytes()
+        self.case.write_bytes(original.replace(
+            b'status: investigating', b'status: validating', 1
+        ))
+        legacy = self.case.read_bytes()
+        rejected = self.run_cli(
+            'close', '--id', self.case_id, '--decision', 'complete',
+            '--reason', 'Objective verified', '--limitations', 'none',
+            '--source', 'synthetic closure review', '--evidence', 'E-001',
+            '--expected-public-sha256', hashlib.sha256(legacy).hexdigest(),
+            ok=False,
+        )
+        self.assertIn('must be migrated to investigating', rejected.stderr)
+        self.assertEqual(legacy, self.case.read_bytes())
+
+        self.run_cli(
+            'transition', '--id', self.case_id, '--to', 'investigating',
+            '--reason', 'Adopt the three-state lifecycle',
+            '--source', 'requested public lifecycle migration',
+            '--expected-public-sha256', hashlib.sha256(legacy).hexdigest(),
+        )
+        self.assertIn('Migrated prior state `validating`', self.case.read_text())
 
         closed_before = self.case.read_bytes()
         self.case.write_bytes(closed_before.replace(
