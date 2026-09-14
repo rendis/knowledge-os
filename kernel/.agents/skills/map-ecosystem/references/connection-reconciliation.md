@@ -17,6 +17,7 @@ After the binding or access setup becomes available, rerun the same executor or 
 
 1. Select only connections required for the current system map, flow or investigation. Start from the repository note's `Verificaciones pendientes` item and carry forward its local claim ID, owning flow, direction, operation, protocol, resource/configuration key, environment scope, terminal behavior, unresolved question and close condition. Group selected connections by authoritative repository, provider/project, cluster context or database target so one bounded observation can resolve every directly supported item without repeated access.
 2. Search the least expensive authoritative source that can answer the question:
+   - related accepted vault notes and their cited evidence at the relevant revision;
    - versioned sibling service or caller/consumer source;
    - source pinned by the service's dependency manifest;
    - versioned IaC, schema or deployment configuration;
@@ -41,5 +42,7 @@ A configured edge proves possible routing. It does not prove deployment, success
 Do not reopen an accepted service map merely because an external end remains unknown. Reconcile another connection only when it changes the selected map, flow or investigation. A local sync reuses stable connection claim IDs for unchanged connector slots; a changed destination updates the same claim, while a genuinely added or removed connector adds or retires its own claim.
 
 ## Completion criterion
+
+For a system map or synchronization campaign, [mapping-completion.md](mapping-completion.md) defines the required scoped pass, evidence-source classification and visible coverage check.
 
 The phase is complete when every selected local connection claim has exactly one `resolved`, `partial` or `unresolved` decision, each new relationship has independently resolvable evidence, affected nodes have explicit actions, every applied note exactly matches an independently accepted final candidate, resolved items were removed from the verification list, and partial or unresolved items state their next check and close condition without weakening the accepted local map.

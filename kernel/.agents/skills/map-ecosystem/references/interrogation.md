@@ -31,6 +31,8 @@ Accept a question, proposed change, or starting node. Resolve aliases only to fi
 
 ## Recipes
 
+- **Pending work or coverage status**: use [mapping-completion.md](mapping-completion.md#report-and-stop) to compare current summaries and classify remaining questions without reopening completed extraction.
+
 - **Change impact**: start from the changed unit; inspect input/output contracts, topics, callers/callees, data, runtime, and flows; enumerate every node whose contract or behavior may require a change.
 - **Dependencies**: distinguish HTTP from messaging; use backlinks for inverse relationships instead of rebuilding manual lists.
 - **Data**: identify the resource, read/write mode, transformation rules, and participants; retain low-level strings when no durable node exists.

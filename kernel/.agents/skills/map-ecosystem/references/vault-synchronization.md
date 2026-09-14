@@ -80,4 +80,6 @@ this local workflow.
 
 Complete only after all inventory items have a persisted decision, every unit is applied, the durable receipt exists, the second inventory has no repeated inspected SHA, relevant vault checks pass, and source checkouts remain unchanged. Verify the published meaning and preserved knowledge using [evidence-extraction.md](evidence-extraction.md).
 
+The run receipt closes the Git publication transaction. Before declaring the mapping campaign complete, apply [mapping-completion.md](mapping-completion.md) for scoped reconciliation and alignment of current visible coverage.
+
 Report the run closure separately from its documentation outcome. For each repository, give the inspected commit and one result: documentation updated (with written paths), reviewed with no documentation change required, or inspection limited/review rejected (with the unresolved gap and retained note baseline). A zero `changed`/`new` count means no uninspected source delta; it does not mean every note was updated or every limitation resolved. Summarize accepted no-change and limited/rejected counts separately.

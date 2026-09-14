@@ -19,6 +19,8 @@ Classify the request, then select one primary skill. Use `map-ecosystem` for kno
 - `grilling` — one decision at a time.
 - `obsidian-cli`, `obsidian-markdown`, `obsidian-bases` — user-invoked Obsidian helpers.
 
+For mapping closure or pending-work status, follow the skill's [mapping completion contract](.agents/skills/map-ecosystem/references/mapping-completion.md).
+
 Adapters (only if listed in `instance.yaml` `adapters`):
 
 - `inspect-gcp-runtime` with `gcloud` leaf syntax.
