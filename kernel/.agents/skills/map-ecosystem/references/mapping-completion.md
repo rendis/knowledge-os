@@ -35,6 +35,10 @@ After publication and reconciliation, compare the current inventory and accepted
 
 ## Report and stop
 
+For repository campaigns with pending checklists, run `python3 -B 90-Meta/check-map-closure.py --vault <vault> --checkpoint <existing-checkpoint>` before closure or commit. In the existing checkpoint, keep current counts under `visible_coverage.remaining_verification_items` and `visible_coverage.notes_with_verifications`, and `paths` pointing to Home and its linked coverage note. Keep dated pass receipts historical; current fields describe the latest aggregate. Avoid duplicating current numbers in a free-text checkpoint scope.
+
+Each visible summary states the current aggregate once as `Remaining: N verification items in M notes.` or `Permanecen N verificaciones en M notas.` (Markdown emphasis is allowed). The checker compares those counts and the checkpoint with unchecked repository-note items; missing or conflicting counts block closure. Correct only stale summaries; preserve technical notes and historical receipts. This count check does not establish semantic completion, deduplicate questions, or replace review of the summary's scope and claims.
+
 Report separately: local mapping outcome, static reconciliation outcome, and remaining live/access/deferred questions. State whether visible coverage is aligned. Declare the campaign complete only when the scoped pass has an evidenced outcome and current summaries agree; partial or deferred knowledge is acceptable when explicit. An incomplete local pass or stale current summary remains an actionable closure task.
 
 For a read-only pending-work query, inspect the current linked summary and latest checkpoint first, compare dates and scope, then read only the relevant pending sections. Report disagreements without editing. Count raw verification items separately from deduplicated groups; classify by evidence source rather than labelling every pending item external. State the observation date of a saved inventory instead of implying a fresh remote check. Stop when this evidence answers the question; old batch logs and broad memory scans are not a prerequisite.
