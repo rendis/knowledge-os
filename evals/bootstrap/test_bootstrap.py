@@ -3344,6 +3344,9 @@ change:
         self.assertIn("load @AGENTS.personal.md when it exists", router)
         self.assertIn("local tool and agent selection", router)
         self.assertIn("delegation, monitoring, resumption and verification workflows", router)
+        self.assertIn("personal instructions take precedence over generic skill guidance", router)
+        self.assertIn("preserve that skill", router)
+        self.assertIn("record the specialization only in the personal file", router)
         self.assertGreater(
             router.index("## Personal instructions"),
             router.index("## Guardrails"),
