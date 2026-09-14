@@ -10,6 +10,8 @@ For an external verification of an already mapped connection, reuse the reposito
 
 ## Baseline
 
+For an investigation correction package backed by exact evidence of a defect at the mapped revision, perform step 1 and verify the supplied source identity/revision and affected assertions. Reuse the existing baseline and relevant evidence; skip steps 2–6 unless a concrete unresolved part of the defect needs them. In Evidence interrogation below, apply P1–P5 only to the affected meaning and directly impacted relationships, preserving the rest. Keep source analysis metadata unchanged for a correction at the same revision. A newer implementation follows the normal delta branch instead. Publication still requires independent review of complete resulting notes; a confirmed correction is not a `current` no-write outcome.
+
 For external-only reconciliation, perform step 1 and reuse the accepted source baseline; skip source inventory, acquisition and scanning in steps 2–6. Follow connection-reconciliation.md for the selected external evidence. Any discovered source contradiction becomes a separate source update, not a silent refresh of source metadata.
 
 1. Read the existing note, system MOC, flows, nearby topics/integrations/glossary terms, and backlinks. For a new target, search basenames, aliases, `nombre-raw`, and backlinks before concluding that no canonical note exists.
