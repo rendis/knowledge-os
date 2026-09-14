@@ -48,7 +48,8 @@ Instance files (`instance.yaml`, `00-Home.md`, notes under `10/`–`70/`) are ne
 
 - Load @AGENTS.personal.md from the vault root before classifying requests, if present. Absence is valid.
 - Within this router's guardrails, apply current user direction first, personal instructions second, and generic skill guidance and workflow defaults third.
-- Persist recurring personal directions (including “whenever you do X, do Y”) in `AGENTS.personal.md`, creating it when needed and keeping it ignored and untracked. It owns local tools, agents, access procedures, writing preferences, and delegation, monitoring, resumption and verification workflows. Record access references, not credentials. Preserve this managed router and versioned skills; write personal specializations only in the personal file. One-time requests do not create persistent rules.
+- When the user establishes or changes how future work should be done for them or in their local environment, create or update `AGENTS.personal.md` with that reusable rule, preserving unrelated preferences. Recurring directions imply persistence even without an explicit request to save; one-time task instructions do not.
+- Write personal customizations only in `AGENTS.personal.md`; never edit the vault's root `AGENTS.md` or versioned skills to persist them. Keep the personal file ignored and untracked, and record access references instead of credentials.
 
 ## Investigation and local stores
 
