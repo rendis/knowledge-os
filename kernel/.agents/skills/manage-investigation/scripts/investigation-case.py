@@ -72,6 +72,14 @@ DEVELOPMENT_HANDOFF_SECTION_ALIASES = (
     "Handoffs de desarrollo",
 )
 HISTORY_SECTION_ALIASES = ("History", "Historial")
+REGISTER_SECTION_ALIASES = {
+    "E": ("Evidence", "Evidencia"),
+    "A": ("References and attachments", "Referencias y adjuntos"),
+    "Q": ("Open questions", "Preguntas abiertas"),
+    "D": ("Decisions", "Decisiones"),
+    "AC": ("Acceptance criteria", "Criterios de aceptación"),
+    "DH": DEVELOPMENT_HANDOFF_SECTION_ALIASES,
+}
 DEVELOPMENT_HANDOFF_FIELDS = (
     "Story ID",
     "Tracker ID",
@@ -1451,11 +1459,37 @@ def validate_private_text(text: str, case_id: str) -> list[str]:
 
 
 def declares_register(text: str, register_id: str) -> bool:
-    """Require a current register declaration, not a History-only reference."""
+    """Require a declaration in the register's authoritative case section."""
+    prefix = register_id.rsplit("-", 1)[0]
+    aliases = REGISTER_SECTION_ALIASES.get(prefix)
+    if aliases is None:
+        return False
+    lines, count = named_section(text, aliases)
+    if count != 1 or lines is None:
+        return False
     return re.search(
         rf"(?m)^(?:-\s+|###\s+)`?{re.escape(register_id)}`?(?=$|[\s:—(])",
-        text,
+        "\n".join(lines),
     ) is not None
+
+
+def declared_export_ids(case_dir: Path, case_id: str) -> set[str]:
+    story_ids: set[str] = set()
+    for draft in (case_dir / "exports").glob("*.md"):
+        if draft.is_symlink() or not draft.is_file():
+            continue
+        try:
+            fields = parse_frontmatter(draft.read_text(encoding="utf-8"))
+        except (CaseError, OSError, UnicodeDecodeError):
+            continue
+        story_id = str(fields.get("story-id", ""))
+        if (
+            STORY_ID_RE.fullmatch(story_id)
+            and fields.get("source-investigation") == case_id
+            and draft.name.startswith(f"{story_id}-")
+        ):
+            story_ids.add(story_id)
+    return story_ids
 
 
 def save_case(args: argparse.Namespace, root: Path) -> int:
@@ -1571,8 +1605,11 @@ def save_case(args: argparse.Namespace, root: Path) -> int:
                 "Lifecycle fields must change through transition or close",
                 fields=changed_lifecycle,
             )
+        export_ids = declared_export_ids(record.path.parent, args.id)
         missing_targets = [
-            target for target in all_targets if not declares_register(public_text, target)
+            target
+            for target in all_targets
+            if not declares_register(public_text, target) and target not in export_ids
         ]
         if missing_targets:
             raise CaseError(
@@ -2096,20 +2133,7 @@ def close_case(args: argparse.Namespace, root: Path) -> int:
                 raise CaseError("closure_gate_failed", "Completion requires an evaluated vault outcome")
             if not args.evidence:
                 raise CaseError("closure_gate_failed", "Completion requires closure evidence IDs")
-        declared_exports = set()
-        for draft in (record.path.parent / "exports").glob("*.md"):
-            if draft.is_symlink() or not draft.is_file():
-                continue
-            try:
-                story_id = str(
-                    parse_frontmatter(draft.read_text(encoding="utf-8")).get(
-                        "story-id", ""
-                    )
-                )
-            except (CaseError, OSError, UnicodeDecodeError):
-                continue
-            if STORY_ID_RE.fullmatch(story_id):
-                declared_exports.add(story_id)
+        declared_exports = declared_export_ids(record.path.parent, args.id)
         invalid_evidence = [
             value
             for value in args.evidence
