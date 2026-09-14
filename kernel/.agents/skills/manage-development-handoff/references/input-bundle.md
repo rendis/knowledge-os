@@ -30,6 +30,8 @@ Absence is `producer-required`, not `invalid-package`. The consumer never opens 
 
 Before materializing an exact package, require the producer's implementation-sufficiency check below for that content and source snapshot. When it has not already run in the current workflow, route the exact directory to `manage-investigation` for a read-only assessment. Return concrete gaps to that owner; a successful helper command is not a substitute for this assessment.
 
+That producer review retains SHA-256 snapshots of the complete public case and exact source story bytes. Carry those two hashes in the workflow context to **Bind development handoff** together with the validated materialization observation. They are review inputs, not new bundle or handoff manifest fields. For subsequent targets in a shared case or a retry, the producer rechecks the source against the exact package before refreshing snapshots; a previous binding may have changed case History. A stale or missing snapshot leaves the target `materialized-unbound` until that review succeeds.
+
 ## Canonical package
 
 Create one package per work item and target repository. Packages from the same investigation and repository may later share one worktree; they never share a family directory:
