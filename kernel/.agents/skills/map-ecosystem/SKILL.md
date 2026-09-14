@@ -31,7 +31,7 @@ Choose the next action from the existing knowledge, not from the number of pendi
 - Answer from the vault and its cited evidence first. A pending-work or cost question is read-only; it does not start extraction or reconciliation.
 - Before another source read, identify the unanswered question and the missing evidence. Inspect the relevant file, dependency or configuration. A targeted symbol/resource search across configured repositories is appropriate when the owner is unknown after consulting the vault; it is not authority to extract those repositories again.
 - Reuse accepted maps. Changed source calls for delta analysis; an identified defect calls for review of the affected scope. Pending connections, new sessions and changed instructions alone do not justify remapping.
-- Close a pending item only when evidence answers its exact question. Configured wiring does not prove an active consumer or delivery. A missing source answer remains a specific evidence gap, not automatically a live-infrastructure task.
+- Before creating or reusing pending items, apply [references/evidence-sufficiency.md](references/evidence-sufficiency.md). Close material in-scope questions with sufficient evidence; explicitly retire obsolete demands without claiming they were tested. Mapping a relationship does not require observed traffic, delivery or business rows. Preserve the distinction between configured, deployed and functionally verified claims.
 - Estimate effort only from a measured relevant sample, stating its scope and uncertainty. Without one, report that cost and the deduplicated count are not yet measured; offer a bounded sample instead of invented ranges.
 
 | Request or condition | Load / action |
