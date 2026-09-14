@@ -62,6 +62,8 @@ def _stems_from_value(value: Any) -> list[str]:
 def _iter_notes(root: Path):
     for path in root.rglob("*.md"):
         parts = path.relative_to(root).parts
+        if parts == ("AGENTS.personal.md",):
+            continue
         if any(part in SKIP_PARTS or part.startswith(".") for part in parts[:-1]):
             continue
         yield path

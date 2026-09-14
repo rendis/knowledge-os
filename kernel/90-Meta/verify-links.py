@@ -11,7 +11,7 @@ from pathlib import Path
 from vault_frontmatter import split_frontmatter
 
 EXPECTED_ORPHANS = {"00-Home", "README"}
-EXCLUDED_ROOT_FILES = {"AGENTS.md", "CLAUDE.md"}
+EXCLUDED_ROOT_FILES = {"AGENTS.md", "CLAUDE.md", "AGENTS.personal.md"}
 
 
 def visible_files(root: Path, pattern: str) -> list[Path]:
