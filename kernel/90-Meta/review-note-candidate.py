@@ -367,6 +367,32 @@ def check_candidate(
     }
 
 
+def check_published(vault: Path, reviewed: list[list[Path]]) -> dict[str, object]:
+    """Check current bytes against accepted images, oldest to newest per path."""
+    vault = safe_path(vault)
+    expected: dict[str, tuple[str, bool]] = {}
+    for manifest_path, review_path in reviewed:
+        manifest = validate_manifest(read_json(safe_path(manifest_path)))
+        validate_review(read_json(safe_path(review_path)), manifest)
+        for relative, digest in manifest["candidate_files"].items():
+            expected[relative] = (digest, relative not in manifest["deleted_files"])
+    mismatches = []
+    for relative, (digest, present) in sorted(expected.items()):
+        path = contained_path(vault, note_path(relative))
+        if present:
+            matches = path.is_file() and file_digest(path) == digest
+        else:
+            matches = not path.exists()
+        if not matches:
+            mismatches.append(relative)
+    return {
+        "status": "blocked" if mismatches else "pass",
+        "code": "published-note-drift" if mismatches else "published-notes-reviewed",
+        "checked_files": len(expected),
+        "mismatches": mismatches,
+    }
+
+
 def write_json(path: Path, value: object) -> None:
     path = safe_path(path, must_exist=False)
     if not path.parent.is_dir() or path.exists() and not path.is_file():
@@ -389,6 +415,13 @@ def main() -> int:
     freeze.add_argument("--output", required=True, type=Path)
     check.add_argument("--manifest", required=True, type=Path)
     check.add_argument("--review", required=True, type=Path)
+    published = commands.add_parser("verify-published")
+    published.add_argument("--vault", required=True, type=Path)
+    published.add_argument(
+        "--reviewed", nargs=2, action="append", required=True, type=Path,
+        metavar=("MANIFEST", "REVIEW"),
+        help="Accepted pairs in publication order; the latest image owns each path.",
+    )
     args = parser.parse_args()
     try:
         if args.command == "freeze":
@@ -402,6 +435,8 @@ def main() -> int:
                 "manifest": str(args.output.absolute()),
                 "manifest_digest": canonical_digest(result),
             }
+        elif args.command == "verify-published":
+            output = check_published(args.vault, args.reviewed)
         else:
             output = check_candidate(
                 args.vault, args.candidate, args.evidence_root,

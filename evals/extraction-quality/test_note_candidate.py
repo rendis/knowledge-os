@@ -81,6 +81,53 @@ class NoteCandidateReview(unittest.TestCase):
         with self.assertRaisesRegex(tool.NoteCandidateError, "stale"):
             self.check()
 
+    def test_published_drift_and_later_review(self):
+        pairs = [[self.manifest_path, self.review_path]]
+        self.assertEqual(tool.check_published(self.vault, pairs)["status"], "blocked")
+        relative = "20-Repos/demo/service.md"
+        note = self.vault / relative
+        shutil.copyfile(self.candidate / relative, note)
+        self.assertEqual(tool.check_published(self.vault, pairs)["status"], "pass")
+        (self.candidate / relative).write_text(note.read_text() + "\nReviewed addition.\n")
+        later = tool.freeze_candidate(self.vault, self.candidate, self.evidence, ["record.json"])
+        manifest_path = self.manifest_path.with_name("later-manifest.json")
+        review_path = self.review_path.with_name("later-review.json")
+        manifest_path.write_text(json.dumps(later))
+        review = dict(self.review, manifest_digest=tool.canonical_digest(later))
+        review["connection_decisions"] = {
+            key: {"action": "preserve", "reason": "Existing connection preserved."}
+            for key in self.review["connection_decisions"]
+        }
+        review_path.write_text(json.dumps(review))
+        shutil.copyfile(self.candidate / relative, note)
+        self.assertEqual(tool.check_published(self.vault, pairs)["mismatches"], [relative])
+        pairs.append([manifest_path, review_path])
+        self.assertEqual(tool.check_published(self.vault, pairs)["status"], "pass")
+        review["verdict"] = "revise"
+        review["findings"] = [{"reason": "Not accepted."}]
+        review_path.write_text(json.dumps(review))
+        with self.assertRaises(tool.NoteCandidateError):
+            tool.check_published(self.vault, pairs)
+
+    def test_published_deletion_requires_absence(self):
+        relative = "20-Repos/demo/service.md"
+        (self.candidate / relative).unlink()
+        manifest = tool.freeze_candidate(
+            self.vault, self.candidate, self.evidence, ["record.json"],
+            deleted_paths=[relative],
+        )
+        self.manifest_path.write_text(json.dumps(manifest))
+        review = dict(self.review, manifest_digest=tool.canonical_digest(manifest))
+        review["connection_decisions"] = {
+            relative + "#connection.orders": {"action": "retire", "reason": "Retired."}
+        }
+        self.review_path.write_text(json.dumps(review))
+        pairs = [[self.manifest_path, self.review_path]]
+        (self.vault / relative).write_text("")
+        self.assertEqual(tool.check_published(self.vault, pairs)["status"], "blocked")
+        (self.vault / relative).unlink()
+        self.assertEqual(tool.check_published(self.vault, pairs)["status"], "pass")
+
     def test_base_drift_is_refused(self):
         note = self.vault / "20-Repos/demo/service.md"
         note.write_text(note.read_text().replace("Old", "Concurrent"), encoding="utf-8")
