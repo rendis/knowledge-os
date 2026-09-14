@@ -1,0 +1,3 @@
+I can’t show the current production topology from the supplied sources: no production inventory, deployment configuration, runtime discovery, or environment-specific diagram was provided.
+
+The only available topology description is explicitly synthetic: client → gateway → API, then API → queue → worker → DB, with the worker emitting an audit event. I will not present that synthetic chain as the current production topology. A production topology response requires a production source or an explicit source snapshot and as-of boundary.

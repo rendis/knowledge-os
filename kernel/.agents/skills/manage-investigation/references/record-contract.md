@@ -206,6 +206,12 @@ For a large source, summarize the material relevant to the investigation objecti
 
 If reading fails, record only observable metadata and the access failure, move to `blocked`, and ask the user to grant access, upload again, replace, remove, or explicitly continue without the source. Do not infer or summarize unread content.
 
+### Generated visual attachments
+
+A visual produced for a case is a derived view, not an exact source copy or new primary evidence. `explain-visually` prepares the reviewed visual and same-stem Markdown context; this skill owns their public placement and registration. Use one `A-NNN` entry for the logical unit, name its files `A-NNN-<safe-name>.<extension>`, and record relative paths, SHA-256 for every file including the context, generation time, supporting source/evidence IDs, and derived status. The context links to the representations and documents intent, interpretation, assumptions and limits. Embedded Markdown diagrams need no second Markdown file.
+
+Stage and validate the complete unit before replacing any retained files. Register only the reviewed revision; preserve the previous complete unit until saving the case succeeds and restore it on failure. Updates of the same purpose preserve the attachment ID and append a material revision event; a changed attachment meaning receives a new ID under the register rules. Retention does not itself perform or authorize a Git commit or push.
+
 ## Persistence classification
 
 Before every write, classify proposed content:

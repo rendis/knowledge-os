@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 360" role="img" aria-labelledby="title desc">
+  <title id="title">Atomic visual sample</title>
+  <desc id="desc">Reusable English sample showing three bounded steps: observe, explain, and check.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#006b63"/>
+    </marker>
+    <style>
+      .ink{fill:#182b33;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+      .muted{fill:#4d626b;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+      .box{fill:#fffefa;stroke:#182b33;stroke-width:1.8}
+      .box-focus{fill:#e1f0ed;stroke:#006b63;stroke-width:2.2}
+      .edge{stroke:#006b63;stroke-width:2;fill:none;marker-end:url(#arrow)}
+    </style>
+  </defs>
+  <rect width="900" height="360" fill="#f7f6f2"/>
+  <text x="48" y="50" class="ink" font-size="24" font-weight="700">Atomic visual sample</text>
+  <text x="48" y="78" class="muted" font-size="15">A reusable three-step relationship diagram</text>
+
+  <rect x="76" y="142" width="184" height="78" rx="12" class="box"/>
+  <text x="168" y="177" class="ink" font-size="19" font-weight="700" text-anchor="middle">Observe</text>
+  <text x="168" y="201" class="muted" font-size="14" text-anchor="middle">name the signal</text>
+  <path d="M 260 181 H 350" class="edge"/>
+
+  <rect x="350" y="142" width="200" height="78" rx="12" class="box-focus"/>
+  <text x="450" y="177" class="ink" font-size="19" font-weight="700" text-anchor="middle">Explain</text>
+  <text x="450" y="201" class="muted" font-size="14" text-anchor="middle">show the relationship</text>
+  <path d="M 550 181 H 640" class="edge"/>
+
+  <rect x="640" y="142" width="184" height="78" rx="12" class="box"/>
+  <text x="732" y="177" class="ink" font-size="19" font-weight="700" text-anchor="middle">Check</text>
+  <text x="732" y="201" class="muted" font-size="14" text-anchor="middle">state the boundary</text>
+
+  <line x1="48" y1="282" x2="852" y2="282" stroke="#d7dfdf"/>
+  <text x="48" y="314" class="muted" font-size="14">Reusable neutral asset · synthetic example with no external source.</text>
+</svg>

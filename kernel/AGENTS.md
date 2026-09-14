@@ -22,6 +22,7 @@ Before using an existing case as context, use the read-only case load in `manage
 - `manage-git-workflow` — own analysis and publication of the cell's Git/GitHub policy, or apply it to source repositories; routine local versioning of this vault follows repository instructions.
 - `manage-operational-workflow` — audit flow executions or an entity by date through read-only evidence; draft or execute operational procedures; resume runs in `.operations/`. Uses inspection adapters for access and queries; business actions and publication require matching authorization.
 - `inspect-database` — engine-neutral database evidence through the target’s configured runbook.
+- `explain-visually` — auxiliary static or interactive explanations when requested or materially useful; temporary aids or source-linked retained artifacts.
 - `grilling` — one decision at a time.
 - `obsidian-cli`, `obsidian-markdown`, `obsidian-bases` — user-invoked Obsidian helpers.
 

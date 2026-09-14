@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="SAMPLE editorial explainer template with an accessible architecture diagram.">
+  <title>Explainer — Sample request path</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --paper: #fbfaf6;
+      --paper-deep: #f2efe7;
+      --ink: #1e2b2a;
+      --muted: #65706d;
+      --line: #d8ddd7;
+      --teal: #087d7d;
+      --teal-dark: #075c5d;
+      --teal-pale: #dcefed;
+      --amber: #b96f26;
+      --amber-pale: #f5e5cf;
+      --shadow: 0 16px 35px rgba(30, 43, 42, .08);
+      --serif: Georgia, "Times New Roman", serif;
+      --sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html { background: var(--paper); }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--paper);
+      font-family: var(--sans);
+      font-size: 16px;
+      line-height: 1.58;
+    }
+    a { color: var(--teal-dark); }
+    :focus-visible { outline: 3px solid var(--amber); outline-offset: 4px; }
+    .page { max-width: 1220px; margin: 0 auto; padding: 0 5vw 5rem; }
+    .masthead {
+      min-height: 82px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      border-bottom: 1px solid var(--line);
+      font-size: .875rem;
+      letter-spacing: .11em;
+      text-transform: uppercase;
+    }
+    .wordmark { display: inline-flex; align-items: center; gap: .65rem; font-weight: 760; color: var(--ink); }
+    .mark { width: 25px; height: 25px; border: 2px solid var(--teal); border-radius: 50%; position: relative; }
+    .mark::after { content: ""; position: absolute; width: 7px; height: 7px; background: var(--amber); border-radius: 50%; top: 7px; left: 7px; }
+    .sample-label { color: var(--amber); font-weight: 760; }
+    .intro { max-width: 840px; padding: clamp(3.5rem, 9vw, 8rem) 0 4rem; }
+    .kicker { margin: 0 0 1.1rem; color: var(--teal-dark); font-size: .875rem; font-weight: 780; letter-spacing: .13em; text-transform: uppercase; }
+    h1, h2, h3 { margin: 0; font-family: var(--serif); font-weight: 500; line-height: 1.05; letter-spacing: -.025em; }
+    h1 { max-width: 780px; font-size: clamp(3rem, 7vw, 6.4rem); }
+    .dek { max-width: 640px; margin: 2rem 0 0; color: var(--muted); font-size: clamp(1.12rem, 1.8vw, 1.35rem); line-height: 1.55; }
+    .rule { width: 72px; height: 5px; margin-top: 2.4rem; background: var(--amber); }
+    .story-grid { display: grid; grid-template-columns: minmax(0, 1fr) 235px; gap: clamp(2.5rem, 7vw, 7rem); align-items: start; }
+    article { min-width: 0; }
+    .section-number { display: block; margin-bottom: .85rem; color: var(--teal); font-size: .875rem; font-weight: 800; letter-spacing: .12em; }
+    h2 { font-size: clamp(2rem, 4vw, 3.3rem); }
+    h3 { font-size: 1.7rem; }
+    .prose { max-width: 660px; }
+    .prose p { margin: 1.2rem 0; }
+    .prose .lead { color: var(--muted); font-size: 1.18rem; }
+    .architecture {
+      margin: 3.25rem 0 4.5rem;
+      padding: clamp(1.1rem, 3vw, 2rem);
+      border-top: 1px solid var(--ink);
+      border-bottom: 1px solid var(--line);
+      background: #fffefa;
+      box-shadow: var(--shadow);
+    }
+    .figure-head { display: flex; justify-content: space-between; gap: 1rem; align-items: baseline; margin-bottom: 1rem; }
+    .figure-head h3 { font-size: 1.55rem; }
+    .figure-head span { color: var(--muted); font-size: .875rem; }
+    .architecture svg { display: block; width: 100%; height: auto; min-height: 280px; }
+    .architecture .mobile-diagram { display: none; }
+    .architecture figcaption { max-width: 680px; margin-top: 1rem; color: var(--muted); font-size: .93rem; }
+    .annotation { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; margin: 2rem 0 0; border-top: 1px solid var(--line); background: var(--line); }
+    .annotation > div { padding: 1.15rem 1rem; background: #fffefa; }
+    .annotation strong { display: block; color: var(--teal-dark); font-size: .875rem; letter-spacing: .08em; text-transform: uppercase; }
+    .annotation p { margin: .45rem 0 0; font-size: .94rem; }
+    .pullquote { margin: 4rem 0; padding: 1.5rem 0 1.5rem 1.7rem; border-left: 4px solid var(--amber); font-family: var(--serif); font-size: clamp(1.55rem, 3vw, 2.25rem); line-height: 1.18; }
+    .pullquote cite { display: block; margin-top: 1.2rem; color: var(--muted); font: 600 .875rem/1.4 var(--sans); letter-spacing: .1em; text-transform: uppercase; }
+    .replace-note { margin-top: 3rem; padding: 1rem 1.1rem; border: 1px dashed #d6aa76; background: var(--amber-pale); color: #704518; font-size: .92rem; }
+    .replace-note strong { letter-spacing: .07em; text-transform: uppercase; }
+    .rail { position: sticky; top: 1.5rem; padding-top: .4rem; border-top: 3px solid var(--teal); }
+    .rail h2 { font: 760 .875rem/1.3 var(--sans); letter-spacing: .14em; text-transform: uppercase; }
+    .rail ol { margin: 1.2rem 0 0; padding: 0; list-style: none; counter-reset: map; }
+    .rail li { display: grid; grid-template-columns: 2rem 1fr; gap: .4rem; padding: .8rem 0; border-bottom: 1px solid var(--line); color: var(--muted); font-size: .92rem; }
+    .rail li::before { counter-increment: map; content: counter(map, decimal-leading-zero); color: var(--amber); font-weight: 800; }
+    .rail .meta { margin-top: 2rem; color: var(--muted); font-size: .875rem; }
+    footer { display: flex; justify-content: space-between; gap: 1rem; margin-top: 5rem; padding-top: 1.2rem; border-top: 1px solid var(--ink); color: var(--muted); font-size: .875rem; }
+    @media (max-width: 760px) {
+      .page { padding: 0 1.15rem 3.5rem; }
+      .masthead { min-height: 68px; }
+      .masthead .sample-label { max-width: 42%; text-align: right; }
+      .intro { padding: 3.75rem 0 3rem; }
+      .story-grid { display: flex; flex-direction: column; gap: 3rem; }
+      .rail { position: static; width: 100%; order: -1; padding: 1rem 0 0; border-top-width: 2px; }
+      .rail ol { display: grid; grid-template-columns: 1fr 1fr; gap: 0 1rem; }
+      .rail li { min-height: 3.6rem; }
+      .architecture { margin: 2.5rem -.25rem 3.5rem; padding: 1rem .75rem; }
+      .architecture .desktop-diagram { display: none; }
+      .architecture .mobile-diagram { display: block; min-height: 0; }
+      .annotation { grid-template-columns: 1fr; }
+      footer { flex-direction: column; gap: .3rem; }
+    }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; } }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header class="masthead" aria-label="Publication header">
+      <div class="wordmark"><span class="mark" aria-hidden="true"></span><span>Field Notes</span></div>
+      <span class="sample-label">SAMPLE / Replace publication label</span>
+    </header>
+
+    <main>
+      <section class="intro" aria-labelledby="page-title">
+        <!-- REPLACE: kicker, title, and dek with the explanation's own editorial framing. -->
+        <p class="kicker">A visual guide to evidence flow</p>
+        <h1 id="page-title">How a request becomes a trustworthy answer</h1>
+        <p class="dek">A compact architecture for moving from a real question to a decision someone can inspect, challenge, and use.</p>
+        <div class="rule" aria-hidden="true"></div>
+      </section>
+
+      <div class="story-grid">
+        <article>
+          <div class="prose">
+            <span class="section-number">01 / THE SHAPE OF THE WORK</span>
+            <!-- REPLACE: this sample narrative with the core context and stakes of the subject. -->
+            <h2>Start with the question that has consequences.</h2>
+            <p class="lead">Good explanations make the route visible. They name the question, show the evidence that can answer it, and leave uncertainty where it belongs.</p>
+            <p>A useful answer is rarely a single fact dropped into a blank page. It is a short chain of choices: what was asked, what was observed, what was inferred, and what remains unresolved.</p>
+          </div>
+
+          <figure class="architecture">
+            <div class="figure-head">
+              <h3>The answer path</h3>
+              <span>SAMPLE architecture</span>
+            </div>
+            <!-- REPLACE: node labels, annotations, and connections with the subject's real system. -->
+            <svg class="desktop-diagram" viewBox="0 0 900 390" role="img" aria-labelledby="arch-title arch-desc" xmlns="http://www.w3.org/2000/svg">
+              <title id="arch-title">Four step path from question to decision</title>
+              <desc id="arch-desc">A left to right diagram showing a question becoming evidence, then a synthesis, then a decision. A dashed amber line marks uncertainty carried into the decision.</desc>
+              <defs>
+                <marker id="arrow-teal" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                  <path d="M 0 0 L 10 5 L 0 10 z" fill="#087d7d"/>
+                </marker>
+                <marker id="arrow-amber" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                  <path d="M 0 0 L 10 5 L 0 10 z" fill="#b96f26"/>
+                </marker>
+              </defs>
+              <rect x="16" y="20" width="868" height="350" rx="3" fill="#f8f8f3" stroke="#d8ddd7"/>
+              <path d="M 220 170 H 247" fill="none" stroke="#087d7d" stroke-width="3" marker-end="url(#arrow-teal)"/>
+              <path d="M 434 170 H 461" fill="none" stroke="#087d7d" stroke-width="3" marker-end="url(#arrow-teal)"/>
+              <path d="M 648 170 H 675" fill="none" stroke="#087d7d" stroke-width="3" marker-end="url(#arrow-teal)"/>
+              <path d="M 537 246 C 585 320, 694 320, 746 242" fill="none" stroke="#b96f26" stroke-width="2.5" stroke-dasharray="8 7" marker-end="url(#arrow-amber)"/>
+              <g fill="#fffefa" stroke="#087d7d" stroke-width="2">
+                <rect id="desktop-card-1" data-text-box="" x="36" y="100" width="184" height="144" rx="4"/>
+                <rect id="desktop-card-2" data-text-box="" x="250" y="100" width="184" height="144" rx="4"/>
+                <rect id="desktop-card-3" data-text-box="" x="464" y="100" width="184" height="144" rx="4"/>
+                <rect id="desktop-card-4" data-text-box="" x="678" y="100" width="184" height="144" rx="4"/>
+              </g>
+              <g fill="#087d7d" font-family="ui-sans-serif, system-ui, sans-serif" font-size="14" font-weight="800" letter-spacing="0.5">
+                <text data-fit-box="desktop-card-1" x="50" y="142">01 / ASK</text><text data-fit-box="desktop-card-2" x="264" y="142">02 / GATHER</text><text data-fit-box="desktop-card-3" x="478" y="142">03 / SYNTHESIZE</text><text data-fit-box="desktop-card-4" x="692" y="142">04 / DECIDE</text>
+              </g>
+              <g fill="#1e2b2a" font-family="Georgia, serif" font-size="22">
+                <text data-fit-box="desktop-card-1" x="50" y="178">Question</text><text data-fit-box="desktop-card-2" x="264" y="178">Evidence</text><text data-fit-box="desktop-card-3" x="478" y="178">Interpretation</text><text data-fit-box="desktop-card-4" x="692" y="178">Action</text>
+              </g>
+              <g fill="#65706d" font-family="ui-sans-serif, system-ui, sans-serif" font-size="16">
+                <text data-fit-box="desktop-card-1" x="50" y="201"><tspan x="50">What needs</tspan><tspan x="50" dy="21">an answer?</tspan></text><text data-fit-box="desktop-card-2" x="264" y="201"><tspan x="264">What can</tspan><tspan x="264" dy="21">we inspect?</tspan></text><text data-fit-box="desktop-card-3" x="478" y="201"><tspan x="478">What does</tspan><tspan x="478" dy="21">it mean?</tspan></text><text data-fit-box="desktop-card-4" x="692" y="201"><tspan x="692">What changes</tspan><tspan x="692" dy="21">now?</tspan></text>
+              </g>
+              <text x="545" y="348" fill="#704518" font-family="ui-sans-serif, system-ui, sans-serif" font-size="19" font-weight="700">uncertainty stays visible</text>
+              <circle cx="534" cy="318" r="4" fill="#b96f26"/>
+            </svg>
+            <svg class="mobile-diagram" viewBox="0 0 360 650" role="img" aria-labelledby="arch-mobile-title arch-mobile-desc" xmlns="http://www.w3.org/2000/svg">
+              <title id="arch-mobile-title">Four step vertical path from question to decision</title>
+              <desc id="arch-mobile-desc">A stacked diagram showing a question becoming evidence, then interpretation, then action. A dashed amber line marks uncertainty carried into the decision.</desc>
+              <defs>
+                <marker id="mobile-arrow-teal" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#087d7d"/></marker>
+                <marker id="mobile-arrow-amber" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#b96f26"/></marker>
+              </defs>
+              <rect x="10" y="10" width="340" height="630" rx="3" fill="#f8f8f3" stroke="#d8ddd7"/>
+              <path d="M 180 135 V 174" fill="none" stroke="#087d7d" stroke-width="3" marker-end="url(#mobile-arrow-teal)"/>
+              <path d="M 180 275 V 314" fill="none" stroke="#087d7d" stroke-width="3" marker-end="url(#mobile-arrow-teal)"/>
+              <path d="M 180 415 V 454" fill="none" stroke="#087d7d" stroke-width="3" marker-end="url(#mobile-arrow-teal)"/>
+              <path d="M 265 415 C 322 444, 318 558, 253 570" fill="none" stroke="#b96f26" stroke-width="2.5" stroke-dasharray="8 7" marker-end="url(#mobile-arrow-amber)"/>
+              <g fill="#fffefa" stroke="#087d7d" stroke-width="2">
+                <rect id="mobile-card-1" data-text-box="" x="45" y="35" width="270" height="100" rx="4"/><rect id="mobile-card-2" data-text-box="" x="45" y="175" width="270" height="100" rx="4"/>
+                <rect id="mobile-card-3" data-text-box="" x="45" y="315" width="270" height="100" rx="4"/><rect id="mobile-card-4" data-text-box="" x="45" y="455" width="270" height="100" rx="4"/>
+              </g>
+              <g fill="#087d7d" font-family="ui-sans-serif, system-ui, sans-serif" font-size="15" font-weight="800" letter-spacing="1.3">
+                <text data-fit-box="mobile-card-1" x="63" y="63">01 / ASK</text><text data-fit-box="mobile-card-2" x="63" y="203">02 / GATHER</text><text data-fit-box="mobile-card-3" x="63" y="343">03 / SYNTHESIZE</text><text data-fit-box="mobile-card-4" x="63" y="483">04 / DECIDE</text>
+              </g>
+              <g fill="#1e2b2a" font-family="Georgia, serif" font-size="20">
+                <text data-fit-box="mobile-card-1" x="63" y="94">Question</text><text data-fit-box="mobile-card-2" x="63" y="234">Evidence</text><text data-fit-box="mobile-card-3" x="63" y="374">Interpretation</text><text data-fit-box="mobile-card-4" x="63" y="514">Action</text>
+              </g>
+              <g fill="#65706d" font-family="ui-sans-serif, system-ui, sans-serif" font-size="15">
+                <text data-fit-box="mobile-card-1" x="63" y="118">What needs an answer?</text><text data-fit-box="mobile-card-2" x="63" y="258">What can we inspect?</text><text data-fit-box="mobile-card-3" x="63" y="398">What does it mean?</text><text data-fit-box="mobile-card-4" x="63" y="538">What changes now?</text>
+              </g>
+              <text x="77" y="603" fill="#704518" font-family="ui-sans-serif, system-ui, sans-serif" font-size="15" font-weight="700">uncertainty stays visible</text>
+            </svg>
+            <figcaption>Read the solid teal route as the minimum chain needed for a useful answer. The amber return path keeps a known gap attached to the decision instead of hiding it in confident prose.</figcaption>
+            <div class="annotation" aria-label="Diagram notes">
+              <div><strong>Inspectable</strong><p>Each step leaves a place to check the claim.</p></div>
+              <div><strong>Honest</strong><p>Uncertainty is a property of the route, not a footnote.</p></div>
+            </div>
+          </figure>
+
+          <div class="prose">
+            <span class="section-number">02 / THE READER'S HANDLE</span>
+            <!-- REPLACE: conclusion and pull quote with the explanation's practical takeaway. -->
+            <h2>Give the reader a handle, then let them look closer.</h2>
+            <p>Once the chain is explicit, a reader can disagree precisely. They can question the input, inspect the method, or accept the result while keeping one open item in view.</p>
+            <blockquote class="pullquote">“A clear route turns a conclusion into something another person can work with.”<cite>Sample editorial principle</cite></blockquote>
+            <p class="replace-note"><strong>Template note.</strong> This is sample content. Replace the narrative, labels, and diagram semantics while keeping the accessible structure and visual rhythm.</p>
+          </div>
+        </article>
+
+        <aside class="rail" aria-label="Reading map">
+          <h2>Reading map</h2>
+          <ol>
+            <li>Question and stakes</li>
+            <li>Evidence route</li>
+            <li>Interpretation</li>
+            <li>Decision and gap</li>
+          </ol>
+          <p class="meta">SAMPLE TEMPLATE<br>Designed for adaptation<br>Offline / no dependencies</p>
+        </aside>
+      </div>
+    </main>
+
+    <footer><span>Field Notes / Explain Visually</span><span>Replace sample text before publication</span></footer>
+  </div>
+</body>
+</html>
