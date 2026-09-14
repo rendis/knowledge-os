@@ -24,6 +24,7 @@ from instance import (  # noqa: E402
 )
 
 LOCK_NAME = ".knowledge-os.lock.yaml"
+PERSONAL_AGENTS = "AGENTS.personal.md"
 MANAGED_HASH_COMMENT = "# gitleaks:allow -- managed SHA-256 digest"
 INSTANCE_OWNED = {
     "instance.yaml",
@@ -285,6 +286,7 @@ def _copytree(src: Path, dst: Path) -> None:
 
 def ensure_gitignore_lines(dest: Path) -> None:
     required = (
+        f"/{PERSONAL_AGENTS}",
         "/.investigations/",
         "/.investigations-private/",
         "/.knowledge-os-config.yaml",
@@ -317,6 +319,22 @@ def ensure_gitignore_lines(dest: Path) -> None:
         path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
 
 
+def personal_agents_ignored(dest: Path) -> bool:
+    """Return whether Git or the portable root rule ignores the personal router."""
+    checked = subprocess.run(
+        ["git", "-C", str(dest), "check-ignore", "--no-index", "--quiet", "--", PERSONAL_AGENTS],
+        capture_output=True,
+        check=False,
+    )
+    if checked.returncode in {0, 1}:
+        return checked.returncode == 0
+    gitignore = dest / ".gitignore"
+    if not gitignore.is_file():
+        return False
+    rules = {line.strip() for line in gitignore.read_text(encoding="utf-8").splitlines()}
+    return f"/{PERSONAL_AGENTS}" in rules or PERSONAL_AGENTS in rules
+
+
 def ensure_obsidian_ignore_filters(dest: Path) -> None:
     path = dest / ".obsidian" / "app.json"
     payload: dict[str, object] = {}
@@ -335,6 +353,8 @@ def ensure_obsidian_ignore_filters(dest: Path) -> None:
         filters.append(".plan/")
     if "investigations/" not in filters:
         filters.append("investigations/")
+    if PERSONAL_AGENTS not in filters:
+        filters.append(PERSONAL_AGENTS)
     payload["userIgnoreFilters"] = filters
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
@@ -454,6 +474,7 @@ def write_bootstrap(dest: Path, instance: dict[str, Any]) -> None:
                 ".DS_Store",
                 ".obsidian/workspace.json",
                 ".obsidian/workspace-mobile.json",
+                f"/{PERSONAL_AGENTS}",
                 "/.investigations/",
                 "/.investigations-private/",
                 "/.operations/",
@@ -847,6 +868,17 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     dest = Path(args.dest).expanduser().resolve()
     state = dest_state(dest)
     payload: dict[str, Any] = {"dest": str(dest), "state": state}
+    tracked = subprocess.run(
+        ["git", "-C", str(dest), "ls-files", "--error-unmatch", "--", PERSONAL_AGENTS],
+        capture_output=True,
+        check=False,
+    ).returncode == 0
+    payload["personal_instructions"] = {
+        "path": PERSONAL_AGENTS,
+        "exists": (dest / PERSONAL_AGENTS).is_file(),
+        "ignored": personal_agents_ignored(dest),
+        "tracked": tracked,
+    }
     invalid_instance = False
     instance = None
     if state == "installed":
@@ -914,6 +946,8 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         or payload.get("drift") or payload.get("topology_drift")
         or payload.get("adapter_configuration_drift")
         or not payload.get("managed_matches_dist")
+        or not payload["personal_instructions"]["ignored"]
+        or payload["personal_instructions"]["tracked"]
     ):
         return 2
     return 0 if state in {"installed", "empty", "missing"} else 1

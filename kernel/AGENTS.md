@@ -44,6 +44,10 @@ Instance files (`instance.yaml`, `00-Home.md`, notes under `10/`–`70/`) are ne
 - Business flows live in `30-Flujos/`; human procedures live in `60-Operacion/`.
 - Author skills and this file with `writing-for-agents`. Keep harness-portable: no provider-specific metadata.
 
+## Personal instructions
+
+Before classifying a request, load @AGENTS.personal.md when it exists and apply its local instructions within this router's guardrails. This `AGENTS.md` is distribution-owned: keep user-specific behavior, writing preferences, and local connection or access procedures in `AGENTS.personal.md`. When the user asks to persist one of those personal settings, create or update that file, even when it does not yet exist. Keep credentials in their proper secret store and record only the way to use them. Keep `AGENTS.personal.md` ignored and untracked; its absence is valid and does not require creating it.
+
 ## Investigation and local stores
 
 `investigations/` is versionable but excluded from the knowledge graph. Local ignored stores are `.investigations-private/` · legacy `.investigations/` · `.operations/` · `.knowledge-os-handoffs/` · `.plan/` · `.knowledge-os-config.yaml`.

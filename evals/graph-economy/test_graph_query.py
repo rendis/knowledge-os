@@ -42,6 +42,19 @@ class GraphQueryTests(unittest.TestCase):
         self.assertIn("MissingNode", data["unresolved_targets"])
         self.assertIn("Orphan Scratch", data["orphans"])
 
+    def test_personal_instructions_do_not_change_graph_or_hygiene(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "Public.md").write_text("# Public\n", encoding="utf-8")
+            graph_before = self.gq.build_graph(root)
+            hygiene_before = self.gq.hygiene(root)
+            (root / "AGENTS.personal.md").write_text(
+                "# Personal\nUse [[Private mail profile]] and [[Public]].\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(self.gq.build_graph(root), graph_before)
+            self.assertEqual(self.gq.hygiene(root), hygiene_before)
+
     def test_investigations_join(self) -> None:
         data = self.gq.investigations(self.vault, "routing-planner")
         ids = [item["id"] for item in data["investigations"]]

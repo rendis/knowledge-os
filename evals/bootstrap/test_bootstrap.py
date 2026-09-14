@@ -2701,6 +2701,7 @@ change:
             self.assertTrue((dest / "10-Sistemas" / "Payments.md").is_file())
             self.assertTrue((dest / "instance.yaml").is_file())
             self.assertTrue((dest / "AGENTS.md").is_file())
+            self.assertFalse((dest / "AGENTS.personal.md").exists())
             self.assertTrue((dest / ".agents" / "skills" / "map-ecosystem" / "SKILL.md").is_file())
             git_skill = dest / ".agents" / "skills" / "manage-git-workflow"
             self.assertTrue((git_skill / "SKILL.md").is_file())
@@ -2730,6 +2731,7 @@ change:
             gitignore = (dest / ".gitignore").read_text(encoding="utf-8")
             self.assertNotIn(".knowledge-os.lock.yaml", gitignore)
             self.assertIn("/.agents/state/map-ecosystem/", gitignore)
+            self.assertIn("/AGENTS.personal.md", gitignore)
             self.assertIn("/.plan/", gitignore)
             self.assertIn("/.investigations/", gitignore)
             self.assertIn("/.investigations-private/", gitignore)
@@ -2738,7 +2740,7 @@ change:
             obsidian_app = json.loads(
                 (dest / ".obsidian" / "app.json").read_text(encoding="utf-8")
             )
-            self.assertEqual(obsidian_app["userIgnoreFilters"], [".plan/", "investigations/"])
+            self.assertEqual(obsidian_app["userIgnoreFilters"], [".plan/", "investigations/", "AGENTS.personal.md"])
             self.assertNotIn(".agents/state/map-ecosystem/sync", lock)
             doctor = run(["sh", str(INSTALL), "doctor", "--dest", str(dest)])
             self.assertEqual(doctor.returncode, 0, doctor.stderr)
@@ -2747,6 +2749,15 @@ change:
             self.assertEqual(info["start_here"][0], "00-Home.md")
             self.assertTrue(info["portable_lock"])
             self.assertTrue(info["managed_matches_dist"])
+            self.assertEqual(
+                info["personal_instructions"],
+                {
+                    "path": "AGENTS.personal.md",
+                    "exists": False,
+                    "ignored": True,
+                    "tracked": False,
+                },
+            )
             self.assertEqual(
                 info["distribution_revision_installed"],
                 info["distribution_revision_dist"],
@@ -3152,6 +3163,7 @@ change:
             self.assertIn("/custom-ignore", gitignore)
             self.assertNotIn(".knowledge-os.lock.yaml", gitignore)
             self.assertIn("/.plan/", gitignore)
+            self.assertIn("/AGENTS.personal.md", gitignore)
             self.assertNotIn("/plan/", gitignore)
             obsidian_app = json.loads(
                 (dest / ".obsidian" / "app.json").read_text(encoding="utf-8")
@@ -3159,7 +3171,7 @@ change:
             self.assertTrue(obsidian_app["livePreview"])
             self.assertEqual(
                 obsidian_app["userIgnoreFilters"],
-                ["archive/", ".plan/", "investigations/"],
+                ["archive/", ".plan/", "investigations/", "AGENTS.personal.md"],
             )
             lock = (dest / ".knowledge-os.lock.yaml").read_text(encoding="utf-8")
             self.assertIn('version: "3"', lock)
@@ -3172,6 +3184,9 @@ change:
             self.assertEqual(doctor.returncode, 0, doctor.stderr)
             info = json.loads(doctor.stdout)
             self.assertEqual(info["state"], "installed")
+            personal = dest / "AGENTS.personal.md"
+            personal_text = "# Personal instructions\n\nUse the local mail profile.\n"
+            personal.write_text(personal_text, encoding="utf-8")
             self.assertTrue(info["orientation"]["ready"])
             sync_state = dest / ".agents" / "state" / "map-ecosystem" / "sync" / "active" / "run-eval" / "run.json"
             sync_state.parent.mkdir(parents=True)
@@ -3179,6 +3194,7 @@ change:
             updated = run(["sh", str(INSTALL), "update", "--dest", str(dest)])
             self.assertEqual(updated.returncode, 0, updated.stderr)
             self.assertEqual(sync_state.read_text(encoding="utf-8"), '{"local":"keep"}\n')
+            self.assertEqual(personal.read_text(encoding="utf-8"), personal_text)
             self.assertNotIn(
                 ".agents/state/map-ecosystem/sync",
                 (dest / ".knowledge-os.lock.yaml").read_text(encoding="utf-8"),
@@ -3321,6 +3337,64 @@ change:
                 ".knowledge-os.lock.yaml",
                 gitignore.read_text(encoding="utf-8"),
             )
+
+    def test_personal_agents_contract_and_doctor_rejects_tracked_copy(self) -> None:
+        router = (DIST / "kernel" / "AGENTS.md").read_text(encoding="utf-8")
+        self.assertIn("## Personal instructions", router)
+        self.assertIn("load @AGENTS.personal.md when it exists", router)
+        self.assertGreater(
+            router.index("## Personal instructions"),
+            router.index("## Guardrails"),
+        )
+        self.assertLess(
+            router.index("## Personal instructions"),
+            router.index("## Investigation and local stores"),
+        )
+        self.assertIn("create or update that file", router)
+        self.assertIn("its absence is valid", router)
+        self.assertIn("Keep credentials in their proper secret store", router)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            dest = Path(tmp) / "cell"
+            initialized = run([
+                "sh", str(INSTALL), "init", "--dest", str(dest),
+                "--cell-name", "Payments", "--purpose", "Card-present checkout",
+                "--system", "payments:Payments", "--yes",
+            ])
+            self.assertEqual(initialized.returncode, 0, initialized.stderr)
+            self.assertEqual(run(["git", "init", str(dest)]).returncode, 0)
+            spec = importlib.util.spec_from_file_location("personal_installer", DIST / "scripts/knowledge_os.py")
+            installer = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(installer)
+            lock = installer.load_lock(dest / installer.LOCK_NAME)
+            # Isolate provenance only; exercise real hashes, Git and strict checks.
+            lock["distribution_revision"] = "test-revision"
+            lock["distribution_dirty"] = False
+
+            def strict_status():
+                with mock.patch.object(installer, "distribution_provenance", return_value=("test-revision", False)), mock.patch.object(installer, "load_lock", return_value=lock), mock.patch("builtins.print"):
+                    return installer.cmd_doctor(SimpleNamespace(dest=str(dest), strict=True))
+
+            self.assertEqual(strict_status(), 0)
+            personal = dest / "AGENTS.personal.md"
+            personal.write_text("# Personal instructions\n", encoding="utf-8")
+            self.assertEqual(
+                run(["git", "-C", str(dest), "check-ignore", "AGENTS.personal.md"]).returncode,
+                0,
+            )
+            self.assertNotEqual(
+                run(["git", "-C", str(dest), "add", "AGENTS.personal.md"]).returncode,
+                0,
+            )
+            self.assertEqual(strict_status(), 0)
+            self.assertEqual(
+                run(["git", "-C", str(dest), "add", "-f", "AGENTS.personal.md"]).returncode,
+                0,
+            )
+            doctor = run(["sh", str(INSTALL), "doctor", "--dest", str(dest)])
+            self.assertEqual(doctor.returncode, 0, doctor.stderr)
+            self.assertTrue(json.loads(doctor.stdout)["personal_instructions"]["tracked"])
+            self.assertEqual(strict_status(), 2)
 
 
 if __name__ == "__main__":
