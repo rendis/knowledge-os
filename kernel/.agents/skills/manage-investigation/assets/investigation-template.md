@@ -2,7 +2,7 @@
 id: <investigation-id>
 title: <title>
 dedupe-key: <dedupe-key>
-status: intake
+status: investigating
 created-at: <ISO-8601 timestamp>
 updated-at: <ISO-8601 timestamp>
 source-type: <message|bug|ticket|issue|attachment|other>

@@ -2,71 +2,103 @@
 
 ## States
 
+Investigations use exactly three lifecycle states:
+
 ```text
-intake → investigating → validating → ready-to-export → exported → closed
+investigating ⇄ blocked
+      ↓           ↓
+             closed
+closed ──explicit reopen──> investigating
 ```
 
-Knowledge work may transition from `validating` directly to `closed` when its objective is answered and the explicit completion decision, closure reason, evidence reviewed, and outstanding limitations are recorded in Readiness and History. No story, acceptance criteria for implementation, or export is required. Assess `vault-outcome` independently; closure never publishes knowledge.
+- `investigating`: the case is open. It covers intake, evidence collection, analysis, validation, and preparation of any requested output.
+- `blocked`: useful progress on the investigation objective cannot continue because of one concrete inaccessible dependency or unresolved decision. Record it in `blocked-on`.
+- `closed`: active investigation work ended. Record `closure-outcome: completed` or `closure-outcome: abandoned`.
 
-`blocked` may interrupt any active state. Store the interrupted state in `resume-to`; after the user resolves or accepts the dependency, return there and record the decision. New evidence may move `validating`, `ready-to-export`, or `exported` back to `investigating`.
+Do not encode internal workflow stages as statuses. Export, publication, implementation, pull-request, deployment, documentation, and learning outcomes have their own evidence and fields; none changes the investigation status automatically.
 
-A closed investigation reopens only through an explicit user decision, transitions to `investigating`, and records the reason in History.
+`learning-outcome` remains independent. Material new evidence that could change an earlier assessment resets it to `not-evaluated` while History preserves the prior result.
 
-`learning-outcome` is an independent assessment result and never advances or blocks this lifecycle. Material new evidence that could change an earlier learning assessment resets it to `not-evaluated` while History preserves the prior result.
+## Investigating
 
-## Transition gates
+Open every new case directly as `investigating`. `purpose: undecided` is valid while the requested outcome is still being classified, but resolve it before declaring completion or producing an external or development output.
 
-### Intake to investigating
+Continue in `investigating` while any useful in-scope action can advance the objective. A missing item that blocks only one story, repository, or optional evidence path does not block the whole case when other useful investigation work remains.
 
-- Request summary and source are captured without preserving a transcript.
-- Objective and initial scope are usable.
-- Every supplied attachment has a copy, summary, pending action, or explicit exclusion.
-- `purpose` is `knowledge`, `development`, or `mixed`; `undecided` cannot leave intake.
-- `vault-outcome` contains a valid value. `not-evaluated` may remain while evidence collection is still required; apply the **Promote** evidence-profile rules: defer proposals and deployment-dependent claims; `documented-source` permits inspected implementation claims before deployment.
-- `learning-outcome` contains a valid value and may remain `not-evaluated`; learning assessment is not required to advance the investigation.
-- A development or mixed case keeps **Current productive state** separate from **Future/proposed state** under **Current state**.
+## Block and unblock
 
-### Investigating to validating
+Use `blocked` only when the named dependency prevents useful progress on the global investigation objective. `blocked-on` must be one concise, portable description of that dependency. History records the observable failure, reason, source, recorder, and the user or external action needed when known.
 
-- Current productive state and, when applicable, future/proposed state cover the stated objective and scope.
-- Facts, inferences, contradictions, and limitations are separated and sourced.
-- Current productive observations and future proposals remain separated; no proposal is labeled as a vault fact or production evidence.
-- `vault-outcome` is no longer `not-evaluated`. In a mixed case it follows the current-state candidate when one exists; the future portion remains separately deferred and outside the vault.
-- Affected surfaces and active decisions are current.
-- Remaining questions are explicit.
-- Every existing provisional draft is synchronized or explicitly marked stale; no draft has an unlabeled mismatch.
+Do not store `resume-to`; unblocking always returns to `investigating`. Use the helper with the exact snapshot returned by `load`:
 
-### Validating to ready-to-export
+```text
+investigation-case.py --root "$VAULT_ROOT/investigations" transition \
+  --id <id> --to blocked --blocked-on "<dependency>" \
+  --reason "<formalized reason>" --source "<portable source>" \
+  --expected-public-sha256 <sha256>
 
-- No open question or unread source blocks the intended output.
-- Contradictions that could change acceptance are resolved or explicitly accepted by the user.
-- Acceptance criteria are testable and trace to the current understanding.
-- Requester role and export intent are sufficient to choose story kind and audience.
-- Readiness lists the evidence reviewed and any accepted limitations.
-- Every existing draft intended for the output is current, has no missing, reused, or meaning-shifted register reference, and contains no unregistered source, component, dependency, or implementation claim.
-- `vault-outcome` matches the evidence: a proposal or claim missing profile-required deployment remains `deferred-until-production`; inspected source behavior may qualify under `documented-source`; `candidate-for-audit` records only a handoff candidate; `documented` cites a completed `map-ecosystem` audit, the affected canonical notes, and whether the lifecycle result was no change or a verified write.
+investigation-case.py --root "$VAULT_ROOT/investigations" transition \
+  --id <id> --to investigating \
+  --reason "<why progress can resume>" --source "<portable source>" \
+  --expected-public-sha256 <sha256>
+```
 
-### Ready-to-export to exported
+## Close
 
-- At least one release-ready platform-neutral local draft exists in `exports/`; provisional drafts created in earlier states do not satisfy this gate.
-- Every release-ready draft is `current`, its `source-updated-at` matches the investigation `updated-at`, and it references the case-file ID and relevant in-scope evidence or acceptance criteria without changed identifier meanings or unregistered implementation context.
+Closure is an explicit, attributed decision. It is based on the case objective, not on `purpose`, story export, handoff state, or deployment by default.
 
-### Exported to closed
+### Completed
 
-- The user accepts the outcome, discards it, or declares the investigation complete.
-- Closure reason and outstanding limitations are recorded.
-- Any deferred or candidate vault outcome remains explicit; closing a case does not promote it.
+Close with `closure-outcome: completed` only when all of these are true:
 
-### Blocked
+- `purpose` is resolved to `knowledge`, `development`, or `mixed`;
+- the current state answers the objective and covers the agreed scope;
+- facts, inferences, contradictions, limitations, decisions, and open questions are current and traceable;
+- applicable acceptance criteria or other objective-specific completion conditions were verified or explicitly accepted with evidence;
+- `vault-outcome` was evaluated independently;
+- affected drafts are current or explicitly stale;
+- the closure reason, supporting register IDs, and outstanding limitations are recorded.
 
-- `blocked-on` names the inaccessible dependency or decision.
-- `resume-to` names the prior active state.
-- History records the observable failure and exact user action needed.
+Implementation, export, publication, merge, or deployment evidence is required only when the stated objective or an applicable acceptance criterion requires it. A knowledge case can complete without stories. A development or mixed case can complete after producing an agreed, verified specification even when implementation remains outside scope. Conversely, a case whose objective includes productive deployment cannot complete from source, a handoff, or a clean Git merge alone.
+
+Invoke:
+
+```text
+investigation-case.py --root "$VAULT_ROOT/investigations" close \
+  --id <id> --decision complete --reason "<formalized reason>" \
+  --limitations "<formalized limitations or none>" \
+  --source "<portable closure source>" \
+  --evidence E-001 --evidence AC-001 \
+  --expected-public-sha256 <sha256>
+```
+
+### Abandoned
+
+Use `closure-outcome: abandoned` when the requester explicitly ends the work without satisfying the objective, or when the work is deliberately discontinued. Record the reason and unresolved limitations. Closure evidence IDs are optional. `purpose` may remain `undecided`; an unevaluated vault outcome becomes `none`, while an already evaluated outcome is preserved.
+
+### Reopen
+
+Reopen only for an explicit request or new material evidence that requires active investigation. Transition from `closed` to `investigating`, remove active `closure-outcome`, and preserve the earlier closure event in History:
+
+```text
+investigation-case.py --root "$VAULT_ROOT/investigations" transition \
+  --id <id> --to investigating \
+  --reason "<reopen reason>" --source "<portable source>" \
+  --expected-public-sha256 <sha256>
+```
+
+## Output sufficiency is separate
+
+Evaluate publication or development readiness for the selected `S-NNN`, work item, and repository package. Only questions, dependencies, decisions, and criteria applicable to that exact output can block it. An unrelated pending story or optional investigation branch does not.
+
+A case status never proves output sufficiency:
+
+- an `investigating` case may produce a sufficient output for one bounded target while other work continues;
+- a `blocked` case may still expose an unaffected, already sufficient output, provided the global blocker cannot change it;
+- a `closed` case may supply an unchanged output from its recorded snapshot; material new evidence requires reopening first.
+
+Apply the export contract and the development input-bundle check independently. Keep unresolved output-specific gaps in the relevant story or package; keep global blockers in `blocked-on`.
 
 ## Completion criterion
 
-A status is valid only when its gate is satisfied. Use the earliest valid state; move backward when evidence invalidates a later gate.
-
-After recording the knowledge readiness evidence and explicit decision, run `investigation-case.py --root "$VAULT_ROOT/investigations" close --id <id> --decision <complete|abandoned> --reason "<formalized reason>" --limitations "<formalized limitations or none>"`. This transactional command validates the case and records closure without requiring stories or exports.
-
-An explicit `abandoned` decision may close knowledge work from any active state, including intake or blocked. Record reason and limitations; an unevaluated vault outcome becomes `none` (no promotion requested), while existing candidate/deferred outcomes are preserved. Completed outcomes still require validation.
+The lifecycle is valid when the case uses only the three states, transitions use current-snapshot compare-and-swap, every transition is attributed in History, blocked metadata exists only while blocked, closure metadata exists only while closed, and the semantic gate above supports the recorded outcome. Structural validation is necessary but does not replace the agent's objective-based review.

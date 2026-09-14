@@ -56,16 +56,322 @@ class Transactions(unittest.TestCase):
         self.assertFalse((self.root / '.open.lock').exists())
 
     def test_knowledge_close_without_story_or_export(self):
-        self.case.write_text(self.case.read_text().replace('status: intake', 'status: validating'))
-        self.run_cli('close', '--id', self.case_id, '--decision', 'complete', '--reason', 'Question answered', '--limitations', 'No production access')
-        self.assertIn('status: closed', self.case.read_text())
-        self.assertIn('No production access', self.case.read_text())
+        before = self.case.read_bytes()
+        candidate = Path(self.tmp.name) / 'knowledge-complete.md'
+        candidate.write_bytes(before.replace(
+            b'### Facts\n',
+            b'### Facts\n\n- E-001 (fact) - The inspected contract answers the stated question.\n',
+        ))
+        self.run_cli(
+            'save', '--id', self.case_id,
+            '--public-candidate', str(candidate),
+            '--expected-public-sha256', hashlib.sha256(before).hexdigest(),
+            '--private-root', str(Path(self.tmp.name) / '.investigations-private'),
+            '--source', 'synthetic contract fixture', '--target', 'E-001',
+        )
+        current = self.case.read_bytes()
+        self.run_cli(
+            'close', '--id', self.case_id, '--decision', 'complete',
+            '--reason', 'Question answered', '--limitations', 'No production access',
+            '--source', 'synthetic closure review', '--evidence', 'E-001',
+            '--expected-public-sha256', hashlib.sha256(current).hexdigest(),
+        )
+        text = self.case.read_text()
+        self.assertIn('status: closed', text)
+        self.assertIn('closure-outcome: completed', text)
+        self.assertIn('No production access', text)
+        self.assertIn('evidence: `E-001`', text)
         self.run_cli('validate')
 
-    def test_abandoned_intake_needs_no_export_or_assessment(self):
+    def test_abandoned_investigation_needs_no_export_or_assessment(self):
         self.case.write_text(self.case.read_text().replace('vault-outcome: none', 'vault-outcome: not-evaluated'))
-        self.run_cli('close', '--id', self.case_id, '--decision', 'abandoned', '--reason', 'User discarded question', '--limitations', 'Not investigated')
-        self.assertIn('vault-outcome: none', self.case.read_text())
+        before = self.case.read_bytes()
+        self.run_cli(
+            'close', '--id', self.case_id, '--decision', 'abandoned',
+            '--reason', 'User discarded question', '--limitations', 'Not investigated',
+            '--source', 'synthetic abandonment decision',
+            '--expected-public-sha256', hashlib.sha256(before).hexdigest(),
+        )
+        text = self.case.read_text()
+        self.assertIn('vault-outcome: none', text)
+        self.assertIn('closure-outcome: abandoned', text)
+        self.run_cli('validate')
+
+    def test_lifecycle_transitions_are_traced_cas_guarded_and_reopen_cleanly(self):
+        initial = self.case.read_bytes()
+        blocked = self.run_cli(
+            'transition', '--id', self.case_id, '--to', 'blocked',
+            '--blocked-on', 'carrier API: access denied',
+            '--reason', 'The required source is unavailable',
+            '--source', 'synthetic access check',
+            '--expected-public-sha256', hashlib.sha256(initial).hexdigest(),
+            '--timestamp', '2026-09-10T10:00:00+00:00',
+        )
+        self.assertIn('"to": "blocked"', blocked.stdout)
+        blocked_bytes = self.case.read_bytes()
+        blocked_text = blocked_bytes.decode()
+        self.assertIn('status: blocked', blocked_text)
+        self.assertIn('blocked-on: "carrier API: access denied"', blocked_text)
+        self.assertNotIn('resume-to:', blocked_text)
+        self.assertIn('recorded by Test Recorder <recorder@example.invalid>', blocked_text)
+
+        stale = self.run_cli(
+            'transition', '--id', self.case_id, '--to', 'investigating',
+            '--reason', 'Access restored', '--source', 'synthetic access check',
+            '--expected-public-sha256', hashlib.sha256(initial).hexdigest(),
+            ok=False,
+        )
+        self.assertIn('stale_public_snapshot', stale.stderr)
+        self.assertEqual(blocked_bytes, self.case.read_bytes())
+
+        self.run_cli(
+            'transition', '--id', self.case_id, '--to', 'investigating',
+            '--reason', 'Access restored', '--source', 'synthetic access check',
+            '--expected-public-sha256', hashlib.sha256(blocked_bytes).hexdigest(),
+            '--timestamp', '2026-09-10T10:05:00+00:00',
+        )
+        active = self.case.read_bytes()
+        self.assertIn(b'status: investigating', active)
+        self.assertNotIn(b'blocked-on:', active)
+
+        candidate = Path(self.tmp.name) / 'lifecycle-evidence.md'
+        candidate.write_bytes(active.replace(
+            b'### Facts\n',
+            b'### Facts\n\n- E-001 (fact) - The restored source resolves the objective.\n',
+        ))
+        self.run_cli(
+            'save', '--id', self.case_id,
+            '--public-candidate', str(candidate),
+            '--expected-public-sha256', hashlib.sha256(active).hexdigest(),
+            '--private-root', str(Path(self.tmp.name) / '.investigations-private'),
+            '--source', 'synthetic restored contract', '--target', 'E-001',
+        )
+        resolved = self.case.read_bytes()
+        self.run_cli(
+            'close', '--id', self.case_id, '--decision', 'complete',
+            '--reason', 'Objective verified', '--limitations', 'none',
+            '--source', 'synthetic closure review', '--evidence', 'E-001',
+            '--expected-public-sha256', hashlib.sha256(resolved).hexdigest(),
+            '--timestamp', '2026-09-10T10:10:00+00:00',
+        )
+        closed = self.case.read_bytes()
+        self.assertIn(b'closure-outcome: completed', closed)
+
+        self.run_cli(
+            'transition', '--id', self.case_id, '--to', 'investigating',
+            '--reason', 'New evidence changes the prior conclusion',
+            '--source', 'synthetic follow-up report',
+            '--expected-public-sha256', hashlib.sha256(closed).hexdigest(),
+            '--timestamp', '2026-09-10T10:15:00+00:00',
+        )
+        reopened = self.case.read_text()
+        self.assertIn('status: investigating', reopened)
+        self.assertNotIn('closure-outcome:', reopened)
+        self.assertIn('closed as `completed`', reopened)
+        self.assertIn('Investigation reopened', reopened)
+        self.run_cli('validate')
+
+    def test_save_cannot_bypass_lifecycle_commands(self):
+        before = self.case.read_bytes()
+        candidate = Path(self.tmp.name) / 'bypass.md'
+        candidate.write_bytes(before.replace(b'status: investigating', b'status: blocked'))
+        rejected = self.run_cli(
+            'save', '--id', self.case_id,
+            '--public-candidate', str(candidate),
+            '--expected-public-sha256', hashlib.sha256(before).hexdigest(),
+            '--private-root', str(Path(self.tmp.name) / '.investigations-private'),
+            '--source', 'synthetic bypass attempt', '--target', 'Q-001',
+            ok=False,
+        )
+        self.assertIn('status_transition_required', rejected.stderr)
+        self.assertEqual(before, self.case.read_bytes())
+
+        duplicate = Path(self.tmp.name) / 'duplicate-status.md'
+        duplicate.write_bytes(before.replace(
+            b'status: investigating',
+            b'status: blocked\nstatus: investigating',
+        ))
+        rejected_duplicate = self.run_cli(
+            'save', '--id', self.case_id,
+            '--public-candidate', str(duplicate),
+            '--expected-public-sha256', hashlib.sha256(before).hexdigest(),
+            '--private-root', str(Path(self.tmp.name) / '.investigations-private'),
+            '--source', 'synthetic duplicate-key attempt', '--target', 'Q-001',
+            ok=False,
+        )
+        self.assertIn('frontmatter repeats status', rejected_duplicate.stderr)
+        self.assertEqual(before, self.case.read_bytes())
+
+    def test_close_rejects_history_only_evidence_reference(self):
+        before = self.case.read_bytes()
+        self.case.write_text(before.decode().replace(
+            '## History\n',
+            '## History\n\n- 2026-09-10T10:00:00+00:00 — Mentioned `E-999`; recorded by Test Recorder <recorder@example.invalid>; source: synthetic note.\n',
+        ))
+        current = self.case.read_bytes()
+        rejected = self.run_cli(
+            'close', '--id', self.case_id, '--decision', 'complete',
+            '--reason', 'Unsupported closure', '--limitations', 'none',
+            '--source', 'synthetic closure review', '--evidence', 'E-999',
+            '--expected-public-sha256', hashlib.sha256(current).hexdigest(),
+            ok=False,
+        )
+        self.assertIn('existing register IDs', rejected.stderr)
+        self.assertEqual(current, self.case.read_bytes())
+
+    def test_legacy_states_and_invalid_lifecycle_metadata_are_rejected(self):
+        original = self.case.read_bytes()
+        for replacement, expected in (
+            (b'status: intake', 'invalid status'),
+            (b'status: closed\nclosure-outcome: unexpected', 'valid closure-outcome'),
+            (b'status: investigating\nresume-to: investigating', 'resume-to is legacy'),
+        ):
+            self.case.write_bytes(original.replace(b'status: investigating', replacement))
+            invalid = self.run_cli('validate', ok=False)
+            self.assertIn(expected, invalid.stderr)
+        self.case.write_bytes(original)
+
+    def test_prior_public_statuses_can_be_converted_case_by_case(self):
+        second_id = '20260908-120150-prior-public'
+        self.run_cli(
+            'open', '--id', second_id, '--title', 'Prior public case',
+            '--objective', 'Convert the prior public lifecycle',
+            '--request-summary', 'Convert a previously versioned public case.',
+            '--dedupe-key', 'prior-public-case', '--purpose', 'development',
+            '--vault-outcome', 'none', '--learning-outcome', 'not-evaluated',
+        )
+        second = self.root / second_id / 'investigation.md'
+        self.case.write_text(self.case.read_text().replace('status: investigating', 'status: intake', 1))
+        second.write_text(second.read_text().replace('status: investigating', 'status: ready-to-export', 1))
+
+        first_before = self.case.read_bytes()
+        first = self.run_cli(
+            'transition', '--id', self.case_id, '--to', 'investigating',
+            '--reason', 'Adopt the three-state lifecycle',
+            '--source', 'requested public lifecycle migration',
+            '--expected-public-sha256', hashlib.sha256(first_before).hexdigest(),
+        )
+        self.assertIn('"migration": true', first.stdout)
+        self.assertIn('pre-existing case errors remain', first.stdout)
+        self.assertIn('status: investigating', self.case.read_text())
+        self.assertIn('Migrated prior state `intake`', self.case.read_text())
+
+        second_before = second.read_bytes()
+        converted = self.run_cli(
+            'transition', '--id', second_id, '--to', 'investigating',
+            '--reason', 'Adopt the three-state lifecycle',
+            '--source', 'requested public lifecycle migration',
+            '--expected-public-sha256', hashlib.sha256(second_before).hexdigest(),
+        )
+        self.assertIn('"migration": true', converted.stdout)
+        self.assertIn('Migrated prior state `ready-to-export`', second.read_text())
+        self.run_cli('validate')
+
+        closed_before = self.case.read_bytes()
+        self.case.write_bytes(closed_before.replace(
+            b'status: investigating', b'status: closed', 1
+        ))
+        prior_closed = self.case.read_bytes()
+        self.run_cli(
+            'transition', '--id', self.case_id, '--to', 'investigating',
+            '--reason', 'Prior closure outcome requires explicit review',
+            '--source', 'requested public lifecycle migration',
+            '--expected-public-sha256', hashlib.sha256(prior_closed).hexdigest(),
+        )
+        self.assertIn('Migrated prior state `closed`', self.case.read_text())
+        self.run_cli('validate')
+
+        self.case.write_text(self.case.read_text().replace(
+            'status: investigating',
+            'status: investigating\nresume-to: validating',
+            1,
+        ))
+        obsolete = self.case.read_bytes()
+        rejected = self.run_cli(
+            'transition', '--id', self.case_id, '--to', 'blocked',
+            '--blocked-on', 'synthetic dependency',
+            '--reason', 'Attempted non-conversion transition',
+            '--source', 'requested public lifecycle migration',
+            '--expected-public-sha256', hashlib.sha256(obsolete).hexdigest(),
+            ok=False,
+        )
+        self.assertIn('conversion must end in investigating', rejected.stderr)
+        self.assertEqual(obsolete, self.case.read_bytes())
+        self.run_cli(
+            'transition', '--id', self.case_id, '--to', 'investigating',
+            '--reason', 'Remove obsolete lifecycle metadata',
+            '--source', 'requested public lifecycle migration',
+            '--expected-public-sha256', hashlib.sha256(obsolete).hexdigest(),
+        )
+        self.assertNotIn('resume-to:', self.case.read_text())
+        self.run_cli('validate')
+
+    def test_undecided_purpose_is_active_but_cannot_complete(self):
+        undecided_id = '20260908-120200-undecided'
+        self.run_cli(
+            'open', '--id', undecided_id, '--title', 'Undecided case',
+            '--objective', 'Classify the requested outcome',
+            '--request-summary', 'Determine whether the outcome is knowledge or development.',
+            '--dedupe-key', 'undecided-case', '--purpose', 'undecided',
+            '--vault-outcome', 'not-evaluated', '--learning-outcome', 'not-evaluated',
+        )
+        path = self.root / undecided_id / 'investigation.md'
+        self.assertIn('status: investigating', path.read_text())
+        before = path.read_bytes()
+        rejected = self.run_cli(
+            'close', '--id', undecided_id, '--decision', 'complete',
+            '--reason', 'Premature completion', '--limitations', 'none',
+            '--source', 'synthetic closure review', '--evidence', 'E-001',
+            '--expected-public-sha256', hashlib.sha256(before).hexdigest(),
+            ok=False,
+        )
+        self.assertIn('resolved purpose', rejected.stderr)
+        self.assertEqual(before, path.read_bytes())
+        self.run_cli(
+            'close', '--id', undecided_id, '--decision', 'abandoned',
+            '--reason', 'Requester discontinued classification',
+            '--limitations', 'The intended outcome remains undecided',
+            '--source', 'synthetic abandonment decision',
+            '--expected-public-sha256', hashlib.sha256(before).hexdigest(),
+        )
+        closed = path.read_text()
+        self.assertIn('purpose: undecided', closed)
+        self.assertIn('closure-outcome: abandoned', closed)
+
+    def test_development_and_mixed_close_against_objective_without_export(self):
+        for offset, purpose in enumerate(('development', 'mixed'), start=3):
+            case_id = f'20260908-120{offset}00-{purpose}-scope'
+            self.run_cli(
+                'open', '--id', case_id, '--title', f'{purpose.title()} scope',
+                '--objective', 'Produce an agreed implementation specification',
+                '--request-summary', 'Define the implementation boundary; implementation is out of scope.',
+                '--dedupe-key', f'{purpose}-scope', '--purpose', purpose,
+                '--vault-outcome', 'none', '--learning-outcome', 'not-evaluated',
+            )
+            path = self.root / case_id / 'investigation.md'
+            before = path.read_bytes()
+            candidate = Path(self.tmp.name) / f'{purpose}-scope.md'
+            candidate.write_bytes(before.replace(
+                b'## Acceptance criteria\n',
+                b'## Acceptance criteria\n\n- AC-001 (met) - The agreed repository boundary and verification behavior are explicit.\n',
+            ))
+            self.run_cli(
+                'save', '--id', case_id,
+                '--public-candidate', str(candidate),
+                '--expected-public-sha256', hashlib.sha256(before).hexdigest(),
+                '--private-root', str(Path(self.tmp.name) / '.investigations-private'),
+                '--source', 'synthetic specification review', '--target', 'AC-001',
+            )
+            current = path.read_bytes()
+            self.run_cli(
+                'close', '--id', case_id, '--decision', 'complete',
+                '--reason', 'The agreed specification objective is verified',
+                '--limitations', 'Implementation and deployment are outside scope',
+                '--source', 'synthetic specification acceptance', '--evidence', 'AC-001',
+                '--expected-public-sha256', hashlib.sha256(current).hexdigest(),
+            )
+            self.assertIn('closure-outcome: completed', path.read_text())
+            self.assertFalse(any((path.parent / 'exports').iterdir()))
         self.run_cli('validate')
 
     def test_coordinated_save_rejects_stale_and_credentials_and_can_delete_private(self):
