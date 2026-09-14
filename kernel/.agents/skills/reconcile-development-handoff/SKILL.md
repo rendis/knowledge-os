@@ -51,11 +51,13 @@ Complete this stage when each direct dependent is `ready`, `partial`, `still-blo
 
 Immediately before the case write, invoke **Validate** again and require the same identity and closure fingerprint captured before evidence inspection. If either changed, discard the assembled local comparison and restart from the new snapshot; do not write a stale reconciliation.
 
-Pass the normalized vault-side context and exact closure fingerprint directly to `manage-investigation` through its **Reconcile development** route in the same interaction. Let that workflow update the case snapshot, stable registers, draft synchronization, readiness, learning assessment state, and History. Keep branch, pull-request, work-item, and implementation claims in future/undeployed state until a separate post-deployment `map-ecosystem` audit proves production.
+Pass the normalized vault-side context and exact closure fingerprint directly to `manage-investigation` through its **Reconcile development** route in the same interaction. Let that workflow update only the affected case snapshot, stable registers, draft synchronization, readiness, learning assessment state, and History, then reevaluate the global investigation objective and closure criteria. Keep branch, pull-request, work-item, and implementation claims in future/undeployed state until a separate post-deployment `map-ecosystem` audit proves production.
 
 When implementation evidence shows that the selected handoff is a production candidate or deployed, compare that evidence with its observed lifecycle state. Record the evidence in the case and preserve `ACTIVE.yaml`. If the state is inconsistent, report the exact mismatch for the worktree agent to resolve; reconciliation never invokes **Set state**.
 
-Complete reconciliation when the case validates, every observed material change and dependent card is represented, no unlogged delta remains, and any lifecycle mismatch is reported exactly. No tracker, source-code, Git remote, pull-request, deployment, worktree lifecycle, or technical-vault write is performed.
+Do not close, reopen, block, or unblock the investigation automatically. A terminal `ACTIVE.yaml` handoff state, merged branch, or observed deployment may satisfy one objective-specific criterion but is never the closure decision itself. If the reevaluation suggests a lifecycle action, report the evidence and let `manage-investigation` apply a separate explicit current-snapshot transition.
+
+Complete reconciliation when the case validates, every observed material change and dependent card is represented, no unlogged delta remains, global closure criteria were reevaluated without an automatic status change, and any lifecycle mismatch is reported exactly. No tracker, source-code, Git remote, pull-request, deployment, worktree lifecycle, or technical-vault write is performed.
 
 ## Authority
 

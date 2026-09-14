@@ -50,11 +50,11 @@ learning-outcome: not-evaluated
 - `knowledge`: answer or understand without defining a software delivery.
 - `development`: define, validate, or export a future change.
 - `mixed`: investigate current behavior and define a future change; keep both states separate.
-- `undecided`: allowed only during `intake`.
+- `undecided`: allowed while `investigating` or `blocked` as the requested outcome is classified. Resolve it before completed closure or any external or development output; an abandoned case may retain it.
 
 `vault-outcome` records the independent documentation path for the case's current durable candidate, if one exists:
 
-- `not-evaluated`: evidence is not yet sufficient to assess a current-state candidate; allowed during `intake` and `investigating`, but not when entering `validating`.
+- `not-evaluated`: evidence is not yet sufficient to assess a current-state candidate; allowed while investigating or blocked, but not for a completed closure.
 - `none`: no durable technical fact is a candidate.
 - `deferred-until-production`: the only candidate is a proposal or lacks deployment required by the cell evidence profile. Implemented source behavior may qualify before deployment under `documented-source`.
 - `candidate-for-audit`: a fact may qualify under the cell evidence profile, but `map-ecosystem` has not independently applied that profile's evidence gate.
@@ -73,12 +73,19 @@ For `purpose: mixed`, the field follows the current-state candidate when one exi
 
 The assessment itself is read-only. `manage-investigation` may record its observed outcome, target note, evidence boundary, case snapshot, and checks in Readiness and History after the assessment completes. When a later material input could change that result, preserve the prior event in History and reset the field to `not-evaluated`.
 
-Use `unknown` only when the value cannot be derived and does not justify a question. Add these fields only while blocked:
+Use `unknown` only when the value cannot be derived and does not justify a question. Add `blocked-on` only while blocked:
 
 ```yaml
 blocked-on: A-002 cannot be read
-resume-to: investigating
 ```
+
+Add `closure-outcome` only while closed:
+
+```yaml
+closure-outcome: completed
+```
+
+Allowed closure outcomes are `completed` and `abandoned`. `resume-to` is obsolete metadata and is invalid; unblocking and reopening always return to `investigating` while History preserves the prior state and reason.
 
 Allowed statuses are defined only in [readiness-and-lifecycle.md](readiness-and-lifecycle.md).
 

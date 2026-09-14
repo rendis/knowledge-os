@@ -12,7 +12,7 @@ Treat `investigations/<id>/investigation.md` as the canonical, versionable case.
 1. Load `../../../90-Meta/vault-resolution.md` and run `../../../90-Meta/resolve-vault.py` relative to this skill directory. Bind one canonical `VAULT_ROOT`; use `VAULT_ROOT/investigations/` as the public root.
 2. Require `investigations/` to be eligible for tracking. Require both `.investigations-private/` and the legacy `.investigations/` to be ignored and absent from `git ls-files` when they exist.
 3. Load [references/record-contract.md](references/record-contract.md) before creating or changing a case file.
-4. Resolve `scripts/investigation-case.py` relative to this skill. Use it for Open, Load, Save, Consolidate, Bind, Close, and validation; do not reproduce its discovery, locking, attribution, or rollback logic manually.
+4. Resolve `scripts/investigation-case.py` relative to this skill. Use it for Open, Load, Save, Transition, Consolidate, Bind, Close, and validation; do not reproduce its discovery, locking, attribution, or rollback logic manually.
 5. Before a mutating route, confirm that the vault checkout has effective Git `user.name` and `user.email`. The helper enforces this gate and never changes Git configuration.
 
 Complete preflight when the public root is trackable, private and legacy roots are ignored, and the record contract is loaded.
@@ -21,14 +21,15 @@ Complete preflight when the public root is trackable, private and legacy roots a
 
 - **Open**: create a case file from a message, bug, ticket, issue, or attachment.
 - **Resume**: find a case file by exact `id`, then `consolidated-from`, source reference, title, or keywords. Present candidates only when several match.
-- **Migrate**: when explicitly requested, load [references/migration.md](references/migration.md) and transform selected legacy cases without changing them.
+- **Migrate**: when explicitly requested, load [references/migration.md](references/migration.md); convert prior public lifecycle states and transform selected ignored legacy cases without changing their sources.
 - **Reconcile collaboration**: before accepting concurrent contributions, load [references/investigation-reconciliation.md](references/investigation-reconciliation.md).
 - **Investigate**: gather evidence, refine the current understanding, resolve contradictions, and record decisions.
 - **Bind development handoff**: own the case binding decision for one validated materialization or activation result; mutate only for a new or advanced revision.
 - **Reconcile development**: consume one normalized result from `reconcile-development-handoff` and update the exact source case.
 - **Consolidate**: reconcile duplicate case files into one canonical directory while retaining retired IDs in its lineage.
 - **Validate**: assess investigation readiness or, for an exact development package, read-only implementation sufficiency.
-- **Close**: apply the knowledge closure gate in [references/readiness-and-lifecycle.md](references/readiness-and-lifecycle.md); record the explicit decision, reason, and outstanding limitations. Stories and export are optional for knowledge outcomes.
+- **Transition**: block, unblock, or explicitly reopen through the current-snapshot transition command and [references/readiness-and-lifecycle.md](references/readiness-and-lifecycle.md).
+- **Close**: apply the objective-based closure gate in [references/readiness-and-lifecycle.md](references/readiness-and-lifecycle.md); record the outcome, reason, evidence, and outstanding limitations. Output and implementation are required only when the objective requires them.
 - **Export**: load [references/export-contract.md](references/export-contract.md) and create one or more local story drafts.
 - **Learn**: hand an exact case to `manage-investigation-derived-learning` for critical read-only assessment and optional authorized durable publication.
 - **Promote**: assess a documentation candidate under the cell evidence profile and hand eligible claims to `map-ecosystem`; this skill never writes the vault.
@@ -40,17 +41,17 @@ Use no parallel index. Interrogation may call `90-Meta/graph-query.py investigat
 1. Load [references/deduplication-and-consolidation.md](references/deduplication-and-consolidation.md), derive the immutable ID and stable `dedupe-key`, classify `purpose`, set the initial `vault-outcome` and `learning-outcome: not-evaluated`, then invoke the helper's `open` command.
 2. Resolve semantic ambiguity before invoking the helper. Route `definite_match` to **Resume** and continue only from `created`.
 3. Formalize only the relevant request. Do not preserve the conversation transcript or literal informal wording. Capture a durable source reference when available and process attachments under the record contract.
-4. Set `status: intake`. Resolve `purpose: undecided` before moving to `investigating`; `vault-outcome: not-evaluated` may remain while the investigation still lacks the evidence needed to assess a durable current-state candidate.
+4. Set `status: investigating`. `purpose: undecided` may remain while the requested outcome is being classified, but resolve it before completing the case or producing an external or development output. `vault-outcome: not-evaluated` may remain while the investigation still lacks the evidence needed to assess a durable current-state candidate.
 
 Complete when the case has no equivalent active case, has a unique ID, professional request summary, source, objective, scope, purpose, initial outcomes, attachment decisions, and creation history.
 
 ## Resume
 
-1. Search `investigations/` first. If only `.investigations/` contains the match, read it as legacy and require **Migrate** before any mutation.
+1. Search `investigations/` first. If a public match uses a prior lifecycle state or obsolete lifecycle metadata, require **Migrate** before ordinary mutation. If only `.investigations/` contains the match, read it as legacy and require **Migrate** before any mutation.
 2. Invoke `load --id <id>` after selecting the case. Read the entire returned public path and, when `private.available` is true, the returned private path. This lookup is mandatory even when the user does not mention private context. Label private provenance and keep it supplementary and non-authoritative. When it is absent, state that the requested private fact is unavailable instead of inferring it; the public case must remain intelligible.
 3. When `exports/` contains drafts, load [references/export-contract.md](references/export-contract.md) and inspect their source timestamps and register references.
 4. Reconstruct authoritative state from the public frontmatter and **Current state**; use public **History** only for provenance.
-5. Report the active status, purpose, outcomes, current understanding, blockers, open questions, handoffs, stale drafts, private-overlay availability, and next useful action.
+5. Report the status, closure outcome when closed, purpose, independent outcomes, current understanding, blockers, open questions, handoffs, stale drafts, private-overlay availability, and next useful action.
 
 Complete when one case file is selected, draft freshness is known, and the next action follows the current state without reviving superseded understanding.
 
@@ -89,7 +90,9 @@ Complete only when the canonical case contains exactly one mechanically valid bi
 3. Apply the assembled baseline deltas, changelog provenance, implementation/delivery/work-item evidence, and direct-dependent cards to Current state and the stable registers without re-reading or mutating the worktree. Record the closure fingerprint in the single reconciliation History event as the local snapshot binding.
 4. Reconcile affected drafts, reset a stale learning assessment when required, append one material History event, and run the case validator. Preserve a byte-level no-op when nothing in the case changed.
 
-Complete when the selected case alone represents the reconciled implementation and downstream context, its current/future boundary remains correct, every affected draft has an explicit synchronization state, structural validation passes, and no source repository, tracker, remote Git, pull request, deployment, or technical-vault write occurred.
+After updating the affected registers, reevaluate the global objective and closure criteria. Reconciliation never closes the investigation automatically and a handoff terminal state is not a closure decision. Leave the current investigation status unchanged unless the same interaction separately applies an explicit lifecycle transition with its own evidence and current snapshot.
+
+Complete when the selected case alone represents the reconciled implementation and downstream context, its current/future boundary remains correct, every affected draft has an explicit synchronization state, global closure criteria were reevaluated without an automatic close, structural validation passes, and no source repository, tracker, remote Git, pull request, deployment, or technical-vault write occurred.
 
 ## Consolidate
 
@@ -101,23 +104,33 @@ Complete when exactly one case directory remains for the equivalence group, its 
 
 For a request to assess whether an exact development package is complete enough to implement, read its source case and apply the [question-based implementation-sufficiency check](../manage-development-handoff/references/input-bundle.md#implementation-sufficiency). Report supported answers and concrete gaps without changing the case, package, tracker, or worktree. This assessment does not change investigation readiness or handoff lifecycle state.
 
-For investigation readiness instead, run the helper's `validate` command for structural and transactional invariants, then apply the lifecycle gate from [references/readiness-and-lifecycle.md](references/readiness-and-lifecycle.md). Move backward when new evidence invalidates readiness. When a required source is unreadable, report the observable failure, set `status: blocked`, and wait for the user to decide how to proceed.
+For investigation readiness instead, run the helper's `validate` command for structural and transactional invariants, then apply the lifecycle gate from [references/readiness-and-lifecycle.md](references/readiness-and-lifecycle.md). Keep `investigating` while useful work remains. When a required source prevents useful progress on the global objective, report the observable failure and invoke the helper's `transition --to blocked` command with `blocked-on`, a portable source, reason, and the current public SHA-256. A target-specific gap does not block the whole case when other useful work can continue.
 
-Complete a package assessment when the supported answers and gaps are reported without writes. Complete investigation-readiness validation when the status is supported by its gate, or `blocked` names the dependency, prior state, and user action required.
+Complete a package assessment when the supported answers and gaps are reported without writes. Complete lifecycle validation when the status is supported by its gate, or `blocked` names the concrete dependency and user or external action required.
+
+## Close
+
+1. Load [references/readiness-and-lifecycle.md](references/readiness-and-lifecycle.md) and evaluate the current objective, scope, registers, criteria, independent vault outcome, draft synchronization, and limitations. Do not infer completion from the case purpose, an export, a terminal handoff state, a merge, or a deployment claim.
+2. For `complete`, require a resolved purpose and cite one or more existing register IDs that support the objective-specific closure. Require implementation, publication, or deployment only when the objective or an applicable criterion requires it.
+3. For `abandoned`, require an explicit discontinuation decision and preserve the unresolved limitations. Evidence IDs are optional and `purpose` may remain undecided.
+4. Invoke the helper's `close` command with the exact SHA-256 returned by the latest load, decision, formalized reason, limitations, portable source, and every closure evidence ID. Never set `status` or `closure-outcome` through a normal save.
+5. If a closed case receives material new evidence, invoke `transition --to investigating` with the current SHA-256 and preserve the former closure in History before applying the evidence.
+
+Complete when the helper validates and atomically records `status: closed`, the explicit `closure-outcome`, attribution, reason, evidence boundary, and limitations, or when a failed semantic gate leaves the loaded bytes unchanged.
 
 ## Export
 
 1. Generate platform-neutral local drafts in `exports/` from [assets/story-template.md](assets/story-template.md).
 2. Match story kind and detail to the audience and purpose; split only independently deliverable outcomes.
 3. Stamp each draft with the current investigation `updated-at`, verify every referenced register item, and set its synchronization state from the export contract.
-4. Before `ready-to-export`, label drafts provisional and keep the lifecycle state unchanged; use them only to refine the investigation.
-5. When the user requests external publication of a release-ready draft, build the publication package defined by the export contract and hand it to `manage-operational-workflow`.
+4. Label a draft provisional until its selected-output sufficiency gate passes. Keep the lifecycle state unchanged; draft readiness never advances or closes the investigation.
+5. When the user requests external publication of an output-sufficient draft, build the publication package defined by the export contract and hand it to `manage-operational-workflow`.
 6. Keep connector selection, external-effect authorization, publication, and read-back verification inside that operational workflow.
 7. After the handoff returns a verified result, update the local draft and History with the non-sensitive external reference and publication status.
-8. When the user requests development handoff for one or more release-ready stories, load `../../../90-Meta/work-item-evidence.md`, obtain current exact work-item snapshots, and build one repository-specific package per target from the development section of the export contract. Complete its question-based implementation-sufficiency check before handing any package to the consumer.
+8. When the user requests development handoff for one or more output-sufficient stories, load `../../../90-Meta/work-item-evidence.md`, obtain current exact work-item snapshots, and build one repository-specific package per target from the development section of the export contract. Complete its question-based implementation-sufficiency check before handing any package to the consumer. Evaluate each selected story and repository independently; unrelated open work does not block the package.
 9. Treat an exact repository remote as mandatory but not sufficient for sharing. Require overlap in the named component or implementation scope. Include compatible existing `DH-NNN` entries as reuse candidates using repository and branch identity; never persist a local path.
 10. Hand the exact package directories, choice, and selected branch to `manage-development-handoff`; that skill resolves the local path from configuration and validates Git before use.
-11. Observe the consumer's terminal state. A target is complete only after **Bind development handoff** validates its stable `DH-NNN`; `materialized-unbound` is a source-case blocker with the repository state left inspectable and active for an exact retry.
+11. Observe the consumer's terminal state. A target is complete only after **Bind development handoff** validates its stable `DH-NNN`; `materialized-unbound` blocks that target, with the repository state left inspectable and active for an exact retry. Change the global investigation to `blocked` only when that target prevents all useful progress on the case objective.
 
 Complete when each draft is current and traces to the case file and evidence, every requested external publication has either been handed off with an exact current package or observed with a verified reference recorded locally, and every materialized development target has one current package plus one exact `DH-NNN` binding or an explicit source blocker.
 

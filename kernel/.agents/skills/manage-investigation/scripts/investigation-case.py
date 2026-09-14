@@ -49,14 +49,14 @@ LEARNING_OUTCOMES = {
     "candidate",
     "documented",
 }
-STATUSES = {
+STATUSES = {"investigating", "blocked", "closed"}
+CLOSURE_OUTCOMES = {"completed", "abandoned"}
+OBSOLETE_STATUSES = {
     "intake",
-    "investigating",
+    "scoped",
     "validating",
     "ready-to-export",
     "exported",
-    "closed",
-    "blocked",
 }
 CURRENT_PRODUCTIVE_STATE_ALIASES = (
     "Current productive state",
@@ -374,6 +374,12 @@ def parse_frontmatter(text: str) -> dict[str, Any]:
             index += 1
             continue
         key, raw_value = match.group(1), match.group(2) or ""
+        if key in fields:
+            raise CaseError(
+                "frontmatter_invalid",
+                f"investigation.md frontmatter repeats {key}",
+                field=key,
+            )
         if raw_value:
             fields[key] = scalar(raw_value)
             index += 1
@@ -1294,25 +1300,31 @@ def validate_root(root: Path, *, ignore_lock: bool = False) -> tuple[list[str], 
             errors.append(f"{relative}: invalid learning-outcome")
 
         status = str(record.fields.get("status", ""))
-        effective_status = status
         if status and status not in STATUSES:
             errors.append(f"{relative}: invalid status")
-        elif status == "blocked":
-            resume_to = str(record.fields.get("resume-to", ""))
-            if resume_to not in STATUSES - {"blocked"}:
-                errors.append(f"{relative}: blocked status requires a valid resume-to")
-            else:
-                effective_status = resume_to
-
-        if purpose == "undecided" and effective_status != "intake":
-            errors.append(f"{relative}: purpose undecided is allowed only during intake")
+        blocked_on = str(record.fields.get("blocked-on", ""))
+        closure_outcome = str(record.fields.get("closure-outcome", ""))
+        if "resume-to" in record.fields:
+            errors.append(f"{relative}: resume-to is legacy lifecycle metadata")
+        if status == "blocked" and not blocked_on:
+            errors.append(f"{relative}: blocked status requires blocked-on")
+        if status != "blocked" and blocked_on:
+            errors.append(f"{relative}: blocked-on is allowed only while blocked")
+        if status == "closed" and closure_outcome not in CLOSURE_OUTCOMES:
+            errors.append(f"{relative}: closed status requires a valid closure-outcome")
+        if status != "closed" and closure_outcome:
+            errors.append(f"{relative}: closure-outcome is allowed only while closed")
         if (
-            vault_outcome == "not-evaluated"
-            and effective_status not in {"intake", "investigating"}
+            purpose == "undecided"
+            and status == "closed"
+            and closure_outcome == "completed"
+        ):
+            errors.append(f"{relative}: a completed case requires a resolved purpose")
+        if vault_outcome == "not-evaluated" and (
+            status == "closed" and closure_outcome == "completed"
         ):
             errors.append(
-                f"{relative}: vault-outcome not-evaluated is allowed only during "
-                "intake or investigating"
+                f"{relative}: a completed case requires an evaluated vault-outcome"
             )
 
         if purpose in {"development", "mixed"}:
@@ -1438,6 +1450,14 @@ def validate_private_text(text: str, case_id: str) -> list[str]:
     return errors
 
 
+def declares_register(text: str, register_id: str) -> bool:
+    """Require a current register declaration, not a History-only reference."""
+    return re.search(
+        rf"(?m)^(?:-\s+|###\s+)`?{re.escape(register_id)}`?(?=$|[\s:—(])",
+        text,
+    ) is not None
+
+
 def save_case(args: argparse.Namespace, root: Path) -> int:
     """Atomically replace a reviewed public snapshot and optional private overlay."""
     candidate = args.public_candidate.read_bytes()
@@ -1539,7 +1559,21 @@ def save_case(args: argparse.Namespace, root: Path) -> int:
         candidate_fields = parse_frontmatter(public_text)
         if candidate_fields.get("id") != args.id:
             raise CaseError("candidate_invalid", "Public candidate id does not match the target")
-        missing_targets = [target for target in all_targets if target not in public_text]
+        lifecycle_fields = ("status", "blocked-on", "closure-outcome", "resume-to")
+        changed_lifecycle = [
+            field
+            for field in lifecycle_fields
+            if candidate_fields.get(field) != record.fields.get(field)
+        ]
+        if changed_lifecycle:
+            raise CaseError(
+                "status_transition_required",
+                "Lifecycle fields must change through transition or close",
+                fields=changed_lifecycle,
+            )
+        missing_targets = [
+            target for target in all_targets if not declares_register(public_text, target)
+        ]
         if missing_targets:
             raise CaseError(
                 "traceability_target_missing",
@@ -1662,6 +1696,30 @@ def replace_frontmatter_scalar(text: str, field: str, value: str) -> str:
         f"The canonical case has no {field} field",
         field=field,
     )
+
+
+def upsert_frontmatter_scalar(text: str, field: str, value: str) -> str:
+    try:
+        return replace_frontmatter_scalar(text, field, value)
+    except CaseError as error:
+        if error.code != "frontmatter_field_missing":
+            raise
+    lines = text.splitlines()
+    frontmatter_end = lines.index("---", 1)
+    lines.insert(frontmatter_end, f"{field}: {value}")
+    return "\n".join(lines) + ("\n" if text.endswith("\n") else "")
+
+
+def remove_frontmatter_fields(text: str, fields: set[str]) -> str:
+    lines = text.splitlines()
+    frontmatter_end = lines.index("---", 1)
+    prefixes = tuple(f"{field}:" for field in fields)
+    kept = [
+        line
+        for index, line in enumerate(lines)
+        if index >= frontmatter_end or not line.startswith(prefixes)
+    ]
+    return "\n".join(kept) + ("\n" if text.endswith("\n") else "")
 
 
 def archive_case(retired: Path, archive: Path, timestamp: str) -> None:
@@ -1865,39 +1923,229 @@ def consolidate_case(args: argparse.Namespace, root: Path) -> int:
     return 0
 
 
-def close_case(args: argparse.Namespace, root: Path) -> int:
-    reject_secret_input(args.reason, args.limitations)
-    for value in (args.reason, args.limitations):
+def validate_event_inputs(code: str, **values: str) -> None:
+    reject_secret_input(*values.values())
+    for field, value in values.items():
         if not value.strip() or "\n" in value or "\r" in value:
-            raise CaseError("closure_invalid", "Closure reason and limitations must be nonempty single lines")
+            raise CaseError(code, f"{field} must be one nonempty line")
+        if LOCAL_PATH_PATTERN.search(value):
+            raise CaseError(code, f"{field} must be portable")
+
+
+def transition_case(args: argparse.Namespace, root: Path) -> int:
+    values = {"reason": args.reason, "source": args.source}
+    if args.blocked_on is not None:
+        values["blocked-on"] = args.blocked_on
+    validate_event_inputs("transition_invalid", **values)
+    timestamp = timestamp_value(args.timestamp)
+    with locked(root):
+        records = {record.case_id: record for record in load_records(root)}
+        record = records.get(args.id)
+        if record is None:
+            raise CaseError("case_not_found", "Exact source case does not exist")
+        original = record.path.read_bytes()
+        if digest_bytes(original) != args.expected_public_sha256:
+            raise CaseError(
+                "stale_public_snapshot",
+                "Public investigation changed after it was read",
+                exit_code=3,
+                current_sha256=digest_bytes(original),
+            )
+        current = str(record.fields.get("status", ""))
+        migration_mode = (
+            current in OBSOLETE_STATUSES
+            or "resume-to" in record.fields
+            or (
+                current == "closed"
+                and record.fields.get("closure-outcome") not in CLOSURE_OUTCOMES
+            )
+        )
+        preexisting_errors, _ = validate_root(root, ignore_lock=True)
+        allowed = {
+            ("investigating", "blocked"),
+            ("blocked", "investigating"),
+            ("closed", "investigating"),
+        }
+        allowed.update((status, "investigating") for status in OBSOLETE_STATUSES)
+        if migration_mode:
+            allowed.add((current, "investigating"))
+        if (current, args.to) not in allowed:
+            raise CaseError(
+                "transition_invalid",
+                "Unsupported investigation lifecycle transition",
+                current=current,
+                requested=args.to,
+            )
+        if migration_mode and args.to != "investigating":
+            raise CaseError(
+                "transition_invalid",
+                "Prior lifecycle conversion must end in investigating",
+                current=current,
+                requested=args.to,
+            )
+        if args.to == "blocked" and not args.blocked_on:
+            raise CaseError("transition_invalid", "Blocking requires --blocked-on")
+        if args.to != "blocked" and args.blocked_on:
+            raise CaseError("transition_invalid", "--blocked-on is valid only when blocking")
+
+        updated = replace_frontmatter_scalar(record.text, "status", args.to)
+        updated = replace_frontmatter_scalar(updated, "updated-at", timestamp)
+        if args.to == "blocked":
+            updated = upsert_frontmatter_scalar(
+                updated,
+                "blocked-on",
+                json.dumps(args.blocked_on, ensure_ascii=False),
+            )
+        else:
+            updated = remove_frontmatter_fields(
+                updated,
+                {"blocked-on", "closure-outcome", "resume-to"},
+            )
+        locale = record_locale(updated)
+        if migration_mode:
+            subject = (
+                f"estado anterior `{current}`"
+                if locale == "es"
+                else f"prior state `{current}`"
+            )
+            action = (
+                f"{subject.capitalize()} migrado a `investigating`; razón: {args.reason}"
+                if locale == "es"
+                else f"Migrated {subject} to `investigating`; reason: {args.reason}"
+            )
+        elif current == "investigating":
+            action = (
+                f"Investigación bloqueada por {args.blocked_on}; razón: {args.reason}"
+                if locale == "es"
+                else f"Investigation blocked by {args.blocked_on}; reason: {args.reason}"
+            )
+        elif current == "blocked":
+            action = (
+                f"Investigación desbloqueada; razón: {args.reason}"
+                if locale == "es"
+                else f"Investigation unblocked; reason: {args.reason}"
+            )
+        else:
+            action = (
+                f"Investigación reabierta; razón: {args.reason}"
+                if locale == "es"
+                else f"Investigation reopened; reason: {args.reason}"
+            )
+        updated = append_history_event(
+            updated,
+            attributed_event(timestamp, action, args.identity, args.source, locale),
+        )
+        try:
+            atomic_write(record.path, updated.encode("utf-8"))
+            errors, warnings = validate_root(root, ignore_lock=True)
+            new_errors = sorted(set(errors) - set(preexisting_errors))
+            if errors and (not migration_mode or new_errors):
+                raise CaseError(
+                    "transition_validation_failed",
+                    "Lifecycle transition failed validation",
+                    errors=new_errors or errors,
+                )
+            if errors:
+                warnings.append(
+                    "Other pre-existing case errors remain; complete the requested "
+                    "public lifecycle migration before normal mutations"
+                )
+        except Exception:
+            atomic_write(record.path, original)
+            raise
+    emit(
+        {
+            "status": "transitioned",
+            "id": args.id,
+            "from": current,
+            "to": args.to,
+            "migration": migration_mode,
+            "warnings": warnings,
+        }
+    )
+    return 0
+
+
+def close_case(args: argparse.Namespace, root: Path) -> int:
+    validate_event_inputs(
+        "closure_invalid",
+        reason=args.reason,
+        limitations=args.limitations,
+        source=args.source,
+    )
     timestamp = timestamp_value(args.timestamp)
     with locked(root):
         records = {record.case_id: record for record in load_records(root)}
         if args.id not in records:
             raise CaseError("case_not_found", "Exact source case does not exist")
         record = records[args.id]
-        if (record.fields.get("purpose") != "knowledge"
-                or record.fields.get("status") == "closed"
-                or (args.decision == "complete" and record.fields.get("status") != "validating")):
-            raise CaseError("closure_gate_failed", "Completion requires validated knowledge; abandonment requires active knowledge")
+        if record.fields.get("status") == "closed":
+            raise CaseError("closure_gate_failed", "Investigation is already closed")
         original = record.path.read_bytes()
+        if digest_bytes(original) != args.expected_public_sha256:
+            raise CaseError(
+                "stale_public_snapshot",
+                "Public investigation changed after it was read",
+                exit_code=3,
+                current_sha256=digest_bytes(original),
+            )
+        if args.decision == "complete":
+            if record.fields.get("purpose") == "undecided":
+                raise CaseError("closure_gate_failed", "Completion requires a resolved purpose")
+            if record.fields.get("vault-outcome") == "not-evaluated":
+                raise CaseError("closure_gate_failed", "Completion requires an evaluated vault outcome")
+            if not args.evidence:
+                raise CaseError("closure_gate_failed", "Completion requires closure evidence IDs")
+        declared_exports = set()
+        for draft in (record.path.parent / "exports").glob("*.md"):
+            if draft.is_symlink() or not draft.is_file():
+                continue
+            try:
+                story_id = str(
+                    parse_frontmatter(draft.read_text(encoding="utf-8")).get(
+                        "story-id", ""
+                    )
+                )
+            except (CaseError, OSError, UnicodeDecodeError):
+                continue
+            if STORY_ID_RE.fullmatch(story_id):
+                declared_exports.add(story_id)
+        invalid_evidence = [
+            value
+            for value in args.evidence
+            if REGISTER_ID_PATTERN.fullmatch(value) is None
+            or (
+                not declares_register(record.text, value)
+                and value not in declared_exports
+            )
+        ]
+        if invalid_evidence:
+            raise CaseError(
+                "closure_gate_failed",
+                "Closure evidence must reference existing register IDs",
+                evidence=invalid_evidence,
+            )
         updated = replace_frontmatter_scalar(record.text, "status", "closed")
         updated = replace_frontmatter_scalar(updated, "updated-at", timestamp)
+        outcome = "completed" if args.decision == "complete" else "abandoned"
+        updated = upsert_frontmatter_scalar(updated, "closure-outcome", outcome)
+        updated = remove_frontmatter_fields(updated, {"blocked-on", "resume-to"})
         if args.decision == "abandoned" and record.fields.get("vault-outcome") == "not-evaluated":
             updated = replace_frontmatter_scalar(updated, "vault-outcome", "none")
         locale = record_locale(updated)
+        evidence = ", ".join(f"`{value}`" for value in args.evidence) or "none"
         closure_action = (
-            f"Cierre de conocimiento `{args.decision}`; razón: {args.reason}; "
-            f"limitaciones pendientes: {args.limitations}"
+            f"Investigación cerrada como `{outcome}`; razón: {args.reason}; "
+            f"evidencia: {evidence}; limitaciones pendientes: {args.limitations}"
             if locale == "es"
-            else f"Knowledge closure `{args.decision}`; reason: {args.reason}; "
-            f"outstanding limitations: {args.limitations}"
+            else f"Investigation closed as `{outcome}`; reason: {args.reason}; "
+            f"evidence: {evidence}; outstanding limitations: {args.limitations}"
         )
         event = attributed_event(
             timestamp,
             closure_action,
             args.identity,
-            "explicit closure decision",
+            args.source,
             locale,
         )
         updated = append_history_event(updated, event)
@@ -1909,7 +2157,7 @@ def close_case(args: argparse.Namespace, root: Path) -> int:
         except Exception:
             atomic_write(record.path, original)
             raise
-    emit({"status": "closed", "id": args.id, "decision": args.decision, "warnings": warnings})
+    emit({"status": "closed", "id": args.id, "outcome": outcome, "warnings": warnings})
     return 0
 
 
@@ -2060,11 +2308,26 @@ def build_parser() -> argparse.ArgumentParser:
     consolidate_parser.add_argument("--expected-retire-sha256", required=True)
     consolidate_parser.add_argument("--timestamp")
 
-    close_parser = commands.add_parser("close", help="close a validated knowledge outcome without export")
+    transition_parser = commands.add_parser(
+        "transition",
+        help="block, unblock, reopen, or convert one prior status with compare-and-swap",
+    )
+    transition_parser.add_argument("--id", required=True)
+    transition_parser.add_argument("--to", required=True, choices=("investigating", "blocked"))
+    transition_parser.add_argument("--reason", required=True)
+    transition_parser.add_argument("--source", required=True)
+    transition_parser.add_argument("--blocked-on")
+    transition_parser.add_argument("--expected-public-sha256", required=True)
+    transition_parser.add_argument("--timestamp")
+
+    close_parser = commands.add_parser("close", help="close one investigation with an explicit outcome")
     close_parser.add_argument("--id", required=True)
     close_parser.add_argument("--decision", required=True, choices=("complete", "abandoned"))
     close_parser.add_argument("--reason", required=True)
     close_parser.add_argument("--limitations", required=True)
+    close_parser.add_argument("--source", required=True)
+    close_parser.add_argument("--evidence", action="append", default=[])
+    close_parser.add_argument("--expected-public-sha256", required=True)
     close_parser.add_argument("--timestamp")
 
     bind_parser = commands.add_parser("bind", help="transactionally bind one validated handoff observation")
@@ -2095,13 +2358,15 @@ def main(argv: list[str] | None = None) -> int:
     try:
         args = build_parser().parse_args(argv)
         root = resolve_root(args.root, create=args.command == "open")
-        if args.command in {"open", "save", "consolidate", "close", "bind"}:
+        if args.command in {"open", "save", "consolidate", "transition", "close", "bind"}:
             args.identity = effective_git_identity(root.parent)
             args.note_locale = notes_locale(root.parent)
         if args.command == "open":
             return open_case(args, root)
         if args.command == "load":
             return load_case(args, root)
+        if args.command == "transition":
+            return transition_case(args, root)
         if args.command == "close":
             return close_case(args, root)
         if args.command == "bind":

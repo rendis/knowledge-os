@@ -16,7 +16,7 @@ Load this reference when preparing or validating a package for `plan` or `apply`
 
 The package is a one-way, self-contained export from `manage-investigation`. The development-handoff consumer receives the package directory only; it does not read or modify the investigation case, query the tracker, reconcile a story, or infer missing content.
 
-Create a package only after the investigation and story are release-ready and the copied work-item snapshot is verified current. If a current exact copy is unavailable, stop at the producer and report the missing source.
+Create a package only after the selected story-and-repository output is sufficient under the producer's export contract and the copied work-item snapshot is verified current. Investigation status and unrelated pending stories do not establish this result. If a current exact copy is unavailable, stop that target at the producer and report the missing source.
 
 ## Intake protocol
 
@@ -155,7 +155,7 @@ The case owner records only new or advanced materialized content revisions. An a
 
 ## Completion criterion
 
-The package is complete only when the schema validates, its tracker binding matches `instance.yaml`, the work-item copy is current and traceable, all three documents are non-empty and secret-free, the remote identifies one configured repository, the context and scope are specific to that repository, and the producer's implementation-sufficiency check passes. Helper validation establishes structural and repository integrity, not semantic completeness. Package completeness alone does not make a materialization or activation complete; the post-materialization binding must also validate.
+The package is complete only when the schema validates, its tracker binding matches `instance.yaml`, the work-item copy is current and traceable, all three documents are non-empty and secret-free, the remote identifies one configured repository, the context and scope are specific to that repository, and the producer's implementation-sufficiency check passes for this selected target. Helper validation establishes structural and repository integrity, not semantic completeness. Another story or repository may remain pending without blocking this package. Package completeness alone does not make a materialization or activation complete; the post-materialization binding must also validate, and neither event closes the source investigation automatically.
 
 ## Optional source context
 

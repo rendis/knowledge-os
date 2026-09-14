@@ -408,6 +408,48 @@ class BootstrapEval(unittest.TestCase):
         self.assertIn("selected entry is not `active`", repository_state)
         self.assertNotIn("while another family is active", repository_state)
 
+    def test_investigation_lifecycle_is_three_state_and_output_scoped(self) -> None:
+        helper_path = (
+            DIST
+            / "kernel/.agents/skills/manage-investigation/scripts/investigation-case.py"
+        )
+        module_name = "investigation_case_lifecycle_eval"
+        spec = importlib.util.spec_from_file_location(module_name, helper_path)
+        self.assertIsNotNone(spec)
+        self.assertIsNotNone(spec.loader)
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[module_name] = module
+        self.addCleanup(sys.modules.pop, module_name, None)
+        spec.loader.exec_module(module)
+        self.assertEqual(module.STATUSES, {"investigating", "blocked", "closed"})
+        self.assertEqual(module.CLOSURE_OUTCOMES, {"completed", "abandoned"})
+
+        lifecycle = (
+            DIST
+            / "kernel/.agents/skills/manage-investigation/references/readiness-and-lifecycle.md"
+        ).read_text(encoding="utf-8")
+        export_contract = (
+            DIST
+            / "kernel/.agents/skills/manage-investigation/references/export-contract.md"
+        ).read_text(encoding="utf-8")
+        input_bundle = (
+            DIST
+            / "kernel/.agents/skills/manage-development-handoff/references/input-bundle.md"
+        ).read_text(encoding="utf-8")
+        reconciler = (
+            DIST / "kernel/.agents/skills/reconcile-development-handoff/SKILL.md"
+        ).read_text(encoding="utf-8")
+
+        for status in ("`investigating`", "`blocked`", "`closed`"):
+            self.assertIn(status, lifecycle)
+        self.assertIn("Do not store `resume-to`", lifecycle)
+        self.assertIn("objective", lifecycle)
+        self.assertIn("unrelated pending story", lifecycle)
+        self.assertIn("selected story-and-repository output", input_bundle)
+        self.assertIn("Another story or repository may remain pending", input_bundle)
+        self.assertIn("None of these events closes the investigation automatically", export_contract)
+        self.assertIn("Do not close, reopen, block, or unblock the investigation automatically", reconciler)
+
     def test_investigation_reconciliation_requires_semantic_review_after_clean_merge(self) -> None:
         runbook = (
             DIST

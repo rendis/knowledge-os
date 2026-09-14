@@ -4,7 +4,7 @@
 
 Create every export locally before considering publication. Use [../assets/story-template.md](../assets/story-template.md) and store drafts as `exports/S-<number>-<slug>.md`.
 
-An active investigation may create a provisional draft to obtain feedback. Label it prominently, keep the investigation in its current lifecycle state, and retain unresolved questions. Only a draft produced after the `ready-to-export` gate can support the transition to `exported`.
+An investigation may create a provisional draft to obtain feedback. Label it prominently, keep the investigation in its current lifecycle state, and retain unresolved questions. Export has no investigation status transition; a draft becomes eligible for publication only after its selected-output sufficiency gate passes.
 
 Required metadata:
 
@@ -31,7 +31,7 @@ After a material case-file change, inspect every local draft that references the
 
 - For `publication-status: draft`, update its content and `updated-at`, copy the current case timestamp into `source-updated-at`, and restore `current`. If reconciliation cannot finish in the same interaction, set `stale` and add a prominent reason; do not leave an unlabeled mismatch.
 - Treat a `published` draft as an immutable publication snapshot. Do not silently rewrite or republish it. Create a new draft with a new `S` identifier for changed work and record the relationship in History.
-- Never hand off a stale draft for publication or use it to satisfy a lifecycle gate.
+- Never hand off a stale draft for publication or use it to satisfy an output-sufficiency gate.
 
 Append one case History event naming every reconciled, marked-stale, or replacement draft.
 
@@ -45,7 +45,7 @@ Create multiple stories only when outcomes are independently deliverable and ver
 
 ## Publication handoff
 
-Keep publication outside this skill. When the user requests external publication, require `synchronization-status: current` and build a package containing:
+Keep publication outside this skill. When the user requests external publication, evaluate the selected draft independently. Require `synchronization-status: current`, a resolved case purpose, supported outcome and audience, applicable decisions and acceptance criteria, and no unresolved question or dependency that could change that exact output. Unrelated pending stories or optional investigation branches do not block it. Then build a package containing:
 
 - source investigation ID and `updated-at`;
 - exact draft paths and story IDs;
@@ -59,7 +59,7 @@ When no compatible integration exists, deliver the local Markdown draft without 
 
 ## Development handoff
 
-A development handoff is separate from publication. Require a release-ready development or mixed story, one exact current work-item snapshot, and an explicit target remote for every repository that owns implementation work.
+A development handoff is separate from publication. Require an output-sufficient development or mixed story, one exact current work-item snapshot, and an explicit target remote for every repository that owns implementation work. Case status does not establish or deny package sufficiency; evaluate only the selected story, work item, repository boundary, applicable decisions, criteria, evidence, questions, and dependencies. A global blocker permits the package only when evidence establishes that it cannot change this selected output.
 
 Before materialization, require an exact repository remote and explicit overlap in the named component or implementation scope before proposing a shared worktree. A common remote alone is not enough; otherwise use a separate worktree. Compare new packages with existing `DH-NNN` entries by repository and branch. Resolve a selected branch to a local path only at runtime; persist no grouping or local-path artifact.
 
@@ -80,6 +80,6 @@ Keep repository evidence flow one-way: hand only exact package directories and t
 
 ## Completion criterion
 
-A provisional export is complete when it is current, traceable, and exposes its unresolved gaps. A stale draft is only a recorded follow-up obligation. A release-ready export is complete when its audience, kind, outcome, scope, acceptance criteria, dependencies, evidence, register references, and source investigation snapshot are coherent. A publication handoff is complete when the operational workflow receives the exact current package; publication is complete only when its verified external reference is observed and recorded locally. A development handoff package is complete only when the linked input contract passes independently for every target repository; materialization or activation is complete only after its exact `DH-NNN` binding passes case validation.
+A provisional export is complete when it is current, traceable, and exposes its unresolved gaps. A stale draft is only a recorded follow-up obligation. An output-sufficient export is complete when its audience, kind, outcome, scope, acceptance criteria, applicable dependencies, evidence, register references, and source investigation snapshot are coherent. Readiness is per selected output: another `S-NNN`, work item, or repository may remain pending. A publication handoff is complete when the operational workflow receives the exact current package; publication is complete only when its verified external reference is observed and recorded locally. A development handoff package is complete only when the linked input contract passes independently for every target repository; materialization or activation is complete only after its exact `DH-NNN` binding passes case validation. None of these events closes the investigation automatically.
 
 For an optional portable, read-only source reference in `context.md`, follow [input-bundle.md](../../manage-development-handoff/references/input-bundle.md#optional-source-context). Include essential context in the package even when an anchor is present.
