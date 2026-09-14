@@ -26,7 +26,11 @@ def run(args):
     if args.variant != 'original':
         observation = root / 'sources/observations.json'
         data = json.loads(observation.read_text())
-        physical, reserved, result = (12, 2500, 9.5) if args.variant == 'alternate' else (14, 3250, 10.75)
+        physical, reserved, result = {
+            'alternate': (12, 2500, 9.5),
+            'fractional': (14, 3250, 10.75),
+            'boundary': (18, 2250, 15.75),
+        }[args.variant]
         data['request'] = {'physical': physical, 'reserved_milliunits': reserved}
         data['interactive_result'] = result
         observation.write_text(json.dumps(data, indent=2))
@@ -41,17 +45,20 @@ def run(args):
     obsidian.chmod(0o755)
     for task_path in (root / 'tasks').glob('*.txt'):
         task_path.write_text(task_path.read_text() + '\nAn offline executable stub is supplied at bin/obsidian. When using the local vault resolver, prepend the absolute bin/ directory to PATH so registration discovery cannot contact the host application.\n')
+    tasks = ['continuity-1', 'continuity-2', 'continuity-3'] if args.task == 'continuity' else [args.task]
+    requests = {task: (root / 'tasks' / f'{task}.txt').read_text() for task in tasks}
+    shutil.rmtree(root / 'tasks')  # requests are supplied only at their actual conversation turn
+    (root / 'task.txt').unlink()
     if args.task == 'overlay-absent':
         overlay = root / 'vault/.investigations-private/20260908-090000-reader-units'
         shutil.rmtree(overlay)  # exact synthetic fixture, never a consumer
     hashes = {str(p.relative_to(root)): hashlib.sha256(p.read_bytes()).hexdigest()
               for p in root.rglob('*') if p.is_file() and '.git' not in p.parts}
     (evaluator / 'baseline-hashes.json').write_text(json.dumps(hashes, indent=2, sort_keys=True))
-    tasks = ['continuity-1', 'continuity-2', 'continuity-3'] if args.task == 'continuity' else [args.task]
     session_id = None
     results = []
     for task in tasks:
-        prompt = (root / 'tasks' / f'{task}.txt').read_text()
+        prompt = requests[task]
         before = fingerprint(root / 'vault')
         result = evaluator / f'{task}-result.md'
         command = ['codex', 'exec', '--skip-git-repo-check', '--ignore-user-config',
@@ -86,5 +93,5 @@ if __name__ == '__main__':
     parser.add_argument('--task', choices=['simple', 'diagnosis', 'cross-source', 'cloud', 'missing', 'variants', 'continuity', 'overlay', 'overlay-absent', 'document', 'routes', 'operational'], required=True)
     parser.add_argument('--model', required=True)
     parser.add_argument('--effort', default='low')
-    parser.add_argument('--variant', choices=['original', 'alternate', 'fractional'], default='original')
+    parser.add_argument('--variant', choices=['original', 'alternate', 'fractional', 'boundary'], default='original')
     run(parser.parse_args())
