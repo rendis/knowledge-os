@@ -25,6 +25,11 @@ class AnalysisRunnerTests(unittest.TestCase):
         def fake_codex(command, **kwargs):
             if command[0] != "codex":
                 return REAL_RUN(command, **kwargs)
+            if task == "diagnosis":
+                # Assert isolation at launch, not only after the executor returns.
+                for relative in ("sources/review-note.md", "sources/accepted-agreement.md",
+                                 "tasks", "task.txt", "package.md", "worktree"):
+                    self.assertFalse((Path(kwargs["cwd"]) / relative).exists(), relative)
             calls.append((command, kwargs["input"]))
             kwargs["stdout"].write(json.dumps({"type": "thread.started", "thread_id": "synthetic-session-17"}) + "\n")
             Path(command[command.index("--output-last-message") + 1]).write_text("Synthetic process result.\n")
