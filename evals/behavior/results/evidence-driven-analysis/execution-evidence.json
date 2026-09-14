@@ -958,12 +958,12 @@
     }
   },
   "suites": {
-    "bootstrap-final": "...................................\n----------------------------------------------------------------------\nRan 35 tests in 17.932s\n\nOK\n",
+    "bootstrap-final": "...................................\n----------------------------------------------------------------------\nRan 35 tests in 17.139s\n\nOK\n",
     "fixture-final": "...\n----------------------------------------------------------------------\nRan 3 tests in 2.234s\n\nOK\n",
-    "instance-final": "........\n----------------------------------------------------------------------\nRan 8 tests in 0.025s\n\nOK\n",
+    "instance-final": "........\n----------------------------------------------------------------------\nRan 8 tests in 0.022s\n\nOK\n",
     "portability-final": ".\n----------------------------------------------------------------------\nRan 1 test in 1.811s\n\nOK\n",
     "query-final": "....\n----------------------------------------------------------------------\nRan 4 tests in 0.279s\n\nOK\n",
-    "runner-final": "<temporary>\ndiagnosis: execution complete, 0 changed vault paths\n<temporary>\ndiagnosis: execution complete, 0 changed vault paths\n.",
+    "runner-final": "<temporary>\ndiagnosis: execution complete, 0 changed vault paths\n<temporary>\ndiagnosis: execution complete, 0 changed vault paths\n.<temporary>\ncontinuity-1: execution complete, 0 changed vault paths\ncontinuity-2: execution complete, 0 changed vault paths\ncontinuity-3: execution complete, 0 changed vault paths\n.<temporary>\n.<temporary>\ndiagnosis: execution complete, 0 changed vault paths\n.\n----------------------------------------------------------------------\nRan 4 tests in 3.880s\n\nOK\n",
     "transactions-final": "......................\n----------------------------------------------------------------------\nRan 22 tests in 9.557s\n\nOK\n",
     "workspace-final": "........\n----------------------------------------------------------------------\nRan 8 tests in 0.244s\n\nOK\n"
   },
@@ -971,8 +971,8 @@
     "instance": {
       "status": "valid"
     },
-    "kernel_version_installed": "0.7.23",
-    "distribution_revision_installed": "8507e5c7ecde5dd8171ff2f7ae3e7a9a80eabf93",
+    "kernel_version_installed": "0.7.24",
+    "distribution_revision_installed": "525b440c3835bfabdeb94b7989e20102ebb6e53e",
     "distribution_dirty_installed": false,
     "reproducible_distribution": true,
     "managed_matches_dist": true,
@@ -983,12 +983,72 @@
     "instance": {
       "status": "valid"
     },
-    "kernel_version_installed": "0.7.23",
-    "distribution_revision_installed": "8507e5c7ecde5dd8171ff2f7ae3e7a9a80eabf93",
+    "kernel_version_installed": "0.7.24",
+    "distribution_revision_installed": "525b440c3835bfabdeb94b7989e20102ebb6e53e",
     "distribution_dirty_installed": false,
     "reproducible_distribution": true,
     "managed_matches_dist": true,
     "drift": [],
     "distribution_drift": []
+  },
+  "isolation": {
+    "criterion": "User confirmed concurrent original work; verify no candidate propagation or modification of protected originals by this execution, not global filesystem stasis",
+    "originals": {
+      "cell-a": {
+        "initial_file_count": 4047,
+        "initial_head": "a6ca7e1ca5900cbdde43b3dc171be1805e98b754",
+        "observed_head": "69c4e66e5cf866b1d6c688e2508a3ae2ecbd1c65",
+        "observed_version": "0.7.23",
+        "invariants": {
+          "local_git_configuration_unchanged": true,
+          "git_status_unchanged": true,
+          "protected_paths_unchanged": true,
+          "candidate_skill_absent": true
+        },
+        "concurrent_tracked_changes": [
+          ".agents/skills/map-ecosystem/references/mapping-completion.md",
+          ".knowledge-os.lock.yaml",
+          "90-Meta/check-map-closure.py",
+          "VERSION"
+        ],
+        "concurrent_changed_path_count": 5,
+        "initial_snapshot_sha256": "a34b1f69b51b44dbefb22534d5d44b57a1229a95cccd6bf573a29e99624c2b20"
+      },
+      "cell-c": {
+        "initial_file_count": 1006,
+        "initial_head": "ec501b16bc39ca7256567d19f455b04815643454",
+        "observed_head": "97288ef06ae81ef2bff4ca8a8eab0af33f5e17fd",
+        "observed_version": "0.7.23",
+        "invariants": {
+          "local_git_configuration_unchanged": true,
+          "git_status_unchanged": true,
+          "protected_paths_unchanged": true,
+          "candidate_skill_absent": true
+        },
+        "concurrent_tracked_changes": [
+          ".agents/skills/map-ecosystem/references/mapping-completion.md",
+          ".knowledge-os.lock.yaml",
+          "00-Home.md",
+          "20-Repos/cell-b/posx-db-liquibase-bigquery-fal.md",
+          "20-Repos/cell-b/posx-db-liquibase-bigquery-tot.md",
+          "20-Repos/cell-b/posx-store-operations-command.md",
+          "\"60-Operacion/GCP/GCP - Observaci\\303\\263n runtime Cell B PROD - 2026-09-14.md\"",
+          "\"90-Meta/Cobertura de sincronizaci\\303\\263n.md\"",
+          "90-Meta/check-map-closure.py",
+          "VERSION"
+        ],
+        "concurrent_changed_path_count": 28,
+        "initial_snapshot_sha256": "39d5ea99e4ee6c418b630b9c1b5ce50055c6bc159b63c77e979153e643a1e1e9"
+      }
+    }
+  },
+  "coordinator_numeric_check": {
+    "input": [
+      18,
+      2250
+    ],
+    "interactive": 15.75,
+    "batch": 0,
+    "assertion": "passed against unchanged c8 source; captured in coordinator tool output, separate from executor stdout"
   }
 }
