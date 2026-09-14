@@ -1,5 +1,6 @@
 """Exercise real fixture preparation while replacing only the Codex process."""
 import argparse
+import hashlib
 import json
 from pathlib import Path
 import subprocess
@@ -49,6 +50,8 @@ class AnalysisRunnerTests(unittest.TestCase):
             self.assertFalse((args.output / "sources/accepted-agreement.md").exists())
             self.assertFalse((args.output / "package.md").exists())
             self.assertFalse((args.output / "worktree").exists())
+            self.assertFalse((args.output / "tasks").exists())
+            self.assertFalse((args.output / "task.txt").exists())
             self.assertEqual(list(args.output.rglob("*-events.jsonl")), [])
             self.assertFalse((args.output / "observed.json").exists())
             self.assertTrue((args.evaluation_output / "diagnosis-events.jsonl").is_file())
@@ -60,9 +63,12 @@ class AnalysisRunnerTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             args, calls = self.execute(Path(temporary), "continuity")
             self.assertEqual(len(calls), 3)
+            observed = json.loads((args.evaluation_output / "observed.json").read_text())
             for index, (command, prompt) in enumerate(calls, 1):
                 self.assertNotIn("--ephemeral", command)
-                self.assertEqual(prompt, (args.output / f"tasks/continuity-{index}.txt").read_text())
+                self.assertEqual(hashlib.sha256(prompt.encode()).hexdigest(), observed[index - 1]["prompt_sha256"])
+                self.assertNotIn('Synthetic process result', prompt)
+                self.assertFalse((args.output / 'tasks').exists())
                 if index == 1:
                     self.assertNotIn("resume", command)
                 else:

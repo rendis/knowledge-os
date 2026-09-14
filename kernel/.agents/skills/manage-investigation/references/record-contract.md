@@ -223,6 +223,16 @@ Inspect before persisting. When a source exposes credentials, tokens, private ke
 
 ## Completion criterion
 
+Before invoking a persistence command, review the candidate for documentary necessity as well as validity. Reject and shorten a candidate that fails these checks:
+
+- Each material detail has one home. Questions own missing inputs and next steps; evidence owns findings and their limits; decisions own actual choices; Current state and Readiness refer to those IDs rather than repeat their contents.
+- A request to create the case is already represented by Request summary and the attributed creation event. It is not a domain decision. An unresolved scope choice belongs in Questions, not another decision saying it remains pending.
+- Preserve the causal explanation and decisive check together at the appropriate level. Do not expand one conclusion into separate entries for obvious arithmetic, a restated conclusion, and the same refuted suspicion. Separate entries only when they carry independently useful evidence or meaning.
+- Acceptance criteria say what will establish completion, using question/evidence IDs instead of duplicating their data collection instructions. Readiness adds only current readiness and the next relevant ID; frontmatter already carries outcomes and status.
+- Do not enumerate every operation that was not requested or every safeguard followed. State material boundaries once; leave unchanged or inapplicable sections empty rather than filling them for appearance.
+
+This is an editing gate, not a new persisted schema or a word-count quota. Retain enough source and uncertainty to support the next action; removing duplication must never hide a contradiction or missing evidence.
+
 The record conforms when identity and register meanings are immutable, the current snapshot matches the latest material evidence and decisions, registers are traceable without reused IDs, every materialized development target has one exact `DH-NNN` binding, History preserves chronology, attachment and consolidation handling is explicit, affected exports have an explicit synchronization state, and no secret value is persisted.
 
 Binding metadata does not change the case semantic `updated-at`. Its independent materialization/event timestamp preserves export freshness; material evidence or decision changes still advance `updated-at`.
