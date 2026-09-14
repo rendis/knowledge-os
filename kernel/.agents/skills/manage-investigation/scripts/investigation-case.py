@@ -2227,6 +2227,11 @@ def bind_case(args: argparse.Namespace, root: Path) -> int:
             raise CaseError("case_not_found", "Exact source case does not exist")
         record = records[args.id]
         original = record.path.read_bytes()
+        if digest_bytes(original) != args.expected_public_sha256:
+            raise CaseError(
+                "stale_public_snapshot", "Public investigation changed after binding review",
+                exit_code=3, current_sha256=digest_bytes(original),
+            )
         text = original.decode("utf-8")
         errors, warnings = validate_root(root, ignore_lock=True)
         if errors:
@@ -2237,9 +2242,15 @@ def bind_case(args: argparse.Namespace, root: Path) -> int:
                 raise CaseError("case_symlink", "Story drafts must not be symlinks")
             metadata = parse_frontmatter(draft.read_text(encoding="utf-8"))
             if metadata.get("story-id") == fields["Story ID"]:
-                stories.append(metadata)
-        if len(stories) != 1 or stories[0].get("source-investigation") != args.id:
+                stories.append((metadata, draft))
+        if len(stories) != 1 or stories[0][0].get("source-investigation") != args.id:
             raise CaseError("binding_story_missing", "Source case must contain one exact story draft")
+        story_digest = sha256(stories[0][1])
+        if story_digest != args.expected_story_sha256:
+            raise CaseError(
+                "stale_story_snapshot", "Source story changed after binding review",
+                exit_code=3, current_sha256=story_digest,
+            )
         lines, count = development_handoff_section(text)
         if count != 1 or lines is None:
             raise CaseError("binding_section_missing", "Source case needs Development handoffs section")
@@ -2380,6 +2391,8 @@ def build_parser() -> argparse.ArgumentParser:
     bind_parser = commands.add_parser("bind", help="transactionally bind one validated handoff observation")
     bind_parser.add_argument("--id", required=True)
     bind_parser.add_argument("--observation", required=True, type=Path)
+    bind_parser.add_argument("--expected-public-sha256", required=True)
+    bind_parser.add_argument("--expected-story-sha256", required=True)
 
     save_parser = commands.add_parser(
         "save",

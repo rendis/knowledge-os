@@ -35,9 +35,24 @@ class Transactions(unittest.TestCase):
         digest = hashlib.sha256(b'delivery|ABC-123|example.invalid/team/repository').hexdigest()
         observation = {'story-id': 'S-001', 'tracker-id': 'delivery', 'provider': 'example', 'tracker-url': 'https://tracker.example.com', 'work-item-reference': 'ABC-123', 'repository-remote': 'example.invalid/team/repository', 'branch': 'issue/abc-123-change', 'handoff-id': digest, 'family': f'delivery-abc-123-{digest[:10]}--repository', 'revision': 'v0001', 'materialized-at': '2026-09-09T12:00:00+00:00'}
         path = Path(self.tmp.name) / 'observation.json'
-        def bind(ok=True):
+        def bind(ok=True, public_sha=None, story_sha=None):
             path.write_text(json.dumps(observation))
-            return self.run_cli('bind', '--id', self.case_id, '--observation', str(path), ok=ok)
+            return self.run_cli(
+                'bind', '--id', self.case_id, '--observation', str(path),
+                '--expected-public-sha256', public_sha or hashlib.sha256(self.case.read_bytes()).hexdigest(),
+                '--expected-story-sha256', story_sha or hashlib.sha256((self.case.parent / 'exports' / 'S-001-story.md').read_bytes()).hexdigest(),
+                ok=ok,
+            )
+        public_sha = hashlib.sha256(self.case.read_bytes()).hexdigest()
+        self.case.write_text(self.case.read_text().replace('### Facts\n', '### Facts\n\n- E-001: Scope changed after review.\n'))
+        changed = self.case.read_bytes()
+        self.assertIn('stale_public_snapshot', bind(False, public_sha=public_sha).stderr)
+        self.assertEqual(changed, self.case.read_bytes())
+        story = self.case.parent / 'exports' / 'S-001-story.md'
+        story_sha = hashlib.sha256(story.read_bytes()).hexdigest()
+        story.write_text(story.read_text() + '\nChanged implementation scope.\n')
+        self.assertIn('stale_story_snapshot', bind(False, story_sha=story_sha).stderr)
+        self.assertEqual(changed, self.case.read_bytes())
         bind()
         bound = self.case.read_bytes()
         self.assertIn(next(x for x in original.splitlines() if x.startswith('updated-at:')), self.case.read_text())
@@ -54,6 +69,32 @@ class Transactions(unittest.TestCase):
         bind()
         self.run_cli('validate')
         self.assertFalse((self.root / '.open.lock').exists())
+
+    def test_reconciliation_content_then_lifecycle_uses_fresh_snapshot(self):
+        before = self.case.read_bytes()
+        candidate = Path(self.tmp.name) / 'reconciled.md'
+        candidate.write_bytes(before.replace(b'### Facts\n', b'### Facts\n\n- E-001: Both contributions require the missing source.\n'))
+        self.run_cli(
+            'save', '--id', self.case_id, '--public-candidate', str(candidate),
+            '--private-root', str(Path(self.tmp.name) / '.investigations-private'),
+            '--expected-public-sha256', hashlib.sha256(before).hexdigest(),
+            '--source', 'common-base b1; current c1; contribution c2', '--target', 'E-001',
+        )
+        saved = self.case.read_bytes()
+        def block(digest, ok=True):
+            return self.run_cli(
+                'transition', '--id', self.case_id, '--to', 'blocked',
+                '--blocked-on', 'Required source unavailable',
+                '--reason', 'Reviewed lifecycle disposition from c1 and c2',
+                '--source', 'common-base b1; current c1; contribution c2',
+                '--expected-public-sha256', digest, ok=ok,
+            )
+        self.assertIn('stale_public_snapshot', block(hashlib.sha256(before).hexdigest(), False).stderr)
+        self.assertEqual(saved, self.case.read_bytes())
+        block(hashlib.sha256(saved).hexdigest())
+        self.assertIn('status: blocked', self.case.read_text())
+        self.assertIn('E-001: Both contributions', self.case.read_text())
+        self.run_cli('validate')
 
     def test_knowledge_close_without_story_or_export(self):
         before = self.case.read_bytes()
