@@ -581,9 +581,14 @@ def render_case(args: argparse.Namespace, timestamp: str, identity: GitIdentity)
 def timestamp_value(raw: str | None) -> str:
     if raw is not None:
         try:
-            datetime.fromisoformat(raw)
+            parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
         except ValueError as error:
             raise CaseError("invalid_timestamp", "Timestamp must be ISO-8601") from error
+        if parsed.tzinfo is None or parsed.utcoffset() is None:
+            raise CaseError(
+                "invalid_timestamp",
+                "Timestamp must be ISO-8601 with a UTC offset",
+            )
         return raw
     return datetime.now().astimezone().isoformat(timespec="seconds")
 
@@ -1249,6 +1254,18 @@ def validate_root(root: Path, *, ignore_lock: bool = False) -> tuple[list[str], 
         for field in REQUIRED_FIELDS:
             if not record.fields.get(field):
                 errors.append(f"{relative}: missing {field}")
+        for field in ("created-at", "updated-at"):
+            value = str(record.fields.get(field, ""))
+            if value and not has_offset_timestamp(value):
+                errors.append(f"{relative}: {field} must be an ISO-8601 timestamp with offset")
+        for line in record.text.splitlines():
+            if "; recorded by " not in line and "; registrado por " not in line:
+                continue
+            timestamp, separator, _ = line.removeprefix("- ").partition(" — ")
+            if not separator or not has_offset_timestamp(timestamp):
+                errors.append(
+                    f"{relative}: attributed History events require an ISO-8601 timestamp with offset"
+                )
         if record.case_id in ids:
             errors.append(f"duplicate id: {record.case_id}")
         ids[record.case_id] = record.path
@@ -1410,6 +1427,14 @@ def validate_private_text(text: str, case_id: str) -> list[str]:
         for index, aliases in enumerate(required_aliases)
     ):
         errors.append("private overlay must contain the required sections once and in order")
+    for line in text.splitlines():
+        if "; recorded by " not in line and "; registrado por " not in line:
+            continue
+        timestamp, separator, _ = line.removeprefix("- ").partition(" — ")
+        if not separator or not has_offset_timestamp(timestamp):
+            errors.append(
+                "private attributed History events require an ISO-8601 timestamp with offset"
+            )
     return errors
 
 

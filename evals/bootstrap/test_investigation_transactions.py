@@ -258,6 +258,44 @@ class Transactions(unittest.TestCase):
             self.assertIn('Expediente creado; registrado por Registrador', text)
             self.assertNotIn('## Request summary', text)
 
+    def test_naive_timestamps_are_rejected_without_writes(self):
+        before = self.case.read_bytes()
+        candidate = Path(self.tmp.name) / 'naive-save.md'
+        candidate.write_bytes(
+            before.replace(
+                b'## Open questions\n',
+                b'## Open questions\n\n- Q-001 (open) - Confirm timestamp handling.\n',
+            )
+        )
+        rejected_save = self.run_cli(
+            'save', '--id', self.case_id,
+            '--public-candidate', str(candidate),
+            '--expected-public-sha256', hashlib.sha256(before).hexdigest(),
+            '--private-root', str(Path(self.tmp.name) / '.investigations-private'),
+            '--source', 'timestamp fixture', '--target', 'Q-001',
+            '--timestamp', '2026-09-14T10:00:00',
+            ok=False,
+        )
+        self.assertIn('invalid_timestamp', rejected_save.stderr)
+        self.assertEqual(before, self.case.read_bytes())
+
+        rejected_open = self.run_cli(
+            'open', '--id', '20260914-100000-naive-open', '--title', 'Naive open',
+            '--objective', 'Reject a naive timestamp', '--request-summary', 'Reject a naive timestamp.',
+            '--dedupe-key', 'naive-open', '--purpose', 'knowledge',
+            '--vault-outcome', 'none', '--learning-outcome', 'not-evaluated',
+            '--timestamp', '2026-09-14T10:00:00',
+            ok=False,
+        )
+        self.assertIn('invalid_timestamp', rejected_open.stderr)
+        self.assertFalse((self.root / '20260914-100000-naive-open').exists())
+
+        self.case.write_bytes(before.replace(
+            b'updated-at: ', b'updated-at: 2026-09-14T10:00:00\nlegacy-updated-at: ', 1
+        ))
+        invalid = self.run_cli('validate', ok=False)
+        self.assertIn('updated-at must be an ISO-8601 timestamp with offset', invalid.stderr)
+
     def test_validator_rejects_credentials_and_local_paths_anywhere_public(self):
         export = self.case.parent / 'exports' / 'unsafe.md'
         export.write_text('password=synthetic-secret\n', encoding='utf-8')
