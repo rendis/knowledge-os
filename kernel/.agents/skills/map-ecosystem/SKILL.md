@@ -26,6 +26,14 @@ For repository mapping and synchronization, [references/repository-map.md](refer
 
 ## Decision Gates
 
+Choose the next action from the existing knowledge, not from the number of pending items:
+
+- Answer from the vault and its cited evidence first. A pending-work or cost question is read-only; it does not start extraction or reconciliation.
+- Before another source read, identify the unanswered question and the missing evidence. Inspect the relevant file, dependency or configuration. A targeted symbol/resource search across configured repositories is appropriate when the owner is unknown after consulting the vault; it is not authority to extract those repositories again.
+- Reuse accepted maps. Changed source calls for delta analysis; an identified defect calls for review of the affected scope. Pending connections, new sessions and changed instructions alone do not justify remapping.
+- Close a pending item only when evidence answers its exact question. Configured wiring does not prove an active consumer or delivery. A missing source answer remains a specific evidence gap, not automatically a live-infrastructure task.
+- Estimate effort only from a measured relevant sample, stating its scope and uncertainty. Without one, report that cost and the deduplicated count are not yet measured; offer a bounded sample instead of invented ranges.
+
 | Request or condition | Load / action |
 | --- | --- |
 | Complete `SYNC_PACKAGE_WORKER_V1` card | Load `references/synchronization-package-worker.md`; return one bounded artifact or contract error. |
