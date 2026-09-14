@@ -2,6 +2,8 @@
 
 Use this final check for mapped technical notes, sync documentation units and external-connection updates. Source-package review establishes acceptable claims; this review checks their actual rendering and preservation in the complete notes. It is a bounded review of the changed meaning, not another repository extraction.
 
+Apply [evidence-sufficiency.md](evidence-sufficiency.md) before preparing or reviewing pending items. Check scope-based reclassifications against the user objective and preserved evidence; do not insist on obsolete functional tests or count retired demands as observed successes.
+
 ## Prepare
 
 Stage only the affected complete Markdown images in a local ignored work area, preserving their vault-relative paths. Preserve the current vault bytes until review passes. Gather the accepted source package and delta, or an external-evidence record with authority, exact target/environment, observation time or source revision, safe retrieval reference, observed facts and limits. The record must distinguish configured identity from observed runtime; omit credentials, raw logs and production rows. The cell evidence profile and authorized scope still govern publication. Hashes establish integrity, not the truth of the evidence or permission to query it.
