@@ -55,4 +55,12 @@ python3 -B 90-Meta/sync-run.py review-unit --state-root <root> --run-id <run_id>
 
 The command invokes the checker against the checkpointed projection, compares reviewed file presence and deletions with the patch-derived path kinds, and persists its bound receipt. An empty file cannot stand in for an absent file. Only then use `apply-unit`; acknowledgement units are exempt. For external-only documentation, after a passing check copy only the reviewed full images to their corresponding authorized note paths and verify destination hashes against the manifest. Explicitly declared deletions follow the ordinary authorized retirement procedure; the manifest represents their result with the empty-content digest, and publication must verify absence. Run the ordinary vault/link gates and inspect the final diff. Recheck immediately before writing; destination drift requires a new candidate and review, never overwriting changed user bytes.
 
+Before declaring completion or committing the scoped notes, verify the current bytes:
+
+```text
+python3 -B 90-Meta/review-note-candidate.py verify-published --vault <vault> --reviewed <manifest.json> <review.json>
+```
+
+For successive accepted updates, repeat `--reviewed` in publication order; the latest accepted full image governs each overlapping path. Include all in-scope published notes. A mismatch blocks closure for that path: preserve the current bytes, inspect the delta, and reuse a later valid review if one exists. Otherwise freeze the affected complete note and obtain independent review focused on the addition and preservation of the accepted content. Reuse unaffected reviews and source evidence; then verify again. Administrative summaries remain subject to their inventory/configuration checks.
+
 Completion requires the accepted review, passing integrity/identity checks and published bytes matching the reviewed images. A structural pass cannot detect false prose; the independent reviewer owns that decision. The helper does not query providers, grant access, publish notes or replace sync authority. Report partial external coverage separately from successful publication and source freshness.

@@ -31,6 +31,7 @@ After publication and reconciliation, compare the current inventory and accepted
 - With vault-update authority, update existing administrative summaries to the observed result. Keep old snapshots explicitly historical with their date and evidence; remove obsolete instructions to resume already completed mapping. Installer updates preserve Home and cell-owned coverage files, so copying the kernel does not perform this step.
 - Keep portable current coverage readable in the vault itself. An ignored checkpoint or handoff may supplement it, but must not be the only accurate account. Administrative count/status updates are checked against the inventory and receipts; technical claims still require their ordinary review and write authority. A sync gate does not grant arbitrary writes to Home or Meta files.
 - Verify the final visible summaries and checkpoint agree, links remain valid, and unrelated user changes are preserved. An old summary labelled current is a closure defect even when Git and structural checks pass.
+- Derive current kernel metadata from the installed `.knowledge-os.lock.yaml`: `kernel_version` and `distribution_revision`. Check installed `VERSION` agrees. Refresh equivalent current fields in the existing checkpoint at closure; never copy them from an old handoff, historical receipt or the vault's own Git HEAD. Preserve historical kernel versions as historical. Missing or inconsistent installation metadata remains explicitly unverified; resolve it through the installer rather than inventing values.
 
 ## Report and stop
 
