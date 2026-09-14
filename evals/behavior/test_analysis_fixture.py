@@ -26,7 +26,7 @@ class AnalysisFixtureTests(unittest.TestCase):
             result = self.prepare(run, evaluation)
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertFalse((run / "rubric.json").exists())
-            self.assertEqual(len(list((run / "tasks").glob("*.txt"))), 13)
+            self.assertEqual(len(list((run / "tasks").glob("*.txt"))), 14)
             hashes = json.loads((evaluation / "baseline-hashes.json").read_text())
             for name, digest in hashes.items():
                 self.assertEqual(hashlib.sha256((run / name).read_bytes()).hexdigest(), digest)

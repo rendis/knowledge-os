@@ -15,6 +15,14 @@ For `analysis`, select one natural request from `tasks/` per fresh fixture and a
 
 The repository has a synthetic origin and workspace roots configured through the installed CLI, so identity-based resolution is exercised. The `operational` task explicitly executes a registered offline audit and should create its `.operations/` ledger; its procedure defines unavailable second-page and receipt evidence as terminal unknowns for this bounded export. The separate `cloud` task is informational and should not create that ledger.
 
+Run one analysis scenario with the process runner:
+
+```sh
+python3 -B evals/behavior/run_analysis.py --distribution /path/to/distribution --output /tmp/analysis-run --evaluation-output /tmp/analysis-evaluator --task diagnosis --model <available-model> --effort low
+```
+
+The runner prepares the fixture, removes irrelevant legacy artifacts and answer-bearing notes from diagnostic inputs, and stores results, events, prompt hashes, exit codes and before/after vault fingerprints in the evaluator directory. Independent scenarios use ephemeral sessions. `--task continuity` starts one session and resumes the actual returned thread ID for the next two requests, passing only the new request rather than replaying a transcript. `--variant alternate` changes the numerical diagnostic inputs for a fresh equivalent check. Use equal model, effort and permissions when comparing revisions. `python3 -B evals/behavior/test_analysis_runner.py` checks runner mechanics with real fixture preparation and a fake Codex process; this does not substitute for observed agent runs. Report scenario outcomes and their evidence, without inferring general performance or efficiency from a small comparison.
+
 For the recorded comparison, each independent worker used `codex exec --ephemeral --skip-git-repo-check --ignore-user-config -m gpt-6-astra -c 'model_reasoning_effort="low"' -c 'approval_policy="never"' -s workspace-write --json --output-last-message result.md - < task.txt > events.jsonl`. CLI availability and host permissions are external prerequisites. Do not pass audit conclusions or another worker's results.
 
 Score each requested outcome independently: correct source-based explanation; accepted knowledge investigation closed without a fabricated export; reader contract implemented and tested while writer preserved; cell-specific procedure configured through the supported onboarding path. Confirm changes and executed checks from artifacts and events, not self-reported completion. Use a separate blind reviewer with anonymized copies and state what evidence the reviewer was given.
