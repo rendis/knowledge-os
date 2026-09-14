@@ -16,9 +16,9 @@ learning-outcome: <not-evaluated|no-learning|already-covered|insufficient-eviden
 
 # <Title>
 
-## Original request
+## Request summary
 
-<Preserve the safe original request verbatim.>
+<Formalize the relevant request without preserving the conversation transcript.>
 
 ## Current state
 

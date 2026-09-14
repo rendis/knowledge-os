@@ -2,6 +2,8 @@
 
 **Estado:** investigación de diseño, 2026-09-01
 
+> Implementation decision (2026-09-13): the shipped first version deliberately keeps one `investigation.md` per case. The hybrid per-register file model discussed below is deferred as unnecessary complexity. Current contracts live in `kernel/.agents/skills/manage-investigation/` and use `investigations/` plus optional `.investigations-private/`.
+
 **Alcance:** expediente compartido y versionado como fuente canónica; overlay privado exclusivamente para material no compartible; continuidad y colaboración concurrente eventual.
 
 ## Conclusión
@@ -146,7 +148,9 @@ Por tanto, “bidireccional” solo es deseable durante la transición **entre v
 | Overlay como copia privada completa | Puede quedar más avanzado y competir con el público | Rechazar |
 | Overlay como complemento referenciado | Protege material no compartible sin duplicar decisiones | Sí, con campos permitidos y prohibidos explícitos |
 
-## Modelo recomendado para `documentation-vault`
+## Alternativa histórica descartada para `documentation-vault`
+
+The multi-file model below was researched but rejected for the first implementation. It is retained only as historical design context; it is not the current contract and `.investigations/` below must not be interpreted as the shipped public path.
 
 ### Autoridad y estructura
 

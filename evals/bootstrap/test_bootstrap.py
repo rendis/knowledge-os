@@ -391,10 +391,10 @@ class BootstrapEval(unittest.TestCase):
         ).read_text(encoding="utf-8")
         self.assertIn("## Development handoffs", template)
         self.assertIn("`DH-001`", contract)
-        self.assertIn("exact absolute worktree path", contract)
+        self.assertIn("exact Git branch", contract)
         self.assertIn("**Bind development handoff**", consumer)
         self.assertIn("## Bind development handoff", owner)
-        self.assertIn("same-revision no-op", owner)
+        self.assertIn("exact-retry no-op", owner)
         self.assertIn("byte-level case no-op", contract)
         self.assertIn(
             "No materialization or activation is complete until",
@@ -407,6 +407,20 @@ class BootstrapEval(unittest.TestCase):
         self.assertIn("collision-safe work-item token", repository_state)
         self.assertIn("selected entry is not `active`", repository_state)
         self.assertNotIn("while another family is active", repository_state)
+
+    def test_investigation_reconciliation_requires_semantic_review_after_clean_merge(self) -> None:
+        runbook = (
+            DIST
+            / "kernel/.agents/skills/manage-investigation/references/investigation-reconciliation.md"
+        ).read_text(encoding="utf-8")
+        self.assertIn("even when Git reports a clean textual merge", runbook)
+        self.assertIn("common base", runbook)
+        self.assertIn("contradictory", runbook)
+        self.assertIn("explicit resolutions", runbook)
+        self.assertIn("SHA-256 of canonical current", runbook)
+
+        audit_text = (DIST / "kernel/90-Meta/audit-vault.py").read_text(encoding="utf-8")
+        self.assertIn('investigations[/\\\\]', audit_text)
 
     def test_investigation_allows_shared_worktree_only_for_same_repository(self) -> None:
         helper = (
@@ -422,7 +436,7 @@ class BootstrapEval(unittest.TestCase):
         self.addCleanup(sys.modules.pop, module_name, None)
         spec.loader.exec_module(module)
 
-        worktree = "/tmp/worktrees/repository/abc-123-change"
+        worktree = "issue/abc-123-change"
         tracker_url = "https://tracker.example.com"
         tracker_id = "delivery"
         provider = "example"
@@ -441,7 +455,7 @@ class BootstrapEval(unittest.TestCase):
                 "tracker-url": tracker_url,
                 "work-item-reference": reference,
                 "repository-remote": remote,
-                "worktree-path": worktree,
+                "branch": worktree,
                 "handoff-id": handoff_id,
                 "family": f"{token}--{repository}",
                 "revision": "v0001",
@@ -455,7 +469,7 @@ class BootstrapEval(unittest.TestCase):
                 f"- Tracker URL: {tracker_url}\n"
                 f"- Work item reference: {reference}\n"
                 f"- Repository remote: {remote}\n"
-                f"- Worktree path: {worktree}\n"
+                f"- Branch: {worktree}\n"
                 f"- Handoff ID: {handoff_id}\n"
                 f"- Family: {fields['family']}\n"
                 "- Revision: v0001\n"
@@ -469,7 +483,7 @@ class BootstrapEval(unittest.TestCase):
                 f"- {fields['materialized-at']} — bound development handoff "
                 f"`{fields['dh']}`; story `{fields['story-id']}`; work item "
                 f"`{fields['tracker-id']}:{fields['work-item-reference']}`; repository `{fields['repository-remote']}`; "
-                f"worktree `{fields['worktree-path']}`; handoff "
+                f"branch `{fields['branch']}`; handoff "
                 f"`{fields['handoff-id']}`; revision `v0001`.\n"
                 f"  <!-- knowledge-os:development-handoff-binding {marker} -->\n"
             )
@@ -499,7 +513,7 @@ class BootstrapEval(unittest.TestCase):
         )
         errors = module.validate_development_handoffs(different_repository)
         self.assertIn(
-            "DH-002 reuses a Worktree path for a different Repository remote",
+            "DH-002 reuses a Branch for a different Repository remote",
             errors,
         )
 
@@ -509,7 +523,7 @@ class BootstrapEval(unittest.TestCase):
             / "kernel/.agents/skills/manage-investigation/scripts/investigation-case.py"
         )
         with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp) / ".investigations"
+            root = Path(tmp) / "investigations"
             root.mkdir()
             opened = run(
                 [
@@ -525,6 +539,8 @@ class BootstrapEval(unittest.TestCase):
                     "Responsibility boundary",
                     "--objective",
                     "Keep reconciliation in the vault",
+                    "--request-summary",
+                    "Preserve the vault-side reconciliation boundary.",
                     "--dedupe-key",
                     "responsibility-boundary",
                     "--source-ref",
@@ -547,7 +563,7 @@ class BootstrapEval(unittest.TestCase):
                 / "investigation.md"
             )
             original = case.read_text(encoding="utf-8")
-            worktree = Path(tmp) / "worktrees" / "repository" / "abc-123-change"
+            worktree = "issue/abc-123-change"
             tracker_id = "delivery"
             provider = "example"
             tracker_url = "https://tracker.example.com"
@@ -566,7 +582,7 @@ class BootstrapEval(unittest.TestCase):
 - Tracker URL: https://tracker.example.com
 - Work item reference: ABC-123
 - Repository remote: example.invalid/team/repository
-- Worktree path: {worktree}
+- Branch: {worktree}
 - Handoff ID: {handoff_id}
 - Family: {family}
 - Revision: v0002
@@ -603,7 +619,7 @@ class BootstrapEval(unittest.TestCase):
                     "tracker-url": tracker_url,
                     "work-item-reference": reference,
                     "repository-remote": "example.invalid/team/repository",
-                    "worktree-path": str(worktree),
+                    "branch": str(worktree),
                     "handoff-id": handoff_id,
                     "family": family,
                     "revision": revision,
@@ -623,7 +639,7 @@ class BootstrapEval(unittest.TestCase):
                 return (
                     f"- {materialized_at} — {action} development handoff `DH-001`; "
                     "story `S-001`; work item `delivery:ABC-123`; repository "
-                    "`example.invalid/team/repository`; worktree "
+                    "`example.invalid/team/repository`; branch "
                     f"`{worktree}`; handoff `{handoff_id}`; revision `{revision}`.\n"
                     f"{marker or history_marker(revision, materialized_at)}\n"
                 )
@@ -2670,11 +2686,14 @@ change:
             self.assertNotIn(".knowledge-os.lock.yaml", gitignore)
             self.assertIn("/.agents/state/map-ecosystem/", gitignore)
             self.assertIn("/.plan/", gitignore)
+            self.assertIn("/.investigations/", gitignore)
+            self.assertIn("/.investigations-private/", gitignore)
+            self.assertNotIn("/investigations/", gitignore)
             self.assertNotIn("/plan/", gitignore)
             obsidian_app = json.loads(
                 (dest / ".obsidian" / "app.json").read_text(encoding="utf-8")
             )
-            self.assertEqual(obsidian_app["userIgnoreFilters"], [".plan/"])
+            self.assertEqual(obsidian_app["userIgnoreFilters"], [".plan/", "investigations/"])
             self.assertNotIn(".agents/state/map-ecosystem/sync", lock)
             doctor = run(["sh", str(INSTALL), "doctor", "--dest", str(dest)])
             self.assertEqual(doctor.returncode, 0, doctor.stderr)
@@ -3095,7 +3114,7 @@ change:
             self.assertTrue(obsidian_app["livePreview"])
             self.assertEqual(
                 obsidian_app["userIgnoreFilters"],
-                ["archive/", ".plan/"],
+                ["archive/", ".plan/", "investigations/"],
             )
             lock = (dest / ".knowledge-os.lock.yaml").read_text(encoding="utf-8")
             self.assertIn('version: "3"', lock)

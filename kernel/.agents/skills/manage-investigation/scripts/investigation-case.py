@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Transactional filesystem mechanics for local investigation case files."""
+"""Transactional filesystem mechanics for shareable investigation case files."""
 from __future__ import annotations
 
 import argparse
@@ -8,6 +8,7 @@ import json
 import os
 import re
 import shutil
+import subprocess
 import sys
 import time
 import unicodedata
@@ -26,6 +27,9 @@ SECRET_PATTERN = re.compile(
     r"\b(?:password|passwd|pwd|secret|token|api[-_]?key)\s*[:=]\s*\S+|"
     r"\b(?:gh[pousr]_|github_pat_|sk-(?:proj-|svcacct-)?|xox[baprs]-)\S+",
     re.IGNORECASE,
+)
+LOCAL_PATH_PATTERN = re.compile(
+    r"(?<![A-Za-z0-9])(?:/(?:Users|home|tmp|var/tmp)/[^\s`]+|[A-Za-z]:\\[^\s`]+)"
 )
 GENERIC_SOURCE_REFS = {"", "unknown", "message", "customer conversation", "conversation"}
 PURPOSES = {"knowledge", "development", "mixed", "undecided"}
@@ -74,7 +78,7 @@ DEVELOPMENT_HANDOFF_FIELDS = (
     "Tracker URL",
     "Work item reference",
     "Repository remote",
-    "Worktree path",
+    "Branch",
     "Handoff ID",
     "Family",
     "Revision",
@@ -100,7 +104,7 @@ DEVELOPMENT_HANDOFF_HISTORY_KEYS = (
     "tracker-url",
     "work-item-reference",
     "repository-remote",
-    "worktree-path",
+    "branch",
     "handoff-id",
     "family",
     "revision",
@@ -129,7 +133,7 @@ REQUIRED_FIELDS = (
     "learning-outcome",
 )
 REQUIRED_SECTIONS = (
-    ("Original request", "Solicitud original"),
+    ("Request summary", "Resumen de la solicitud"),
     ("Current state", "Estado actual", "Estado vigente"),
     ("References and attachments", "Referencias y adjuntos"),
     ("Evidence", "Evidencia"),
@@ -208,17 +212,44 @@ def reject_secret_input(*values: str) -> None:
         )
 
 
-def resolve_root(raw_root: Path) -> Path:
+def public_content_errors(case_dir: Path) -> list[str]:
+    errors: list[str] = []
+    for path in sorted(case_dir.rglob("*")):
+        if path.is_symlink():
+            errors.append(f"{path.name}: shareable case content must not be a symlink")
+            continue
+        if not path.is_file():
+            continue
+        try:
+            text = path.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            continue
+        relative = path.relative_to(case_dir).as_posix()
+        if SECRET_PATTERN.search(text):
+            errors.append(f"{relative}: contains a credential-like value")
+        if LOCAL_PATH_PATTERN.search(text):
+            errors.append(f"{relative}: contains an absolute local path")
+    return errors
+
+
+def resolve_root(raw_root: Path, *, create: bool = False) -> Path:
     if raw_root.is_symlink():
         raise CaseError("root_symlink", "The investigation root must not be a symlink")
+    if raw_root.name != "investigations":
+        raise CaseError("invalid_root", "The investigation root must be named investigations")
+    if create and not raw_root.exists():
+        parent = raw_root.parent.resolve(strict=True)
+        if not parent.is_dir():
+            raise CaseError("root_missing", "The investigation parent does not exist")
+        raw_root.mkdir(mode=0o755)
     try:
         root = raw_root.resolve(strict=True)
     except OSError as error:
         raise CaseError("root_missing", "The investigation root does not exist") from error
-    if root.name != ".investigations" or not root.is_dir():
+    if root.name != "investigations" or not root.is_dir():
         raise CaseError(
             "invalid_root",
-            "The investigation root must be an existing .investigations directory",
+            "The investigation root must be an existing investigations directory",
             root=str(root),
         )
     return root
@@ -392,7 +423,6 @@ def render_case(args: argparse.Namespace, timestamp: str) -> str:
         Path(__file__).resolve().parents[1] / "assets" / "investigation-template.md"
     ).read_text(encoding="utf-8")
     primary_source = args.source_ref[0] if args.source_ref else "unknown"
-    request = args.request if args.request is not None else args.objective
     replacements = {
         "id: <investigation-id>": f"id: {args.id}",
         "title: <title>": f"title: {json.dumps(args.title, ensure_ascii=False)}",
@@ -424,7 +454,7 @@ def render_case(args: argparse.Namespace, timestamp: str) -> str:
             "candidate|documented>"
         ): f"learning-outcome: {args.learning_outcome}",
         "# <Title>": f"# {args.title}",
-        "<Preserve the safe original request verbatim.>": request,
+        "<Formalize the relevant request without preserving the conversation transcript.>": args.request_summary,
         "- <timestamp> — Case file created.": f"- {timestamp} — Case file created.",
     }
     for old, new in replacements.items():
@@ -465,7 +495,7 @@ def open_case(args: argparse.Namespace, root: Path) -> int:
     reject_secret_input(
         args.title,
         args.objective,
-        args.request or "",
+        args.request_summary,
         *args.source_ref,
     )
     timestamp = timestamp_value(args.timestamp)
@@ -563,6 +593,18 @@ def canonical_slug(value: str) -> str:
     return "-".join(re.findall(r"[a-z0-9]+", value.casefold()))
 
 
+def valid_branch(value: str) -> bool:
+    if not value or value != value.strip() or len(value) > 255:
+        return False
+    result = subprocess.run(
+        ["git", "check-ref-format", "--branch", value],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    return result.returncode == 0
+
+
 def named_section(
     text: str,
     aliases: tuple[str, ...],
@@ -618,7 +660,7 @@ def handoff_history_binding(
         "tracker-url": fields["Tracker URL"],
         "work-item-reference": fields["Work item reference"],
         "repository-remote": fields["Repository remote"],
-        "worktree-path": fields["Worktree path"],
+        "branch": fields["Branch"],
         "handoff-id": fields["Handoff ID"],
         "family": fields["Family"],
         "revision": fields["Revision"],
@@ -761,12 +803,9 @@ def validate_development_handoff_history(
         if revision_number < 1 or revision_number > current_number:
             errors.append(f"History binding for {entry_id} exceeds its current Revision")
             continue
-        worktree = marker["worktree-path"]
-        if (
-            not Path(worktree).is_absolute()
-            or any(segment in {".", ".."} for segment in re.split(r"[\\/]", worktree))
-        ):
-            errors.append(f"History binding for {entry_id} has invalid Worktree path")
+        branch = marker["branch"]
+        if not valid_branch(branch):
+            errors.append(f"History binding for {entry_id} has invalid Branch")
             continue
         materialized_at = offset_timestamp(marker["materialized-at"])
         if materialized_at is None:
@@ -800,8 +839,8 @@ def validate_development_handoff_history(
                     f"repository `{marker['repository-remote']}`",
                 ),
                 (
-                    marker["worktree-path"],
-                    f"worktree `{marker['worktree-path']}`",
+                    marker["branch"],
+                    f"branch `{marker['branch']}`",
                 ),
                 (marker["handoff-id"], f"handoff `{marker['handoff-id']}`"),
                 (marker["revision"], f"revision `{marker['revision']}`"),
@@ -910,7 +949,7 @@ def validate_development_handoffs(text: str) -> list[str]:
         errors.append("Development handoff identifiers must be contiguous from DH-001")
 
     targets: set[tuple[str, str]] = set()
-    worktrees: dict[str, str] = {}
+    branches: dict[str, str] = {}
     handoff_ids: set[str] = set()
     for entry_id, _, title, fields in entries:
         if any(field not in fields for field in DEVELOPMENT_HANDOFF_FIELDS):
@@ -921,7 +960,7 @@ def validate_development_handoffs(text: str) -> list[str]:
         tracker_url = fields["Tracker URL"]
         work_item_reference = fields["Work item reference"]
         remote = fields["Repository remote"]
-        worktree = fields["Worktree path"]
+        branch = fields["Branch"]
         handoff_id = fields["Handoff ID"]
         family = fields["Family"]
         revision = fields["Revision"]
@@ -949,13 +988,8 @@ def validate_development_handoffs(text: str) -> list[str]:
             or any(character.isspace() for character in remote)
         ):
             errors.append(f"{entry_id} has invalid normalized Repository remote")
-        worktree_path = Path(worktree)
-        worktree_segments = re.split(r"[\\/]", worktree)
-        if (
-            not worktree_path.is_absolute()
-            or any(segment in {".", ".."} for segment in worktree_segments)
-        ):
-            errors.append(f"{entry_id} has invalid absolute Worktree path")
+        if not valid_branch(branch):
+            errors.append(f"{entry_id} has invalid Branch")
         if HANDOFF_ID_RE.fullmatch(handoff_id) is None:
             errors.append(f"{entry_id} has invalid Handoff ID")
         if HANDOFF_FAMILY_RE.fullmatch(family) is None:
@@ -984,12 +1018,12 @@ def validate_development_handoffs(text: str) -> list[str]:
         if target in targets:
             errors.append(f"{entry_id} duplicates a story-and-repository target")
         targets.add(target)
-        registered_remote = worktrees.get(worktree)
+        registered_remote = branches.get(branch)
         if registered_remote is not None and registered_remote != remote:
             errors.append(
-                f"{entry_id} reuses a Worktree path for a different Repository remote"
+                f"{entry_id} reuses a Branch for a different Repository remote"
             )
-        worktrees.setdefault(worktree, remote)
+        branches.setdefault(branch, remote)
         if handoff_id in handoff_ids:
             errors.append(f"{entry_id} reuses a Handoff ID")
         handoff_ids.add(handoff_id)
@@ -1145,6 +1179,10 @@ def validate_root(root: Path, *, ignore_lock: bool = False) -> tuple[list[str], 
             f"{relative}: {message}"
             for message in validate_development_handoffs(record.text)
         )
+        errors.extend(
+            f"{relative}: {message}"
+            for message in public_content_errors(record.path.parent)
+        )
 
         for retired_id in record.consolidated_from:
             if retired_id in lineage:
@@ -1173,6 +1211,156 @@ def validate_command(root: Path) -> int:
         {
             "status": "valid",
             "cases": len(load_records(root)),
+            "warnings": warnings,
+        }
+    )
+    return 0
+
+
+def digest_bytes(content: bytes | None) -> str:
+    if content is None:
+        return "absent"
+    return hashlib.sha256(content).hexdigest()
+
+
+def validate_private_text(text: str, case_id: str) -> list[str]:
+    errors: list[str] = []
+    try:
+        fields = parse_frontmatter(text)
+    except CaseError as error:
+        return [error.message]
+    if set(fields) != {"id", "authority", "updated-at"}:
+        errors.append("private overlay frontmatter must contain only id, authority, and updated-at")
+    if fields.get("id") != case_id:
+        errors.append("private overlay id must match the public investigation")
+    if fields.get("authority") != "private-overlay":
+        errors.append("private overlay authority must be private-overlay")
+    if not has_offset_timestamp(str(fields.get("updated-at", ""))):
+        errors.append("private overlay updated-at must be an ISO-8601 timestamp with offset")
+    observed = section_names(text)
+    required_aliases = (
+        ("Sensitive context", "Contexto sensible"),
+        ("Private references", "Referencias privadas"),
+        ("History", "Historial"),
+    )
+    if len(observed) != len(required_aliases) or any(
+        observed[index] not in aliases
+        for index, aliases in enumerate(required_aliases)
+    ):
+        errors.append("private overlay must contain the required sections once and in order")
+    return errors
+
+
+def save_case(args: argparse.Namespace, root: Path) -> int:
+    """Atomically replace a reviewed public snapshot and optional private overlay."""
+    candidate = args.public_candidate.read_bytes()
+    try:
+        public_text = candidate.decode("utf-8")
+    except UnicodeDecodeError as error:
+        raise CaseError("candidate_invalid", "Public candidate must be UTF-8") from error
+    reject_secret_input(public_text)
+
+    private_candidate: bytes | None = None
+    private_text: str | None = None
+    if args.private_candidate is not None and args.delete_private:
+        raise CaseError("usage_error", "--private-candidate and --delete-private are mutually exclusive")
+    if args.private_candidate is not None:
+        private_candidate = args.private_candidate.read_bytes()
+        try:
+            private_text = private_candidate.decode("utf-8")
+        except UnicodeDecodeError as error:
+            raise CaseError("candidate_invalid", "Private candidate must be UTF-8") from error
+        reject_secret_input(private_text)
+        private_errors = validate_private_text(private_text, args.id)
+        if private_errors:
+            raise CaseError("private_validation_failed", "Private overlay is invalid", errors=private_errors)
+
+    private_root = args.private_root
+    if private_root is not None:
+        if private_root.is_symlink():
+            raise CaseError("root_symlink", "The private investigation root must not be a symlink")
+        if private_root.name != ".investigations-private":
+            raise CaseError("invalid_private_root", "Private root must be named .investigations-private")
+        if private_root.parent.resolve(strict=True) != root.parent:
+            raise CaseError("invalid_private_root", "Private and public roots must share the vault root")
+    if (private_candidate is not None or args.delete_private) and private_root is None:
+        raise CaseError("private_root_required", "A private mutation requires --private-root")
+
+    with locked(root):
+        records = {record.case_id: record for record in load_records(root)}
+        record = records.get(args.id)
+        if record is None:
+            raise CaseError("case_not_found", "Exact public investigation does not exist")
+        original_public = record.path.read_bytes()
+        if digest_bytes(original_public) != args.expected_public_sha256:
+            raise CaseError(
+                "stale_public_snapshot",
+                "Public investigation changed after it was read",
+                exit_code=3,
+                current_sha256=digest_bytes(original_public),
+            )
+
+        private_path = private_root / args.id / "private.md" if private_root else None
+        if private_path is not None and (
+            private_path.is_symlink() or private_path.parent.is_symlink()
+        ):
+            raise CaseError("case_symlink", "Private overlay paths must not be symlinks")
+        original_private = private_path.read_bytes() if private_path and private_path.is_file() else None
+        if digest_bytes(original_private) != args.expected_private_sha256:
+            raise CaseError(
+                "stale_private_snapshot",
+                "Private overlay changed after it was read",
+                exit_code=3,
+                current_sha256=digest_bytes(original_private),
+            )
+
+        candidate_fields = parse_frontmatter(public_text)
+        if candidate_fields.get("id") != args.id:
+            raise CaseError("candidate_invalid", "Public candidate id does not match the target")
+
+        created_private_root = False
+        created_private_dir = False
+        try:
+            atomic_write(record.path, candidate)
+            if args.delete_private and private_path is not None and private_path.exists():
+                private_path.unlink()
+                if not any(private_path.parent.iterdir()):
+                    private_path.parent.rmdir()
+            elif private_candidate is not None and private_root is not None and private_path is not None:
+                if not private_root.exists():
+                    private_root.mkdir(mode=0o700)
+                    created_private_root = True
+                elif not private_root.is_dir():
+                    raise CaseError("invalid_private_root", "Private root is not a directory")
+                private_dir = private_path.parent
+                if not private_dir.exists():
+                    private_dir.mkdir(mode=0o700)
+                    created_private_dir = True
+                atomic_write(private_path, private_candidate)
+            errors, warnings = validate_root(root, ignore_lock=True)
+            if errors:
+                raise CaseError("save_validation_failed", "Candidate failed validation", errors=errors)
+        except Exception:
+            atomic_write(record.path, original_public)
+            if private_path is not None:
+                if original_private is None and private_path.exists():
+                    private_path.unlink()
+                elif original_private is not None:
+                    private_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+                    atomic_write(private_path, original_private)
+                if created_private_dir and private_path.parent.exists():
+                    private_path.parent.rmdir()
+                if created_private_root and private_root is not None and private_root.exists():
+                    private_root.rmdir()
+            raise
+
+    emit(
+        {
+            "status": "saved",
+            "id": args.id,
+            "public_sha256": digest_bytes(candidate),
+            "private": private_candidate is not None,
+            "private_deleted": bool(args.delete_private),
             "warnings": warnings,
         }
     )
@@ -1286,6 +1474,22 @@ def consolidate_case(args: argparse.Namespace, root: Path) -> int:
             )
         canonical = records[args.canonical]
         retiring = records[args.retire]
+        canonical_snapshot = canonical.path.read_bytes()
+        retiring_snapshot = retiring.path.read_bytes()
+        if digest_bytes(canonical_snapshot) != args.expected_canonical_sha256:
+            raise CaseError(
+                "stale_canonical_snapshot",
+                "Canonical investigation changed after reconciliation",
+                exit_code=3,
+                current_sha256=digest_bytes(canonical_snapshot),
+            )
+        if digest_bytes(retiring_snapshot) != args.expected_retire_sha256:
+            raise CaseError(
+                "stale_retiring_snapshot",
+                "Retiring investigation changed after reconciliation",
+                exit_code=3,
+                current_sha256=digest_bytes(retiring_snapshot),
+            )
         canonical_dir = canonical.path.parent
         retiring_dir = retiring.path.parent
         mapping = canonical_dir / "artifacts" / f"consolidation-{args.retire}-mapping.md"
@@ -1388,6 +1592,7 @@ def consolidate_case(args: argparse.Namespace, root: Path) -> int:
 
 
 def close_case(args: argparse.Namespace, root: Path) -> int:
+    reject_secret_input(args.reason, args.limitations)
     for value in (args.reason, args.limitations):
         if not value.strip() or "\n" in value or "\r" in value:
             raise CaseError("closure_invalid", "Closure reason and limitations must be nonempty single lines")
@@ -1437,6 +1642,7 @@ def bind_case(args: argparse.Namespace, root: Path) -> int:
             or any(not isinstance(v, str) or not v or "\n" in v or "\r" in v
                    for v in observation.values())):
         raise CaseError("binding_observation_invalid", "Expected exact binding fields excluding dh")
+    reject_secret_input(*(str(value) for value in observation.values()))
     fields = dict(zip(DEVELOPMENT_HANDOFF_FIELDS, (observation[k] for k in keys)))
     with locked(root):
         records = {record.case_id: record for record in load_records(root)}
@@ -1491,7 +1697,7 @@ def bind_case(args: argparse.Namespace, root: Path) -> int:
         marker = json.dumps(handoff_history_binding(entry_id, fields), ensure_ascii=False, sort_keys=True, separators=(",", ":"))
         event = (f'- {fields["Materialized at"]} — Bound development handoff `{entry_id}`; '
                  f'story `{fields["Story ID"]}`; work item `{fields["Tracker ID"]}:{fields["Work item reference"]}`; '
-                 f'repository `{fields["Repository remote"]}`; worktree `{fields["Worktree path"]}`; '
+                 f'repository `{fields["Repository remote"]}`; branch `{fields["Branch"]}`; '
                  f'handoff `{fields["Handoff ID"]}`; revision `{fields["Revision"]}`.\n'
                  f'  <!-- {DEVELOPMENT_HANDOFF_HISTORY_MARKER_TOKEN} {marker} -->\n')
         history = re.search(r"(?m)^## (?:" + "|".join(map(re.escape, HISTORY_SECTION_ALIASES)) + r")\s*$", updated)
@@ -1548,7 +1754,7 @@ def build_parser() -> argparse.ArgumentParser:
         choices=tuple(sorted(LEARNING_OUTCOMES)),
         required=True,
     )
-    open_parser.add_argument("--request")
+    open_parser.add_argument("--request-summary", required=True)
     open_parser.add_argument("--timestamp")
 
     consolidate_parser = commands.add_parser(
@@ -1557,6 +1763,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     consolidate_parser.add_argument("--canonical", required=True)
     consolidate_parser.add_argument("--retire", required=True)
+    consolidate_parser.add_argument("--expected-canonical-sha256", required=True)
+    consolidate_parser.add_argument("--expected-retire-sha256", required=True)
     consolidate_parser.add_argument("--timestamp")
 
     close_parser = commands.add_parser("close", help="close a validated knowledge outcome without export")
@@ -1570,6 +1778,18 @@ def build_parser() -> argparse.ArgumentParser:
     bind_parser.add_argument("--id", required=True)
     bind_parser.add_argument("--observation", required=True, type=Path)
 
+    save_parser = commands.add_parser(
+        "save",
+        help="atomically save one reviewed public snapshot and optional private overlay",
+    )
+    save_parser.add_argument("--id", required=True)
+    save_parser.add_argument("--public-candidate", required=True, type=Path)
+    save_parser.add_argument("--expected-public-sha256", required=True)
+    save_parser.add_argument("--private-root", required=True, type=Path)
+    save_parser.add_argument("--private-candidate", type=Path)
+    save_parser.add_argument("--delete-private", action="store_true")
+    save_parser.add_argument("--expected-private-sha256", default="absent")
+
     commands.add_parser("validate", help="validate case-file mechanics")
     return parser
 
@@ -1577,13 +1797,15 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     try:
         args = build_parser().parse_args(argv)
-        root = resolve_root(args.root)
+        root = resolve_root(args.root, create=args.command == "open")
         if args.command == "open":
             return open_case(args, root)
         if args.command == "close":
             return close_case(args, root)
         if args.command == "bind":
             return bind_case(args, root)
+        if args.command == "save":
+            return save_case(args, root)
         if args.command == "consolidate":
             return consolidate_case(args, root)
         if args.command == "validate":

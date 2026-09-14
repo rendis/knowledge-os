@@ -91,8 +91,8 @@ def predicted_legacy(vault: Path, question: dict[str, Any], platform: Path | Non
     elif kind == "investigations":
         files.extend(
             [
-                ".investigations/20260820-090000-stale-gps-write/investigation.md",
-                ".investigations/20260820-090001-unrelated-billing/investigation.md",
+                "investigations/20260820-090000-stale-gps-write/investigation.md",
+                "investigations/20260820-090001-unrelated-billing/investigation.md",
             ]
         )
     elif kind == "hygiene":
@@ -102,7 +102,7 @@ def predicted_legacy(vault: Path, question: dict[str, Any], platform: Path | Non
             rel = resolve_stem(vault, stem)
             if rel:
                 files.append(rel)
-        files.append(".investigations/20260820-090000-stale-gps-write/investigation.md")
+        files.append("investigations/20260820-090000-stale-gps-write/investigation.md")
     return list(dict.fromkeys(files))
 
 
@@ -137,7 +137,7 @@ def predicted_after(vault: Path, question: dict[str, Any], platform: Path | None
     if kind == "learning":
         rel = resolve_stem(vault, "Aprendizaje - Stale GPS")
         files = [rel] if rel else []
-        files.append(".investigations/20260820-090000-stale-gps-write/investigation.md")
+        files.append("investigations/20260820-090000-stale-gps-write/investigation.md")
         nodes = ["Aprendizaje - Stale GPS", "20260820-090000-stale-gps-write"]
         return files, nodes
     start = question.get("start") or ""

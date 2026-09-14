@@ -1309,6 +1309,56 @@ def resolve_handoff_target(
     return resolve_explicit_worktree(vault_root, remote, worktree_path)
 
 
+def resolve_branch_target(
+    vault_root: Path,
+    remote: str,
+    branch: str,
+) -> dict[str, Any]:
+    """Resolve portable repository/branch identity to a verified local worktree."""
+    branch = expect_string(branch, field="branch", maximum=255)
+    check = subprocess.run(
+        ["git", "check-ref-format", "--branch", branch],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    if check.returncode != 0:
+        raise HandoffError("invalid_worktree_branch", "The branch is not a valid Git branch")
+    source, normalized_remote = resolve_repository(vault_root, remote)
+    worktree_root = resolve_worktree_root(vault_root)
+    target = (
+        worktree_root
+        / observed_repository_basename(source, normalized_remote)
+        / branch.rsplit("/", 1)[-1]
+    )
+    if not target.exists():
+        return {
+            "status": "unavailable",
+            "availability": "not-local",
+            "repository_remote": normalized_remote,
+            "branch": branch,
+            "derived_path": str(target),
+        }
+    resolved, observed_remote, observed_branch = resolve_explicit_worktree(
+        vault_root, normalized_remote, str(target)
+    )
+    if observed_branch != branch:
+        raise HandoffError(
+            "worktree_branch_mismatch",
+            "The derived worktree is attached to a different branch",
+            exit_code=3,
+            expected_branch=branch,
+            observed_branch=observed_branch,
+        )
+    return {
+        "status": "available",
+        "availability": "local-verified",
+        "repository_remote": observed_remote,
+        "branch": observed_branch,
+        "worktree_path": str(resolved),
+    }
+
+
 def slug(value: str) -> str:
     normalized = unicodedata.normalize("NFKD", value.casefold())
     without_marks = "".join(
@@ -5005,6 +5055,13 @@ def build_parser() -> ArgumentParser:
     validate.add_argument("--repository-remote", required=True)
     validate.add_argument("--worktree-path", required=True)
 
+    resolve_branch = commands.add_parser(
+        "resolve-branch",
+        help="Resolve portable repository and branch identity to a verified local worktree",
+    )
+    resolve_branch.add_argument("--repository-remote", required=True)
+    resolve_branch.add_argument("--branch", required=True)
+
     state_parser = commands.add_parser(
         "set-state",
         help="Plan or apply one handoff state update",
@@ -5101,6 +5158,15 @@ def main(argv: list[str] | None = None) -> int:
                     vault_root,
                     args.repository_remote,
                     worktree_path=args.worktree_path,
+                )
+            )
+            return 0
+        if args.command == "resolve-branch":
+            emit_json(
+                resolve_branch_target(
+                    vault_root,
+                    args.repository_remote,
+                    args.branch,
                 )
             )
             return 0

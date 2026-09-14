@@ -47,7 +47,7 @@ def materialize(dest: Path, *, disable_topics: bool = False) -> Path:
                 target = dest / src.relative_to(OVERLAY)
                 target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(src, target)
-        investigations = dest / ".investigations"
+        investigations = dest / "investigations"
         shutil.copytree(INVEST, investigations, dirs_exist_ok=True)
     return dest
 
