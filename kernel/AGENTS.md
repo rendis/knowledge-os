@@ -46,7 +46,7 @@ Instance files (`instance.yaml`, `00-Home.md`, notes under `10/`–`70/`) are ne
 
 ## Personal instructions
 
-Before classifying a request, load @AGENTS.personal.md when it exists and apply its local instructions within this router's guardrails. This `AGENTS.md` is distribution-owned: keep user-specific behavior, writing preferences, and local connection or access procedures in `AGENTS.personal.md`. When the user asks to persist one of those personal settings, create or update that file, even when it does not yet exist. Keep credentials in their proper secret store and record only the way to use them. Keep `AGENTS.personal.md` ignored and untracked; its absence is valid and does not require creating it.
+Before classifying a request, load @AGENTS.personal.md when it exists and apply its local instructions within this router's guardrails. `AGENTS.personal.md` owns environment-specific working agreements: local tool and agent selection; delegation, monitoring, resumption and verification workflows; user behavior and writing preferences; and local connection or access procedures. When the user asks to persist one of those settings, create or update the personal file, even when it does not yet exist. Keep credentials in their proper secret store and record only the way to use them. Keep `AGENTS.personal.md` ignored and untracked; its absence is valid and does not require creating it. This `AGENTS.md` remains distribution-owned.
 
 ## Investigation and local stores
 

@@ -3342,6 +3342,8 @@ change:
         router = (DIST / "kernel" / "AGENTS.md").read_text(encoding="utf-8")
         self.assertIn("## Personal instructions", router)
         self.assertIn("load @AGENTS.personal.md when it exists", router)
+        self.assertIn("local tool and agent selection", router)
+        self.assertIn("delegation, monitoring, resumption and verification workflows", router)
         self.assertGreater(
             router.index("## Personal instructions"),
             router.index("## Guardrails"),
@@ -3350,7 +3352,7 @@ change:
             router.index("## Personal instructions"),
             router.index("## Investigation and local stores"),
         )
-        self.assertIn("create or update that file", router)
+        self.assertIn("create or update the personal file", router)
         self.assertIn("its absence is valid", router)
         self.assertIn("Keep credentials in their proper secret store", router)
 
