@@ -234,3 +234,7 @@ Persist one durable direction. Inverse lists are backlinks.
 - Service: `compuesto-por`.
 - Exceptional component: `implementado-por`.
 - Flow participation: `participa-en`.
+
+## Agent execution
+
+For delegation and executor selection, consult [[execution-profiles]]. Personal execution preferences take precedence over its defaults.

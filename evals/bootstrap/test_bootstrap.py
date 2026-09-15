@@ -3362,9 +3362,9 @@ change:
         router = (DIST / "kernel" / "AGENTS.md").read_text(encoding="utf-8")
         self.assertIn("## Personal instructions", router)
         self.assertIn("@AGENTS.personal.md", router)
-        self.assertGreater(
+        self.assertLess(
             router.index("## Personal instructions"),
-            router.index("## Guardrails"),
+            router.index("## Routing"),
         )
         self.assertLess(
             router.index("## Personal instructions"),
