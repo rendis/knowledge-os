@@ -8,6 +8,8 @@ Build the ID as `YYYYMMDD-HHMMSS-<short-slug>`. Before creating it, search activ
 
 For Audit, a match also requires the same branch, environment, period boundaries, timezone, and entity filters. A difference creates a separate run unless the user explicitly expands the existing scope; record that expansion and preserve the original scope and observations.
 
+For an agreed observation campaign, [observation.md](observation.md) defines the overall period and plan revision once. Its bounded cycles are observations/steps in that run, not separate campaign identities. Reload the plan in each session, preserve interval/revision identity on retries and keep one writer. Record scheduler disposition locally without duplicating the plan's authority.
+
 ## Statuses
 
 Use exactly:

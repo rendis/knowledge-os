@@ -427,7 +427,214 @@ def load_records(root: Path) -> list[CaseRecord]:
         require_child(root, record_path, must_exist=True)
         text = record_path.read_text(encoding="utf-8")
         records.append(CaseRecord(record_path, text, parse_frontmatter(text)))
+    retired = retirement_records(root)
+    retired_ids = {value for entry in retired.values()
+                   for value in [entry["id"], *entry["consolidated-from"]]}
+    for record in records:
+        if record.case_id in retired_ids or any(value in retired_ids for value in record.consolidated_from):
+            raise CaseError("retirement_conflict", "A retired ID still resolves to a public case")
     return records
+
+
+RETIREMENT_HEADER = "# Retired investigations\n\n"
+RETIREMENT_FIELDS = {
+    "id", "title", "snapshot-commit", "public-sha256", "retired-at", "recorded-by",
+    "reason", "source", "dependency-review", "absorption-review", "summary",
+    "destinations", "consolidated-from",
+}
+
+
+def retirement_records(root: Path) -> dict[str, dict[str, Any]]:
+    path = root / "retired.md"
+    if path.is_symlink():
+        raise CaseError("case_symlink", "Retirement register must not be a symlink")
+    if not path.exists():
+        return {}
+    text = path.read_text(encoding="utf-8")
+    if not text.startswith(RETIREMENT_HEADER):
+        raise CaseError("retirement_register_invalid", "Invalid retirement register header")
+    records: dict[str, dict[str, Any]] = {}
+    for line in text[len(RETIREMENT_HEADER):].splitlines():
+        try:
+            entry = json.loads(line.removeprefix("- "))
+        except ValueError as error:
+            raise CaseError("retirement_register_invalid", "Invalid retirement record JSON") from error
+        if (not line.startswith("- ") or not isinstance(entry, dict)
+                or set(entry) != RETIREMENT_FIELDS
+                or any(not isinstance(value, str) for key, value in entry.items()
+                       if key not in {"destinations", "consolidated-from"})
+                or any(not isinstance(entry[key], list) or
+                       any(not isinstance(value, str) for value in entry[key])
+                       for key in ("destinations", "consolidated-from"))
+                or line != retirement_line(entry).rstrip("\n")):
+            raise CaseError("retirement_register_invalid", "Invalid retirement record fields")
+        validate_event_inputs("retirement_register_invalid", **{
+            key: value for key, value in entry.items() if isinstance(value, str)})
+        for value in entry["destinations"] + entry["consolidated-from"]:
+            validate_event_inputs("retirement_register_invalid", reference=value)
+        if (ID_PATTERN.fullmatch(entry["id"]) is None
+                or re.fullmatch(r"[a-f0-9]{40}|[a-f0-9]{64}", entry["snapshot-commit"]) is None
+                or re.fullmatch(r"[a-f0-9]{64}", entry["public-sha256"]) is None
+                or not has_offset_timestamp(entry["retired-at"])
+                or entry["id"] in records):
+            raise CaseError("retirement_register_invalid", "Invalid or repeated retirement identity")
+        if (root / entry["id"]).exists() or (root / entry["id"]).is_symlink():
+            raise CaseError("retirement_conflict", "Retired ID still has a public directory")
+        records[entry["id"]] = entry
+    identities: set[str] = set()
+    for entry in records.values():
+        for value in [entry["id"], *entry["consolidated-from"]]:
+            if ID_PATTERN.fullmatch(value) is None or value in identities:
+                raise CaseError("retirement_register_invalid", "Repeated retirement lineage identity")
+            if (root / value).exists() or (root / value).is_symlink():
+                raise CaseError("retirement_conflict", "Retired lineage has a public directory")
+            identities.add(value)
+    return records
+
+
+def retirement_line(entry: dict[str, Any]) -> str:
+    return "- " + json.dumps(entry, ensure_ascii=False, sort_keys=True) + "\n"
+
+
+def retirement_git(root: Path, *arguments: str, required: bool = True) -> bytes:
+    result = subprocess.run(
+        ["git", "-C", str(root.parent), *arguments], capture_output=True, check=False,
+    )
+    if required and result.returncode:
+        raise CaseError("retirement_git_failed", "Required retirement Git evidence is unavailable")
+    return result.stdout if result.returncode == 0 else b""
+
+
+def retirement_git_path(root: Path, path: Path) -> str:
+    top = Path(os.fsdecode(retirement_git(root, "rev-parse", "--show-toplevel")).strip()).resolve()
+    try:
+        return path.relative_to(top).as_posix()
+    except ValueError as error:
+        raise CaseError("retirement_git_failed", "Public case is outside its Git repository") from error
+
+
+def retirement_view(root: Path, entry: dict[str, Any]) -> dict[str, Any]:
+    """Derive completion from a reachable commit that added this record and deleted the case."""
+    ledger = retirement_git_path(root, root / "retired.md")
+    case = retirement_git_path(root, root / entry["id"])
+    marker = retirement_line(entry).encode("utf-8")
+    retirement_commit = None
+    snapshot_tree = retirement_git(root, "rev-parse", f'{entry["snapshot-commit"]}:{case}', required=False)
+    for commit in retirement_git(root, "log", "--format=%H", "--", f":(top,literal){ledger}", required=False).decode().splitlines():
+        content = retirement_git(root, "show", f"{commit}:{ledger}", required=False)
+        parent_content = retirement_git(root, "show", f"{commit}^:{ledger}", required=False)
+        parent_tree = retirement_git(root, "rev-parse", f"{commit}^:{case}", required=False)
+        if (marker in content.splitlines(keepends=True) and marker not in parent_content.splitlines(keepends=True)
+                and snapshot_tree and parent_tree == snapshot_tree
+                and not retirement_git(root, "ls-tree", "--full-tree", commit, "--", case)):
+            retirement_commit = commit
+            break
+    return {**entry, "retirement_commit": retirement_commit,
+            "commit_state": "committed" if retirement_commit else "pending"}
+
+
+def list_cases(root: Path) -> int:
+    with locked(root):
+        cases = [{"id": record.case_id, "title": record.title,
+                  "status": record.fields.get("status"),
+                  "summary": "\n".join(named_section(record.text, REQUIRED_SECTIONS[0])[0] or []).strip(),
+                  "updated-at": record.fields.get("updated-at")}
+                 for record in load_records(root)]
+        retired = [retirement_view(root, entry) for entry in retirement_records(root).values()]
+    emit({"status": "listed", "cases": cases, "retired": retired})
+    return 0
+
+
+def retire_case(args: argparse.Namespace, root: Path) -> int:
+    if not args.authorized:
+        raise CaseError("retirement_not_authorized", "Retirement requires explicit --authorized")
+    validate_event_inputs("retirement_invalid", reason=args.reason, source=args.source,
+                          dependency_review=args.dependency_review,
+                          absorption_review=args.absorption_review,
+                          recorded_by=args.identity.display, summary=args.summary)
+    for destination in args.destination:
+        validate_event_inputs("retirement_invalid", destination=destination)
+    if re.fullmatch(r"[a-f0-9]{40}|[a-f0-9]{64}", args.snapshot_commit) is None:
+        raise CaseError("retirement_snapshot_invalid", "Snapshot must be an exact full Git commit ID")
+    timestamp = timestamp_value(args.timestamp)
+    with locked(root):
+        records = {record.case_id: record for record in load_records(root)}
+        record = records.get(args.id)
+        if record is None:
+            raise CaseError("case_not_found", "Exact public case does not exist")
+        if record.fields.get("status") != "closed":
+            raise CaseError("retirement_not_closed", "Only a closed investigation may be retired")
+        if digest_bytes(record.path.read_bytes()) != args.expected_public_sha256:
+            raise CaseError("stale_public_snapshot", "Public case changed after review", exit_code=3)
+        validate_event_inputs("retirement_invalid", title=record.title)
+        errors, _ = validate_root(root, ignore_lock=True)
+        if errors:
+            raise CaseError("retirement_validation_failed", "Public cases are invalid", errors=errors)
+        case_dir = record.path.parent
+        if any(path.is_symlink() or not (path.is_dir() or path.is_file())
+               for path in case_dir.rglob("*")):
+            raise CaseError("retirement_snapshot_invalid", "Public case contains non-regular filesystem entries")
+        relative = retirement_git_path(root, case_dir)
+        commit = retirement_git(root, "rev-parse", "--verify", f"{args.snapshot_commit}^{{commit}}").decode().strip()
+        if commit != args.snapshot_commit:
+            raise CaseError("retirement_snapshot_invalid", "Snapshot is not a commit")
+        retirement_git(root, "merge-base", "--is-ancestor", commit, "HEAD")
+        if retirement_git(root, "status", "--porcelain=v1", "--untracked-files=all", "--", f":(top,literal){relative}"):
+            raise CaseError("retirement_snapshot_changed", "Case has uncommitted changes")
+        tree = retirement_git(root, "ls-tree", "--full-tree", "-rz", commit, "--", relative)
+        originals: dict[Path, tuple[bytes, int]] = {}
+        for item in tree.split(b"\0"):
+            if not item:
+                continue
+            metadata, name = item.split(b"\t", 1)
+            mode, kind, blob = metadata.split()
+            if kind != b"blob" or mode not in {b"100644", b"100755"}:
+                raise CaseError("retirement_snapshot_invalid", "Snapshot contains a non-regular file")
+            suffix = Path(os.fsdecode(name)).relative_to(relative)
+            target = case_dir / suffix
+            content = retirement_git(root, "cat-file", "blob", blob.decode())
+            if (target.is_symlink() or not target.is_file() or target.read_bytes() != content
+                    or bool(target.stat().st_mode & 0o111) != (mode == b"100755")):
+                raise CaseError("retirement_snapshot_changed", "Snapshot does not match the entire public case")
+            originals[suffix] = (content, target.stat().st_mode & 0o777)
+        actual = {path.relative_to(case_dir) for path in case_dir.rglob("*") if path.is_file()}
+        if not originals or actual != set(originals):
+            raise CaseError("retirement_snapshot_changed", "Snapshot omits public files, including ignored files")
+        entry = {"id": args.id, "title": record.title, "snapshot-commit": commit,
+                 "public-sha256": args.expected_public_sha256, "retired-at": timestamp,
+                 "recorded-by": args.identity.display, "reason": args.reason, "source": args.source,
+                 "dependency-review": args.dependency_review, "absorption-review": args.absorption_review,
+                 "summary": args.summary, "destinations": args.destination,
+                 "consolidated-from": record.consolidated_from}
+        ledger = root / "retired.md"
+        before = ledger.read_bytes() if ledger.exists() else None
+        content = (before if before is not None else RETIREMENT_HEADER.encode()) + retirement_line(entry).encode()
+        backup = root / f".retire-{uuid.uuid4().hex}.tmp"
+        directories = [path.relative_to(case_dir) for path in case_dir.rglob("*") if path.is_dir()]
+        os.replace(case_dir, backup)
+        try:
+            atomic_write(ledger, content)
+            shutil.rmtree(backup)
+        except Exception:
+            if backup.exists():
+                os.replace(backup, case_dir)
+            else:
+                case_dir.mkdir(mode=0o700)
+            for directory in directories:
+                (case_dir / directory).mkdir(parents=True, exist_ok=True)
+            for suffix, (data, mode) in originals.items():
+                target = case_dir / suffix
+                if not target.exists():
+                    atomic_write(target, data)
+                    target.chmod(mode)
+            if before is None:
+                if ledger.exists():
+                    ledger.unlink()
+            elif not ledger.exists() or ledger.read_bytes() != before:
+                atomic_write(ledger, before)
+            raise
+    emit({"status": "retired", **retirement_view(root, entry)})
+    return 0
 
 
 def acquire_lock(root: Path, timeout_seconds: float = 2.0) -> Path:
@@ -631,6 +838,9 @@ def open_case(args: argparse.Namespace, root: Path) -> int:
 
     with locked(root):
         records = load_records(root)
+        if any(args.id == entry["id"] or args.id in entry["consolidated-from"]
+               for entry in retirement_records(root).values()):
+            raise CaseError("case_retired", "A retired investigation ID cannot be reused")
         definite = match_records(
             records,
             case_id=args.id,
@@ -673,7 +883,16 @@ def open_case(args: argparse.Namespace, root: Path) -> int:
 
 
 def load_case(args: argparse.Namespace, root: Path) -> int:
+    with locked(root):
+        return load_case_unlocked(args, root)
+
+
+def load_case_unlocked(args: argparse.Namespace, root: Path) -> int:
     records = load_records(root)
+    for entry in retirement_records(root).values():
+        if args.id == entry["id"] or args.id in entry["consolidated-from"]:
+            emit({"status": "retired", **retirement_view(root, entry)})
+            return 0
     matches = [
         record
         for record in records
@@ -1261,7 +1480,7 @@ def validate_root(root: Path, *, ignore_lock: bool = False) -> tuple[list[str], 
     if not ignore_lock and (root / ".open.lock").exists():
         errors.append("live mutation lock exists")
     for path in root.iterdir():
-        if path.name.startswith(".open-") and path.name.endswith(".tmp"):
+        if path.name.startswith((".open-", ".retire-")) and path.name.endswith(".tmp"):
             errors.append(f"incomplete staging directory: {path.name}")
 
     records = load_records(root)
@@ -2357,6 +2576,15 @@ def build_parser() -> argparse.ArgumentParser:
     )
     load_parser.add_argument("--id", required=True)
 
+    commands.add_parser("list", help="derive active cases and retired entries")
+    retire_parser = commands.add_parser("retire", help="retire a closed case backed by an exact Git snapshot")
+    for option in ("id", "expected-public-sha256", "snapshot-commit", "reason", "source",
+                   "dependency-review", "absorption-review", "summary"):
+        retire_parser.add_argument("--" + option, required=True)
+    retire_parser.add_argument("--destination", action="append", default=[])
+    retire_parser.add_argument("--authorized", action="store_true")
+    retire_parser.add_argument("--timestamp")
+
     consolidate_parser = commands.add_parser(
         "consolidate",
         help="archive and retire one semantically reconciled duplicate",
@@ -2419,13 +2647,17 @@ def main(argv: list[str] | None = None) -> int:
     try:
         args = build_parser().parse_args(argv)
         root = resolve_root(args.root, create=args.command == "open")
-        if args.command in {"open", "save", "consolidate", "transition", "close", "bind"}:
+        if args.command in {"open", "save", "consolidate", "transition", "close", "bind", "retire"}:
             args.identity = effective_git_identity(root.parent)
             args.note_locale = notes_locale(root.parent)
         if args.command == "open":
             return open_case(args, root)
         if args.command == "load":
             return load_case(args, root)
+        if args.command == "list":
+            return list_cases(root)
+        if args.command == "retire":
+            return retire_case(args, root)
         if args.command == "transition":
             return transition_case(args, root)
         if args.command == "close":

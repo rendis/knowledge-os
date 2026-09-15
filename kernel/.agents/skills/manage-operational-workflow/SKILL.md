@@ -15,6 +15,7 @@ Before interpreting evidence to diagnose a cause or audit a claim, read [evidenc
 
 - **Advise**: explain or classify from the runbook with read-only work.
 - **Audit**: execute a bounded read-only evidence procedure, correlate observations, and record findings without triggering business processing. Load [references/read-only-audit.md](references/read-only-audit.md).
+- **Repeated observation**: use Audit with [references/observation.md](references/observation.md) when a user wants a bounded period of recurring observations/reports or a post-change observation proposal. Use supported harness scheduling in a separate execution context only after agreement; this is not an extra lifecycle branch.
 - **Draft**: prepare artifacts and validate them against the procedure without publishing them.
 - **Execute**: open a run, authorize its external effects, and perform the approved steps.
 - **Resume**: reconcile the exact recorded run with external state, then continue its pending steps.

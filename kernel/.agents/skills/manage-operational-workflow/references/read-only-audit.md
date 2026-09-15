@@ -44,4 +44,6 @@ Complete the audit when every required question is answered or has reached a pro
 
 On resume, preserve historical findings and append new observations. Refresh only evidence whose freshness matters to the pending question. Do not overwrite an earlier snapshot with current data or repeat completed collection without a reason. Future monitoring or scheduling requires a user request; a pending observation alone does not create an automation.
 
+For an explicitly agreed observation campaign, apply [observation.md](observation.md): a completed cycle does not complete the campaign, and waiting for its next planned interval keeps `in-progress`. A currently required inaccessible observation still has an explicit blocked/unknown disposition; scheduled waiting is not a business failure.
+
 **Complete when:** the report matches the ledger, required questions have explicit dispositions, and any continuation names the missing observation without triggering the audited process.

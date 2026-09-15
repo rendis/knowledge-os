@@ -2,6 +2,8 @@
 
 Use this runbook whenever two contributors changed the same investigation, even when Git reports a clean textual merge. Git resolves lines; it does not resolve meaning.
 
+Check helper `load`/`list` and `retired.md` before reconciling an old branch. A retired identity is not missing and cannot be silently recreated. Resolve contributions against the historical snapshot and canonical destinations; retain the retirement decision unless the user explicitly authorizes a separately reviewed recovery. A directory/retirement collision blocks acceptance even if Git merges cleanly.
+
 ## Inputs
 
 Bind three complete public snapshots: the common base, canonical current, and contribution. Verify the same investigation ID and preserve the private overlay outside the comparison. Compare `base -> canonical current` and `base -> contribution` across Current state, evidence, questions, decisions, acceptance criteria, handoffs, readiness, and History.

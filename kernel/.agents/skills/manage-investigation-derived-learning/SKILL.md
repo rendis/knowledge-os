@@ -10,7 +10,7 @@ Turn completed or sufficiently evidenced investigation work into bounded, cumula
 ## Preflight
 
 1. Load `../../../90-Meta/vault-resolution.md` and run `../../../90-Meta/resolve-vault.py` relative to this skill directory before reading any vault-relative path. Require one canonical remote- and marker-verified result, then bind every path below to its `VAULT_ROOT`; an unresolved or ambiguous vault blocks the workflow.
-2. Resolve the exact case ID and invoke `../manage-investigation/scripts/investigation-case.py --root <VAULT_ROOT>/investigations load --id <id>`. Read the complete returned public path and the private path when `private.available` is true, even when the user did not mention an overlay; keep their authority distinct. Loading is read-only and does not enter a case-update route.
+2. Resolve the exact case ID and invoke `../manage-investigation/scripts/investigation-case.py --root <VAULT_ROOT>/investigations load --id <id>`. For a present case, read the complete returned public path and the private path when `private.available` is true, even when the user did not mention an overlay; keep their authority distinct. For a retired result, follow `../manage-investigation/references/knowledge-and-retirement.md` to inspect the exact public Git snapshot read-only; never assume a live/private path or restore the case. Unavailable history is an explicit evidence limit. Loading is read-only and does not enter a case-update route.
 3. Treat the case as collaborative provenance and a source map, never as proof of production behavior by itself. Do not expose private-overlay content in the learning output.
 4. Load [references/assessment-contract.md](references/assessment-contract.md), [references/learning-note-contract.md](references/learning-note-contract.md), `VAULT_ROOT/90-Meta/Convenciones.md`, and the **Gate de aprendizaje durable** in `VAULT_ROOT/90-Meta/Auditoria - Framework.md`.
 5. Load `../../../90-Meta/node-selection.md` before selecting or planning a durable target. When the conclusion depends on cell implementation context or source repositories, also load the `map-ecosystem` read-only interrogation branch and resolve every source repository through that workflow before inspecting it.
@@ -54,6 +54,8 @@ Continue only for `extractable`.
 3. Update `investigaciones-origen`, `ultima-validacion`, applicability, limitations, traceability, and state/result only when the newly inspected evidence supports each change.
 4. For `challenge`, preserve both sides and set `estado: cuestionado` until evidence supports a current conclusion. For `supersede`, mark the prior note `superado` and link it from the replacement through `supersede-a`.
 5. Do not mutate the source investigation. Return the observed outcome, action, target notes, and checks to `manage-investigation` if its owner needs to record `learning-outcome`.
+
+Absorption does not close or retire a case. Preserve `investigaciones-origen` as stable provenance after retirement; resolve historical IDs through the case helper. Decisive evidence must remain usable without a removed live case, private overlay or ignored operational run. The investigation owner's `references/knowledge-and-retirement.md` governs retirement, never this publisher.
 
 **Complete when:** the canonical note contains the cumulative evidence and current bounded teaching, older evidence remains traceable, and no local case content was copied as unsupported proof.
 

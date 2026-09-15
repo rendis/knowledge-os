@@ -1,6 +1,6 @@
 ---
 name: manage-investigation
-description: Maintain shareable investigation case files with an optional private overlay. Use when a user wants to open, resume, migrate, reconcile, merge, validate, export, learn from, or promote an investigation.
+description: Maintain shareable investigation case files with an optional private overlay. Use to open, resume, reconcile, validate, prepare a production handover, absorb knowledge, or explicitly retire an investigation, as well as migrate, export, learn from or promote it.
 ---
 
 # Manage investigations
@@ -14,7 +14,7 @@ Own documentary persistence and traceability, not the general inquiry method. An
 1. Load `../../../90-Meta/vault-resolution.md` and run `../../../90-Meta/resolve-vault.py` relative to this skill directory. Bind one canonical `VAULT_ROOT`; use `VAULT_ROOT/investigations/` as the public root.
 2. Require `investigations/` to be eligible for tracking. Require both `.investigations-private/` and the legacy `.investigations/` to be ignored and absent from `git ls-files` when they exist.
 3. Load [references/record-contract.md](references/record-contract.md) before creating or changing a case file.
-4. Resolve `scripts/investigation-case.py` relative to this skill. Use it for Open, Load, Save, Transition, Consolidate, Bind, Close, and validation; do not reproduce its discovery, locking, attribution, or rollback logic manually.
+4. Resolve `scripts/investigation-case.py` relative to this skill. Use it for Open, Load, List, Save, Transition, Consolidate, Bind, Close, Retire, and validation; do not reproduce its discovery, locking, attribution, or rollback logic manually.
 5. Before a mutating route, confirm that the vault checkout has effective Git `user.name` and `user.email`. The helper enforces this gate and never changes Git configuration.
 
 Complete preflight when the public root is trackable, private and legacy roots are ignored, and the record contract is loaded.
@@ -26,6 +26,8 @@ Complete preflight when the public root is trackable, private and legacy roots a
 - **Migrate**: when explicitly requested, load [references/migration.md](references/migration.md); convert prior public lifecycle states and transform selected ignored legacy cases without changing their sources.
 - **Reconcile collaboration**: before accepting concurrent contributions, load [references/investigation-reconciliation.md](references/investigation-reconciliation.md).
 - **Update case**: persist supported findings, decisions, questions, and changes to the current understanding; obtain missing analysis through the shared method only when needed.
+- **Component progress / production preparation**: load [references/components-and-release.md](references/components-and-release.md); use existing registers and the team's operational guides, then validate the proposal with the user.
+- **Observe**: hand an agreed observation proposal to `manage-operational-workflow` and its `references/observation.md`; that owner plans separate-context scheduling and reports. Observation alone does not authorize case updates.
 - **Bind development handoff**: own the case binding decision for one validated materialization or activation result; mutate only for a new or advanced revision.
 - **Reconcile development**: consume one normalized result from `reconcile-development-handoff` and update the exact source case.
 - **Consolidate**: reconcile duplicate case files into one canonical directory while retaining retired IDs in its lineage.
@@ -35,8 +37,9 @@ Complete preflight when the public root is trackable, private and legacy roots a
 - **Export**: load [references/export-contract.md](references/export-contract.md) and create one or more local story drafts.
 - **Learn**: hand an exact case to `manage-investigation-derived-learning` for critical read-only assessment and optional authorized durable publication.
 - **Promote**: assess a documentation candidate under the cell evidence profile and hand eligible claims to `map-ecosystem`; this skill never writes the vault.
+- **Absorb / Retire**: load [references/knowledge-and-retirement.md](references/knowledge-and-retirement.md). Selectively absorb supported knowledge through Promote/Learn, independently of closing; retire only a closed, reviewed case on explicit authorization.
 
-Use no parallel index. Interrogation may call `90-Meta/graph-query.py investigations --node <stem>` (on-demand scan of `investigation.md` files). That query is not a second store. Resume inside this skill still searches case files directly.
+Use no parallel active index. The helper's `list` derives the overview from current cases and the minimal retirement register; `retired` describes storage disposition, not a fourth lifecycle state. Interrogation may call `90-Meta/graph-query.py investigations --node <stem>` for the on-demand public-case/node join. That query is not a second store and does not replace exact-ID retirement lookup.
 
 ## Open
 
@@ -49,8 +52,8 @@ Complete when the case has no equivalent active case, has a unique ID, professio
 
 ## Resume
 
-1. Search `investigations/` first. If a public match uses a prior lifecycle state or obsolete lifecycle metadata, require **Migrate** before ordinary mutation. If only `.investigations/` contains the match, read it as legacy and require **Migrate** before any mutation.
-2. Invoke `load --id <id>` after selecting the case. Read the entire returned public path and, when `private.available` is true, the returned private path. This lookup is mandatory even when the user does not mention private context. Label private provenance and keep it supplementary and non-authoritative. When it is absent, state that the requested private fact is unavailable instead of inferring it; the public case must remain intelligible.
+1. Search `investigations/` first. For an exact ID, use helper `load` to distinguish present, consolidated, retired and missing. A retired result supplies historical provenance and destinations, not an active public path; follow the retirement reference rather than recreating or reopening it automatically. If a public match uses a prior lifecycle state or obsolete lifecycle metadata, require **Migrate** before ordinary mutation. If only `.investigations/` contains the match, read it as legacy and require **Migrate** before any mutation.
+2. Invoke `load --id <id>` after selecting the case. For a present case, read the entire returned public path and, when `private.available` is true, the returned private path. For a retired result, use the historical lookup above and stop the live-case route. This lookup is mandatory even when the user does not mention private context. Label private provenance and keep it supplementary and non-authoritative. When it is absent, state that the requested private fact is unavailable instead of inferring it; the public case must remain intelligible.
 3. When `exports/` contains drafts, load [references/export-contract.md](references/export-contract.md) and inspect their source timestamps and register references.
 4. Reconstruct authoritative state from the public frontmatter and **Current state**; use public **History** only for provenance.
 5. Report the status, closure outcome when closed, purpose, independent outcomes, current understanding, blockers, open questions, handoffs, stale drafts, private-overlay availability, and next useful action.
@@ -117,6 +120,8 @@ Complete a package assessment when the supported answers and gaps are reported w
 3. For `abandoned`, require an explicit discontinuation decision and preserve the unresolved limitations. Evidence IDs are optional and `purpose` may remain undecided.
 4. Invoke the helper's `close` command with the exact SHA-256 returned by the latest load, decision, formalized reason, limitations, portable source, and every closure evidence ID. Never set `status` or `closure-outcome` through a normal save.
 5. If a closed case receives material new evidence, invoke `transition --to investigating` with the current SHA-256 and preserve the former closure in History before applying the evidence.
+
+Closure makes the case a candidate for the selective retention assessment in [references/knowledge-and-retirement.md](references/knowledge-and-retirement.md), not automatic publication or deletion. When the objective includes observation, apply the agreed coverage and outcome conditions from the operational run; elapsed time or a completed audit alone does not satisfy them.
 
 Complete when the helper validates and atomically records `status: closed`, the explicit `closure-outcome`, attribution, reason, evidence boundary, and limitations, or when a failed semantic gate leaves the loaded bytes unchanged.
 
