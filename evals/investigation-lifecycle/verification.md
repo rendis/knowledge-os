@@ -1,5 +1,8 @@
 # Lifecycle verification — 0.9.0
 
+Result: GO for the scoped implementation and synthetic validation; final combined
+independent review has no pending findings.
+
 Scope: isolated distribution branch `issue/investigation-lifecycle`, based on
 `6f102eadf1cf162510923f6c6aa6736e1480c375`. All behavioral sources, identities,
 receipts and Git repositories were synthetic. Consumer vaults were not modified.
@@ -81,7 +84,11 @@ portability (1), graph query (4), workspace configuration (8), retirement (20),
 lifecycle fixtures (4) and sync regressions (170). Fixture tests validate input and
 evaluation contracts; behavioral acceptance comes from the separately observed
 executions above. Six affected skill entrypoints passed skill validation.
-`git diff --check` passed. Installation strict doctor and final disposition pending.
+`git diff --check` passed. A fresh installation from clean implementation commit
+`97dbce7c6b965e33bdd3a70d304d3ad0583c676f` passed `doctor --strict`: version 0.9.0,
+valid instance, reproducible distribution, matching managed files, and no adapter,
+distribution or topology drift. Delivery retains the local issue branch; main
+integration and real-vault propagation remain outside this execution.
 
 No scheduler engine, new investigation state, component state machine, duplicate
 case archive or provider-specific deployment strategy was introduced.
