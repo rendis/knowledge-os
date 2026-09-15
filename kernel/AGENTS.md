@@ -68,7 +68,8 @@ Instance files (`instance.yaml`, `00-Home.md`, notes under `10/`–`70/`) are ne
 - Persist one durable relationship direction; use backlinks for the inverse.
 - Messaging goes producer → topic → consumer when `topic` is enabled.
 - Business flows live in `30-Flujos/`; human procedures live in `60-Operacion/`.
-- Author skills and this file with `writing-for-agents`. Keep harness-portable: no provider-specific metadata.
+- Before executing an operational procedure, apply the [execution eligibility contract](.agents/skills/manage-operational-workflow/references/procedure-contract.md#execution-eligibility), including procedures used by access capabilities.
+- Keep instructions harness-portable: no provider-specific metadata. Resolve technology-specific execution through the cell's configured procedures.
 
 ## Distribution changes
 

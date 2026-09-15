@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from instance import load_instance
+from instance import load_instance, reference_branches, valid_branch_name
 from cell_scope import approved_cross_scope_repositories
 from vault_frontmatter import read_frontmatter
 
@@ -86,7 +86,8 @@ def configure_scope(root: Path) -> None:
     instance = load_instance(root / "instance.yaml")
     sources = instance["sources"]
     global CORE_APP_PREFIXES, APPROVED_CROSS_APP_REPOSITORIES
-    global CONTAINER_REPOSITORIES, DEFAULT_ORG
+    global CONTAINER_REPOSITORIES, DEFAULT_ORG, INSTANCE
+    INSTANCE = instance
     CORE_APP_PREFIXES = tuple(
         f"{str(prefix).rstrip('-')}-"
         for prefix in sources["repo_prefixes"]
@@ -296,7 +297,7 @@ def load_notes(root: Path) -> list[dict[str, Any]]:
             full_name
             and isinstance(commit, str)
             and re.fullmatch(r"[0-9a-f]{12}", commit)
-            and branch in {"main", "master"}
+            and valid_branch_name(branch)
         )
         records.append(
             {
@@ -353,8 +354,8 @@ def load_acknowledgements(root: Path) -> list[dict[str, str]]:
         analysis_date = raw["analysis_date"]
         if not isinstance(repository, str) or not is_tracked_repository(repository):
             raise OperationalError(f"invalid {prefix}: repository is outside the tracked scope")
-        if not isinstance(branch, str) or branch not in {"main", "master"}:
-            raise OperationalError(f"invalid {prefix}: branch must be main or master")
+        if not valid_branch_name(branch):
+            raise OperationalError(f"invalid {prefix}: branch must be a valid Git branch name")
         if not isinstance(analyzed_sha, str) or re.fullmatch(r"[0-9a-f]{12}", analyzed_sha) is None:
             raise OperationalError(f"invalid {prefix}: analyzed_sha must be 12 lowercase hexadecimal characters")
         if decision not in ACKNOWLEDGEMENT_DECISIONS:
@@ -415,11 +416,24 @@ def load_org(org: str, github: GitHubContext) -> list[dict[str, Any]]:
     for repo in repos:
         if not is_tracked_repository(str(repo.get("name", ""))):
             continue
+        candidates = reference_branches(INSTANCE, repo["name"])
+        references = {branch: repo.get(branch) for branch in candidates}
+        if repo["name"] in INSTANCE["sources"]["reference_branches"]:
+            branch = candidates[0]
+            result = run(
+                ["gh", "api", "graphql", "-f", "query=query($org:String!,$repo:String!,$ref:String!){repository(owner:$org,name:$repo){ref(qualifiedName:$ref){name target{oid}}}}",
+                 "-f", f"org={org}", "-f", f"repo={repo['name']}", "-f", f"ref=refs/heads/{branch}"],
+                env=token_env(github.token),
+            )
+            try:
+                references[branch] = json.loads(result.stdout)["data"]["repository"]["ref"]
+            except (json.JSONDecodeError, KeyError, TypeError) as error:
+                raise OperationalError(f"invalid reference lookup for {repo['name']}") from error
         selected = next(
             (
-                (branch, repo.get(branch))
-                for branch in ("main", "master")
-                if repo.get(branch) and repo[branch].get("target", {}).get("oid")
+                (branch, references.get(branch))
+                for branch in candidates
+                if references.get(branch) and references[branch].get("target", {}).get("oid")
             ),
             (None, None),
         )
@@ -512,7 +526,7 @@ def build_inventory(root: Path, org: str, github: GitHubContext) -> list[dict[st
         elif repo.get("isArchived"):
             status, details = "archived", "repository is archived"
         elif not branch:
-            status, details = "branch-ambiguous", "no main or master branch"
+            status, details = "branch-ambiguous", "no configured reference branch (or legacy main/master fallback)"
         elif container_note:
             status = "container"
             details = "vault container documented in Meta; SHA tracking is intentionally not self-referential"
@@ -544,10 +558,10 @@ def build_inventory(root: Path, org: str, github: GitHubContext) -> list[dict[st
                 "new",
                 "no matching vault note; any prior synchronization cursor is stale",
             )
-        elif note["recorded_sha"] == sha:
+        elif note["recorded_sha"] == sha and note["recorded_branch"] == branch:
             status, details = "current", "recorded SHA matches production branch"
         else:
-            status, details = "changed", "production branch SHA differs from note"
+            status, details = "changed", "reference branch or SHA differs from note"
         records.append(
             {
                 "note": container_note or (note["note"] if note else None),

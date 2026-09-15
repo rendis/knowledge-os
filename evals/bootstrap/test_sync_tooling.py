@@ -11,6 +11,7 @@ from pathlib import Path
 
 DIST = Path(__file__).resolve().parents[2]
 META = DIST / "kernel" / "90-Meta"
+sys.path.insert(0, str(META))
 MANIFEST = META / "git-change-manifest.py"
 STATIC_SCAN = META / "static-evidence-scan.py"
 SYNC_RUN = META / "sync-run.py"

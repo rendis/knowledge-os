@@ -15,6 +15,8 @@ from datetime import date
 from pathlib import Path, PurePosixPath
 from typing import Any, NoReturn
 
+from instance import InstanceError, load_instance, reference_branches, valid_branch_name
+
 MANIFEST_FIELDS = {
     "version", "old_oid", "new_oid", "paths", "environment_configs", "credential_suspects",
 }
@@ -1531,7 +1533,7 @@ def validate_gate_for_write(
                 expected_item is None
                 or item["new_oid"] != expected_item["new_oid"]
                 or item["decision"] != expected_item["decision"]
-                or item["branch"] not in {"main", "master"}
+                or not valid_branch_name(item["branch"])
                 or parsed_date is None
                 or parsed_date.isoformat() != item["analysis_date"]
             ):
@@ -1824,7 +1826,7 @@ def acknowledgement_document(
                 "analysis_date",
             }
             or not valid_repository_name(record_value.get("repository"))
-            or record_value.get("branch") not in {"main", "master"}
+            or not valid_branch_name(record_value.get("branch"))
             or not isinstance(record_value.get("analyzed_sha"), str)
             or re.fullmatch(r"[0-9a-f]{12}", record_value["analyzed_sha"]) is None
             or not isinstance(record_value.get("decision"), str)
@@ -3553,6 +3555,7 @@ def close_package(
     review_path: Path,
     production_ref: str,
     analysis_date: str,
+    root: Path | None = None,
 ) -> dict[str, Any]:
     manifest = read_json(manifest_path)
     scaffold = read_json(scaffold_path)
@@ -3571,12 +3574,19 @@ def close_package(
     except (TypeError, ValueError) as error:
         raise ContractError("package-invalid", "analysis date is invalid") from error
     ref_match = re.fullmatch(
-        r"refs/(?:heads|remotes/origin)/(main|master)",
+        r"refs/(?:heads|remotes/origin)/(.+)",
         production_ref,
     )
     if ref_match is None or parsed_date.isoformat() != analysis_date:
         raise ContractError("package-invalid", "acknowledgement metadata is invalid")
     branch = ref_match.group(1)
+    instance_path = (root or Path(__file__).resolve().parents[1]) / "instance.yaml"
+    try:
+        instance = load_instance(instance_path) if instance_path.exists() or root is not None else {}
+    except InstanceError as error:
+        raise ContractError("package-invalid", str(error)) from error
+    if not valid_branch_name(branch) or branch not in reference_branches(instance, repository):
+        raise ContractError("package-invalid", "source ref does not match the repository reference-branch policy")
     branch_oid = resolve_current_ref(repo_path, production_ref)
     if branch_oid != manifest.get("new_oid"):
         raise ContractError(
@@ -3883,8 +3893,9 @@ def parser() -> StableArgumentParser:
     close.add_argument(
         "--production-ref",
         required=True,
-        help="explicit local or origin remote main/master ref frozen for this package",
+        help="explicit local or origin remote configured reference branch frozen for this package",
     )
+    close.add_argument("--root", type=Path, help="cell vault owning the reference-branch policy; defaults to the installed vault")
     close.add_argument("--analysis-date", required=True)
     close.add_argument("--output", required=True, type=Path)
     validate_projection_command = commands.add_parser(
@@ -3943,7 +3954,7 @@ def main(argv: list[str] | None = None) -> int:
             )
             payload = close_package(
                 args.repo, args.manifest, args.scaffold,
-                args.analysis, args.review, args.production_ref, args.analysis_date,
+                args.analysis, args.review, args.production_ref, args.analysis_date, args.root,
             )
             replace_json(args.output, payload)
             emit(payload)

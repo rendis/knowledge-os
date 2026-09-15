@@ -3,14 +3,13 @@
 from __future__ import annotations
 
 import argparse
-import json
 import re
 import sys
 from datetime import date
 from pathlib import Path
 from typing import Any
 
-from instance import load_instance
+from instance import load_instance, valid_branch_name
 from vault_frontmatter import split_frontmatter
 
 FORBIDDEN_RELATION_FILES = {
@@ -402,8 +401,8 @@ def audit_repo(path: Path, root: Path) -> list[str]:
     commit = fields.get("commit-analizado")
     if not isinstance(commit, str) or not re.fullmatch(r"[0-9a-f]{12}", commit):
         issues.append(f"{prefix}: commit-analizado is not a 12-char lowercase sha")
-    if fields.get("rama-analizada") not in {"main", "master"}:
-        issues.append(f"{prefix}: rama-analizada must be main or master")
+    if not valid_branch_name(fields.get("rama-analizada")):
+        issues.append(f"{prefix}: rama-analizada must be a valid Git branch name")
     for key in ("fecha-analisis", "ultima-auditoria"):
         if not valid_date(fields.get(key)):
             issues.append(f"{prefix}: {key} must be a valid YYYY-MM-DD date")

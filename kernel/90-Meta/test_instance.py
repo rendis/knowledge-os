@@ -16,6 +16,9 @@ from instance import (  # noqa: E402
     load_instance,
     orientation_status,
     validate_instance,
+    reference_branches,
+    valid_branch_name,
+    _parse_minimal_yaml,
 )
 
 
@@ -41,6 +44,28 @@ class InstanceTests(unittest.TestCase):
         self.assertEqual(loaded["systems"][0]["id"], "payments")
         self.assertEqual(loaded["evidence"]["profile"], "production-gate")
         self.assertEqual(loaded["trackers"], [])
+
+    def test_reference_branch_policy_roundtrip_and_legacy_defaults(self) -> None:
+        data = self.sample()
+        data["sources"]["reference_branches"] = {"payments-api": "release/stable", "123": "trunk", "quoted": 'release/"stable"'}
+        for loaded in (validate_instance(_parse_minimal_yaml(dump_instance(data))),):
+            self.assertEqual(loaded["sources"]["reference_branches"], data["sources"]["reference_branches"])
+            self.assertEqual(reference_branches(loaded, "payments-api"), ("release/stable",))
+            self.assertEqual(reference_branches(loaded, "123"), ("trunk",))
+            self.assertEqual(reference_branches(loaded, "unlisted"), ("main", "master"))
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "instance.yaml"
+            path.write_text(dump_instance(data))
+            self.assertEqual(load_instance(path)["sources"]["reference_branches"], data["sources"]["reference_branches"])
+
+    def test_reference_branch_policy_rejects_ref_expressions(self) -> None:
+        for branch in ("", "HEAD", "refs/heads/trunk", "../main", "-option", "a..b", "a.lock", "a/.hidden", "a//b", "HEAD~1", "a b", "a\\b"):
+            with self.subTest(branch=branch):
+                self.assertFalse(valid_branch_name(branch))
+                data = self.sample()
+                data["sources"]["reference_branches"] = {"payments-api": branch}
+                with self.assertRaises(InstanceError):
+                    validate_instance(data)
 
     def test_malformed_yaml_is_an_instance_error(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

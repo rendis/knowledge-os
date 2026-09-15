@@ -17,9 +17,11 @@ Select exactly one:
 | `extractable` | The durable-learning gate passes and the candidate adds a non-obvious, reusable, bounded conclusion. | Select `create`, `enrich`, `challenge`, or `supersede`. |
 | `no-learning` | The relevant sources and context are sufficient, but the resolved result is trivial, purely case-specific, only restates a delivery fact, or does not improve a future decision. | `none`. |
 | `already-covered` | A canonical note already contains the same teaching, applicability boundary, and materially equivalent evidence or stronger evidence. | `none`; identify the note and why the new material adds nothing. |
-| `insufficient-evidence` | A required source is missing or unreadable, the investigation is unfinished, the comparison is not reproducible, context is too incomplete, decisive evidence exists only in investigation narrative or another transient/local location, or a possible contradiction lacks enough support to qualify as a durable challenge. | `none`; name the exact missing source or context and the retry condition. |
+| `insufficient-evidence` | A required source is missing or unreadable, an unresolved investigation question could change the selected conclusion or its applicability limits, the comparison is not reproducible, context is too incomplete, decisive evidence exists only in investigation narrative or another transient/local location, or a possible contradiction lacks enough support to qualify as a durable challenge. | `none`; name the exact missing source or context and the retry condition. |
 
 Do not collapse `insufficient-evidence` into `no-learning`: the former is retryable; the latter is a substantive conclusion after sufficient review. Do not collapse `already-covered` into `no-learning`: deduplication is useful evidence that the knowledge system worked.
+
+Assess the selected conclusion independently of the case's lifecycle state. Inspect the case's pending questions and explain whether any could change that conclusion or its applicability limits. An open case with unrelated pending work does not block an otherwise qualified learning; a closed case does not supply missing evidence. Publishing a learning neither closes the investigation nor proves that a proposed correction is deployed.
 
 A negative or neutral result is not automatically `no-learning`. It is `extractable` when a sound comparison shows why an alternative should be avoided, why the baseline remains preferable in the stated context, or which method prevents a future error.
 

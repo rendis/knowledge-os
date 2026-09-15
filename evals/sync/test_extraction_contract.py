@@ -7,6 +7,7 @@ import tempfile
 import unittest
 from fixtures import make_repository_pair, package_artifacts, SOURCE_REPOSITORY, SOURCE_CLAIM, NODE
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / 'kernel/90-Meta'))
 spec = importlib.util.spec_from_file_location('extraction_manifest', ROOT/'kernel/90-Meta/git-change-manifest.py')
 m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
 
