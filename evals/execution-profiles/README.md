@@ -1,0 +1,11 @@
+# Execution profile evaluation
+
+Run `python3 -B evals/execution-profiles/run.py --vault <first> --vault <second> --output <new-private-output-directory>`. Exactly two consumer vaults are required. `--case` selects individual scenarios; the full campaign has thirteen candidate scenarios plus two baselines and two repetitions per vault (34 runs). `--workers` bounds concurrency; `--timeout` bounds each agent process.
+
+The runner creates independent local clones and detached worktrees, installs the candidate router/reference only in the copies, and substitutes a non-routable Git identity in each copy. It never updates the originals or modifies distribution skills. Source revisions, file fingerprints, local Git configuration hashes and skill hashes establish preservation. Prepared worktree fingerprints distinguish scenario inputs from agent changes.
+
+Codex's `:minimal` profile supplies platform runtime reads; only the scenario worktree is writable. The copied Codex executables and clone Git metadata are readable. Other scratch content and original vaults are denied. Before agent execution, controls check outside network reachability, inside network denial, a writable local file, an unreadable/unwritable sibling sentinel and the isolated Obsidian stub. A private temporary Codex home retains full rollouts for dispatch evidence; its authentication link remains inside the automatically removed scratch directory. The shell environment uses local tool wrappers and temporary storage.
+
+Outputs contain private source-derived material. Keep them outside version control, inspect them locally, retain only sanitized findings, and delete raw captures after review. `events.jsonl` is a summarized stream: use full `rollouts/` rollouts for tool dispatch and effective turn model/effort. A zero exit code or a worker's prose is not semantic acceptance. Score against [the rubric](rubric.md), including file changes and artifacts. Runtime errors stop the initial campaign gate; completed captures remain pending independent review until scored.
+
+Only Codex is evaluated here. No cross-provider quality equivalence or token saving follows from these scenarios. See [results](results.md) for observed outcomes and limitations.
