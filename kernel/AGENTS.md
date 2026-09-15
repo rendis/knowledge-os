@@ -20,6 +20,8 @@ This vault is an evidence-backed map of one cell's systems. Load skills by name;
    - Cell-specific scope, allowlists, or exceptions: `90-Meta/Alcance.md`.
    - Schema, node type, or evidence gate: the relevant section of `90-Meta/Convenciones.md` or `90-Meta/Auditoria - Framework.md`.
 
+When a question crosses into another vault, follow [cross-vault consultation](.agents/skills/map-ecosystem/references/cross-vault-consultation.md) before reading its domain content.
+
 Operational audit procedures belong to the registered audit area; link the technologies they inspect through related areas.
 
 Answer questions without a persistent record by default. Recommend an investigation when preserving evidence, decisions or pending questions would make continuation or sharing easier; open it through `manage-investigation` only when the user requests it or accepts the recommendation. A declined recommendation leaves the conversation unrecorded. An explicitly requested operational audit retains its `.operations/` workflow, not a second investigation.

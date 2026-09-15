@@ -40,6 +40,7 @@ Choose the next action from the existing knowledge, not from the number of pendi
 | Full onboarding requested, or the selected task requires source access and roots/acquisition choice are missing | Use `configure-workspace` to collect unresolved decisions before source acquisition; return to the selected map branch afterward. |
 | Incomplete bootstrap or where-to-start request | Load `references/orientation.md`. |
 | Context, dependency, or impact question | Load `references/interrogation.md`. |
+| A related vault is discovered in authorized repository exploration or supplied by the user | Load `references/cross-vault-consultation.md` before consulting it; return to the active branch. |
 | One durable node | Load `references/single-unit-documentation.md`. |
 | Several related units | Load `references/multi-unit-documentation.md`. |
 | Pending-work or campaign-completion question | Load `references/mapping-completion.md`; keep the query read-only. |

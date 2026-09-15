@@ -4,6 +4,8 @@ Use this phase only after a service-local map has passed its independent review 
 
 Apply [evidence-sufficiency.md](evidence-sufficiency.md) before requesting access or reusing a pending close condition.
 
+When the question requires another domain vault discovered through authorized repository exploration or supplied by the user, follow [cross-vault-consultation.md](cross-vault-consultation.md) before reading its domain content. Return its evidence and limits to this workflow.
+
 ## Access gate
 
 Use repository, dependency, IaC and schema evidence first. A discovered connection identifies a question and target; it grants no access. When a material question still requires a live provider, cluster or database, resolve the configured executor or adapter for that procedure and run its bounded read-only target probe. Reuse the existing authenticated identity or session selected by that procedure. The probe must establish both read-only operation and the exact authority and target before the observation proceeds.

@@ -6,6 +6,8 @@ Accept a question, proposed change, or starting node. Resolve aliases only to fi
 
 When evidence needs to be obtained or evaluated, read [evidence-driven-analysis](../../evidence-driven-analysis/SKILL.md) in full before that analysis unless it is already loaded in the current context. Reuse the active method and valid checks; navigation alone does not require another analysis pass. This reference owns navigation and source identity; the shared method does not restart routing. If called as an auxiliary by another workflow, return observations, sources and limits to that owner.
 
+When the question requires another domain vault discovered through authorized repository exploration or supplied by the user, follow [cross-vault-consultation.md](cross-vault-consultation.md) before reading its domain content. Return its evidence and limits to this workflow.
+
 ## Navigation
 
 1. If orientation may be incomplete, run `graph-query.py orientation` (or the equivalent `instance.orientation_status`). If `ready` is false, load [orientation.md](orientation.md) and stop. Do not read Home, Convenciones, or Framework as a prelude to classifying a dependency question.
