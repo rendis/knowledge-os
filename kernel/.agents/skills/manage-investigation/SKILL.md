@@ -7,7 +7,7 @@ description: Maintain shareable investigation case files with an optional privat
 
 Treat `investigations/<id>/investigation.md` as the canonical, versionable case. An optional `.investigations-private/<id>/private.md` may add necessary sensitive context but never overrides public status, evidence, decisions, acceptance criteria, or history.
 
-Own documentary persistence and traceability, not the general inquiry method. Answering a question does not require a case. Open only when the user requests one or accepts a recommendation; recommend one when continuity or collaboration would benefit from retained evidence, decisions, or pending work. For already-supported updates, proceed directly to the documentary checks. Consult [evidence-driven-analysis](../evidence-driven-analysis/SKILL.md) only when evidence still needs to be obtained or evaluated; retain this workflow as owner and consume its result without routing back.
+Own documentary persistence and traceability, not the general inquiry method. Answering a question does not require a case. Open only when the user requests one or accepts a recommendation; recommend one when continuity or collaboration would benefit from retained evidence, decisions, or pending work. For already-supported updates, proceed directly to the documentary checks. When evidence still needs to be obtained or evaluated, read [evidence-driven-analysis](../evidence-driven-analysis/SKILL.md) in full before that analysis unless it is already loaded in the current context. Retain this workflow as owner, reuse valid checks, and consume the result without routing back.
 
 ## Preflight
 

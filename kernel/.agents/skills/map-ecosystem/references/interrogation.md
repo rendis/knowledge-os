@@ -4,7 +4,7 @@
 
 Accept a question, proposed change, or starting node. Resolve aliases only to find a note; navigate and report using canonical basenames. Keep this branch entirely read-only.
 
-Reuse the analysis method when it is already active. Otherwise, load [evidence-driven-analysis](../../evidence-driven-analysis/SKILL.md) only when evidence needs to be obtained or evaluated; navigation alone does not require another analysis pass. This reference owns navigation and source identity; the shared method does not restart routing. If called as an auxiliary by another workflow, return observations, sources and limits to that owner.
+When evidence needs to be obtained or evaluated, read [evidence-driven-analysis](../../evidence-driven-analysis/SKILL.md) in full before that analysis unless it is already loaded in the current context. Reuse the active method and valid checks; navigation alone does not require another analysis pass. This reference owns navigation and source identity; the shared method does not restart routing. If called as an auxiliary by another workflow, return observations, sources and limits to that owner.
 
 ## Navigation
 

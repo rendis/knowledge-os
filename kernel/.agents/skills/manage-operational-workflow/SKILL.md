@@ -9,7 +9,7 @@ Treat the selected procedure in `60-Operacion/` as the runbook, connected capabi
 
 Use this skill for operational evidence about a known flow or entity: when it ran, errors and retries, submissions, reconciliation results, or observed corrections. Informational questions select Advise without a ledger; a requested operational audit selects Audit and retains its run record. Use `map-ecosystem` for explaining architecture or locating dependencies. Recommend `manage-investigation` only when a separate case would help continuity beyond the procedure, and open it only on request or acceptance. Audit continuity alone does not require a second investigation record. If a procedure lacks necessary system knowledge, request that bounded evidence from `map-ecosystem` and return to the same operational run.
 
-When evidence needs interpretation, apply [evidence-driven-analysis](../evidence-driven-analysis/SKILL.md) as an auxiliary method. This skill retains procedure selection, effect authorization and `.operations/` writes; the method returns conclusions and limitations without rerouting or replacing the procedure's access contract.
+Before interpreting evidence to diagnose a cause or audit a claim, read [evidence-driven-analysis](../evidence-driven-analysis/SKILL.md) in full unless it is already loaded in the current context, then apply it as an auxiliary method. Reuse valid checks; do not restart the audit. This skill retains procedure selection, effect authorization and `.operations/` writes; the method returns conclusions and limitations without rerouting or replacing the procedure's access contract.
 
 ## 1. Select the branch and source
 
