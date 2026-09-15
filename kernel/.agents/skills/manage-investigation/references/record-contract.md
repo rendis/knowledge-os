@@ -17,7 +17,7 @@ investigations/
 
 The public directory is canonical and versionable. A necessary private overlay may exist at `.investigations-private/<investigation-id>/private.md`; it is ignored, supplementary, and may contain only `id`, `authority: private-overlay`, `updated-at`, and the ordered sections **Sensitive context**, **Private references**, and **History**. It must not restate or override public decisions, evidence, status, scope, acceptance criteria, or history. Do not create an empty overlay.
 
-Do not maintain a separate index. Resume by searching `investigation.md` frontmatter and content in this order: exact `id`, exact entry in `consolidated-from`, exact `source-ref`, then title or keywords. Require user selection only for multiple matches.
+Do not maintain a separate active index. Use helper `load` for exact IDs, including consolidated/retired identities, and `list` for the derived overview. For discovery, search public frontmatter/content by `source-ref`, then title or keywords; require user selection only for multiple matches. The minimal `retired.md` register under [knowledge-and-retirement.md](knowledge-and-retirement.md) records removed cases only, never a duplicate active state.
 
 Use `handoffs/` only for repository-specific development input packages that conform to the `manage-development-handoff` input contract. Create one package per target repository; the consumer receives the package directory, never authority to read or mutate the investigation case.
 
@@ -149,6 +149,8 @@ Before calling `save`, provide every added or changed public register ID with re
 Each question records `open`, `resolved`, or `superseded` state. Keep open questions first. Retain resolved and superseded questions in a clearly labeled subsection of **Open questions**, with the resolving decision or evidence; a replacement question receives a new ID and reciprocal `supersedes`/`superseded-by` links.
 
 Each evidence entry states its claim, category (`fact`, `inference`, `contradiction`, or `limitation`), source, and relevant location such as file, section, page, line, URL, or revision. Link decisions and acceptance criteria to supporting identifiers when available.
+
+For component progress, use [components-and-release.md](components-and-release.md). Reuse these registers and handoff identities; keep situation evidence in one place and derive the brief summary. No additional component-state field or parallel event taxonomy is required. Closed-case retirement is an explicit exception to retaining the active directory, governed by [knowledge-and-retirement.md](knowledge-and-retirement.md); its immutable Git snapshot preserves the original identifiers and history.
 
 Each materialized development target has one stable entry under **Development handoffs**. Allocate a new `DH-NNN` for a new story-and-repository identity; update that same entry when a later materialization advances its current revision. Entries from the same investigation and repository may share a branch; their story, work-item, handoff, family, and revision identities remain distinct. Record these fields exactly:
 

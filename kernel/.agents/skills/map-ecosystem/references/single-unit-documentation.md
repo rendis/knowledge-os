@@ -6,6 +6,8 @@ Accept one target repository or durable vault node and confirm that the user aut
 
 Apply [evidence-extraction.md](evidence-extraction.md) throughout extraction and verification.
 
+During bounded repository/change discovery, apply [investigation-context.md](investigation-context.md) to locate associated cases and inspect relevant non-code evidence. Reuse the resulting source package; this does not open a case or authorize additional writes.
+
 For an external verification of an already mapped connection, reuse the repository baseline and inspect only the selected external authority. Use this documentation recipe outside the closed Git synchronization run: a provider observation is not a repository Git blob. Record the external evidence identity, environment, observation time and safe retrieval reference in the candidate note. Review and check the complete candidate through [final-note-review.md](final-note-review.md) before publishing it. Preserve source analysis metadata when the source repository was not re-analyzed. This branch may resolve a pending item even when the repository commit is unchanged; it does not alter a sync receipt or bypass a failed source review.
 
 For Git/GitHub policy maintenance, return the selected policy change to `manage-git-workflow` before entering extraction or publication. Normative rules use that workflow’s policy evidence; they are not claims of inspected implementation.

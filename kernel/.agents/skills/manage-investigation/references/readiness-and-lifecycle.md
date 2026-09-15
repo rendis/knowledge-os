@@ -11,11 +11,13 @@ investigating ⇄ blocked
 closed ──explicit reopen──> investigating
 ```
 
-- `investigating`: the case is open. It covers intake, evidence collection, analysis, validation, and preparation of any requested output.
+- `investigating`: the case is open. It covers intake, evidence collection, analysis, validation, preparation of requested output, and implementation or observation when included in the agreed objective.
 - `blocked`: useful progress on the investigation objective cannot continue because of one concrete inaccessible dependency or unresolved decision. Record it in `blocked-on`.
 - `closed`: active investigation work ended. Record `closure-outcome: completed` or `closure-outcome: abandoned`.
 
 Do not encode internal workflow stages as statuses. Export, publication, implementation, pull-request, deployment, documentation, and learning outcomes have their own evidence and fields; none changes the investigation status automatically.
+
+Use [components-and-release.md](components-and-release.md) to distinguish component progress without adding states. Waiting for an agreed observation cycle does not itself block the case. Close, knowledge absorption and retirement are independent decisions; administrative retirement does not reopen a closed case.
 
 `learning-outcome` remains independent. Material new evidence that could change an earlier assessment resets it to `not-evaluated` while History preserves the prior result.
 
