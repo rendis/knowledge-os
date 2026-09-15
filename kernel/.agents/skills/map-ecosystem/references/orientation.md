@@ -1,6 +1,6 @@
 # Orientation
 
-Load this branch first when the user asks for a minimal sync, where to start, or whether the cell vault is bootstrapped. Also load it as the first interrogation step.
+Load this branch when the user asks for a minimal sync, where to start, or whether the cell vault is bootstrapped. For dependency questions, follow the conditional orientation check in [interrogation](interrogation.md#navigation).
 
 ## When to run
 

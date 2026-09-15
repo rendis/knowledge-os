@@ -27,7 +27,7 @@ def read(path):
     return contract.read_json(safe(path))
 
 
-def validate(repo, manifest, scaffold, analysis, review, current_ref):
+def validate(repo, manifest, scaffold, analysis, review, current_ref, *, initial=True):
     result = contract.check_analysis(repo, manifest, scaffold, analysis, current_ref)
     if result['status'] != 'pass':
         raise ValueError(result['code'])
@@ -39,6 +39,16 @@ def validate(repo, manifest, scaffold, analysis, review, current_ref):
         not contract.is_empty_new_manifest(m)
         and a == contract.fallback_analysis_payload(s, m)
     )
+    # The ordinary finalizer can leave edited fallback explanations unchanged.
+    # An initial claim-free artifact still carrying fallback checklist
+    # explanations must match the generated payload, not merely be a finalizer
+    # fixed point. The reviewed correction may legitimately change those fields.
+    fallback_checklist = not a['claims'] and any(
+        item['reason'] == contract.FALLBACK_REASON
+        for item in a['checklist'].values()
+    )
+    if initial and fallback_checklist and not existing_fallback:
+        raise ValueError('analysis-not-finalized')
     if not existing_fallback and finalized != a:
         raise ValueError('analysis-not-finalized')
     if contract.validate_review(r, a['repository'], m, s, a, secrets):
@@ -116,7 +126,7 @@ def check(args):
     validate(safe(args.repo), *[w / ('initial-' + name + '.json') for name in names], args.current_ref)
     if values[3]['verdict'] != 'revise':
         raise ValueError('correction-requires-revise')
-    revised = validate(safe(args.repo), w / 'initial-manifest.json', w / 'initial-scaffold.json', w / 'analysis.json', safe(args.review), args.current_ref)
+    revised = validate(safe(args.repo), w / 'initial-manifest.json', w / 'initial-scaffold.json', w / 'analysis.json', safe(args.review), args.current_ref, initial=False)
     if revised[2] == values[2] or revised[3] == values[3]:
         raise ValueError('correction-needs-new-analysis-and-review')
     scope(values[2], revised[2], values[3])

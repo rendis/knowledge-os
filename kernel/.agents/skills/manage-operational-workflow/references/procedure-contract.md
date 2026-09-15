@@ -51,7 +51,11 @@ For an audit procedure, use the same sections and step table with read-only remo
 
 ### Report
 
-Use `clase: reporte` for one implemented report contract. Add one globally unique lowercase kebab-case `report-id` and require: Propósito, Audiencia y decisiones, Definiciones y grano, Fuente y alcance, Período, filtros y exclusiones, Salida, Validación, Mantenimiento, and Limitaciones. Link the execution procedure or implementation from the source or maintenance section. The destination owns its executor, parameters and output-specific validation; the shared report skill coordinates the requested mode.
+Use `clase: reporte` for one implemented report contract. Add one globally unique lowercase kebab-case `report-id` and require: Propósito, Audiencia y decisiones, Definiciones y grano, Fuente y alcance, Período, filtros y exclusiones, Salida, Validación, Mantenimiento, and Limitaciones. Link the execution procedure or implementation from the source or maintenance section.
+
+The note and its linked procedure must establish input identity and required parameters, bounded scope and exclusions, the actual executor, output format and destination, and observable acceptance criteria. Specify access requirements, resource limits, reproducibility evidence and retention when applicable to that executor and data. A period may be inapplicable; state that explicitly rather than inventing a date range. No query language, renderer, file format, cost-preview mechanism or calendar grain is required by the shared contract.
+
+Generation requires all applicable execution inputs and checks. Validation of existing artifacts requires only the inputs and checks needed to evaluate those artifacts; listing requires neither execution nor live access. A missing required element blocks only the dependent mode with an exact gap. Report identity and duplicate detection belong to the catalog; execution and output checks belong to the destination procedure. Generated source data and result artifacts stay outside the knowledge graph and follow the procedure's retention policy.
 
 ## Lifecycle
 
@@ -64,3 +68,15 @@ Use `clase: reporte` for one implemented report contract. Add one globally uniqu
 ## Relationship to execution
 
 Procedure notes define expected behavior. `.operations/` records one run. Connected systems remain authoritative for current fields, workflows, permissions, and artifact state.
+
+## Execution eligibility
+
+Apply this contract when selecting or resuming any operational procedure, including one used by an inspection capability or a report executor. Catalog resolution identifies a note; it does not establish that the note is eligible for execution.
+
+| State | Permitted use |
+|---|---|
+| `vigente` | Execute the requested steps after checking their current prerequisites, exact targets and existing authorization. The label alone does not prove current access or correctness. |
+| `borrador` | Read, assess or prepare drafts. Before executing a step, verify its required inputs, target, instructions and completion criteria against the relevant authoritative source. Record the supporting evidence in the caller's existing context or run. Missing verification blocks that step; verified steps may proceed within existing authorization without automatically promoting the note. |
+| `retirado` | Read as historical context. Resolve and assess its replacement before execution; if none is available, report the missing current procedure. Do not turn the retired procedure into an ad-hoc execution plan to bypass retirement. |
+
+A missing or unknown state permits inspection only until its validity is resolved. For a procedure selected before an interruption, recheck its state and any material changes before pending steps. Preserve evidence of already completed steps. An authorized ad-hoc plan where no runbook exists follows the same step-verification requirements as a draft; it does not require creating or promoting a note. Eligibility never supplies external-write authorization or requires an additional approval when the existing authorization already covers the verified steps.

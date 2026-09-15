@@ -5,7 +5,7 @@ description: "Trigger: onboard cell identity/capabilities or inspect and change 
 
 # Configure the workspace
 
-Treat `<VAULT_ROOT>/.knowledge-os-config.yaml` as local state. This skill is the sole writer of local workspace configuration. Portable identity, evidence profile and procedure bindings live in `instance.yaml`; local roots and access preferences stay in `.knowledge-os-config.yaml`. Use the semantic CLI; never edit the YAML directly.
+Treat `<VAULT_ROOT>/.knowledge-os-config.yaml` as local state. This skill is the sole writer of local workspace configuration. Portable identity, evidence profile and procedure bindings live in `instance.yaml`; local roots and access preferences stay in `.knowledge-os-config.yaml`. Use the semantic CLI for local workspace configuration; never edit its YAML directly.
 
 This skill reports stored identity, capability bindings and local configuration; it does not certify that an operation can execute. Return the configuration result to the initiating workflow. Checks for a specific map operation remain in `map-ecosystem` readiness; query orientation remains in its orientation branch.
 
@@ -92,3 +92,5 @@ Bind an existing operational note (or first prepare the requested team procedure
 ```
 
 Repeat `--procedure` for required companion catalogs. Use `runtime-inspection` for runtime policy/catalogs and `database-inspection` for the database executor contract. Procedures own permitted environments, target selection, authentication mechanism, repository/skill entrypoint and any runner flags. Record mechanisms and references, never secrets. Binding configures guidance and does not authorize live execution. Report separately: identity configured, repositories discoverable, and each requested capability configured or its exact gap; resume the initiating task.
+
+For a source repository with a different mapping baseline, follow `90-Meta/reference-branches.md`. Like portable database targets, reference-branch declarations belong to authorized cell configuration: preserve existing fields and validate through the semantic read. The branch selects source evidence and does not prove deployment.

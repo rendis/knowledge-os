@@ -111,7 +111,7 @@ tags: [tipo/api]
 
 `tipo` for repos: `api | bff | adapter | http-adapter | suscriptor | publicador | job | function | frontend | libreria | scaffold | infraestructura`.
 
-Use `infraestructura` for repositories whose owned behavior is provisioning or configuring infrastructure (for example Terraform/Terragrunt). `scaffold` is for reusable project starters; it is not a fallback type for infrastructure code.
+Use `infraestructura` for repositories whose owned behavior is provisioning or configuring infrastructure. `scaffold` is for reusable project starters; it is not a fallback type for infrastructure code.
 
 Relational properties that point at durable notes use quoted wikilinks.
 
@@ -130,7 +130,7 @@ Use the exact headings below. The current validator requires these Spanish headi
 - Relaciones
 - Limitaciones y desconocimientos
 
-Use the repository frontmatter above. `aliases`, relationship properties, and `tags` must be lists. Coverage values are `completo | parcial | no-aplica | por-confirmar`. `sistema` must link a declared system; `commit-analizado` is the observed 12-character lowercase SHA; `rama-analizada` is `main` or `master`. Both dates must be valid `YYYY-MM-DD` values. Replace the example SHA and dates with observed values.
+Use the repository frontmatter above. `aliases`, relationship properties, and `tags` must be lists. Coverage values are `completo | parcial | no-aplica | por-confirmar`. `sistema` must link a declared system; `commit-analizado` is the observed 12-character lowercase SHA; `rama-analizada` is the observed Git branch name; new analyses select the reference through [[reference-branches]], while historical metadata remains readable. Both dates must be valid `YYYY-MM-DD` values. Replace the example SHA and dates with observed values.
 
 Under `Limitaciones y desconocimientos`, use the optional subsection `### Verificaciones pendientes` when an accepted map has partial or unresolved `connection.*` claims. Each unchecked item uses this compact form:
 
@@ -227,7 +227,7 @@ Include exactly two Mermaid blocks. The block under `Diagrama de componentes` mu
 
 Persist one durable direction. Inverse lists are backlinks.
 
-- Pub/Sub: producer `publica-en` → topic; consumer `gatillado-por` the topic.
+- Asynchronous messaging: producer `publica-en` → topic; consumer `gatillado-por` the topic.
 - HTTP: caller `consume-de` callee or integration.
 - Data: `lee-de` / `escribe-en` as strings unless a runtime or integration node qualifies.
 - Runtime: `usa-infra`.

@@ -18,9 +18,9 @@ Reuse the analysis method when it is already active. Otherwise, load [evidence-d
 ```
 
    Use `neighbors` for dependency, topic, flow, and impact. Use `hygiene` for unresolved links and orphans. Use `investigations` for vault ↔ `investigations/` join (on-demand public-case scan; not a second index). When consulting a case, use the read-only loading mechanism in `manage-investigation` to discover its overlay by ID; preserve private provenance and disclosure restrictions. `manage-investigation` remains owner of the store.
-3. Open the stems/paths named in the JSON. If a node or needed relationship is absent, search the named subject in the relevant notes or configured source before concluding that it does not exist. The graph is a navigation index, not proof of completeness. For change impact, query `neighbors` of the changed unit, then `neighbors` of its `publica-en` / `gatillado-por` / `participa-en` targets. Skip types disabled in `instance.yaml` `graph.enabled_types` (do not expand Pub/Sub when `topic` is disabled). If the question asks where a fact belongs, load [node-selection.md](../../../../90-Meta/node-selection.md) and open the candidate note, not the full Convenciones file.
+3. Open the stems/paths named in the JSON. If a node or needed relationship is absent, search the named subject in the relevant notes or configured source before concluding that it does not exist. The graph is a navigation index, not proof of completeness. For change impact, query `neighbors` of the changed unit, then `neighbors` of its `publica-en` / `gatillado-por` / `participa-en` targets. Skip types disabled in `instance.yaml` `graph.enabled_types` (do not expand asynchronous messaging when `topic` is disabled). If the question asks where a fact belongs, load [node-selection.md](../../../../90-Meta/node-selection.md) and open the candidate note, not the full Convenciones file.
 4. Expand a second named note only when the JSON edge is required by the question:
-   - Pub/Sub: producer → topic → consumer (only when `topic` is enabled).
+   - asynchronous messaging: producer → topic → consumer (only when `topic` is enabled).
    - HTTP: caller → consumed repository or integration.
    - Data: `lee-de` and `escribe-en`, plus evidence in the opened note body.
    - Runtime: `usa-infra` and backlinks from the JSON.

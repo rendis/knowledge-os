@@ -1,8 +1,8 @@
 # Report contract
 
-Resolve one canonical `clase: reporte` note with a unique `report-id` through `90-Meta/operational-catalog.py`. The note defines purpose, audience, metrics, grain, scope, input parameters, exclusions, output, validation, maintenance and limitations.
+Resolve one canonical `clase: reporte` note with a unique `report-id` through `90-Meta/operational-catalog.py`. The [Report section of the operational contract](../../manage-operational-workflow/references/procedure-contract.md#report) is the normative definition of required inputs, execution and acceptance criteria. Apply that contract's execution eligibility rules to the report and linked procedure before execution; listing remains a read-only catalog operation.
 
-Its source or maintenance section links the destination-owned execution procedure or implementation. That procedure identifies the executor and version, exact source, authentication references, read-only checks, parameter semantics, resource limits, output destination and validation commands. Reuse installed tools; this contract requires no plugin interface, directory layout, query language or renderer.
+Follow the destination-owned procedure or implementation linked from the report. Reuse installed tools and resolve the requirements for the selected mode through that contract.
 
 For generation, resolve → bind inputs and access → execute → validate → deliver locally. For listing or validation, perform only that mode’s required steps.
 

@@ -5,10 +5,10 @@ Load this reference for an explicit deployment audit, or the specific part neede
 ## Evidence sequence
 
 1. Inspect `.github/workflows/`, including called reusable workflows, event filters, branch or tag conditions, matrices, environments, inputs, and job dependencies.
-2. Follow the referenced build and deployment definitions, container files, workload manifests and infrastructure-as-code modules. Cloud Build, Helm/Kustomize, Cloud Run/Functions, AWS CloudFormation/ECS/Lambda and Azure deployment definitions are examples, not an exhaustive platform list. Include other cloud and on-premises targets when observed.
+2. Follow the referenced build and deployment definitions, container files, workload manifests and infrastructure-as-code modules. Inspect the platforms actually named by those sources, including hosted and on-premises targets; the kernel prescribes no provider or deployment stack.
 3. Resolve versioned variables that identify project, platform, resource, region or zone, namespace, workload, artifact, and environment. Record secret names only as unresolved indirection; never infer their values.
 4. Inspect an accessible pinned reusable action or cross-repository deployment definition when the local workflow delegates target selection to it. Otherwise record the external definition as an exact unresolved indirection, answer dependent fields as “no observado en fuentes estáticas revisadas”, and withhold only claims that require the unavailable body. The unresolved indirection does not make the repository analysis or synchronization incomplete.
-5. Follow the access gate in connection-reconciliation.md before a bounded read-only metadata query against the concrete static target. Use the configured provider or infrastructure executor; platform examples confer no authorization. Keep missing access pending only when it blocks an in-scope material question under [evidence-sufficiency.md](evidence-sufficiency.md); ordinary maps do not require operational success tests.
+5. Follow the access gate in connection-reconciliation.md before a bounded read-only metadata query against the concrete static target. Use the configured provider or infrastructure executor; observed source configuration confers no access authorization. Keep missing access pending only when it blocks an in-scope material question under [evidence-sufficiency.md](evidence-sufficiency.md); ordinary maps do not require operational success tests.
 
 ## Per-environment chain
 

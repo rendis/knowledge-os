@@ -86,6 +86,62 @@ class CorrectionTests(unittest.TestCase):
         self.assertEqual(self.prepare()[1]['code'], 'analysis-not-finalized')
         self.assertFalse(self.workspace.exists())
 
+    def test_edited_fallback_checklist_is_rejected_without_writes(self):
+        analysis = self.fallback()
+        dimension = next(iter(analysis['checklist']))
+        analysis['checklist'][dimension]['reason'] = 'Edited fallback explanation.'
+        write_json(self.paths[2], analysis)
+        review = json.loads(self.paths[3].read_text())
+        review['analysis_digest'] = digest(analysis)
+        write_json(self.paths[3], review)
+        before = [p.read_bytes() for p in self.paths]
+        self.assertEqual(self.prepare()[1]['code'], 'analysis-not-finalized')
+        self.assertFalse(self.workspace.exists())
+        self.assertEqual([p.read_bytes() for p in self.paths], before)
+
+    def test_finalized_claim_free_analysis_is_not_mistaken_for_fallback(self):
+        analysis = json.loads(self.paths[2].read_text())
+        analysis['claims'] = []
+        write_json(self.paths[2], analysis)
+        result = subprocess.run([sys.executable, '-B', str(MANIFEST), 'finalize-analysis', '--repo', str(self.repo), '--manifest', str(self.paths[0]), '--scaffold', str(self.paths[1]), '--analysis', str(self.paths[2])], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertFalse(json.loads(result.stdout)['fallback_used'])
+        analysis = json.loads(self.paths[2].read_text())
+        self.assertEqual(analysis['claims'], [])
+        review = json.loads(self.paths[3].read_text())
+        review['analysis_digest'] = digest(analysis)
+        review['findings'][0].update(target='paths.component.txt', evidence={'path': 'component.txt', 'anchor': 'exact commit evidence'})
+        write_json(self.paths[3], review)
+        self.assertEqual(self.prepare()[0], 0)
+
+    def test_exact_fallback_can_be_corrected_with_reviewed_claims(self):
+        fallback = self.fallback()
+        review = json.loads(self.paths[3].read_text())
+        # Replacing the cursor-only fallback affects both its repository node
+        # and the claim's target; the initial finding must cover both.
+        review['findings'][0]['nodes'] = sorted(node['basename'] for node in fallback['nodes'])
+        write_json(self.paths[3], review)
+        self.assertEqual(self.prepare()[0], 0)
+        analysis = json.loads(self.original[2])
+        write_json(self.workspace / 'analysis.json', analysis)
+        review = json.loads(self.paths[3].read_text())
+        review.update(analysis_digest=digest(analysis), verdict='accept', findings=[])
+        write_json(self.workspace / 'review.json', review)
+        result = self.check()
+        self.assertEqual(result[0], 0, result)
+
+    def test_exact_fallback_can_be_corrected_without_adding_claims(self):
+        self.fallback()
+        self.assertEqual(self.prepare()[0], 0)
+        analysis = json.loads((self.workspace / 'analysis.json').read_text())
+        analysis['paths'][0]['reason'] = 'Reviewed clarification: no durable change is justified.'
+        write_json(self.workspace / 'analysis.json', analysis)
+        review = json.loads(self.paths[3].read_text())
+        review.update(analysis_digest=digest(analysis), verdict='accept', findings=[])
+        write_json(self.workspace / 'review.json', review)
+        result = self.check()
+        self.assertEqual(result[0], 0, result)
+
     def test_success_preserves_initial_and_closes_existing_package(self):
         self.assertEqual(self.prepare()[0], 0)
         self.repair()

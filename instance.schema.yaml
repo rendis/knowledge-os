@@ -45,6 +45,10 @@ fields:
   sources.discovery_roots:
     type: list
     optional: true
+  sources.reference_branches:
+    type: object
+    optional: true
+    description: Maps exact repository basenames to Git branch names. Unlisted repositories use main, falling back to master. An explicit branch never falls back.
   sources.schema_repository:
     type: object
     optional: true

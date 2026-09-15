@@ -87,7 +87,7 @@ def _parse_minimal_yaml(text: str) -> dict[str, Any]:
                 container.append(_scalar(item))
             continue
         key, _, raw = stripped.partition(":")
-        key = key.strip()
+        key = _scalar(key.strip())
         raw = raw.strip()
         if not isinstance(container, dict):
             raise InstanceError(f"key {key} inside a list")
@@ -123,10 +123,13 @@ def _scalar(value: str) -> Any:
         if not inner:
             return []
         return [part.strip().strip("\"'") for part in inner.split(",") if part.strip()]
-    if (value.startswith('"') and value.endswith('"')) or (
-        value.startswith("'") and value.endswith("'")
-    ):
-        return value[1:-1]
+    if value.startswith('"') and value.endswith('"'):
+        try:
+            return json.loads(value)
+        except json.JSONDecodeError as error:
+            raise InstanceError("invalid quoted scalar") from error
+    if value.startswith("'") and value.endswith("'"):
+        return value[1:-1].replace("''", "'")
     if value in {"true", "false"}:
         return value == "true"
     if re.fullmatch(r"-?\d+", value):
@@ -174,6 +177,11 @@ def dump_instance(data: dict[str, Any]) -> str:
             lines.append(f"    - {_quote(root)}")
     else:
         lines.append("  discovery_roots: []")
+    branches = sources.get("reference_branches") or {}
+    if branches:
+        lines.append("  reference_branches:")
+        for repository, branch in sorted(branches.items()):
+            lines.append(f"    {_quote(repository)}: {_quote(branch)}")
     schema = sources.get("schema_repository") or {}
     lines.append("  schema_repository:")
     lines.append(f"    remote: {_quote(schema.get('remote') or '')}")
@@ -212,8 +220,7 @@ def dump_instance(data: dict[str, Any]) -> str:
 
 
 def _quote(value: str) -> str:
-    text = str(value).replace('"', '\\"')
-    return f'"{text}"'
+    return json.dumps(str(value), ensure_ascii=False)
 
 
 def _canonical_tracker_url(value: object) -> str:
@@ -337,6 +344,7 @@ def validate_instance(data: dict[str, Any]) -> dict[str, Any]:
             "repo_prefixes": list(((data.get("sources") or {}).get("repo_prefixes") or [])),
             "discovery_roots": list(((data.get("sources") or {}).get("discovery_roots") or [])),
             "schema_repository": (data.get("sources") or {}).get("schema_repository") or {},
+            "reference_branches": validate_reference_branches((data.get("sources") or {}).get("reference_branches", {})),
         },
         "graph": {"enabled_types": list(types)},
         "evidence": {"profile": profile},
@@ -345,6 +353,33 @@ def validate_instance(data: dict[str, Any]) -> dict[str, Any]:
         "capabilities": normalized_capabilities,
         "database_targets": targets,
     }
+
+
+def valid_branch_name(value: Any) -> bool:
+    """Portable Git branch-name syntax; never accept a ref expression or option."""
+    return bool(
+        isinstance(value, str) and value and value not in {"@", "HEAD"}
+        and not value.startswith(("-", "refs/"))
+        and not value.endswith(".") and ".." not in value and "@{" not in value
+        and not re.search(r"[\x00-\x20\x7f~^:?*\[\\]", value)
+        and all(part and not part.startswith(".") and not part.endswith(".lock") for part in value.split("/"))
+    )
+
+
+def validate_reference_branches(value: Any) -> dict[str, str]:
+    if not isinstance(value, dict):
+        raise InstanceError("sources.reference_branches must map repository basenames to branch names")
+    for repository, branch in value.items():
+        if (not isinstance(repository, str) or re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9_.-]*", repository) is None
+                or not valid_branch_name(branch)):
+            raise InstanceError("sources.reference_branches requires repository basenames and valid Git branch names")
+    return dict(value)
+
+
+def reference_branches(instance: dict[str, Any], repository: str) -> tuple[str, ...]:
+    """Explicit repository policy; absent entries retain the legacy ordered fallback."""
+    branch = instance.get("sources", {}).get("reference_branches", {}).get(repository)
+    return (branch,) if branch else ("main", "master")
 
 
 def validate_database_targets(targets: Any, systems: set[str]) -> list[dict[str, Any]]:
