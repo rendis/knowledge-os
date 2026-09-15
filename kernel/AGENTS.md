@@ -43,7 +43,6 @@ Delegate bounded, autonomous work when context isolation, independent review, sp
 - `manage-operational-workflow` — requested audits of a known flow or entity for a period through read-only evidence; draft or execute operational procedures; resume runs in `.operations/`. Uses inspection adapters for access and queries; business actions and publication require matching authorization.
 - `inspect-database` — engine-neutral database evidence through the target’s configured runbook.
 - `explain-visually` — auxiliary static or interactive explanations when requested or materially useful; temporary aids or source-linked retained artifacts.
-- `grilling` — one decision at a time.
 - `obsidian-cli`, `obsidian-markdown`, `obsidian-bases` — user-invoked Obsidian helpers.
 
 For mapping closure or pending-work status, follow the skill's [mapping completion contract](.agents/skills/map-ecosystem/references/mapping-completion.md).
