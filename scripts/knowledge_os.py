@@ -23,6 +23,8 @@ from instance import (  # noqa: E402
     InstanceError,
 )
 
+from vault_catalog import CATALOG_PATH, CatalogError, load_catalog  # noqa: E402
+
 LOCK_NAME = ".knowledge-os.lock.yaml"
 PERSONAL_AGENTS = "AGENTS.personal.md"
 MANAGED_HASH_COMMENT = "# gitleaks:allow -- managed SHA-256 digest"
@@ -147,6 +149,8 @@ def managed_sources(adapters: list[str]) -> dict[str, Path]:
                         sources.update(
                             _source_files(skill_dir, f".agents/skills/{skill_dir.name}")
                         )
+    # Consumer catalogs are never distribution payload, even if accidentally added.
+    sources.pop(CATALOG_PATH.as_posix(), None)
     return dict(sorted(sources.items()))
 
 
@@ -880,6 +884,16 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         "ignored": personal_agents_ignored(dest),
         "tracked": tracked,
     }
+    invalid_catalog = False
+    try:
+        catalog = load_catalog(dest)
+        payload["vault_catalog"] = {
+            "status": "valid" if (dest / CATALOG_PATH).exists() else "absent",
+            "count": len(catalog["vaults"]),
+        }
+    except CatalogError as error:
+        payload["vault_catalog"] = {"status": "invalid", "error": str(error)}
+        invalid_catalog = True
     invalid_instance = False
     instance = None
     if state == "installed":
@@ -939,7 +953,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
             "start_here", ["00-Home.md", "instance.yaml"]
         )
     print(json.dumps(payload, indent=2, ensure_ascii=False))
-    if invalid_instance:
+    if invalid_instance or invalid_catalog:
         return 2
     if getattr(args, "strict", False) and (
         state != "installed" or not payload.get("portable_lock")
