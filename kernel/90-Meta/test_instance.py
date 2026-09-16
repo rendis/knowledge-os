@@ -5,6 +5,7 @@ from __future__ import annotations
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -19,6 +20,7 @@ from instance import (  # noqa: E402
     reference_branches,
     valid_branch_name,
     _parse_minimal_yaml,
+    _parse_simple_yaml,
 )
 
 
@@ -44,6 +46,77 @@ class InstanceTests(unittest.TestCase):
         self.assertEqual(loaded["systems"][0]["id"], "payments")
         self.assertEqual(loaded["evidence"]["profile"], "production-gate")
         self.assertEqual(loaded["trackers"], [])
+
+    def test_special_strings_roundtrip_without_optional_yaml(self) -> None:
+        data = self.sample()
+        data["cell"]["purpose"] = 'Quotes "inside", hash # and slash \\; Unicode á'
+        data["systems"][0]["aliases"] = ["one,two", 'a"b', "it's", "#tag", "[bracket]", ""]
+        data["sources"]["repo_prefixes"] = ["prefix,with,commas"]
+        data["capabilities"] = {"runtime-inspection": ['Procedure, "quoted"']}
+        self.assertEqual(
+            _parse_simple_yaml(dump_instance(data))["systems"][0]["aliases"],
+            data["systems"][0]["aliases"],
+        )
+        data["sources"]["schema_repository"] = {"remote": "", "note": ""}
+        data = validate_instance(data)
+        text = dump_instance(data)
+        with patch.dict(sys.modules, {"yaml": None}):
+            self.assertEqual(validate_instance(_parse_simple_yaml(text)), data)
+        # An installed YAML module must never be imported or consulted.
+        with patch.dict(sys.modules, {"yaml": object()}):
+            self.assertEqual(validate_instance(_parse_simple_yaml(text)), data)
+
+    def test_comments_and_single_quoted_flow_lists(self) -> None:
+        parsed = _parse_simple_yaml(
+            "# comment with an unmatched quote ' ignored\n"
+            "name: 'It''s # literal' # actual comment\n"
+            'aliases: ["a,b", \'it\'\'s\', plain,] # comment\n'
+            "url: https://example.test/a#fragment\n"
+            "empty: {}\n"
+            "enabled: true\n"
+        )
+        self.assertEqual(parsed, {
+            "name": "It's # literal", "aliases": ["a,b", "it's", "plain"],
+            "url": "https://example.test/a#fragment", "empty": {}, "enabled": True,
+        })
+
+    def test_plain_scalar_punctuation_and_comment_context(self) -> None:
+        cases = {
+            "Notes [2026]": "Notes [2026]",
+            "Notes {draft}, [] and {}": "Notes {draft}, [] and {}",
+            "customer 's workflows": "customer 's workflows",
+            "customer's workflows": "customer's workflows",
+            'Notes "quoted" and "unfinished': 'Notes "quoted" and "unfinished',
+            'Notes, "quoted" # comment with unmatched quote "': 'Notes, "quoted"',
+            'Notes ["unfinished # actual comment': 'Notes ["unfinished',
+            "customer 's # actual comment": "customer 's",
+            'Notes " # actual comment': 'Notes "',
+            'Notes "#literal': 'Notes "#literal',
+        }
+        for raw, expected in cases.items():
+            with self.subTest(raw=raw):
+                self.assertEqual(_parse_simple_yaml(f"purpose: {raw}\n"), {"purpose": expected})
+        self.assertEqual(
+            _parse_simple_yaml('aliases: [customer\'s, customer \'s, "a,b", \'#literal\'] # comment\n'),
+            {"aliases": ["customer's", "customer 's", "a,b", "#literal"]},
+        )
+
+    def test_rejects_malformed_or_unsupported_yaml(self) -> None:
+        cases = (
+            "cell: [", 'name: "unterminated', "name: 'unterminated",
+            'name: "bad\\q"', 'name: "ok" junk', "name: 'ok' junk",
+            "name missing colon", " name: root-indented", "name: value\n  extra: child",
+            "name: one\nname: two", "cell:\n  name: one\n  name: two",
+            "items:\n  - id: one\n    id: two", "cell:\n\tname: tab",
+            "items: [one,,two]", "items: [one, [two]]", "cell: {name: X}",
+            "name: &anchor value", "name: *anchor", "name: !!str value",
+            "purpose: |\n  multiline", "purpose: >\n  folded", "---\nname: X",
+            "items:\n  - one\n  name: mixed", "items:\n  - one\n    nested: invalid",
+        )
+        for text in cases:
+            with self.subTest(text=text):
+                with self.assertRaisesRegex(InstanceError, "invalid instance.yaml syntax"):
+                    _parse_simple_yaml(text)
 
     def test_reference_branch_policy_roundtrip_and_legacy_defaults(self) -> None:
         data = self.sample()

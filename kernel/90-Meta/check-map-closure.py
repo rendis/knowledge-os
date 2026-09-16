@@ -32,8 +32,16 @@ def check(vault, checkpoint):
     if not isinstance(paths, list) or len(paths) < 2 or "00-Home.md" not in paths:
         errors.append("visible_coverage.paths: Home and linked coverage note required")
         paths = []
+    resolved_paths = set()
     for name in paths:
+        if not isinstance(name, str):
+            errors.append(f"invalid summary path: {name}")
+            continue
         path = (vault / name).resolve()
+        if path in resolved_paths:
+            errors.append(f"duplicate summary path: {name}")
+            continue
+        resolved_paths.add(path)
         if not path.is_relative_to(vault.resolve()) or not path.is_file():
             errors.append(f"invalid summary path: {name}")
             continue

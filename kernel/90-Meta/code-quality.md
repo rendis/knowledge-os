@@ -9,7 +9,9 @@ compact fixture style remains outside the lint baseline.
 
 Ruff discovers Python files and loads `ruff.toml`; Bandit loads `.bandit`. The
 small `check-code-quality.py` entrypoint only invokes those tools so the same
-command works in the distribution and in an installed vault. The configuration
+command works in the distribution and in an installed vault. Bandit reports
+scanner errors separately from findings; the gate rejects incomplete or invalid
+reports even when the scanner exits successfully. The configuration
 ignores local/generated state and virtual environments. It does not download
 remote rules, apply automatic fixes, compare against a baseline, or encode a
 company-specific threshold. A reported issue must be fixed or reviewed in its
