@@ -10,6 +10,8 @@ When the question requires another domain vault discovered through authorized re
 
 ## Navigation
 
+For a bounded question about an already identified source, read it directly when no relationship discovery is needed. Preserve vault/repository identity, private-case loading and access checks. Use the graph steps below when locating context or relationships; a direct read does not prove graph completeness.
+
 1. If orientation may be incomplete, run `graph-query.py orientation` (or the equivalent `instance.orientation_status`). If `ready` is false, load [orientation.md](orientation.md) and stop. Do not read Home, Convenciones, or Framework as a prelude to classifying a dependency question.
 2. First hop — portable graph query (Obsidian app not required; do not use `obsidian-cli` for this):
 

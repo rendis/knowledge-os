@@ -3,6 +3,8 @@ import importlib.util
 import json
 from pathlib import Path
 import shutil
+import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -80,6 +82,59 @@ class NoteCandidateReview(unittest.TestCase):
         (self.evidence / "record.json").write_text('{"observed":false}\n', encoding="utf-8")
         with self.assertRaisesRegex(tool.NoteCandidateError, "stale"):
             self.check()
+
+    def test_stale_diagnostics_identify_each_changed_source(self):
+        relative = "20-Repos/demo/service.md"
+        for category, root, path in (
+            ("candidate", self.candidate, relative),
+            ("base", self.vault, relative),
+            ("evidence", self.evidence, "record.json"),
+        ):
+            with self.subTest(category=category):
+                target = root / path
+                original = target.read_bytes()
+                target.write_bytes(original + b"\nChanged.\n")
+                try:
+                    with self.assertRaises(tool.NoteCandidateError) as caught:
+                        self.check()
+                    self.assertEqual(str(caught.exception), "candidate-base-or-evidence-stale")
+                    self.assertEqual(caught.exception.changes, [{"category": category, "paths": [path]}])
+                finally:
+                    target.write_bytes(original)
+
+    def test_cli_reports_all_drift_without_mutating_artifacts(self):
+        relative = "20-Repos/demo/service.md"
+        note = self.vault / relative
+        note.write_text(note.read_text() + "Concurrent update.\n")
+        (self.evidence / "record.json").write_text('{"observed":false}\n')
+        before = {path: path.read_bytes() for path in Path(self.temporary.name).rglob("*") if path.is_file()}
+        result = subprocess.run([
+            sys.executable, "-B", str(ROOT / "kernel/90-Meta/review-note-candidate.py"),
+            "check", "--vault", str(self.vault), "--candidate", str(self.candidate),
+            "--evidence-root", str(self.evidence), "--manifest", str(self.manifest_path),
+            "--review", str(self.review_path),
+        ], capture_output=True, text=True, check=False)
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertEqual(json.loads(result.stdout), {
+            "status": "blocked", "code": "candidate-base-or-evidence-stale",
+            "changes": [
+                {"category": "base", "paths": [relative]},
+                {"category": "evidence", "paths": ["record.json"]},
+            ],
+        })
+        self.assertEqual(before, {path: path.read_bytes() for path in before})
+
+    def test_empty_base_removal_reports_presence_drift(self):
+        relative = "20-Repos/demo/service.md"
+        note = self.vault / relative
+        note.write_text("")
+        manifest = tool.freeze_candidate(self.vault, self.candidate, self.evidence, ["record.json"])
+        self.manifest_path.write_text(json.dumps(manifest))
+        note.unlink()
+        with self.assertRaises(tool.NoteCandidateError) as caught:
+            self.check()
+        self.assertEqual(str(caught.exception), "candidate-base-or-evidence-stale")
+        self.assertEqual(caught.exception.changes, [{"category": "base", "paths": [relative]}])
 
     def test_published_drift_and_later_review(self):
         pairs = [[self.manifest_path, self.review_path]]
@@ -347,6 +402,46 @@ class NoteCandidateReview(unittest.TestCase):
             tool.freeze_candidate(
                 self.vault, self.candidate, self.evidence, ["record.json"], projection_path
             )
+
+    def test_projected_check_reports_source_or_projection_drift(self):
+        relative = "20-Repos/demo/service.md"
+        projection = {
+            "base_files": dict(self.manifest["base_files"]),
+            "result_files": dict(self.manifest["candidate_files"]),
+        }
+        projection_path = self.manifest_path.parent / "projection.json"
+        projection_path.write_text(json.dumps(projection))
+        bound = tool.freeze_candidate(
+            self.vault, self.candidate, self.evidence, ["record.json"], projection_path
+        )
+        self.manifest_path.write_text(json.dumps(bound))
+        self.review["manifest_digest"] = tool.canonical_digest(bound)
+        self.write_review()
+        for category, target, reported_path in (
+            ("candidate", self.candidate / relative, relative),
+            ("base", self.vault / relative, relative),
+            ("projection", projection_path, str(projection_path)),
+        ):
+            with self.subTest(category=category):
+                original = target.read_bytes()
+                if category == "projection":
+                    changed = json.loads(original)
+                    changed["result_files"][relative] = "0" * 64
+                    target.write_text(json.dumps(changed))
+                else:
+                    target.write_bytes(original + b"\nConcurrent change.\n")
+                try:
+                    with self.assertRaises(tool.NoteCandidateError) as caught:
+                        tool.check_candidate(
+                            self.vault, self.candidate, self.evidence,
+                            self.manifest_path, self.review_path, projection_path,
+                        )
+                    self.assertEqual(str(caught.exception), "projection-file-binding-invalid")
+                    self.assertEqual(caught.exception.changes, [{
+                        "category": category, "paths": [reported_path],
+                    }])
+                finally:
+                    target.write_bytes(original)
 
     def test_deletion_requires_retirement_decisions(self):
         deleted = "20-Repos/demo/removed.md"

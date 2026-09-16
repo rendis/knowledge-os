@@ -35,6 +35,10 @@ REVIEW_FIELDS = {
 class NoteCandidateError(ValueError):
     """A closed-gate contract violation."""
 
+    def __init__(self, code: str, *, changes: list[dict[str, object]] | None = None):
+        super().__init__(code)
+        self.changes = changes
+
 
 def canonical_digest(value: object) -> str:
     encoded = json.dumps(
@@ -338,6 +342,34 @@ def validate_review(review: object, manifest: dict[str, object]) -> None:
         raise NoteCandidateError("review-requires-revision")
 
 
+def candidate_changes(manifest: dict, current: dict, projection_path: Path | None) -> list[dict[str, object]]:
+    """Describe drift without changing any validation gate."""
+    changes = []
+    for category, field in (
+        ("candidate", "candidate_files"),
+        ("base", "base_files"),
+        ("evidence", "evidence_files"),
+    ):
+        before, after = manifest[field], current[field]
+        paths = {
+            name for name in before.keys() | after.keys()
+            if before.get(name) != after.get(name)
+        }
+        if category == "base":
+            paths.update(set(manifest["base_present"]) ^ set(current["base_present"]))
+        if category in {"candidate", "base"}:
+            paths.update(
+                name for name in manifest["connections"].keys() | current["connections"].keys()
+                if manifest["connections"].get(name, {}).get(category)
+                != current["connections"].get(name, {}).get(category)
+            )
+        if paths:
+            changes.append({"category": category, "paths": sorted(paths)})
+    if manifest.get("projection_digest") != current.get("projection_digest"):
+        changes.append({"category": "projection", "paths": [str(projection_path)] if projection_path else []})
+    return changes
+
+
 def check_candidate(
     vault: Path,
     candidate: Path,
@@ -349,16 +381,29 @@ def check_candidate(
     manifest_path = safe_path(manifest_path)
     review_path = safe_path(review_path)
     manifest = validate_manifest(read_json(manifest_path))
-    current = freeze_candidate(
-        vault,
-        candidate,
-        evidence_root,
-        manifest["evidence_files"].keys(),
-        projection_path,
-        manifest["deleted_files"],
-    )
+    try:
+        current = freeze_candidate(
+            vault, candidate, evidence_root, manifest["evidence_files"].keys(),
+            projection_path, manifest["deleted_files"],
+        )
+    except NoteCandidateError as error:
+        if str(error) != "projection-file-binding-invalid":
+            raise
+        # The binding gate already rejected the operation. Rebuild only to
+        # diagnose drift against the accepted manifest; never accept this image.
+        current = freeze_candidate(
+            vault, candidate, evidence_root, manifest["evidence_files"].keys(),
+            deleted_paths=manifest["deleted_files"],
+        )
+        current["projection_digest"] = canonical_digest(read_json(safe_path(projection_path)))
+        raise NoteCandidateError(
+            str(error), changes=candidate_changes(manifest, current, projection_path)
+        ) from error
     if current != manifest:
-        raise NoteCandidateError("candidate-base-or-evidence-stale")
+        raise NoteCandidateError(
+            "candidate-base-or-evidence-stale",
+            changes=candidate_changes(manifest, current, projection_path),
+        )
     validate_review(read_json(review_path), manifest)
     return {
         "status": "pass",
@@ -444,6 +489,8 @@ def main() -> int:
             )
     except (NoteCandidateError, OSError) as error:
         output = {"status": "blocked", "code": str(error)}
+        if isinstance(error, NoteCandidateError) and error.changes is not None:
+            output["changes"] = error.changes
     print(json.dumps(output, sort_keys=True))
     return 0 if output["status"] == "pass" else 1
 
