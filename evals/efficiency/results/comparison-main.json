@@ -1,0 +1,2801 @@
+{
+  "runs": [
+    {
+      "id": "known-file/r01-baseline",
+      "case": "known-file",
+      "repetition": 1,
+      "variant": "baseline",
+      "wall_seconds": 49.64537549999659,
+      "setup_seconds": 0.6825299580086721,
+      "ok": true,
+      "changed": [],
+      "usage": {
+        "input_tokens": 183039,
+        "cached_input_tokens": 147584,
+        "output_tokens": 750,
+        "uncached_input_tokens": 35455
+      },
+      "review": {
+        "accepted": true,
+        "issues": []
+      },
+      "phase_count": 2,
+      "repaired": false,
+      "phases": [
+        {
+          "phase": "parent",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 29.705400750011904,
+          "usage": {
+            "input_tokens": 109376,
+            "cached_input_tokens": 88960,
+            "output_tokens": 474
+          }
+        },
+        {
+          "phase": "review",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 19.935019833006663,
+          "usage": {
+            "input_tokens": 73663,
+            "cached_input_tokens": 58624,
+            "output_tokens": 276
+          }
+        }
+      ],
+      "semantic": {
+        "id": "known-file/r01-baseline",
+        "accepted": true,
+        "reason": "Explica planes de despacho y publicación en route-events con fuente y una sola frase.",
+        "critical": false,
+        "blind_id": "4b2f1c4390dd",
+        "trace_verified": true
+      },
+      "trace_verified": true,
+      "accepted": true
+    },
+    {
+      "id": "known-file/r01-alternative",
+      "case": "known-file",
+      "repetition": 1,
+      "variant": "alternative",
+      "wall_seconds": 59.05707545799669,
+      "setup_seconds": 1.6804009589977795,
+      "ok": true,
+      "changed": [],
+      "usage": {
+        "input_tokens": 283129,
+        "cached_input_tokens": 237696,
+        "output_tokens": 1331,
+        "uncached_input_tokens": 45433
+      },
+      "review": {
+        "accepted": true,
+        "issues": []
+      },
+      "phase_count": 2,
+      "repaired": false,
+      "phases": [
+        {
+          "phase": "parent",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 32.47622425000009,
+          "usage": {
+            "input_tokens": 146752,
+            "cached_input_tokens": 116864,
+            "output_tokens": 738
+          }
+        },
+        {
+          "phase": "review",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 26.578051082993625,
+          "usage": {
+            "input_tokens": 136377,
+            "cached_input_tokens": 120832,
+            "output_tokens": 593
+          }
+        }
+      ],
+      "semantic": {
+        "id": "known-file/r01-alternative",
+        "accepted": true,
+        "reason": "Indica construcción de planes y publicación en route-events con fuente, dentro de dos frases.",
+        "critical": false,
+        "blind_id": "37714b652402",
+        "trace_verified": true
+      },
+      "trace_verified": true,
+      "accepted": true
+    },
+    {
+      "id": "dependencies/r01-baseline",
+      "case": "dependencies",
+      "repetition": 1,
+      "variant": "baseline",
+      "wall_seconds": 82.81880412499595,
+      "setup_seconds": 0.67689554199751,
+      "ok": true,
+      "changed": [],
+      "usage": {
+        "input_tokens": 326655,
+        "cached_input_tokens": 284032,
+        "output_tokens": 1766,
+        "uncached_input_tokens": 42623
+      },
+      "review": {
+        "accepted": true,
+        "issues": []
+      },
+      "phase_count": 2,
+      "repaired": false,
+      "phases": [
+        {
+          "phase": "parent",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 59.071332124993205,
+          "usage": {
+            "input_tokens": 225698,
+            "cached_input_tokens": 201728,
+            "output_tokens": 1146
+          }
+        },
+        {
+          "phase": "review",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 23.743518707997282,
+          "usage": {
+            "input_tokens": 100957,
+            "cached_input_tokens": 82304,
+            "output_tokens": 620
+          }
+        }
+      ],
+      "semantic": {
+        "id": "dependencies/r01-baseline",
+        "accepted": true,
+        "reason": "Cubre todos los vínculos con fuentes y limita correctamente la conclusión a una cadena documentada sin impacto operativo demostrado.",
+        "critical": false,
+        "blind_id": "f3bcd9f0150c",
+        "trace_verified": true
+      },
+      "trace_verified": true,
+      "accepted": true
+    },
+    {
+      "id": "dependencies/r01-alternative",
+      "case": "dependencies",
+      "repetition": 1,
+      "variant": "alternative",
+      "wall_seconds": 73.81957562499156,
+      "setup_seconds": 0.22123287500289734,
+      "ok": true,
+      "changed": [],
+      "usage": {
+        "input_tokens": 333624,
+        "cached_input_tokens": 295168,
+        "output_tokens": 1644,
+        "uncached_input_tokens": 38456
+      },
+      "review": {
+        "accepted": true,
+        "issues": []
+      },
+      "phase_count": 2,
+      "repaired": false,
+      "phases": [
+        {
+          "phase": "parent",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 46.10002874999191,
+          "usage": {
+            "input_tokens": 207963,
+            "cached_input_tokens": 185984,
+            "output_tokens": 1244
+          }
+        },
+        {
+          "phase": "review",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 27.714236832995084,
+          "usage": {
+            "input_tokens": 125661,
+            "cached_input_tokens": 109184,
+            "output_tokens": 400
+          }
+        }
+      ],
+      "semantic": {
+        "id": "dependencies/r01-alternative",
+        "accepted": true,
+        "reason": "Presenta la cadena completa con fuentes y separa dependencia documental de entrega efectiva, salud e impacto operativo.",
+        "critical": false,
+        "blind_id": "30fa99947d0d",
+        "trace_verified": true
+      },
+      "trace_verified": true,
+      "accepted": true
+    },
+    {
+      "id": "two-repositories/r01-baseline",
+      "case": "two-repositories",
+      "repetition": 1,
+      "variant": "baseline",
+      "wall_seconds": 76.23039058300492,
+      "setup_seconds": 0.6832481250021374,
+      "ok": true,
+      "changed": [],
+      "usage": {
+        "input_tokens": 389142,
+        "cached_input_tokens": 339328,
+        "output_tokens": 1807,
+        "uncached_input_tokens": 49814
+      },
+      "review": {
+        "accepted": true,
+        "issues": []
+      },
+      "phase_count": 2,
+      "repaired": false,
+      "phases": [
+        {
+          "phase": "parent",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 56.43712937500095,
+          "usage": {
+            "input_tokens": 283779,
+            "cached_input_tokens": 255616,
+            "output_tokens": 1438
+          }
+        },
+        {
+          "phase": "review",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 19.779118207996362,
+          "usage": {
+            "input_tokens": 105363,
+            "cached_input_tokens": 83712,
+            "output_tokens": 369
+          }
+        }
+      ],
+      "semantic": {
+        "id": "two-repositories/r01-baseline",
+        "accepted": true,
+        "reason": "Compara roles y conexión con fuentes y explica que fechas y commits documentales no prueban ejecución productiva actual.",
+        "critical": false,
+        "blind_id": "0b7753195c56",
+        "trace_verified": true
+      },
+      "trace_verified": true,
+      "accepted": true
+    },
+    {
+      "id": "two-repositories/r01-alternative",
+      "case": "two-repositories",
+      "repetition": 1,
+      "variant": "alternative",
+      "wall_seconds": 105.19547237500956,
+      "setup_seconds": 0.28813529199396726,
+      "ok": true,
+      "changed": [],
+      "usage": {
+        "input_tokens": 699854,
+        "cached_input_tokens": 619520,
+        "output_tokens": 3894,
+        "uncached_input_tokens": 80334
+      },
+      "review": {
+        "accepted": true,
+        "issues": []
+      },
+      "phase_count": 4,
+      "repaired": false,
+      "phases": [
+        {
+          "phase": "child-01",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 57.29419462500664,
+          "usage": {
+            "input_tokens": 327066,
+            "cached_input_tokens": 296064,
+            "output_tokens": 1544
+          }
+        },
+        {
+          "phase": "child-02",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 39.3478509580018,
+          "usage": {
+            "input_tokens": 175855,
+            "cached_input_tokens": 156160,
+            "output_tokens": 995
+          }
+        },
+        {
+          "phase": "parent",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 26.84292408300098,
+          "usage": {
+            "input_tokens": 99668,
+            "cached_input_tokens": 81152,
+            "output_tokens": 859
+          }
+        },
+        {
+          "phase": "review",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 21.044178625001223,
+          "usage": {
+            "input_tokens": 97265,
+            "cached_input_tokens": 86144,
+            "output_tokens": 496
+          }
+        }
+      ],
+      "semantic": {
+        "id": "two-repositories/r01-alternative",
+        "accepted": false,
+        "reason": "Cubre roles, contrato y límite de producción correctamente. Se rechaza por claridad: agrega salidas coincidentes, un primer trabajador y una referencia Stale GPS sin corroborar, innecesarios para comparar estos repositorios. No se califican las alusiones de coordinación como falsas; su narración y hallazgo extra no verificado impiden una síntesis clara e independiente.",
+        "critical": false,
+        "blind_id": "c76f1bd58015",
+        "trace_verified": true
+      },
+      "trace_verified": true,
+      "accepted": false
+    },
+    {
+      "id": "reuse-investigation/r01-baseline",
+      "case": "reuse-investigation",
+      "repetition": 1,
+      "variant": "baseline",
+      "wall_seconds": 67.80311374999292,
+      "setup_seconds": 0.6930252500023926,
+      "ok": true,
+      "changed": [],
+      "usage": {
+        "input_tokens": 322947,
+        "cached_input_tokens": 278912,
+        "output_tokens": 1412,
+        "uncached_input_tokens": 44035
+      },
+      "review": {
+        "accepted": true,
+        "issues": []
+      },
+      "phase_count": 2,
+      "repaired": false,
+      "phases": [
+        {
+          "phase": "parent",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 39.47150229099498,
+          "usage": {
+            "input_tokens": 186490,
+            "cached_input_tokens": 162048,
+            "output_tokens": 910
+          }
+        },
+        {
+          "phase": "review",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 28.327592916990397,
+          "usage": {
+            "input_tokens": 136457,
+            "cached_input_tokens": 116864,
+            "output_tokens": 502
+          }
+        }
+      ],
+      "semantic": {
+        "id": "reuse-investigation/r01-baseline",
+        "accepted": true,
+        "reason": "Resume sobrescritura y tratamiento de GPS obsoleto con fuentes; investigating y aprendizaje no se confunden con remediación ni fallo actual.",
+        "critical": false,
+        "blind_id": "8b061eb2fc7e",
+        "trace_verified": true
+      },
+      "trace_verified": true,
+      "accepted": true
+    },
+    {
+      "id": "reuse-investigation/r01-alternative",
+      "case": "reuse-investigation",
+      "repetition": 1,
+      "variant": "alternative",
+      "wall_seconds": 64.4754321250075,
+      "setup_seconds": 0.2957490419939859,
+      "ok": true,
+      "changed": [],
+      "usage": {
+        "input_tokens": 336223,
+        "cached_input_tokens": 294144,
+        "output_tokens": 1444,
+        "uncached_input_tokens": 42079
+      },
+      "review": {
+        "accepted": true,
+        "issues": []
+      },
+      "phase_count": 2,
+      "repaired": false,
+      "phases": [
+        {
+          "phase": "parent",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 38.739488417006214,
+          "usage": {
+            "input_tokens": 206787,
+            "cached_input_tokens": 185344,
+            "output_tokens": 848
+          }
+        },
+        {
+          "phase": "review",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 25.73128354200162,
+          "usage": {
+            "input_tokens": 129436,
+            "cached_input_tokens": 108800,
+            "output_tokens": 596
+          }
+        }
+      ],
+      "semantic": {
+        "id": "reuse-investigation/r01-alternative",
+        "accepted": true,
+        "reason": "Resume hallazgo y aprendizaje con ambas fuentes, conserva investigating y distingue aprendizaje documentado de corrección verificada.",
+        "critical": false,
+        "blind_id": "d2172d4829ff",
+        "trace_verified": true
+      },
+      "trace_verified": true,
+      "accepted": true
+    },
+    {
+      "id": "ambiguous/r01-baseline",
+      "case": "ambiguous",
+      "repetition": 1,
+      "variant": "baseline",
+      "wall_seconds": 111.88359887499246,
+      "setup_seconds": 0.6987568329932401,
+      "ok": true,
+      "changed": [],
+      "usage": {
+        "input_tokens": 525102,
+        "cached_input_tokens": 481408,
+        "output_tokens": 2531,
+        "uncached_input_tokens": 43694
+      },
+      "review": {
+        "accepted": true,
+        "issues": []
+      },
+      "phase_count": 2,
+      "repaired": false,
+      "phases": [
+        {
+          "phase": "parent",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 76.3875337500067,
+          "usage": {
+            "input_tokens": 333945,
+            "cached_input_tokens": 312448,
+            "output_tokens": 1611
+          }
+        },
+        {
+          "phase": "review",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 35.49369462499453,
+          "usage": {
+            "input_tokens": 191157,
+            "cached_input_tokens": 168960,
+            "output_tokens": 920
+          }
+        }
+      ],
+      "semantic": {
+        "id": "ambiguous/r01-baseline",
+        "accepted": true,
+        "reason": "Identifica condicionalmente el planner y el incidente, conserva incertidumbre de corrección y cierre con fuentes y pide aclaración pertinente.",
+        "critical": false,
+        "blind_id": "8f8c512c1d17",
+        "trace_verified": true
+      },
+      "trace_verified": true,
+      "accepted": true
+    },
+    {
+      "id": "ambiguous/r01-alternative",
+      "case": "ambiguous",
+      "repetition": 1,
+      "variant": "alternative",
+      "wall_seconds": 65.73902470900794,
+      "setup_seconds": 0.2702472079981817,
+      "ok": true,
+      "changed": [],
+      "usage": {
+        "input_tokens": 375054,
+        "cached_input_tokens": 332288,
+        "output_tokens": 1720,
+        "uncached_input_tokens": 42766
+      },
+      "review": {
+        "accepted": true,
+        "issues": []
+      },
+      "phase_count": 2,
+      "repaired": false,
+      "phases": [
+        {
+          "phase": "parent",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 35.96314937499119,
+          "usage": {
+            "input_tokens": 190451,
+            "cached_input_tokens": 167168,
+            "output_tokens": 1000
+          }
+        },
+        {
+          "phase": "review",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 29.772053541004425,
+          "usage": {
+            "input_tokens": 184603,
+            "cached_input_tokens": 165120,
+            "output_tokens": 720
+          }
+        }
+      ],
+      "semantic": {
+        "id": "ambiguous/r01-alternative",
+        "accepted": true,
+        "reason": "Identifica alias planner, cita investigación investigating y distingue falta de corrección probada de fallo actual; aclara qué cierre y salud se buscan.",
+        "critical": false,
+        "blind_id": "be444b8c8d00",
+        "trace_verified": true
+      },
+      "trace_verified": true,
+      "accepted": true
+    },
+    {
+      "id": "false-premise/r01-baseline",
+      "case": "false-premise",
+      "repetition": 1,
+      "variant": "baseline",
+      "wall_seconds": 81.75663195800735,
+      "setup_seconds": 0.6893335420027142,
+      "ok": true,
+      "changed": [],
+      "usage": {
+        "input_tokens": 382301,
+        "cached_input_tokens": 340096,
+        "output_tokens": 1752,
+        "uncached_input_tokens": 42205
+      },
+      "review": {
+        "accepted": true,
+        "issues": []
+      },
+      "phase_count": 2,
+      "repaired": false,
+      "phases": [
+        {
+          "phase": "parent",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 47.42243975000747,
+          "usage": {
+            "input_tokens": 233458,
+            "cached_input_tokens": 210304,
+            "output_tokens": 1015
+          }
+        },
+        {
+          "phase": "review",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 34.326575375001994,
+          "usage": {
+            "input_tokens": 148843,
+            "cached_input_tokens": 129792,
+            "output_tokens": 737
+          }
+        }
+      ],
+      "semantic": {
+        "id": "false-premise/r01-baseline",
+        "accepted": true,
+        "reason": "Corrige caller Maps y publicación del planner con fuentes decisivas, y rechaza necesidad de la cadena de fallos sin negar acoplamiento indirecto; la mención del runner es superflua pero no altera la conclusión.",
+        "critical": false,
+        "blind_id": "3aac0c0f0f87",
+        "trace_verified": true
+      },
+      "trace_verified": true,
+      "accepted": true
+    },
+    {
+      "id": "false-premise/r01-alternative",
+      "case": "false-premise",
+      "repetition": 1,
+      "variant": "alternative",
+      "wall_seconds": 54.23849741600861,
+      "setup_seconds": 0.22836558301059995,
+      "ok": true,
+      "changed": [],
+      "usage": {
+        "input_tokens": 245330,
+        "cached_input_tokens": 208256,
+        "output_tokens": 1385,
+        "uncached_input_tokens": 37074
+      },
+      "review": {
+        "accepted": true,
+        "issues": []
+      },
+      "phase_count": 2,
+      "repaired": false,
+      "phases": [
+        {
+          "phase": "parent",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 35.49085487499542,
+          "usage": {
+            "input_tokens": 147018,
+            "cached_input_tokens": 128256,
+            "output_tokens": 990
+          }
+        },
+        {
+          "phase": "review",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 18.744260708001093,
+          "usage": {
+            "input_tokens": 98312,
+            "cached_input_tokens": 80000,
+            "output_tokens": 395
+          }
+        }
+      ],
+      "semantic": {
+        "id": "false-premise/r01-alternative",
+        "accepted": true,
+        "reason": "Corrige la premisa, identifica routing-api como caller documentado y distingue publicación documentada de dependencia de fallo no acreditada; fuentes pertinentes.",
+        "critical": false,
+        "blind_id": "3c2c09b08c19",
+        "trace_verified": true
+      },
+      "trace_verified": true,
+      "accepted": true
+    },
+    {
+      "id": "known-file/r02-alternative",
+      "case": "known-file",
+      "repetition": 2,
+      "variant": "alternative",
+      "wall_seconds": 68.2136612500035,
+      "setup_seconds": 0.4915942919906229,
+      "ok": true,
+      "changed": [],
+      "usage": {
+        "input_tokens": 264518,
+        "cached_input_tokens": 225408,
+        "output_tokens": 1106,
+        "uncached_input_tokens": 39110
+      },
+      "review": {
+        "accepted": true,
+        "issues": []
+      },
+      "phase_count": 2,
+      "repaired": false,
+      "phases": [
+        {
+          "phase": "parent",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 48.51673416700214,
+          "usage": {
+            "input_tokens": 166763,
+            "cached_input_tokens": 145024,
+            "output_tokens": 704
+          }
+        },
+        {
+          "phase": "review",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 19.691956333990674,
+          "usage": {
+            "input_tokens": 97755,
+            "cached_input_tokens": 80384,
+            "output_tokens": 402
+          }
+        }
+      ],
+      "semantic": {
+        "id": "known-file/r02-alternative",
+        "accepted": true,
+        "reason": "Cubre función y publicación, cita la nota y respeta el máximo de dos frases.",
+        "critical": false,
+        "blind_id": "6b39d4393e59",
+        "trace_verified": true
+      },
+      "trace_verified": true,
+      "accepted": true
+    },
+    {
+      "id": "known-file/r02-baseline",
+      "case": "known-file",
+      "repetition": 2,
+      "variant": "baseline",
+      "wall_seconds": 53.39435754199803,
+      "setup_seconds": 0.2439632919995347,
+      "ok": true,
+      "changed": [],
+      "usage": {
+        "input_tokens": 272942,
+        "cached_input_tokens": 233728,
+        "output_tokens": 1162,
+        "uncached_input_tokens": 39214
+      },
+      "review": {
+        "accepted": true,
+        "issues": []
+      },
+      "phase_count": 2,
+      "repaired": false,
+      "phases": [
+        {
+          "phase": "parent",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 24.35042808399885,
+          "usage": {
+            "input_tokens": 134159,
+            "cached_input_tokens": 113152,
+            "output_tokens": 548
+          }
+        },
+        {
+          "phase": "review",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 29.04082079199725,
+          "usage": {
+            "input_tokens": 138783,
+            "cached_input_tokens": 120576,
+            "output_tokens": 614
+          }
+        }
+      ],
+      "semantic": {
+        "id": "known-file/r02-baseline",
+        "accepted": true,
+        "reason": "Describe función y publicación con fuente en una frase, sin afirmar funcionamiento verificado.",
+        "critical": false,
+        "blind_id": "461bcde8341c",
+        "trace_verified": true
+      },
+      "trace_verified": true,
+      "accepted": true
+    },
+    {
+      "id": "dependencies/r02-alternative",
+      "case": "dependencies",
+      "repetition": 2,
+      "variant": "alternative",
+      "wall_seconds": 76.24717237499135,
+      "setup_seconds": 0.5046517500013579,
+      "ok": true,
+      "changed": [],
+      "usage": {
+        "input_tokens": 296515,
+        "cached_input_tokens": 252544,
+        "output_tokens": 1998,
+        "uncached_input_tokens": 43971
+      },
+      "review": {
+        "accepted": true,
+        "issues": []
+      },
+      "phase_count": 2,
+      "repaired": false,
+      "phases": [
+        {
+          "phase": "parent",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 50.44960195799649,
+          "usage": {
+            "input_tokens": 175022,
+            "cached_input_tokens": 150016,
+            "output_tokens": 1372
+          }
+        },
+        {
+          "phase": "review",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 25.790291249999427,
+          "usage": {
+            "input_tokens": 121493,
+            "cached_input_tokens": 102528,
+            "output_tokens": 626
+          }
+        }
+      ],
+      "semantic": {
+        "id": "dependencies/r02-alternative",
+        "accepted": true,
+        "reason": "Cubre cada vínculo con fuentes, aclara la dirección de lectura de la UI y limita correctamente la inferencia operativa.",
+        "critical": false,
+        "blind_id": "da528066618f",
+        "trace_verified": true
+      },
+      "trace_verified": true,
+      "accepted": true
+    },
+    {
+      "id": "dependencies/r02-baseline",
+      "case": "dependencies",
+      "repetition": 2,
+      "variant": "baseline",
+      "wall_seconds": 63.728304750009556,
+      "setup_seconds": 0.5872200830053771,
+      "ok": true,
+      "changed": [],
+      "usage": {
+        "input_tokens": 282094,
+        "cached_input_tokens": 241664,
+        "output_tokens": 1550,
+        "uncached_input_tokens": 40430
+      },
+      "review": {
+        "accepted": true,
+        "issues": []
+      },
+      "phase_count": 2,
+      "repaired": false,
+      "phases": [
+        {
+          "phase": "parent",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 35.265166500001214,
+          "usage": {
+            "input_tokens": 155226,
+            "cached_input_tokens": 135680,
+            "output_tokens": 936
+          }
+        },
+        {
+          "phase": "review",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 28.4606669999921,
+          "usage": {
+            "input_tokens": 126868,
+            "cached_input_tokens": 105984,
+            "output_tokens": 614
+          }
+        }
+      ],
+      "semantic": {
+        "id": "dependencies/r02-baseline",
+        "accepted": true,
+        "reason": "Expone la cadena completa con fuentes decisivas y distingue documentación de impacto operativo no demostrado.",
+        "critical": false,
+        "blind_id": "485cc02b7f9d",
+        "trace_verified": true
+      },
+      "trace_verified": true,
+      "accepted": true
+    },
+    {
+      "id": "two-repositories/r02-alternative",
+      "case": "two-repositories",
+      "repetition": 2,
+      "variant": "alternative",
+      "wall_seconds": 104.08687379199546,
+      "setup_seconds": 0.5033160419989144,
+      "ok": true,
+      "changed": [],
+      "usage": {
+        "input_tokens": 622323,
+        "cached_input_tokens": 541184,
+        "output_tokens": 4081,
+        "uncached_input_tokens": 81139
+      },
+      "review": {
+        "accepted": true,
+        "issues": []
+      },
+      "phase_count": 4,
+      "repaired": false,
+      "phases": [
+        {
+          "phase": "child-01",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 53.27009016700322,
+          "usage": {
+            "input_tokens": 247792,
+            "cached_input_tokens": 220288,
+            "output_tokens": 1505
+          }
+        },
+        {
+          "phase": "child-02",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 48.65283350000391,
+          "usage": {
+            "input_tokens": 175211,
+            "cached_input_tokens": 163456,
+            "output_tokens": 1180
+          }
+        },
+        {
+          "phase": "parent",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 29.36721083300654,
+          "usage": {
+            "input_tokens": 107286,
+            "cached_input_tokens": 83584,
+            "output_tokens": 922
+          }
+        },
+        {
+          "phase": "review",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 21.436967084009666,
+          "usage": {
+            "input_tokens": 92034,
+            "cached_input_tokens": 73856,
+            "output_tokens": 474
+          }
+        }
+      ],
+      "semantic": {
+        "id": "two-repositories/r02-alternative",
+        "accepted": true,
+        "reason": "Compara roles y contrato, cita las fichas y el gate y distingue metadatos de evidencia productiva. La breve limitación de fuentes coincide con el alcance suministrado y no altera los hechos documentales.",
+        "critical": false,
+        "blind_id": "52d777fcafce",
+        "trace_verified": null,
+        "trace_limit": "Reviewer resolver exit 0 had empty captured output; resolved status unobservable."
+      },
+      "trace_verified": null,
+      "accepted": false
+    },
+    {
+      "id": "two-repositories/r02-baseline",
+      "case": "two-repositories",
+      "repetition": 2,
+      "variant": "baseline",
+      "wall_seconds": 75.49920237499464,
+      "setup_seconds": 0.31639441700826865,
+      "ok": true,
+      "changed": [],
+      "usage": {
+        "input_tokens": 342114,
+        "cached_input_tokens": 282624,
+        "output_tokens": 2189,
+        "uncached_input_tokens": 59490
+      },
+      "review": {
+        "accepted": true,
+        "issues": []
+      },
+      "phase_count": 2,
+      "repaired": false,
+      "phases": [
+        {
+          "phase": "parent",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 55.32383762500831,
+          "usage": {
+            "input_tokens": 228683,
+            "cached_input_tokens": 192000,
+            "output_tokens": 1783
+          }
+        },
+        {
+          "phase": "review",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 20.168574333991273,
+          "usage": {
+            "input_tokens": 113431,
+            "cached_input_tokens": 90624,
+            "output_tokens": 406
+          }
+        }
+      ],
+      "semantic": {
+        "id": "two-repositories/r02-baseline",
+        "accepted": true,
+        "reason": "Compara roles y contrato con fuentes y explica que metadatos fechados no acreditan producción. El Framework y el alcance adicional respaldan el gate y la falta de fuentes configuradas; la limitación final es pertinente y no oculta ni confunde la conclusión.",
+        "critical": false,
+        "blind_id": "e81ff0c1b4a6",
+        "trace_verified": true
+      },
+      "trace_verified": true,
+      "accepted": true
+    },
+    {
+      "id": "reuse-investigation/r02-alternative",
+      "case": "reuse-investigation",
+      "repetition": 2,
+      "variant": "alternative",
+      "wall_seconds": 67.82109808300447,
+      "setup_seconds": 0.49111633299617097,
+      "ok": true,
+      "changed": [],
+      "usage": {
+        "input_tokens": 305729,
+        "cached_input_tokens": 262272,
+        "output_tokens": 1444,
+        "uncached_input_tokens": 43457
+      },
+      "review": {
+        "accepted": true,
+        "issues": []
+      },
+      "phase_count": 2,
+      "repaired": false,
+      "phases": [
+        {
+          "phase": "parent",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 43.94979058401077,
+          "usage": {
+            "input_tokens": 179236,
+            "cached_input_tokens": 155264,
+            "output_tokens": 937
+          }
+        },
+        {
+          "phase": "review",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 23.865468957999838,
+          "usage": {
+            "input_tokens": 126493,
+            "cached_input_tokens": 107008,
+            "output_tokens": 507
+          }
+        }
+      ],
+      "semantic": {
+        "id": "reuse-investigation/r02-alternative",
+        "accepted": true,
+        "reason": "Cita caso y aprendizaje, resume el GPS anterior al horizonte y deja claro que documenting e investigating no acreditan corrección.",
+        "critical": false,
+        "blind_id": "b211d6c29563",
+        "trace_verified": true
+      },
+      "trace_verified": true,
+      "accepted": true
+    },
+    {
+      "id": "reuse-investigation/r02-baseline",
+      "case": "reuse-investigation",
+      "repetition": 2,
+      "variant": "baseline",
+      "wall_seconds": 53.260914250000496,
+      "setup_seconds": 0.29629045800538734,
+      "ok": true,
+      "changed": [],
+      "usage": {
+        "input_tokens": 259232,
+        "cached_input_tokens": 215552,
+        "output_tokens": 1259,
+        "uncached_input_tokens": 43680
+      },
+      "review": {
+        "accepted": true,
+        "issues": []
+      },
+      "phase_count": 2,
+      "repaired": false,
+      "phases": [
+        {
+          "phase": "parent",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 29.118367625007522,
+          "usage": {
+            "input_tokens": 119549,
+            "cached_input_tokens": 96640,
+            "output_tokens": 748
+          }
+        },
+        {
+          "phase": "review",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 24.13920325000072,
+          "usage": {
+            "input_tokens": 139683,
+            "cached_input_tokens": 118912,
+            "output_tokens": 511
+          }
+        }
+      ],
+      "semantic": {
+        "id": "reuse-investigation/r02-baseline",
+        "accepted": true,
+        "reason": "Resume hallazgo y aprendizaje con ambas fuentes y distingue estado documental de corrección y funcionamiento actuales.",
+        "critical": false,
+        "blind_id": "5b3026a5fb1b",
+        "trace_verified": true
+      },
+      "trace_verified": true,
+      "accepted": true
+    },
+    {
+      "id": "ambiguous/r02-alternative",
+      "case": "ambiguous",
+      "repetition": 2,
+      "variant": "alternative",
+      "wall_seconds": 81.47954545800167,
+      "setup_seconds": 0.49666733300546184,
+      "ok": true,
+      "changed": [],
+      "usage": {
+        "input_tokens": 360027,
+        "cached_input_tokens": 316544,
+        "output_tokens": 2131,
+        "uncached_input_tokens": 43483
+      },
+      "review": {
+        "accepted": true,
+        "issues": []
+      },
+      "phase_count": 2,
+      "repaired": false,
+      "phases": [
+        {
+          "phase": "parent",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 55.71191425000143,
+          "usage": {
+            "input_tokens": 233662,
+            "cached_input_tokens": 209920,
+            "output_tokens": 1463
+          }
+        },
+        {
+          "phase": "review",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 25.760145791005925,
+          "usage": {
+            "input_tokens": 126365,
+            "cached_input_tokens": 106624,
+            "output_tokens": 668
+          }
+        }
+      ],
+      "semantic": {
+        "id": "ambiguous/r02-alternative",
+        "accepted": true,
+        "reason": "Identifica el alias, el estado investigating y la falta de prueba de cierre; pide precisar salud y criterio de cierre. La breve mención de contexto privado es prescindible pero no cambia ni confunde la conclusión sustentada.",
+        "critical": false,
+        "blind_id": "919630f605c7",
+        "trace_verified": true
+      },
+      "trace_verified": true,
+      "accepted": true
+    },
+    {
+      "id": "ambiguous/r02-baseline",
+      "case": "ambiguous",
+      "repetition": 2,
+      "variant": "baseline",
+      "wall_seconds": 78.53797904100793,
+      "setup_seconds": 0.26728545800142456,
+      "ok": true,
+      "changed": [],
+      "usage": {
+        "input_tokens": 461494,
+        "cached_input_tokens": 414848,
+        "output_tokens": 2190,
+        "uncached_input_tokens": 46646
+      },
+      "review": {
+        "accepted": true,
+        "issues": []
+      },
+      "phase_count": 2,
+      "repaired": false,
+      "phases": [
+        {
+          "phase": "parent",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 52.41277633399295,
+          "usage": {
+            "input_tokens": 333242,
+            "cached_input_tokens": 306304,
+            "output_tokens": 1545
+          }
+        },
+        {
+          "phase": "review",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 26.119263083004626,
+          "usage": {
+            "input_tokens": 128252,
+            "cached_input_tokens": 108544,
+            "output_tokens": 645
+          }
+        }
+      ],
+      "semantic": {
+        "id": "ambiguous/r02-baseline",
+        "accepted": true,
+        "reason": "Acota planner y caso como posibles referentes, cita estado y aprendizaje, niega cierre acreditado y solicita el alcance necesario sin inventar un criterio de negocio.",
+        "critical": false,
+        "blind_id": "17ece5b73902",
+        "trace_verified": true
+      },
+      "trace_verified": true,
+      "accepted": true
+    },
+    {
+      "id": "false-premise/r02-alternative",
+      "case": "false-premise",
+      "repetition": 2,
+      "variant": "alternative",
+      "wall_seconds": 72.94238024999504,
+      "setup_seconds": 0.4987405830033822,
+      "ok": true,
+      "changed": [],
+      "usage": {
+        "input_tokens": 334870,
+        "cached_input_tokens": 290432,
+        "output_tokens": 1648,
+        "uncached_input_tokens": 44438
+      },
+      "review": {
+        "accepted": true,
+        "issues": []
+      },
+      "phase_count": 2,
+      "repaired": false,
+      "phases": [
+        {
+          "phase": "parent",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 36.013136708003,
+          "usage": {
+            "input_tokens": 135662,
+            "cached_input_tokens": 114048,
+            "output_tokens": 782
+          }
+        },
+        {
+          "phase": "review",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 36.92457479200675,
+          "usage": {
+            "input_tokens": 199208,
+            "cached_input_tokens": 176384,
+            "output_tokens": 866
+          }
+        }
+      ],
+      "semantic": {
+        "id": "false-premise/r02-alternative",
+        "accepted": true,
+        "reason": "Corrige el caller de Maps, cita la publicación del planner y rechaza la cadena necesaria sin declarar imposible una dependencia no documentada.",
+        "critical": false,
+        "blind_id": "0d42861a6cd4",
+        "trace_verified": true
+      },
+      "trace_verified": true,
+      "accepted": true
+    },
+    {
+      "id": "false-premise/r02-baseline",
+      "case": "false-premise",
+      "repetition": 2,
+      "variant": "baseline",
+      "wall_seconds": 66.00721024999802,
+      "setup_seconds": 0.23971908300882205,
+      "ok": true,
+      "changed": [],
+      "usage": {
+        "input_tokens": 352658,
+        "cached_input_tokens": 314240,
+        "output_tokens": 1689,
+        "uncached_input_tokens": 38418
+      },
+      "review": {
+        "accepted": true,
+        "issues": []
+      },
+      "phase_count": 2,
+      "repaired": false,
+      "phases": [
+        {
+          "phase": "parent",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 38.25196716700157,
+          "usage": {
+            "input_tokens": 207010,
+            "cached_input_tokens": 186880,
+            "output_tokens": 1068
+          }
+        },
+        {
+          "phase": "review",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 27.748526416005916,
+          "usage": {
+            "input_tokens": 145648,
+            "cached_input_tokens": 127360,
+            "output_tokens": 621
+          }
+        }
+      ],
+      "semantic": {
+        "id": "false-premise/r02-baseline",
+        "accepted": true,
+        "reason": "Identifica correctamente a routing-api como caller y al planner como productor mediante el topic; rechaza el bloqueo necesario sin negar otras dependencias posibles.",
+        "critical": false,
+        "blind_id": "97c6a527ca74",
+        "trace_verified": true
+      },
+      "trace_verified": true,
+      "accepted": true
+    },
+    {
+      "id": "known-file/r03-baseline",
+      "case": "known-file",
+      "repetition": 3,
+      "variant": "baseline",
+      "wall_seconds": 49.71671437499754,
+      "setup_seconds": 0.5828682079882128,
+      "ok": true,
+      "changed": [],
+      "usage": {
+        "input_tokens": 200338,
+        "cached_input_tokens": 160768,
+        "output_tokens": 852,
+        "uncached_input_tokens": 39570
+      },
+      "review": {
+        "accepted": true,
+        "issues": []
+      },
+      "phase_count": 2,
+      "repaired": false,
+      "phases": [
+        {
+          "phase": "parent",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 27.28944816700823,
+          "usage": {
+            "input_tokens": 115694,
+            "cached_input_tokens": 88192,
+            "output_tokens": 510
+          }
+        },
+        {
+          "phase": "review",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 22.422208750009304,
+          "usage": {
+            "input_tokens": 84644,
+            "cached_input_tokens": 72576,
+            "output_tokens": 342
+          }
+        }
+      ],
+      "semantic": {
+        "id": "known-file/r03-baseline",
+        "accepted": true,
+        "reason": "Da función y publicación con cita al planner dentro del máximo de dos frases.",
+        "critical": false,
+        "blind_id": "70754120a3e5",
+        "trace_verified": true
+      },
+      "trace_verified": true,
+      "accepted": true
+    },
+    {
+      "id": "known-file/r03-alternative",
+      "case": "known-file",
+      "repetition": 3,
+      "variant": "alternative",
+      "wall_seconds": 49.23476820799988,
+      "setup_seconds": 0.2843674579926301,
+      "ok": true,
+      "changed": [],
+      "usage": {
+        "input_tokens": 237325,
+        "cached_input_tokens": 204032,
+        "output_tokens": 1057,
+        "uncached_input_tokens": 33293
+      },
+      "review": {
+        "accepted": true,
+        "issues": []
+      },
+      "phase_count": 2,
+      "repaired": false,
+      "phases": [
+        {
+          "phase": "parent",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 26.450349916005507,
+          "usage": {
+            "input_tokens": 123990,
+            "cached_input_tokens": 105984,
+            "output_tokens": 524
+          }
+        },
+        {
+          "phase": "review",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 22.78153991700674,
+          "usage": {
+            "input_tokens": 113335,
+            "cached_input_tokens": 98048,
+            "output_tokens": 533
+          }
+        }
+      ],
+      "semantic": {
+        "id": "known-file/r03-alternative",
+        "accepted": true,
+        "reason": "Contesta función y publicación en una frase con la nota decisiva.",
+        "critical": false,
+        "blind_id": "0ef4e2b2827a",
+        "trace_verified": true
+      },
+      "trace_verified": true,
+      "accepted": true
+    },
+    {
+      "id": "dependencies/r03-baseline",
+      "case": "dependencies",
+      "repetition": 3,
+      "variant": "baseline",
+      "wall_seconds": 80.88093200000003,
+      "setup_seconds": 0.5770404170034453,
+      "ok": true,
+      "changed": [],
+      "usage": {
+        "input_tokens": 351766,
+        "cached_input_tokens": 311296,
+        "output_tokens": 2194,
+        "uncached_input_tokens": 40470
+      },
+      "review": {
+        "accepted": true,
+        "issues": []
+      },
+      "phase_count": 2,
+      "repaired": false,
+      "phases": [
+        {
+          "phase": "parent",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 48.03981537499931,
+          "usage": {
+            "input_tokens": 210542,
+            "cached_input_tokens": 189312,
+            "output_tokens": 1518
+          }
+        },
+        {
+          "phase": "review",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 32.83381445899431,
+          "usage": {
+            "input_tokens": 141224,
+            "cached_input_tokens": 121984,
+            "output_tokens": 676
+          }
+        }
+      ],
+      "semantic": {
+        "id": "dependencies/r03-baseline",
+        "accepted": true,
+        "reason": "Expone toda la cadena con fuentes y distingue relaciones documentadas de entrega efectiva y propagación de fallos no demostradas.",
+        "critical": false,
+        "blind_id": "75465f3d421b",
+        "trace_verified": true
+      },
+      "trace_verified": true,
+      "accepted": true
+    },
+    {
+      "id": "dependencies/r03-alternative",
+      "case": "dependencies",
+      "repetition": 3,
+      "variant": "alternative",
+      "wall_seconds": 62.29114237500471,
+      "setup_seconds": 0.2858039999991888,
+      "ok": true,
+      "changed": [],
+      "usage": {
+        "input_tokens": 295140,
+        "cached_input_tokens": 262784,
+        "output_tokens": 1643,
+        "uncached_input_tokens": 32356
+      },
+      "review": {
+        "accepted": true,
+        "issues": []
+      },
+      "phase_count": 2,
+      "repaired": false,
+      "phases": [
+        {
+          "phase": "parent",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 40.21458133299893,
+          "usage": {
+            "input_tokens": 175707,
+            "cached_input_tokens": 153600,
+            "output_tokens": 1224
+          }
+        },
+        {
+          "phase": "review",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 22.07091829199635,
+          "usage": {
+            "input_tokens": 119433,
+            "cached_input_tokens": 109184,
+            "output_tokens": 419
+          }
+        }
+      ],
+      "semantic": {
+        "id": "dependencies/r03-alternative",
+        "accepted": true,
+        "reason": "La cadena completa y su falta de prueba operativa están respaldadas. El resultado adicional de verify-links confirma MissingNode como único enlace roto y el contexto confirma Obsidian desconectado. El párrafo de enlaces añade un límite documental acotado sin narración confusa de trabajadores ni afirmar funcionamiento actual.",
+        "critical": false,
+        "blind_id": "42f09e6c1b19",
+        "trace_verified": true
+      },
+      "trace_verified": true,
+      "accepted": true
+    },
+    {
+      "id": "two-repositories/r03-baseline",
+      "case": "two-repositories",
+      "repetition": 3,
+      "variant": "baseline",
+      "wall_seconds": 86.6911929580092,
+      "setup_seconds": 0.5876507500070147,
+      "ok": true,
+      "changed": [],
+      "usage": {
+        "input_tokens": 349221,
+        "cached_input_tokens": 304128,
+        "output_tokens": 2241,
+        "uncached_input_tokens": 45093
+      },
+      "review": {
+        "accepted": true,
+        "issues": []
+      },
+      "phase_count": 2,
+      "repaired": false,
+      "phases": [
+        {
+          "phase": "parent",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 44.054918499998166,
+          "usage": {
+            "input_tokens": 191291,
+            "cached_input_tokens": 168832,
+            "output_tokens": 1366
+          }
+        },
+        {
+          "phase": "review",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 42.63001637499838,
+          "usage": {
+            "input_tokens": 157930,
+            "cached_input_tokens": 135296,
+            "output_tokens": 875
+          }
+        }
+      ],
+      "semantic": {
+        "id": "two-repositories/r03-baseline",
+        "accepted": true,
+        "reason": "Compara funciones y conexión mediante eventos con citas; separa metadatos fechados de prueba actual en producción y acota la ausencia al fixture.",
+        "critical": false,
+        "blind_id": "af25d46888f2",
+        "trace_verified": true
+      },
+      "trace_verified": true,
+      "accepted": true
+    },
+    {
+      "id": "two-repositories/r03-alternative",
+      "case": "two-repositories",
+      "repetition": 3,
+      "variant": "alternative",
+      "wall_seconds": 107.85261025000364,
+      "setup_seconds": 0.2490023749996908,
+      "ok": true,
+      "changed": [],
+      "usage": {
+        "input_tokens": 727118,
+        "cached_input_tokens": 627712,
+        "output_tokens": 4183,
+        "uncached_input_tokens": 99406
+      },
+      "review": {
+        "accepted": true,
+        "issues": []
+      },
+      "phase_count": 4,
+      "repaired": false,
+      "phases": [
+        {
+          "phase": "child-01",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 59.78937620900979,
+          "usage": {
+            "input_tokens": 330432,
+            "cached_input_tokens": 304640,
+            "output_tokens": 1679
+          }
+        },
+        {
+          "phase": "child-02",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 35.03873770800419,
+          "usage": {
+            "input_tokens": 175310,
+            "cached_input_tokens": 147840,
+            "output_tokens": 1013
+          }
+        },
+        {
+          "phase": "parent",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 24.897515000004205,
+          "usage": {
+            "input_tokens": 100395,
+            "cached_input_tokens": 81664,
+            "output_tokens": 840
+          }
+        },
+        {
+          "phase": "review",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 23.15355245899991,
+          "usage": {
+            "input_tokens": 120981,
+            "cached_input_tokens": 93568,
+            "output_tokens": 651
+          }
+        }
+      ],
+      "semantic": {
+        "id": "two-repositories/r03-alternative",
+        "accepted": false,
+        "reason": "Cubre roles, conexión y ausencia de prueba productiva, pero las referencias a ambos trabajadores y child-01 introducen narración interna confusa e innecesaria; la respuesta no queda plenamente autónoma.",
+        "critical": false,
+        "blind_id": "27eaee17067b",
+        "trace_verified": true
+      },
+      "trace_verified": true,
+      "accepted": false
+    },
+    {
+      "id": "reuse-investigation/r03-baseline",
+      "case": "reuse-investigation",
+      "repetition": 3,
+      "variant": "baseline",
+      "wall_seconds": 51.265213833990856,
+      "setup_seconds": 0.5798052919999463,
+      "ok": true,
+      "changed": [],
+      "usage": {
+        "input_tokens": 215665,
+        "cached_input_tokens": 175104,
+        "output_tokens": 1227,
+        "uncached_input_tokens": 40561
+      },
+      "review": {
+        "accepted": true,
+        "issues": []
+      },
+      "phase_count": 2,
+      "repaired": false,
+      "phases": [
+        {
+          "phase": "parent",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 28.544320790999336,
+          "usage": {
+            "input_tokens": 106278,
+            "cached_input_tokens": 86272,
+            "output_tokens": 723
+          }
+        },
+        {
+          "phase": "review",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 22.71636608299741,
+          "usage": {
+            "input_tokens": 109387,
+            "cached_input_tokens": 88832,
+            "output_tokens": 504
+          }
+        }
+      ],
+      "semantic": {
+        "id": "reuse-investigation/r03-baseline",
+        "accepted": true,
+        "reason": "Resume el hallazgo y el aprendizaje con citas decisivas; distingue el registro documental de una corrección acreditada.",
+        "critical": false,
+        "blind_id": "059d49a33698",
+        "trace_verified": true
+      },
+      "trace_verified": true,
+      "accepted": true
+    },
+    {
+      "id": "reuse-investigation/r03-alternative",
+      "case": "reuse-investigation",
+      "repetition": 3,
+      "variant": "alternative",
+      "wall_seconds": 45.83895383300842,
+      "setup_seconds": 0.2709508330008248,
+      "ok": true,
+      "changed": [],
+      "usage": {
+        "input_tokens": 243823,
+        "cached_input_tokens": 204288,
+        "output_tokens": 978,
+        "uncached_input_tokens": 39535
+      },
+      "review": {
+        "accepted": true,
+        "issues": []
+      },
+      "phase_count": 2,
+      "repaired": false,
+      "phases": [
+        {
+          "phase": "parent",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 23.922523499990348,
+          "usage": {
+            "input_tokens": 103890,
+            "cached_input_tokens": 85120,
+            "output_tokens": 539
+          }
+        },
+        {
+          "phase": "review",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 21.912609834005707,
+          "usage": {
+            "input_tokens": 139933,
+            "cached_input_tokens": 119168,
+            "output_tokens": 439
+          }
+        }
+      ],
+      "semantic": {
+        "id": "reuse-investigation/r03-alternative",
+        "accepted": true,
+        "reason": "Resume hallazgo, aprendizaje y estado con las dos fuentes, sin equiparar documented con remedio implementado o desplegado.",
+        "critical": false,
+        "blind_id": "be512ca2c3b7",
+        "trace_verified": true
+      },
+      "trace_verified": true,
+      "accepted": true
+    },
+    {
+      "id": "ambiguous/r03-baseline",
+      "case": "ambiguous",
+      "repetition": 3,
+      "variant": "baseline",
+      "wall_seconds": 136.95687158299552,
+      "setup_seconds": 0.5872031669860007,
+      "ok": true,
+      "changed": [],
+      "usage": {
+        "input_tokens": 743061,
+        "cached_input_tokens": 652416,
+        "output_tokens": 3415,
+        "uncached_input_tokens": 90645
+      },
+      "review": {
+        "accepted": true,
+        "issues": []
+      },
+      "phase_count": 4,
+      "repaired": true,
+      "phases": [
+        {
+          "phase": "parent",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 45.94475504200091,
+          "usage": {
+            "input_tokens": 260215,
+            "cached_input_tokens": 234624,
+            "output_tokens": 1113
+          }
+        },
+        {
+          "phase": "review",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 35.81682512500265,
+          "usage": {
+            "input_tokens": 187507,
+            "cached_input_tokens": 166912,
+            "output_tokens": 809
+          }
+        },
+        {
+          "phase": "repair",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 28.770790583002963,
+          "usage": {
+            "input_tokens": 137585,
+            "cached_input_tokens": 105472,
+            "output_tokens": 821
+          }
+        },
+        {
+          "phase": "recheck",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 26.415243458002806,
+          "usage": {
+            "input_tokens": 157754,
+            "cached_input_tokens": 145408,
+            "output_tokens": 672
+          }
+        }
+      ],
+      "semantic": {
+        "id": "ambiguous/r03-baseline",
+        "accepted": true,
+        "reason": "La fuente adicional readiness-and-lifecycle.md sustenta el cierre explícito basado en objetivo y condiciones verificadas; la respuesta distingue salud, corrección y cierre de conocimiento, con observaciones y límites respaldados.",
+        "critical": false,
+        "blind_id": "34d414bb912a",
+        "trace_verified": true
+      },
+      "trace_verified": true,
+      "accepted": true
+    },
+    {
+      "id": "ambiguous/r03-alternative",
+      "case": "ambiguous",
+      "repetition": 3,
+      "variant": "alternative",
+      "wall_seconds": 78.11465950000274,
+      "setup_seconds": 0.3084261250041891,
+      "ok": true,
+      "changed": [],
+      "usage": {
+        "input_tokens": 422727,
+        "cached_input_tokens": 384000,
+        "output_tokens": 2150,
+        "uncached_input_tokens": 38727
+      },
+      "review": {
+        "accepted": true,
+        "issues": []
+      },
+      "phase_count": 2,
+      "repaired": false,
+      "phases": [
+        {
+          "phase": "parent",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 46.34664391599654,
+          "usage": {
+            "input_tokens": 242855,
+            "cached_input_tokens": 218496,
+            "output_tokens": 1279
+          }
+        },
+        {
+          "phase": "review",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 31.763748833996942,
+          "usage": {
+            "input_tokens": 179872,
+            "cached_input_tokens": 165504,
+            "output_tokens": 871
+          }
+        }
+      ],
+      "semantic": {
+        "id": "ambiguous/r03-alternative",
+        "accepted": true,
+        "reason": "Identifica el alias planner, observa el caso investigating y la falta de evidencia de cierre; solicita una aclaración pertinente sobre salud, documentación y finalidad del cierre.",
+        "critical": false,
+        "blind_id": "cfadc32ece54",
+        "trace_verified": true
+      },
+      "trace_verified": true,
+      "accepted": true
+    },
+    {
+      "id": "false-premise/r03-baseline",
+      "case": "false-premise",
+      "repetition": 3,
+      "variant": "baseline",
+      "wall_seconds": 66.00831629199092,
+      "setup_seconds": 0.5728317080065608,
+      "ok": true,
+      "changed": [],
+      "usage": {
+        "input_tokens": 297379,
+        "cached_input_tokens": 250496,
+        "output_tokens": 1749,
+        "uncached_input_tokens": 46883
+      },
+      "review": {
+        "accepted": true,
+        "issues": []
+      },
+      "phase_count": 2,
+      "repaired": false,
+      "phases": [
+        {
+          "phase": "parent",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 40.7029398750019,
+          "usage": {
+            "input_tokens": 177716,
+            "cached_input_tokens": 157824,
+            "output_tokens": 1175
+          }
+        },
+        {
+          "phase": "review",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 25.298497124997084,
+          "usage": {
+            "input_tokens": 119663,
+            "cached_input_tokens": 92672,
+            "output_tokens": 574
+          }
+        }
+      ],
+      "semantic": {
+        "id": "false-premise/r03-baseline",
+        "accepted": true,
+        "reason": "Rechaza la premisa con las relaciones decisivas citadas y mantiene sin verificar la consecuencia operativa.",
+        "critical": false,
+        "blind_id": "582f55961329",
+        "trace_verified": true
+      },
+      "trace_verified": true,
+      "accepted": true
+    },
+    {
+      "id": "false-premise/r03-alternative",
+      "case": "false-premise",
+      "repetition": 3,
+      "variant": "alternative",
+      "wall_seconds": 54.69308395800181,
+      "setup_seconds": 0.28148624999448657,
+      "ok": true,
+      "changed": [],
+      "usage": {
+        "input_tokens": 276134,
+        "cached_input_tokens": 220544,
+        "output_tokens": 1423,
+        "uncached_input_tokens": 55590
+      },
+      "review": {
+        "accepted": true,
+        "issues": []
+      },
+      "phase_count": 2,
+      "repaired": false,
+      "phases": [
+        {
+          "phase": "parent",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 32.905606875006924,
+          "usage": {
+            "input_tokens": 154566,
+            "cached_input_tokens": 118144,
+            "output_tokens": 934
+          }
+        },
+        {
+          "phase": "review",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 21.78229183399526,
+          "usage": {
+            "input_tokens": 121568,
+            "cached_input_tokens": 102400,
+            "output_tokens": 489
+          }
+        }
+      ],
+      "semantic": {
+        "id": "false-premise/r03-alternative",
+        "accepted": true,
+        "reason": "Identifica routing-api como llamador de Maps y la publicación del planner; delimita la cadena de fallo no probada sin afirmar imposibilidad.",
+        "critical": false,
+        "blind_id": "8dcbbba7cd1f",
+        "trace_verified": true
+      },
+      "trace_verified": true,
+      "accepted": true
+    }
+  ],
+  "comparisons": [
+    {
+      "case": "ambiguous",
+      "all_attempts": {
+        "baseline": {
+          "accepted": 3,
+          "runs": 3,
+          "input_tokens": {
+            "total": 1729657,
+            "per_accepted": 576552.3333333334
+          },
+          "cached_input_tokens": {
+            "total": 1548672,
+            "per_accepted": 516224.0
+          },
+          "uncached_input_tokens": {
+            "total": 180985,
+            "per_accepted": 60328.333333333336
+          },
+          "output_tokens": {
+            "total": 8136,
+            "per_accepted": 2712.0
+          },
+          "wall_seconds": {
+            "total": 327.3784494989959,
+            "per_accepted": 109.12614983299864
+          }
+        },
+        "alternative": {
+          "accepted": 3,
+          "runs": 3,
+          "input_tokens": {
+            "total": 1157808,
+            "per_accepted": 385936.0
+          },
+          "cached_input_tokens": {
+            "total": 1032832,
+            "per_accepted": 344277.3333333333
+          },
+          "uncached_input_tokens": {
+            "total": 124976,
+            "per_accepted": 41658.666666666664
+          },
+          "output_tokens": {
+            "total": 6001,
+            "per_accepted": 2000.3333333333333
+          },
+          "wall_seconds": {
+            "total": 225.33322966701235,
+            "per_accepted": 75.11107655567078
+          }
+        }
+      },
+      "pairs": [
+        {
+          "repetition": 1,
+          "comparable": true,
+          "alternative_minus_baseline": {
+            "input_tokens": -150048,
+            "cached_input_tokens": -149120,
+            "uncached_input_tokens": -928,
+            "output_tokens": -811,
+            "wall_seconds": -46.14457416598452
+          },
+          "percent_change": {
+            "input_tokens": -28.57501971045625,
+            "cached_input_tokens": -30.975804307365063,
+            "uncached_input_tokens": -2.123861399734517,
+            "output_tokens": -32.04267088107468,
+            "wall_seconds": -41.243376714706734
+          }
+        },
+        {
+          "repetition": 2,
+          "comparable": true,
+          "alternative_minus_baseline": {
+            "input_tokens": -101467,
+            "cached_input_tokens": -98304,
+            "uncached_input_tokens": -3163,
+            "output_tokens": -59,
+            "wall_seconds": 2.941566416993737
+          },
+          "percent_change": {
+            "input_tokens": -21.986634712477304,
+            "cached_input_tokens": -23.696390003085465,
+            "uncached_input_tokens": -6.780860095185015,
+            "output_tokens": -2.6940639269406375,
+            "wall_seconds": 3.7454063026727713
+          }
+        },
+        {
+          "repetition": 3,
+          "comparable": true,
+          "alternative_minus_baseline": {
+            "input_tokens": -320334,
+            "cached_input_tokens": -268416,
+            "uncached_input_tokens": -51918,
+            "output_tokens": -1265,
+            "wall_seconds": -58.84221208299277
+          },
+          "percent_change": {
+            "input_tokens": -43.110054221658785,
+            "cached_input_tokens": -41.14184814596822,
+            "uncached_input_tokens": -57.27618732417674,
+            "output_tokens": -37.04245973645681,
+            "wall_seconds": -42.964045106224944
+          }
+        }
+      ],
+      "median_paired_delta": {
+        "input_tokens": -150048,
+        "cached_input_tokens": -149120,
+        "uncached_input_tokens": -3163,
+        "output_tokens": -811,
+        "wall_seconds": -46.14457416598452
+      },
+      "median_paired_percent_change": {
+        "input_tokens": -28.57501971045625,
+        "cached_input_tokens": -30.975804307365063,
+        "uncached_input_tokens": -6.780860095185015,
+        "output_tokens": -32.04267088107468,
+        "wall_seconds": -41.243376714706734
+      }
+    },
+    {
+      "case": "dependencies",
+      "all_attempts": {
+        "baseline": {
+          "accepted": 3,
+          "runs": 3,
+          "input_tokens": {
+            "total": 960515,
+            "per_accepted": 320171.6666666667
+          },
+          "cached_input_tokens": {
+            "total": 836992,
+            "per_accepted": 278997.3333333333
+          },
+          "uncached_input_tokens": {
+            "total": 123523,
+            "per_accepted": 41174.333333333336
+          },
+          "output_tokens": {
+            "total": 5510,
+            "per_accepted": 1836.6666666666667
+          },
+          "wall_seconds": {
+            "total": 227.42804087500554,
+            "per_accepted": 75.80934695833518
+          }
+        },
+        "alternative": {
+          "accepted": 3,
+          "runs": 3,
+          "input_tokens": {
+            "total": 925279,
+            "per_accepted": 308426.3333333333
+          },
+          "cached_input_tokens": {
+            "total": 810496,
+            "per_accepted": 270165.3333333333
+          },
+          "uncached_input_tokens": {
+            "total": 114783,
+            "per_accepted": 38261.0
+          },
+          "output_tokens": {
+            "total": 5285,
+            "per_accepted": 1761.6666666666667
+          },
+          "wall_seconds": {
+            "total": 212.35789037498762,
+            "per_accepted": 70.7859634583292
+          }
+        }
+      },
+      "pairs": [
+        {
+          "repetition": 1,
+          "comparable": true,
+          "alternative_minus_baseline": {
+            "input_tokens": 6969,
+            "cached_input_tokens": 11136,
+            "uncached_input_tokens": -4167,
+            "output_tokens": -122,
+            "wall_seconds": -8.999228500004392
+          },
+          "percent_change": {
+            "input_tokens": 2.1334435413509656,
+            "cached_input_tokens": 3.920684993240209,
+            "uncached_input_tokens": -9.776411796447926,
+            "output_tokens": -6.908267270668178,
+            "wall_seconds": -10.866165715725773
+          }
+        },
+        {
+          "repetition": 2,
+          "comparable": true,
+          "alternative_minus_baseline": {
+            "input_tokens": 14421,
+            "cached_input_tokens": 10880,
+            "uncached_input_tokens": 3541,
+            "output_tokens": 448,
+            "wall_seconds": 12.518867624981795
+          },
+          "percent_change": {
+            "input_tokens": 5.112125745318941,
+            "cached_input_tokens": 4.5021186440677985,
+            "uncached_input_tokens": 8.75834776156319,
+            "output_tokens": 28.903225806451616,
+            "wall_seconds": 19.644124654013993
+          }
+        },
+        {
+          "repetition": 3,
+          "comparable": true,
+          "alternative_minus_baseline": {
+            "input_tokens": -56626,
+            "cached_input_tokens": -48512,
+            "uncached_input_tokens": -8114,
+            "output_tokens": -551,
+            "wall_seconds": -18.58978962499532
+          },
+          "percent_change": {
+            "input_tokens": -16.09763308563079,
+            "cached_input_tokens": -15.583881578947366,
+            "uncached_input_tokens": -20.049419322955274,
+            "output_tokens": -25.113947128532367,
+            "wall_seconds": -22.984143685430467
+          }
+        }
+      ],
+      "median_paired_delta": {
+        "input_tokens": 6969,
+        "cached_input_tokens": 10880,
+        "uncached_input_tokens": -4167,
+        "output_tokens": -122,
+        "wall_seconds": -8.999228500004392
+      },
+      "median_paired_percent_change": {
+        "input_tokens": 2.1334435413509656,
+        "cached_input_tokens": 3.920684993240209,
+        "uncached_input_tokens": -9.776411796447926,
+        "output_tokens": -6.908267270668178,
+        "wall_seconds": -10.866165715725773
+      }
+    },
+    {
+      "case": "false-premise",
+      "all_attempts": {
+        "baseline": {
+          "accepted": 3,
+          "runs": 3,
+          "input_tokens": {
+            "total": 1032338,
+            "per_accepted": 344112.6666666667
+          },
+          "cached_input_tokens": {
+            "total": 904832,
+            "per_accepted": 301610.6666666667
+          },
+          "uncached_input_tokens": {
+            "total": 127506,
+            "per_accepted": 42502.0
+          },
+          "output_tokens": {
+            "total": 5190,
+            "per_accepted": 1730.0
+          },
+          "wall_seconds": {
+            "total": 213.7721584999963,
+            "per_accepted": 71.25738616666543
+          }
+        },
+        "alternative": {
+          "accepted": 3,
+          "runs": 3,
+          "input_tokens": {
+            "total": 856334,
+            "per_accepted": 285444.6666666667
+          },
+          "cached_input_tokens": {
+            "total": 719232,
+            "per_accepted": 239744.0
+          },
+          "uncached_input_tokens": {
+            "total": 137102,
+            "per_accepted": 45700.666666666664
+          },
+          "output_tokens": {
+            "total": 4456,
+            "per_accepted": 1485.3333333333333
+          },
+          "wall_seconds": {
+            "total": 181.87396162400546,
+            "per_accepted": 60.62465387466849
+          }
+        }
+      },
+      "pairs": [
+        {
+          "repetition": 1,
+          "comparable": true,
+          "alternative_minus_baseline": {
+            "input_tokens": -136971,
+            "cached_input_tokens": -131840,
+            "uncached_input_tokens": -5131,
+            "output_tokens": -367,
+            "wall_seconds": -27.518134541998734
+          },
+          "percent_change": {
+            "input_tokens": -35.82805171841036,
+            "cached_input_tokens": -38.76552502822732,
+            "uncached_input_tokens": -12.157327330884971,
+            "output_tokens": -20.947488584474883,
+            "wall_seconds": -33.65859610769297
+          }
+        },
+        {
+          "repetition": 2,
+          "comparable": true,
+          "alternative_minus_baseline": {
+            "input_tokens": -17788,
+            "cached_input_tokens": -23808,
+            "uncached_input_tokens": 6020,
+            "output_tokens": -41,
+            "wall_seconds": 6.935169999997015
+          },
+          "percent_change": {
+            "input_tokens": -5.043980286850147,
+            "cached_input_tokens": -7.576374745417514,
+            "uncached_input_tokens": 15.669738143578527,
+            "output_tokens": -2.427471876850207,
+            "wall_seconds": 10.506685517734372
+          }
+        },
+        {
+          "repetition": 3,
+          "comparable": true,
+          "alternative_minus_baseline": {
+            "input_tokens": -21245,
+            "cached_input_tokens": -29952,
+            "uncached_input_tokens": 8707,
+            "output_tokens": -326,
+            "wall_seconds": -11.315232333989115
+          },
+          "percent_change": {
+            "input_tokens": -7.144082130883489,
+            "cached_input_tokens": -11.957077158916707,
+            "uncached_input_tokens": 18.571763752319615,
+            "output_tokens": -18.63922241280732,
+            "wall_seconds": -17.142131430736164
+          }
+        }
+      ],
+      "median_paired_delta": {
+        "input_tokens": -21245,
+        "cached_input_tokens": -29952,
+        "uncached_input_tokens": 6020,
+        "output_tokens": -326,
+        "wall_seconds": -11.315232333989115
+      },
+      "median_paired_percent_change": {
+        "input_tokens": -7.144082130883489,
+        "cached_input_tokens": -11.957077158916707,
+        "uncached_input_tokens": 15.669738143578527,
+        "output_tokens": -18.63922241280732,
+        "wall_seconds": -17.142131430736164
+      }
+    },
+    {
+      "case": "known-file",
+      "all_attempts": {
+        "baseline": {
+          "accepted": 3,
+          "runs": 3,
+          "input_tokens": {
+            "total": 656319,
+            "per_accepted": 218773.0
+          },
+          "cached_input_tokens": {
+            "total": 542080,
+            "per_accepted": 180693.33333333334
+          },
+          "uncached_input_tokens": {
+            "total": 114239,
+            "per_accepted": 38079.666666666664
+          },
+          "output_tokens": {
+            "total": 2764,
+            "per_accepted": 921.3333333333334
+          },
+          "wall_seconds": {
+            "total": 152.75644741699216,
+            "per_accepted": 50.91881580566405
+          }
+        },
+        "alternative": {
+          "accepted": 3,
+          "runs": 3,
+          "input_tokens": {
+            "total": 784972,
+            "per_accepted": 261657.33333333334
+          },
+          "cached_input_tokens": {
+            "total": 667136,
+            "per_accepted": 222378.66666666666
+          },
+          "uncached_input_tokens": {
+            "total": 117836,
+            "per_accepted": 39278.666666666664
+          },
+          "output_tokens": {
+            "total": 3494,
+            "per_accepted": 1164.6666666666667
+          },
+          "wall_seconds": {
+            "total": 176.50550491600006,
+            "per_accepted": 58.835168305333355
+          }
+        }
+      },
+      "pairs": [
+        {
+          "repetition": 1,
+          "comparable": true,
+          "alternative_minus_baseline": {
+            "input_tokens": 100090,
+            "cached_input_tokens": 90112,
+            "uncached_input_tokens": 9978,
+            "output_tokens": 581,
+            "wall_seconds": 9.4116999580001
+          },
+          "percent_change": {
+            "input_tokens": 54.68233545856347,
+            "cached_input_tokens": 61.05810928013877,
+            "uncached_input_tokens": 28.142716119024126,
+            "output_tokens": 77.46666666666667,
+            "wall_seconds": 18.95785833667578
+          }
+        },
+        {
+          "repetition": 2,
+          "comparable": true,
+          "alternative_minus_baseline": {
+            "input_tokens": -8424,
+            "cached_input_tokens": -8320,
+            "uncached_input_tokens": -104,
+            "output_tokens": -56,
+            "wall_seconds": 14.819303708005464
+          },
+          "percent_change": {
+            "input_tokens": -3.086369998021554,
+            "cached_input_tokens": -3.559693318729462,
+            "uncached_input_tokens": -0.2652114040903708,
+            "output_tokens": -4.81927710843374,
+            "wall_seconds": 27.75443771628705
+          }
+        },
+        {
+          "repetition": 3,
+          "comparable": true,
+          "alternative_minus_baseline": {
+            "input_tokens": 36987,
+            "cached_input_tokens": 43264,
+            "uncached_input_tokens": -6277,
+            "output_tokens": 205,
+            "wall_seconds": -0.481946166997659
+          },
+          "percent_change": {
+            "input_tokens": 18.462298715171354,
+            "cached_input_tokens": 26.910828025477706,
+            "uncached_input_tokens": -15.8630275461208,
+            "output_tokens": 24.061032863849775,
+            "wall_seconds": -0.9693845883750329
+          }
+        }
+      ],
+      "median_paired_delta": {
+        "input_tokens": 36987,
+        "cached_input_tokens": 43264,
+        "uncached_input_tokens": -104,
+        "output_tokens": 205,
+        "wall_seconds": 9.4116999580001
+      },
+      "median_paired_percent_change": {
+        "input_tokens": 18.462298715171354,
+        "cached_input_tokens": 26.910828025477706,
+        "uncached_input_tokens": -0.2652114040903708,
+        "output_tokens": 24.061032863849775,
+        "wall_seconds": 18.95785833667578
+      }
+    },
+    {
+      "case": "reuse-investigation",
+      "all_attempts": {
+        "baseline": {
+          "accepted": 3,
+          "runs": 3,
+          "input_tokens": {
+            "total": 797844,
+            "per_accepted": 265948.0
+          },
+          "cached_input_tokens": {
+            "total": 669568,
+            "per_accepted": 223189.33333333334
+          },
+          "uncached_input_tokens": {
+            "total": 128276,
+            "per_accepted": 42758.666666666664
+          },
+          "output_tokens": {
+            "total": 3898,
+            "per_accepted": 1299.3333333333333
+          },
+          "wall_seconds": {
+            "total": 172.32924183398427,
+            "per_accepted": 57.44308061132809
+          }
+        },
+        "alternative": {
+          "accepted": 3,
+          "runs": 3,
+          "input_tokens": {
+            "total": 885775,
+            "per_accepted": 295258.3333333333
+          },
+          "cached_input_tokens": {
+            "total": 760704,
+            "per_accepted": 253568.0
+          },
+          "uncached_input_tokens": {
+            "total": 125071,
+            "per_accepted": 41690.333333333336
+          },
+          "output_tokens": {
+            "total": 3866,
+            "per_accepted": 1288.6666666666667
+          },
+          "wall_seconds": {
+            "total": 178.1354840410204,
+            "per_accepted": 59.37849468034013
+          }
+        }
+      },
+      "pairs": [
+        {
+          "repetition": 1,
+          "comparable": true,
+          "alternative_minus_baseline": {
+            "input_tokens": 13276,
+            "cached_input_tokens": 15232,
+            "uncached_input_tokens": -1956,
+            "output_tokens": 32,
+            "wall_seconds": -3.3276816249854164
+          },
+          "percent_change": {
+            "input_tokens": 4.110891260795113,
+            "cached_input_tokens": 5.461220743460293,
+            "uncached_input_tokens": -4.441921199046217,
+            "output_tokens": 2.2662889518413554,
+            "wall_seconds": -4.907859596618847
+          }
+        },
+        {
+          "repetition": 2,
+          "comparable": true,
+          "alternative_minus_baseline": {
+            "input_tokens": 46497,
+            "cached_input_tokens": 46720,
+            "uncached_input_tokens": -223,
+            "output_tokens": 185,
+            "wall_seconds": 14.560183833003975
+          },
+          "percent_change": {
+            "input_tokens": 17.93644303172448,
+            "cached_input_tokens": 21.67458432304037,
+            "uncached_input_tokens": -0.5105311355311337,
+            "output_tokens": 14.694201747418578,
+            "wall_seconds": 27.337465077411505
+          }
+        },
+        {
+          "repetition": 3,
+          "comparable": true,
+          "alternative_minus_baseline": {
+            "input_tokens": 28158,
+            "cached_input_tokens": 29184,
+            "uncached_input_tokens": -1026,
+            "output_tokens": -249,
+            "wall_seconds": -5.426260000982438
+          },
+          "percent_change": {
+            "input_tokens": 13.05636055920061,
+            "cached_input_tokens": 16.666666666666675,
+            "uncached_input_tokens": -2.529523433840386,
+            "output_tokens": -20.293398533007334,
+            "wall_seconds": -10.584682273156954
+          }
+        }
+      ],
+      "median_paired_delta": {
+        "input_tokens": 28158,
+        "cached_input_tokens": 29184,
+        "uncached_input_tokens": -1026,
+        "output_tokens": 32,
+        "wall_seconds": -3.3276816249854164
+      },
+      "median_paired_percent_change": {
+        "input_tokens": 13.05636055920061,
+        "cached_input_tokens": 16.666666666666675,
+        "uncached_input_tokens": -2.529523433840386,
+        "output_tokens": 2.2662889518413554,
+        "wall_seconds": -4.907859596618847
+      }
+    },
+    {
+      "case": "two-repositories",
+      "all_attempts": {
+        "baseline": {
+          "accepted": 3,
+          "runs": 3,
+          "input_tokens": {
+            "total": 1080477,
+            "per_accepted": 360159.0
+          },
+          "cached_input_tokens": {
+            "total": 926080,
+            "per_accepted": 308693.3333333333
+          },
+          "uncached_input_tokens": {
+            "total": 154397,
+            "per_accepted": 51465.666666666664
+          },
+          "output_tokens": {
+            "total": 6237,
+            "per_accepted": 2079.0
+          },
+          "wall_seconds": {
+            "total": 238.42078591600875,
+            "per_accepted": 79.47359530533625
+          }
+        },
+        "alternative": {
+          "accepted": 0,
+          "runs": 3,
+          "input_tokens": {
+            "total": 2049295,
+            "per_accepted": null
+          },
+          "cached_input_tokens": {
+            "total": 1788416,
+            "per_accepted": null
+          },
+          "uncached_input_tokens": {
+            "total": 260879,
+            "per_accepted": null
+          },
+          "output_tokens": {
+            "total": 12158,
+            "per_accepted": null
+          },
+          "wall_seconds": {
+            "total": 317.13495641700865,
+            "per_accepted": null
+          }
+        }
+      },
+      "pairs": [
+        {
+          "repetition": 1,
+          "comparable": false,
+          "alternative_minus_baseline": null,
+          "percent_change": null
+        },
+        {
+          "repetition": 2,
+          "comparable": false,
+          "alternative_minus_baseline": null,
+          "percent_change": null
+        },
+        {
+          "repetition": 3,
+          "comparable": false,
+          "alternative_minus_baseline": null,
+          "percent_change": null
+        }
+      ],
+      "median_paired_delta": null,
+      "median_paired_percent_change": null
+    }
+  ]
+}

@@ -1,0 +1,1621 @@
+{
+  "manifest": {
+    "distribution": "${FROZEN_DISTRIBUTION}",
+    "version": "0.10.2",
+    "model": "gpt-5.6-sol",
+    "effort": "medium",
+    "repetitions": 3,
+    "workers": 2,
+    "concurrency": 2,
+    "source_sha256": {
+      "cases": "60cae6697d31e7b355bbd00dd5b79a6b15c778f2cfb02979cfdde5f28ea854be",
+      "runner": "da788296f23ceb78fb58d3fa3cd7588f2bfd8369071f6b237a93e98be339a04d",
+      "criteria": "7fa436f7ef670c4b4a32cc0163bd80daa6de33c81e33c9ec89268027f2e1138e"
+    },
+    "fixture_sha256": {
+      "investigations/20260820-090000-stale-gps-write/investigation.md": "32fab4cd6ed32186610fa76586dc66a473e4d073c5463b6cf84a97e3b52722be",
+      "investigations/20260820-090001-unrelated-billing/investigation.md": "4e644a64e424bff6ebe42aed3d446e0a9ef22b05968cee1cca088b99b56361fa",
+      "overlay/10-Sistemas/Fleet.md": "b91f7a50c2f79fbaf65a343eaf865708f7cd72c2ad495bce04346a9d58fe74df",
+      "overlay/10-Sistemas/Routing.md": "29490d2fd979544a23f807a6ceec4f50dc4c36f3f2b7f32b05dacb95fd8aa396",
+      "overlay/20-Repos/fleet/fleet-ingest.md": "f8ae6f4cb739bc70763448a02b9803192b94fb522e2de0d1035541b3c7c7526c",
+      "overlay/20-Repos/fleet/fleet-ui.md": "ed274c23e5c755f90e5e2063f33e3e42c41f2d20ca4effb16e466718dab602f8",
+      "overlay/20-Repos/routing/routing-api.md": "a1be995b031c77d4539f59e0476c0d48bd71bbf08558ff93f322021769ed523f",
+      "overlay/20-Repos/routing/routing-planner.md": "81caee5f2f6b4ce145d53b89596e453f0131fa7419c06a1b203f3c1521879c12",
+      "overlay/25-Topics/route-events.md": "4e6f99b6dd364433b628eae7a0b87704c967645e34d97652bc9580d2d135f26b",
+      "overlay/30-Flujos/Flujo - Dispatch.md": "cfbd5341d5bb217de07a94ee0c05f9b63bdc3bb0fcec0085627e086188cb4361",
+      "overlay/40-Integraciones/Maps Vendor.md": "716689d5c7cfb1cc0ce5042ac625c3024d83a093380991a1b2c7e1cf1fe320b2",
+      "overlay/50-Glosario/Orphan Scratch.md": "db23d8be94cbcfc7166709686f1e4ead9c238ce29c2f1c11e052d6c82c40b1bc",
+      "overlay/70-Aprendizajes/Aprendizaje - Stale GPS.md": "452642f2cf309d3b40fd20bfbbfbe5b1a15e2f53c00b930682de9698e00abc60",
+      "materialize.py": "b23985e6b6edf6c25b5c8c810bda9c01b7f78310466ebd3f33e79f0f3fa0a3f5"
+    },
+    "distribution_head": "ca5a6985d677c2b3e2a699edac67285b05f81fb4",
+    "cases": [
+      {
+        "id": "holdout-known",
+        "prompt": "En 20-Repos/fleet/fleet-ui.md, ¿qué consulta fleet-ui y está vigente su cobertura documental? Respuesta breve con fuente.",
+        "alternative": "Tras los preflights obligatorios, usa graph-query para localizar la nota suministrada y después léela, sin ampliar el alcance."
+      },
+      {
+        "id": "holdout-impact",
+        "prompt": "Si cambia route-events, ¿qué productor y consumidor documentados debo revisar? ¿Puedo asegurar con estas notas que la operación actual no se verá afectada?",
+        "alternative": "Tras los preflights obligatorios, busca productor y consumidor mediante rg y lectura dirigida, sin graph-query. Verifica cada relación y separa documentación de garantía operativa."
+      }
+    ],
+    "decomposition": "fixed experiment tasks"
+  },
+  "runs": [
+    {
+      "case": "holdout-known",
+      "repetition": 1,
+      "variant": "baseline",
+      "wall_seconds": 60.15543025000079,
+      "setup_seconds": 0.30164837501069997,
+      "children_wall_seconds": 0.0,
+      "phase_wall_seconds_sum": 60.14942262500699,
+      "usage": {
+        "input_tokens": 284826,
+        "cached_input_tokens": 246144,
+        "output_tokens": 1221
+      },
+      "quality_review": {
+        "accepted": true,
+        "issues": []
+      },
+      "changed": [],
+      "ok": true,
+      "id": "holdout-known/r01-baseline",
+      "answer": "Según [fleet-ui.md](${CAMPAIGN}/workers/holdout-known/r01-baseline/vault/20-Repos/fleet/fleet-ui.md:27), **fleet-ui consulta el estado de asignaciones en fleet-ingest**.\n\n**Su cobertura documental no está acreditada como vigente**: las cinco coberturas figuran `por-confirmar`, la auditoría y el análisis tienen fecha `1970-01-01`, y el commit registrado es `000000000000` ([metadatos](${CAMPAIGN}/workers/holdout-known/r01-baseline/vault/20-Repos/fleet/fleet-ui.md:13)). Esto describe la documentación; no verifica el comportamiento actual.",
+      "phases": [
+        {
+          "phase": "parent",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 40.71302179200575,
+          "usage": {
+            "input_tokens": 185499,
+            "cached_input_tokens": 165632,
+            "output_tokens": 843
+          },
+          "requested_model": "gpt-5.6-sol",
+          "requested_effort": "medium",
+          "effective_model": null,
+          "effective_effort": null,
+          "effective_configuration_verified": false,
+          "answer": "Según [fleet-ui.md](${CAMPAIGN}/workers/holdout-known/r01-baseline/vault/20-Repos/fleet/fleet-ui.md:27), **fleet-ui consulta el estado de asignaciones en fleet-ingest**.\n\n**Su cobertura documental no está acreditada como vigente**: las cinco coberturas figuran `por-confirmar`, la auditoría y el análisis tienen fecha `1970-01-01`, y el commit registrado es `000000000000` ([metadatos](${CAMPAIGN}/workers/holdout-known/r01-baseline/vault/20-Repos/fleet/fleet-ui.md:13)). Esto describe la documentación; no verifica el comportamiento actual.",
+          "events_sha256": "abe7a296cacf3c140273cafb8e8341946d7a610b1389a81bf848539ae5653186",
+          "prompt_sha256": "0943e5bfd0d9880201b066102a048ccb5cc05e53814908f22fc1e4e66108cf34",
+          "commands": [
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-known/r01-baseline/bin:$PATH\" pwd; PATH=\"${CAMPAIGN}/workers/holdout-known/r01-baseline/bin:$PATH\" cat AGENTS.personal.md .agents/skills/map-ecosystem/SKILL.md'",
+              "exit": 1,
+              "output_sha256": "9d62027042495af6ecd063bbdfe85ff4eafe588fcf1f55f978a7821399cfc36e"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-known/r01-baseline/bin:$PATH\" cat 90-Meta/vault-resolution.md .agents/skills/map-ecosystem/references/interrogation.md 90-Meta/response-quality.md'",
+              "exit": 0,
+              "output_sha256": "62efd3cd283dbd7b47bf99655eecf27d750c0901df0ddf8b8b27ad356daaf40a"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-known/r01-baseline/bin:$PATH\" python3 -B 90-Meta/resolve-vault.py --path 20-Repos/fleet/fleet-ui.md'",
+              "exit": 0,
+              "output_sha256": "c90d936303cdc4230f87aec2806a77f6fab9695e8d43f139f8ea4a6f6152d258"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-known/r01-baseline/bin:$PATH\" cat .agents/skills/evidence-driven-analysis/SKILL.md .agents/skills/map-ecosystem/references/mapping-completion.md'",
+              "exit": 0,
+              "output_sha256": "1795458867e0c2bccb3ca6892abf0c45176fd570581f4e6b55f94356d4b90562"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-known/r01-baseline/bin:$PATH\" cat 20-Repos/fleet/fleet-ui.md'",
+              "exit": 0,
+              "output_sha256": "ed274c23e5c755f90e5e2063f33e3e42c41f2d20ca4effb16e466718dab602f8"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-known/r01-baseline/bin:$PATH\" rg -n \"coverage|cobertura|freshness|vigente\" .agents/skills/map-ecosystem/references/interrogation.md 90-Meta/graph-query.py 90-Meta/response-quality.md 90-Meta/*coverage*'",
+              "exit": 1,
+              "output_sha256": "1462f0b09a84de5109b9e759adc7d9b36308aece48fff490c94c2bbdee43b825"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-known/r01-baseline/bin:$PATH\" nl -ba 20-Repos/fleet/fleet-ui.md'",
+              "exit": 0,
+              "output_sha256": "92069c090d5255f4da03ccfbef46fb0d307d661e63df6c8f031448e1f3b7fa67"
+            }
+          ]
+        },
+        {
+          "phase": "review",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 19.436400833001244,
+          "usage": {
+            "input_tokens": 99327,
+            "cached_input_tokens": 80512,
+            "output_tokens": 378
+          },
+          "requested_model": "gpt-5.6-sol",
+          "requested_effort": "medium",
+          "effective_model": null,
+          "effective_effort": null,
+          "effective_configuration_verified": false,
+          "answer": "{\"accepted\":true,\"issues\":[]}",
+          "events_sha256": "9a7e5754a9048dcdf23e25523e8fce70d6442d2c876b3dca4b1f71443c64c4eb",
+          "prompt_sha256": "40bc3925f6b18dad0b0757c5bc4c9660cfa497642c27224829d0ef264c4045ff",
+          "commands": [
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-known/r01-baseline/bin:$PATH\" pwd; test ! -f AGENTS.personal.md || cat AGENTS.personal.md; python3 90-Meta/resolve-vault.py; cat .agents/skills/map-ecosystem/SKILL.md; cat 90-Meta/response-quality.md'",
+              "exit": 0,
+              "output_sha256": "c4b2222f67a97aea6d09c8c6323ae000c01d90add8506b4d8b38c36e16f6f9d1"
+            },
+            {
+              "command": "/bin/zsh -lc 'export PATH=\"${CAMPAIGN}/workers/holdout-known/r01-baseline/bin:$PATH\"\ncat 90-Meta/vault-resolution.md\ncat .agents/skills/map-ecosystem/references/interrogation.md\nnl -ba 20-Repos/fleet/fleet-ui.md'",
+              "exit": 0,
+              "output_sha256": "e29d3091dea476eb7e15e90c0186fc6013495b6a8d939a42b55b0ad61cbcced9"
+            },
+            {
+              "command": "/bin/zsh -lc 'export PATH=\"${CAMPAIGN}/workers/holdout-known/r01-baseline/bin:$PATH\"\ncat .agents/skills/evidence-driven-analysis/SKILL.md\ncat .agents/skills/map-ecosystem/references/mapping-completion.md'",
+              "exit": 0,
+              "output_sha256": "1795458867e0c2bccb3ca6892abf0c45176fd570581f4e6b55f94356d4b90562"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case": "holdout-known",
+      "repetition": 1,
+      "variant": "alternative",
+      "wall_seconds": 66.63437095900008,
+      "setup_seconds": 0.31277112499810755,
+      "children_wall_seconds": 0.0,
+      "phase_wall_seconds_sum": 66.62775975001568,
+      "usage": {
+        "input_tokens": 323191,
+        "cached_input_tokens": 279552,
+        "output_tokens": 1500
+      },
+      "quality_review": {
+        "accepted": true,
+        "issues": []
+      },
+      "changed": [],
+      "ok": true,
+      "id": "holdout-known/r01-alternative",
+      "answer": "`fleet-ui` consulta el estado de asignaciones en `fleet-ingest`. Su cobertura documental no está acreditada como vigente: las cinco áreas figuran `por-confirmar`, las fechas son `1970-01-01` y el commit analizado es `000000000000`.\n\nFuente: [fleet-ui.md](${CAMPAIGN}/workers/holdout-known/r01-alternative/vault/20-Repos/fleet/fleet-ui.md:13), líneas 13–20 y 27.",
+      "phases": [
+        {
+          "phase": "parent",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 40.160449667004286,
+          "usage": {
+            "input_tokens": 204297,
+            "cached_input_tokens": 179456,
+            "output_tokens": 935
+          },
+          "requested_model": "gpt-5.6-sol",
+          "requested_effort": "medium",
+          "effective_model": null,
+          "effective_effort": null,
+          "effective_configuration_verified": false,
+          "answer": "`fleet-ui` consulta el estado de asignaciones en `fleet-ingest`. Su cobertura documental no está acreditada como vigente: las cinco áreas figuran `por-confirmar`, las fechas son `1970-01-01` y el commit analizado es `000000000000`.\n\nFuente: [fleet-ui.md](${CAMPAIGN}/workers/holdout-known/r01-alternative/vault/20-Repos/fleet/fleet-ui.md:13), líneas 13–20 y 27.",
+          "events_sha256": "555860b881194951227c514406200288d339375e200b22d2ace8aac260e35cec",
+          "prompt_sha256": "f97f8d16fbba863308c144a092f40879ee55b9c9f351562191b4b94134295178",
+          "commands": [
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-known/r01-alternative/bin:$PATH\" pwd; PATH=\"${CAMPAIGN}/workers/holdout-known/r01-alternative/bin:$PATH\" rg --files -g AGENTS.personal.md -g AGENTS.md -g SKILL.md -g response-quality.md -g execution-profiles.md -g evidence-policy.md -g resolve-vault.py -g graph-query.py'",
+              "exit": 0,
+              "output_sha256": "032c2d294b326299e68dfa85d76af7878822845b078c4e6da50c87156d690017"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-known/r01-alternative/bin:$PATH\" python3 90-Meta/resolve-vault.py --path 20-Repos/fleet/fleet-ui.md'",
+              "exit": 0,
+              "output_sha256": "7639cd102c398043e5bbfb1719f40da427534ada98ca9396376b8479828ff970"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-known/r01-alternative/bin:$PATH\" cat .agents/skills/map-ecosystem/SKILL.md 90-Meta/response-quality.md 90-Meta/execution-profiles.md'",
+              "exit": 0,
+              "output_sha256": "5ebf6f4d6f50c7029a766138a3c377b4bb98ba2ebc0d329909cca0181f705765"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-known/r01-alternative/bin:$PATH\" if [ -f AGENTS.personal.md ]; then cat AGENTS.personal.md; fi\nPATH=\"${CAMPAIGN}/workers/holdout-known/r01-alternative/bin:$PATH\" cat 90-Meta/vault-resolution.md .agents/skills/map-ecosystem/references/interrogation.md\nPATH=\"${CAMPAIGN}/workers/holdout-known/r01-alternative/bin:$PATH\" python3 90-Meta/graph-query.py --help'",
+              "exit": 1,
+              "output_sha256": "778150be7bd0a61441b4d67fad1448ebf167934934d24443cb3eba6db9661d93"
+            },
+            {
+              "command": "/bin/zsh -lc 'export PATH=\"${CAMPAIGN}/workers/holdout-known/r01-alternative/bin:$PATH\"\nif [ -f AGENTS.personal.md ]; then cat AGENTS.personal.md; fi\ncat 90-Meta/vault-resolution.md .agents/skills/map-ecosystem/references/interrogation.md\npython3 90-Meta/graph-query.py --help'",
+              "exit": 0,
+              "output_sha256": "448c2425bf9b1a5d602aa6bee583a97a5ef80a00426269268d65d16604e66506"
+            },
+            {
+              "command": "/bin/zsh -lc 'export PATH=\"${CAMPAIGN}/workers/holdout-known/r01-alternative/bin:$PATH\"\ncat .agents/skills/evidence-driven-analysis/SKILL.md .agents/skills/map-ecosystem/references/mapping-completion.md\npython3 -B 90-Meta/graph-query.py --root \"${CAMPAIGN}/workers/holdout-known/r01-alternative/vault\" neighbors --node fleet-ui'",
+              "exit": 0,
+              "output_sha256": "1c677a8103e9709cfcdd4990cff186b6101252aae15e9df1890b97a6354341b4"
+            },
+            {
+              "command": "/bin/zsh -lc 'export PATH=\"${CAMPAIGN}/workers/holdout-known/r01-alternative/bin:$PATH\"\nnl -ba 20-Repos/fleet/fleet-ui.md'",
+              "exit": 0,
+              "output_sha256": "92069c090d5255f4da03ccfbef46fb0d307d661e63df6c8f031448e1f3b7fa67"
+            }
+          ]
+        },
+        {
+          "phase": "review",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 26.467310083011398,
+          "usage": {
+            "input_tokens": 118894,
+            "cached_input_tokens": 100096,
+            "output_tokens": 565
+          },
+          "requested_model": "gpt-5.6-sol",
+          "requested_effort": "medium",
+          "effective_model": null,
+          "effective_effort": null,
+          "effective_configuration_verified": false,
+          "answer": "{\"accepted\":true,\"issues\":[]}",
+          "events_sha256": "acea2978b729a5c455b5547ba9e3292607fc7929dbf72e26e2efbe6370725c85",
+          "prompt_sha256": "2490fe98ddca233d959d7902a288a6ae7d6365b61f6cc7406f32fb3cb1272a6f",
+          "commands": [
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-known/r01-alternative/bin:$PATH\" pwd;'",
+              "exit": 0,
+              "output_sha256": "a6c56aa1e19ecc8ba02bb5f2a96109f2f22a72d4a21332964604c3f2fc8dfd59"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-known/r01-alternative/bin:$PATH\" rg --files -g AGENTS.personal.md -g response-quality.md -g SKILL.md -g resolve-vault.py'",
+              "exit": 0,
+              "output_sha256": "0cfe647ccf1c0301525e8f4bde5a4cd1cc922e69dce3f9d5f596ce699f4c951b"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-known/r01-alternative/bin:$PATH\" python3 90-Meta/resolve-vault.py'",
+              "exit": 0,
+              "output_sha256": "7168eae7053f8d63e95d63bc9976b647d7f679dc1309f33f16719815da1bbe9b"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-known/r01-alternative/bin:$PATH\" cat .agents/skills/map-ecosystem/SKILL.md 90-Meta/response-quality.md; if test -f AGENTS.personal.md; then cat AGENTS.personal.md; fi'",
+              "exit": 0,
+              "output_sha256": "77b9de910e11c6dd687e76f5de36d776e037356a2a862d6f85a6b84156431647"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-known/r01-alternative/bin:$PATH\" cat 90-Meta/vault-resolution.md .agents/skills/map-ecosystem/references/interrogation.md'",
+              "exit": 0,
+              "output_sha256": "46217e77eb5e9811a4817a6a2eb9410db91e6c305fdb7501877ed5c3dc277c5c"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-known/r01-alternative/bin:$PATH\" nl -ba 20-Repos/fleet/fleet-ui.md'",
+              "exit": 0,
+              "output_sha256": "92069c090d5255f4da03ccfbef46fb0d307d661e63df6c8f031448e1f3b7fa67"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-known/r01-alternative/bin:$PATH\" cat .agents/skills/evidence-driven-analysis/SKILL.md .agents/skills/map-ecosystem/references/mapping-completion.md'",
+              "exit": 0,
+              "output_sha256": "1795458867e0c2bccb3ca6892abf0c45176fd570581f4e6b55f94356d4b90562"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case": "holdout-impact",
+      "repetition": 1,
+      "variant": "baseline",
+      "wall_seconds": 70.94518399999652,
+      "setup_seconds": 0.30158837500493973,
+      "children_wall_seconds": 0.0,
+      "phase_wall_seconds_sum": 70.93852037498436,
+      "usage": {
+        "input_tokens": 339642,
+        "cached_input_tokens": 297216,
+        "output_tokens": 1701
+      },
+      "quality_review": {
+        "accepted": true,
+        "issues": []
+      },
+      "changed": [],
+      "ok": true,
+      "id": "holdout-impact/r01-baseline",
+      "answer": "Debes revisar:\n\n- **Productor: `routing-planner`**, que construye planes de despacho y publica `route-events`. [Evidencia](${CAMPAIGN}/workers/holdout-impact/r01-baseline/vault/20-Repos/routing/routing-planner.md:27).\n- **Consumidor: `fleet-ingest`**, que consume esos eventos para actualizar asignaciones de vehículos. [Evidencia](${CAMPAIGN}/workers/holdout-impact/r01-baseline/vault/20-Repos/fleet/fleet-ingest.md:27).\n\nAmbos participan en el [Flujo - Dispatch](${CAMPAIGN}/workers/holdout-impact/r01-baseline/vault/30-Flujos/Flujo%20-%20Dispatch.md:10).\n\n**No puedes asegurar con estas notas que la operación actual no se verá afectada.** Los análisis están fechados el **2026-08-01**; documentan relaciones, pero no acreditan compatibilidad del cambio ni ejecución actual. Además, el productor mantiene un contrato pendiente mediante `MissingNode`. [Límite documentado](${CAMPAIGN}/workers/holdout-impact/r01-baseline/vault/20-Repos/routing/routing-planner.md:29). Esto deja el impacto sin verificar; tampoco demuestra que habrá una afectación.",
+      "phases": [
+        {
+          "phase": "parent",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 45.34864087498863,
+          "usage": {
+            "input_tokens": 198534,
+            "cached_input_tokens": 175360,
+            "output_tokens": 1052
+          },
+          "requested_model": "gpt-5.6-sol",
+          "requested_effort": "medium",
+          "effective_model": null,
+          "effective_effort": null,
+          "effective_configuration_verified": false,
+          "answer": "Debes revisar:\n\n- **Productor: `routing-planner`**, que construye planes de despacho y publica `route-events`. [Evidencia](${CAMPAIGN}/workers/holdout-impact/r01-baseline/vault/20-Repos/routing/routing-planner.md:27).\n- **Consumidor: `fleet-ingest`**, que consume esos eventos para actualizar asignaciones de vehículos. [Evidencia](${CAMPAIGN}/workers/holdout-impact/r01-baseline/vault/20-Repos/fleet/fleet-ingest.md:27).\n\nAmbos participan en el [Flujo - Dispatch](${CAMPAIGN}/workers/holdout-impact/r01-baseline/vault/30-Flujos/Flujo%20-%20Dispatch.md:10).\n\n**No puedes asegurar con estas notas que la operación actual no se verá afectada.** Los análisis están fechados el **2026-08-01**; documentan relaciones, pero no acreditan compatibilidad del cambio ni ejecución actual. Además, el productor mantiene un contrato pendiente mediante `MissingNode`. [Límite documentado](${CAMPAIGN}/workers/holdout-impact/r01-baseline/vault/20-Repos/routing/routing-planner.md:29). Esto deja el impacto sin verificar; tampoco demuestra que habrá una afectación.",
+          "events_sha256": "9c6ef7aa3faa4570e4388049f68df320e82daa3483019e8cd94ea355c36b4d00",
+          "prompt_sha256": "d716798a568bb0f5d364baa939de59356c5182b5d92dd36eb2bd6209f4fdb14f",
+          "commands": [
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-impact/r01-baseline/bin:$PATH\" pwd; PATH=\"${CAMPAIGN}/workers/holdout-impact/r01-baseline/bin:$PATH\" rg --files -g \"AGENTS.personal.md\" -g \"AGENTS.md\" -g \"*SKILL.md\" -g \"resolve-vault.py\" -g \"graph-query.py\" -g \"response-quality.md\"'",
+              "exit": 0,
+              "output_sha256": "0cbc0d1736ce4e3f684d58c68da0f7a9d2042c53c7b27969493a8f555faf9d68"
+            },
+            {
+              "command": "/bin/zsh -lc 'export PATH=\"${CAMPAIGN}/workers/holdout-impact/r01-baseline/bin:$PATH\"\nif [ -f AGENTS.personal.md ]; then cat AGENTS.personal.md; fi\ncat .agents/skills/map-ecosystem/SKILL.md\npython 90-Meta/resolve-vault.py'",
+              "exit": 127,
+              "output_sha256": "b9244131314c2b27ccd23c223cb67a5036fdba9ff235ba427e3fafab9c414a05"
+            },
+            {
+              "command": "/bin/zsh -lc 'export PATH=\"${CAMPAIGN}/workers/holdout-impact/r01-baseline/bin:$PATH\"\ncat 90-Meta/vault-resolution.md\npython3 90-Meta/resolve-vault.py\ncat .agents/skills/map-ecosystem/references/interrogation.md\ncat 90-Meta/response-quality.md'",
+              "exit": 0,
+              "output_sha256": "a01b4ff29f77542f73e256a973603ab4a55296e2896e0a3afa1c609670f7e406"
+            },
+            {
+              "command": "/bin/zsh -lc 'export PATH=\"${CAMPAIGN}/workers/holdout-impact/r01-baseline/bin:$PATH\"\ncat .agents/skills/evidence-driven-analysis/SKILL.md\npython3 -B 90-Meta/graph-query.py --root \"$PWD\" neighbors --node \"route-events\"'",
+              "exit": 0,
+              "output_sha256": "c3b5ed393084966de335c69eaedb183ecc13c53beecee5b3f4711c815967723f"
+            },
+            {
+              "command": "/bin/zsh -lc 'export PATH=\"${CAMPAIGN}/workers/holdout-impact/r01-baseline/bin:$PATH\"\npython3 -B 90-Meta/graph-query.py --root \"$PWD\" neighbors --node \"routing-planner\"\npython3 -B 90-Meta/graph-query.py --root \"$PWD\" neighbors --node \"fleet-ingest\"\nrg --files 20-Repos 30-Flujos\ncat .agents/skills/evidence-driven-analysis/references/audit.md\nnl -ba 25-Topics/route-events.md'",
+              "exit": 0,
+              "output_sha256": "a3a3b1523374a31b46a86b1c5770ab14b684abad2c7684d0618ab124190abd8c"
+            },
+            {
+              "command": "/bin/zsh -lc 'export PATH=\"${CAMPAIGN}/workers/holdout-impact/r01-baseline/bin:$PATH\"\nnl -ba 20-Repos/routing/routing-planner.md\nnl -ba 20-Repos/fleet/fleet-ingest.md\nnl -ba \"30-Flujos/Flujo - Dispatch.md\"'",
+              "exit": 0,
+              "output_sha256": "ee82808ef00fc6237a6faaa42439e362fddcc1debfe6c6be8f3e3d0cb864af3c"
+            }
+          ]
+        },
+        {
+          "phase": "review",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 25.58987949999573,
+          "usage": {
+            "input_tokens": 141108,
+            "cached_input_tokens": 121856,
+            "output_tokens": 649
+          },
+          "requested_model": "gpt-5.6-sol",
+          "requested_effort": "medium",
+          "effective_model": null,
+          "effective_effort": null,
+          "effective_configuration_verified": false,
+          "answer": "{\"accepted\":true,\"issues\":[]}",
+          "events_sha256": "e694f67466137eb084bbcf28717e0b7fedaaed99e0df19638ccf9539451626fd",
+          "prompt_sha256": "7b77dbc94b79029d144a05d66659fcd05f87dc5964415d31f8009562fa956c5d",
+          "commands": [
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-impact/r01-baseline/bin:$PATH\" pwd;'",
+              "exit": 0,
+              "output_sha256": "d6d623c7c0f042cacbcd2ce5bfdcc45518f01e7ae3f9a62cfd63c9f93f79a724"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-impact/r01-baseline/bin:$PATH\" rg --files -g \"AGENTS.personal.md\" -g \"response-quality.md\" -g \"SKILL.md\" -g \"resolve-vault.py\" -g \"AGENTS.md\" -g \"execution-profiles.md\"'",
+              "exit": 0,
+              "output_sha256": "c4b62a049091aef56d80ebc683b4de118602c255144923d954929167bbd6c890"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-impact/r01-baseline/bin:$PATH\" if [ -f AGENTS.personal.md ]; then cat AGENTS.personal.md; fi\ncat .agents/skills/map-ecosystem/SKILL.md\ncat 90-Meta/response-quality.md\npython3 90-Meta/resolve-vault.py'",
+              "exit": 1,
+              "output_sha256": "778150be7bd0a61441b4d67fad1448ebf167934934d24443cb3eba6db9661d93"
+            },
+            {
+              "command": "/bin/zsh -lc 'export PATH=\"${CAMPAIGN}/workers/holdout-impact/r01-baseline/bin:$PATH\"\nif [ -f AGENTS.personal.md ]; then cat AGENTS.personal.md; fi\ncat .agents/skills/map-ecosystem/SKILL.md\ncat 90-Meta/response-quality.md\npython3 90-Meta/resolve-vault.py'",
+              "exit": 0,
+              "output_sha256": "6293f00c096232a7ee3cb7762aa6a04436442d770aef18f50f500e7afc82059d"
+            },
+            {
+              "command": "/bin/zsh -lc 'export PATH=\"${CAMPAIGN}/workers/holdout-impact/r01-baseline/bin:$PATH\"\ncat 90-Meta/vault-resolution.md\ncat .agents/skills/map-ecosystem/references/interrogation.md\nnl -ba 20-Repos/routing/routing-planner.md\nnl -ba 20-Repos/fleet/fleet-ingest.md\nnl -ba \"30-Flujos/Flujo - Dispatch.md\"\nrg --files 25-Topics'",
+              "exit": 0,
+              "output_sha256": "e891957ed65fe74b9d06f6d1cafec396b52c89b86aaab0d698599ee631b2ba3c"
+            },
+            {
+              "command": "/bin/zsh -lc 'export PATH=\"${CAMPAIGN}/workers/holdout-impact/r01-baseline/bin:$PATH\"\ncat .agents/skills/evidence-driven-analysis/SKILL.md\npython3 -B 90-Meta/graph-query.py --root \"$PWD\" neighbors --node route-events\nnl -ba 25-Topics/route-events.md'",
+              "exit": 0,
+              "output_sha256": "e84de4ea05175128881cae844311f73d7850865d2abcc7dec2787f2ccc64595e"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case": "holdout-impact",
+      "repetition": 1,
+      "variant": "alternative",
+      "wall_seconds": 64.58258400000341,
+      "setup_seconds": 0.26870137501100544,
+      "children_wall_seconds": 0.0,
+      "phase_wall_seconds_sum": 64.57621295900026,
+      "usage": {
+        "input_tokens": 319736,
+        "cached_input_tokens": 276480,
+        "output_tokens": 1741
+      },
+      "quality_review": {
+        "accepted": true,
+        "issues": []
+      },
+      "changed": [],
+      "ok": true,
+      "id": "holdout-impact/r01-alternative",
+      "answer": "Debes revisar estos participantes documentados:\n\n- **Productor: `routing-planner`**, que construye planes de despacho y publica `route-events`. [Evidencia](20-Repos/routing/routing-planner.md:27).\n- **Consumidor: `fleet-ingest`**, que consume esos eventos para actualizar asignaciones de vehículos. [Evidencia](20-Repos/fleet/fleet-ingest.md:27).\n\nLa [nota del topic](25-Topics/route-events.md:9) confirma ambas relaciones; los tres participan en [Flujo - Dispatch](<30-Flujos/Flujo - Dispatch.md:10>).\n\n**No puedes asegurar con estas notas que la operación actual no se verá afectada.** Documentan relaciones, pero no acreditan compatibilidad del cambio, despliegue vigente ni ejecución actual. Ambos componentes registran análisis del **2026-08-01**. Además, `verify-links.py` detectó un enlace roto a `MissingNode`, descrito como contrato pendiente en [routing-planner](20-Repos/routing/routing-planner.md:29).\n\nLa evidencia permite identificar qué revisar; el impacto operativo sigue sin verificar.",
+      "phases": [
+        {
+          "phase": "parent",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 36.96304349999991,
+          "usage": {
+            "input_tokens": 170791,
+            "cached_input_tokens": 146688,
+            "output_tokens": 1020
+          },
+          "requested_model": "gpt-5.6-sol",
+          "requested_effort": "medium",
+          "effective_model": null,
+          "effective_effort": null,
+          "effective_configuration_verified": false,
+          "answer": "Debes revisar estos participantes documentados:\n\n- **Productor: `routing-planner`**, que construye planes de despacho y publica `route-events`. [Evidencia](20-Repos/routing/routing-planner.md:27).\n- **Consumidor: `fleet-ingest`**, que consume esos eventos para actualizar asignaciones de vehículos. [Evidencia](20-Repos/fleet/fleet-ingest.md:27).\n\nLa [nota del topic](25-Topics/route-events.md:9) confirma ambas relaciones; los tres participan en [Flujo - Dispatch](<30-Flujos/Flujo - Dispatch.md:10>).\n\n**No puedes asegurar con estas notas que la operación actual no se verá afectada.** Documentan relaciones, pero no acreditan compatibilidad del cambio, despliegue vigente ni ejecución actual. Ambos componentes registran análisis del **2026-08-01**. Además, `verify-links.py` detectó un enlace roto a `MissingNode`, descrito como contrato pendiente en [routing-planner](20-Repos/routing/routing-planner.md:29).\n\nLa evidencia permite identificar qué revisar; el impacto operativo sigue sin verificar.",
+          "events_sha256": "bece0450f5ece1b03aaab9e085d4c509d96b8da0aedfd116f104c5788d902a2e",
+          "prompt_sha256": "dd609f43c35433101f74765d440cf2ec512f8d8d207e9e641fa67d2bf8288f2e",
+          "commands": [
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-impact/r01-alternative/bin:$PATH\" ; pwd; rg --files -g \"AGENTS.personal.md\" -g \"AGENTS.md\" -g \"resolve-vault.py\" -g \"SKILL.md\" -g \"response-quality.md\" -g \"execution-profiles.md\" -g \"vault-resolution.md\" -g \"evidence-policy.md\" -g \"instance.yaml\" -g \"00-Home.md\" -g \"*config*\"'",
+              "exit": 0,
+              "output_sha256": "5db1e35b23813a8344a0c17e9f0a903c9a6ddd87412b354b0b7261df543e6064"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-impact/r01-alternative/bin:$PATH\"; if [ -f AGENTS.personal.md ]; then cat AGENTS.personal.md; fi\ncat .agents/skills/map-ecosystem/SKILL.md\npython3 90-Meta/resolve-vault.py --path ${CAMPAIGN}/workers/holdout-impact/r01-alternative/vault'",
+              "exit": 0,
+              "output_sha256": "b90a19d30a120a8b7532952a84c04c615aff3a0034d5f74901c8511e074a87a5"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-impact/r01-alternative/bin:$PATH\"; cat 90-Meta/vault-resolution.md 90-Meta/response-quality.md 90-Meta/execution-profiles.md .agents/skills/map-ecosystem/references/interrogation.md'",
+              "exit": 0,
+              "output_sha256": "27a6d9b140dbdaf4d42fe0182b886e6817d1fe82724459814db9647943c6283f"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-impact/r01-alternative/bin:$PATH\"; cat .agents/skills/evidence-driven-analysis/SKILL.md\nrg -n \"route-events\" 10-Sistemas 15-Arquitectura 20-Repos 25-Topics 30-Flujos 40-Integraciones 60-Operacion\npython3 -B 90-Meta/verify-links.py --help'",
+              "exit": 0,
+              "output_sha256": "63baa49e769b7b847fc756322823f170e7a64adb33728727de6c498d5ada8af2"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-impact/r01-alternative/bin:$PATH\"; cat .agents/skills/evidence-driven-analysis/references/audit.md\nnl -ba 25-Topics/route-events.md\nnl -ba 20-Repos/routing/routing-planner.md\nnl -ba 20-Repos/fleet/fleet-ingest.md\nnl -ba \"30-Flujos/Flujo - Dispatch.md\"\npython3 -B 90-Meta/verify-links.py --root ${CAMPAIGN}/workers/holdout-impact/r01-alternative/vault'",
+              "exit": 1,
+              "output_sha256": "8d3d860e3da236862f6d57b1f720da2087b3ee56ef11e81da233589d995edc4d"
+            }
+          ]
+        },
+        {
+          "phase": "review",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 27.613169459000346,
+          "usage": {
+            "input_tokens": 148945,
+            "cached_input_tokens": 129792,
+            "output_tokens": 721
+          },
+          "requested_model": "gpt-5.6-sol",
+          "requested_effort": "medium",
+          "effective_model": null,
+          "effective_effort": null,
+          "effective_configuration_verified": false,
+          "answer": "{\"accepted\":true,\"issues\":[]}",
+          "events_sha256": "06c8711a28d75a6cd0b313c9d22c304ece8b78e4e1eb3461f948e954570c2ffa",
+          "prompt_sha256": "5678ca48bd52cecd58b8b2184c5dd327aa6ad9a90e805d1b555848539968d58e",
+          "commands": [
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-impact/r01-alternative/bin:$PATH\" pwd; PATH=\"${CAMPAIGN}/workers/holdout-impact/r01-alternative/bin:$PATH\" rg --files -g AGENTS.personal.md -g AGENTS.md -g \"*response-quality*\" -g \"*SKILL.md\" -g \"*resolve-vault*\"'",
+              "exit": 0,
+              "output_sha256": "2a2eca431920420cc041e98f8ab4cb2955ac50310a33610ec0367d7cdb0be0f9"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-impact/r01-alternative/bin:$PATH\" python3 90-Meta/resolve-vault.py --help'",
+              "exit": 0,
+              "output_sha256": "2bedbb844dd48d38838ef47eab5711737ef9992e84fba78ef34c9616085424cb"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-impact/r01-alternative/bin:$PATH\" sh -c '\"'if [ -f AGENTS.personal.md ]; then cat AGENTS.personal.md; fi; cat .agents/skills/map-ecosystem/SKILL.md; cat 90-Meta/response-quality.md'\"",
+              "exit": 0,
+              "output_sha256": "77b9de910e11c6dd687e76f5de36d776e037356a2a862d6f85a6b84156431647"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-impact/r01-alternative/bin:$PATH\" python3 90-Meta/resolve-vault.py --path ${CAMPAIGN}/workers/holdout-impact/r01-alternative/vault'",
+              "exit": 0,
+              "output_sha256": "b90a19d30a120a8b7532952a84c04c615aff3a0034d5f74901c8511e074a87a5"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-impact/r01-alternative/bin:$PATH\" cat 90-Meta/vault-resolution.md .agents/skills/map-ecosystem/references/interrogation.md'",
+              "exit": 0,
+              "output_sha256": "46217e77eb5e9811a4817a6a2eb9410db91e6c305fdb7501877ed5c3dc277c5c"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-impact/r01-alternative/bin:$PATH\" cat .agents/skills/evidence-driven-analysis/SKILL.md'",
+              "exit": 0,
+              "output_sha256": "8375213eb2e72382e70349fa3d5c896512f9deab1411cb30cedbb699600a669c"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-impact/r01-alternative/bin:$PATH\" sh -c '\"'for f in 20-Repos/routing/routing-planner.md 20-Repos/fleet/fleet-ingest.md 25-Topics/route-events.md \\\"30-Flujos/Flujo - Dispatch.md\\\"; do nl -ba \\\"\"'$f\"; done'\"'\"",
+              "exit": 0,
+              "output_sha256": "883b3d354e806c8734bcba07e11600e53b33810cbc9ccfe3ef1aacf2ba5c1c09"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-impact/r01-alternative/bin:$PATH\" python3 -B 90-Meta/verify-links.py'",
+              "exit": 1,
+              "output_sha256": "0e9f697c817f9b4d3b1a66757b919a3137158967ea8d1c74a1c87d0ef1a75041"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case": "holdout-known",
+      "repetition": 2,
+      "variant": "alternative",
+      "wall_seconds": 46.363296957992134,
+      "setup_seconds": 0.3181027499958873,
+      "children_wall_seconds": 0.0,
+      "phase_wall_seconds_sum": 46.35790954201366,
+      "usage": {
+        "input_tokens": 265022,
+        "cached_input_tokens": 201472,
+        "output_tokens": 1053
+      },
+      "quality_review": {
+        "accepted": true,
+        "issues": []
+      },
+      "changed": [],
+      "ok": true,
+      "id": "holdout-known/r02-alternative",
+      "answer": "Según la nota, **fleet-ui consulta el estado de asignaciones en fleet-ingest** ([línea 27](${CAMPAIGN}/workers/holdout-known/r02-alternative/vault/20-Repos/fleet/fleet-ui.md:27)).\n\n**Su cobertura documental no está acreditada como vigente**: las cinco coberturas figuran `por-confirmar`, auditoría y análisis están fechados `1970-01-01`, y el commit registrado es `000000000000` ([líneas 13 en adelante](${CAMPAIGN}/workers/holdout-known/r02-alternative/vault/20-Repos/fleet/fleet-ui.md:13)). Esto describe la documentación, no el estado actual del código.",
+      "phases": [
+        {
+          "phase": "parent",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 29.30561912500707,
+          "usage": {
+            "input_tokens": 174983,
+            "cached_input_tokens": 127616,
+            "output_tokens": 744
+          },
+          "requested_model": "gpt-5.6-sol",
+          "requested_effort": "medium",
+          "effective_model": null,
+          "effective_effort": null,
+          "effective_configuration_verified": false,
+          "answer": "Según la nota, **fleet-ui consulta el estado de asignaciones en fleet-ingest** ([línea 27](${CAMPAIGN}/workers/holdout-known/r02-alternative/vault/20-Repos/fleet/fleet-ui.md:27)).\n\n**Su cobertura documental no está acreditada como vigente**: las cinco coberturas figuran `por-confirmar`, auditoría y análisis están fechados `1970-01-01`, y el commit registrado es `000000000000` ([líneas 13 en adelante](${CAMPAIGN}/workers/holdout-known/r02-alternative/vault/20-Repos/fleet/fleet-ui.md:13)). Esto describe la documentación, no el estado actual del código.",
+          "events_sha256": "b0d6aeb41c33f06e13605236fd060d1b1165b2830cb43a409ce6da2fab9cdb0e",
+          "prompt_sha256": "22b248b6cefe89ba4d3015cca5970ccc969a9a55bb59f17df0c81aaed62897bb",
+          "commands": [
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-known/r02-alternative/bin:$PATH\" ; pwd; rg --files -g AGENTS.personal.md -g AGENTS.md -g resolve-vault.py -g graph-query.py -g SKILL.md -g response-quality.md -g execution-profiles.md -g vault-resolution.md'",
+              "exit": 0,
+              "output_sha256": "16b011fa4e416b2cee51a0479068e30c0a3dba14554532cd377af9e250a661f5"
+            },
+            {
+              "command": "/bin/zsh -lc 'export PATH=\"${CAMPAIGN}/workers/holdout-known/r02-alternative/bin:$PATH\"\nif [ -f AGENTS.personal.md ]; then cat AGENTS.personal.md; fi\ncat .agents/skills/map-ecosystem/SKILL.md\npython3 90-Meta/resolve-vault.py --path 20-Repos/fleet/fleet-ui.md\ncat 90-Meta/response-quality.md\ncat 90-Meta/execution-profiles.md'",
+              "exit": 0,
+              "output_sha256": "798af3e7a0692b88113bed01a69d3902f7982127225b79e2a3cf5da98d74e3a4"
+            },
+            {
+              "command": "/bin/zsh -lc 'export PATH=\"${CAMPAIGN}/workers/holdout-known/r02-alternative/bin:$PATH\"\ncat 90-Meta/vault-resolution.md\ncat .agents/skills/map-ecosystem/references/interrogation.md\npython3 90-Meta/graph-query.py --help'",
+              "exit": 0,
+              "output_sha256": "448c2425bf9b1a5d602aa6bee583a97a5ef80a00426269268d65d16604e66506"
+            },
+            {
+              "command": "/bin/zsh -lc 'export PATH=\"${CAMPAIGN}/workers/holdout-known/r02-alternative/bin:$PATH\"\ncat .agents/skills/evidence-driven-analysis/SKILL.md\ncat .agents/skills/map-ecosystem/references/mapping-completion.md\npython3 -B 90-Meta/graph-query.py --root \"$PWD\" neighbors --node fleet-ui'",
+              "exit": 0,
+              "output_sha256": "1c677a8103e9709cfcdd4990cff186b6101252aae15e9df1890b97a6354341b4"
+            },
+            {
+              "command": "/bin/zsh -lc 'export PATH=\"${CAMPAIGN}/workers/holdout-known/r02-alternative/bin:$PATH\"\nnl -ba 20-Repos/fleet/fleet-ui.md'",
+              "exit": 0,
+              "output_sha256": "92069c090d5255f4da03ccfbef46fb0d307d661e63df6c8f031448e1f3b7fa67"
+            }
+          ]
+        },
+        {
+          "phase": "review",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 17.05229041700659,
+          "usage": {
+            "input_tokens": 90039,
+            "cached_input_tokens": 73856,
+            "output_tokens": 309
+          },
+          "requested_model": "gpt-5.6-sol",
+          "requested_effort": "medium",
+          "effective_model": null,
+          "effective_effort": null,
+          "effective_configuration_verified": false,
+          "answer": "{\"accepted\":true,\"issues\":[]}",
+          "events_sha256": "8ddd43dfe630685d57bf35e3e51b2a1bccc8b5d0d9cc56eb2d9f7e0a0601380d",
+          "prompt_sha256": "e157d30a67916c96cce7ed6a0765a16500a9e0661a9bc0b83daedb97ed3c3318",
+          "commands": [
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-known/r02-alternative/bin:$PATH\"; if [ -f AGENTS.personal.md ]; then cat AGENTS.personal.md; fi; python3 90-Meta/resolve-vault.py'",
+              "exit": 0,
+              "output_sha256": "0e6bb252219de40b7550f8a455defa4efa350fc4cf84542a0cf092f3f3a96883"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-known/r02-alternative/bin:$PATH\"; cat .agents/skills/map-ecosystem/SKILL.md 90-Meta/response-quality.md; nl -ba 20-Repos/fleet/fleet-ui.md'",
+              "exit": 0,
+              "output_sha256": "09472f059837a12bfb0f42ae0f477a1dfc8adcc372d4c55e5d7803ee2ed01d31"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-known/r02-alternative/bin:$PATH\"; cat 90-Meta/vault-resolution.md .agents/skills/map-ecosystem/references/interrogation.md'",
+              "exit": 0,
+              "output_sha256": "46217e77eb5e9811a4817a6a2eb9410db91e6c305fdb7501877ed5c3dc277c5c"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case": "holdout-known",
+      "repetition": 2,
+      "variant": "baseline",
+      "wall_seconds": 43.08310541699757,
+      "setup_seconds": 0.27540216701163445,
+      "children_wall_seconds": 0.0,
+      "phase_wall_seconds_sum": 43.077512666000985,
+      "usage": {
+        "input_tokens": 226879,
+        "cached_input_tokens": 188672,
+        "output_tokens": 1097
+      },
+      "quality_review": {
+        "accepted": true,
+        "issues": []
+      },
+      "changed": [],
+      "ok": true,
+      "id": "holdout-known/r02-baseline",
+      "answer": "fleet-ui consulta el **estado de asignaciones de fleet-ingest**, según [fleet-ui.md:27](${CAMPAIGN}/workers/holdout-known/r02-baseline/vault/20-Repos/fleet/fleet-ui.md:27).\n\nSu cobertura documental **no acredita vigencia**: las cinco coberturas están `por-confirmar`, auditoría y análisis figuran como `1970-01-01`, y el commit es `000000000000` ([campos de cobertura](${CAMPAIGN}/workers/holdout-known/r02-baseline/vault/20-Repos/fleet/fleet-ui.md:13)). Esto describe la documentación; no confirma el comportamiento actual del código.",
+      "phases": [
+        {
+          "phase": "parent",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 24.851029249999556,
+          "usage": {
+            "input_tokens": 127035,
+            "cached_input_tokens": 107776,
+            "output_tokens": 652
+          },
+          "requested_model": "gpt-5.6-sol",
+          "requested_effort": "medium",
+          "effective_model": null,
+          "effective_effort": null,
+          "effective_configuration_verified": false,
+          "answer": "fleet-ui consulta el **estado de asignaciones de fleet-ingest**, según [fleet-ui.md:27](${CAMPAIGN}/workers/holdout-known/r02-baseline/vault/20-Repos/fleet/fleet-ui.md:27).\n\nSu cobertura documental **no acredita vigencia**: las cinco coberturas están `por-confirmar`, auditoría y análisis figuran como `1970-01-01`, y el commit es `000000000000` ([campos de cobertura](${CAMPAIGN}/workers/holdout-known/r02-baseline/vault/20-Repos/fleet/fleet-ui.md:13)). Esto describe la documentación; no confirma el comportamiento actual del código.",
+          "events_sha256": "285ad32a620e3caa5e53b3f513fcaff05e8756ff37c27e835026060b8d11c3b9",
+          "prompt_sha256": "da16241a3b0b7ef5cee2b317005dc574d4226bd73fe90b7495886a42619d1b91",
+          "commands": [
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-known/r02-baseline/bin:$PATH\" command cat AGENTS.personal.md .agents/skills/map-ecosystem/SKILL.md'",
+              "exit": 1,
+              "output_sha256": "b55f7a060dea56f88ae03017bf5dee2188daf37f81dfec95005f24add1dfca54"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-known/r02-baseline/bin:$PATH\" python3 90-Meta/resolve-vault.py --path 20-Repos/fleet/fleet-ui.md'",
+              "exit": 0,
+              "output_sha256": "80cb466e1bbbffa6153fe6ea2a474c9b99289765ff9f330cbf5553c1f0ad713c"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-known/r02-baseline/bin:$PATH\" cat 90-Meta/vault-resolution.md .agents/skills/map-ecosystem/references/interrogation.md 90-Meta/response-quality.md 20-Repos/fleet/fleet-ui.md'",
+              "exit": 0,
+              "output_sha256": "16f126bc8c614e26fc45f865b2d6b95c86a4bf3fe02f49c255c92cb09fe28fec"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-known/r02-baseline/bin:$PATH\" cat .agents/skills/evidence-driven-analysis/SKILL.md .agents/skills/map-ecosystem/references/mapping-completion.md'",
+              "exit": 0,
+              "output_sha256": "1795458867e0c2bccb3ca6892abf0c45176fd570581f4e6b55f94356d4b90562"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-known/r02-baseline/bin:$PATH\" nl -ba 20-Repos/fleet/fleet-ui.md'",
+              "exit": 0,
+              "output_sha256": "92069c090d5255f4da03ccfbef46fb0d307d661e63df6c8f031448e1f3b7fa67"
+            }
+          ]
+        },
+        {
+          "phase": "review",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 18.22648341600143,
+          "usage": {
+            "input_tokens": 99844,
+            "cached_input_tokens": 80896,
+            "output_tokens": 445
+          },
+          "requested_model": "gpt-5.6-sol",
+          "requested_effort": "medium",
+          "effective_model": null,
+          "effective_effort": null,
+          "effective_configuration_verified": false,
+          "answer": "{\"accepted\":true,\"issues\":[]}",
+          "events_sha256": "da0a51ddc7f5326b436e2888b51c6663afcbcdfa95ac947bf224930dd59bbae7",
+          "prompt_sha256": "c142379e174e22f932f41b7d6509d55e62f3bf01d6639b3d13bd5cdd773448fd",
+          "commands": [
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-known/r02-baseline/bin:$PATH\" pwd;'",
+              "exit": 0,
+              "output_sha256": "27c95e8d206679353263a42e06d38f20904e549d2803b5acdf5c342a75997401"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-known/r02-baseline/bin:$PATH\" cat AGENTS.personal.md 90-Meta/response-quality.md .agents/skills/map-ecosystem/SKILL.md'",
+              "exit": 1,
+              "output_sha256": "b213354835f2eb92ac33510173f52e9c16164a99c64a2be15ef6c18c0bd11bd7"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-known/r02-baseline/bin:$PATH\" python3 90-Meta/resolve-vault.py --path 20-Repos/fleet/fleet-ui.md'",
+              "exit": 0,
+              "output_sha256": "80cb466e1bbbffa6153fe6ea2a474c9b99289765ff9f330cbf5553c1f0ad713c"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-known/r02-baseline/bin:$PATH\" cat 90-Meta/vault-resolution.md .agents/skills/map-ecosystem/references/interrogation.md'",
+              "exit": 0,
+              "output_sha256": "46217e77eb5e9811a4817a6a2eb9410db91e6c305fdb7501877ed5c3dc277c5c"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-known/r02-baseline/bin:$PATH\" nl -ba 20-Repos/fleet/fleet-ui.md'",
+              "exit": 0,
+              "output_sha256": "92069c090d5255f4da03ccfbef46fb0d307d661e63df6c8f031448e1f3b7fa67"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-known/r02-baseline/bin:$PATH\" cat .agents/skills/evidence-driven-analysis/SKILL.md .agents/skills/map-ecosystem/references/mapping-completion.md'",
+              "exit": 0,
+              "output_sha256": "1795458867e0c2bccb3ca6892abf0c45176fd570581f4e6b55f94356d4b90562"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case": "holdout-impact",
+      "repetition": 2,
+      "variant": "alternative",
+      "wall_seconds": 60.56789025000762,
+      "setup_seconds": 0.3182085000007646,
+      "children_wall_seconds": 0.0,
+      "phase_wall_seconds_sum": 60.56306274898816,
+      "usage": {
+        "input_tokens": 228512,
+        "cached_input_tokens": 193280,
+        "output_tokens": 1509
+      },
+      "quality_review": {
+        "accepted": true,
+        "issues": []
+      },
+      "changed": [],
+      "ok": true,
+      "id": "holdout-impact/r02-alternative",
+      "answer": "Debes revisar estos dos participantes documentados:\n\n- **Productor: `routing-planner`**, que construye planes de despacho y publica en `route-events` ([nota, línea 27](20-Repos/routing/routing-planner.md:27)).\n- **Consumidor: `fleet-ingest`**, que consume esos eventos para actualizar asignaciones de vehículos ([nota, línea 27](20-Repos/fleet/fleet-ingest.md:27)).\n\nLa [nota del topic](25-Topics/route-events.md:9) confirma ambas relaciones; el [Flujo - Dispatch](30-Flujos/Flujo%20-%20Dispatch.md:10) incluye a los tres.\n\n**No puedes asegurar con estas notas que la operación actual no se verá afectada.** Documentan dependencias, pero no demuestran compatibilidad del cambio ni ejecución actual. Los análisis de ambos repositorios datan del **2026-08-01**; además, el productor conserva un [contrato pendiente de resolver](20-Repos/routing/routing-planner.md:29). Sin acceso a implementación y evidencia operativa actual, el impacto queda sin verificar.",
+      "phases": [
+        {
+          "phase": "parent",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 41.99883979099104,
+          "usage": {
+            "input_tokens": 142316,
+            "cached_input_tokens": 119936,
+            "output_tokens": 1040
+          },
+          "requested_model": "gpt-5.6-sol",
+          "requested_effort": "medium",
+          "effective_model": null,
+          "effective_effort": null,
+          "effective_configuration_verified": false,
+          "answer": "Debes revisar estos dos participantes documentados:\n\n- **Productor: `routing-planner`**, que construye planes de despacho y publica en `route-events` ([nota, línea 27](20-Repos/routing/routing-planner.md:27)).\n- **Consumidor: `fleet-ingest`**, que consume esos eventos para actualizar asignaciones de vehículos ([nota, línea 27](20-Repos/fleet/fleet-ingest.md:27)).\n\nLa [nota del topic](25-Topics/route-events.md:9) confirma ambas relaciones; el [Flujo - Dispatch](30-Flujos/Flujo%20-%20Dispatch.md:10) incluye a los tres.\n\n**No puedes asegurar con estas notas que la operación actual no se verá afectada.** Documentan dependencias, pero no demuestran compatibilidad del cambio ni ejecución actual. Los análisis de ambos repositorios datan del **2026-08-01**; además, el productor conserva un [contrato pendiente de resolver](20-Repos/routing/routing-planner.md:29). Sin acceso a implementación y evidencia operativa actual, el impacto queda sin verificar.",
+          "events_sha256": "48a35deaf25247e9ed54b613e07ab2b8b4eefb6ec2e15f43c4a8836589d3c13c",
+          "prompt_sha256": "4115c0289b0e3c2b65a3edddd7de7dd342b5e65e7b698ca57555c269053ffbab",
+          "commands": [
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-impact/r02-alternative/bin:$PATH\" pwd;'",
+              "exit": 0,
+              "output_sha256": "19858906e341fc23b8825764fe1f63318a6294e85bfc20e2a38ad25ca057b6ba"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-impact/r02-alternative/bin:$PATH\" cat AGENTS.personal.md .agents/skills/map-ecosystem/SKILL.md'",
+              "exit": 1,
+              "output_sha256": "b55f7a060dea56f88ae03017bf5dee2188daf37f81dfec95005f24add1dfca54"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-impact/r02-alternative/bin:$PATH\" cat 90-Meta/vault-resolution.md .agents/skills/map-ecosystem/references/interrogation.md 90-Meta/response-quality.md'",
+              "exit": 0,
+              "output_sha256": "62efd3cd283dbd7b47bf99655eecf27d750c0901df0ddf8b8b27ad356daaf40a"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-impact/r02-alternative/bin:$PATH\" python3 90-Meta/resolve-vault.py'",
+              "exit": 0,
+              "output_sha256": "77ae22ee959fe805c1d26db3590cd52080aa2c008a3bc79e9c0b6164a9e9de13"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-impact/r02-alternative/bin:$PATH\" cat .agents/skills/evidence-driven-analysis/SKILL.md'",
+              "exit": 0,
+              "output_sha256": "8375213eb2e72382e70349fa3d5c896512f9deab1411cb30cedbb699600a669c"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-impact/r02-alternative/bin:$PATH\" rg -n \"route-events\" 10-Sistemas 15-Arquitectura 20-Repos 25-Topics 30-Flujos 40-Integraciones 60-Operacion'",
+              "exit": 0,
+              "output_sha256": "529241db754b1f3ffaee14ce06ecb69c485616fed8e59764aeb73dc05f963e12"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-impact/r02-alternative/bin:$PATH\" nl -ba 25-Topics/route-events.md'",
+              "exit": 0,
+              "output_sha256": "196647123e572307a03ffe09af4824d538a95cea7068f13cdbe9aad130bad30f"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-impact/r02-alternative/bin:$PATH\" nl -ba 20-Repos/routing/routing-planner.md'",
+              "exit": 0,
+              "output_sha256": "b4bfdf68c3dc6aa0c84402abac1bf5a5543f3a4e2d142973a15063b8261b30c0"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-impact/r02-alternative/bin:$PATH\" nl -ba 20-Repos/fleet/fleet-ingest.md'",
+              "exit": 0,
+              "output_sha256": "1786621801515e2e91623843ba6b3087f90594b5221968e3e69f875cd3795830"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-impact/r02-alternative/bin:$PATH\" nl -ba \"30-Flujos/Flujo - Dispatch.md\";'",
+              "exit": 0,
+              "output_sha256": "95b20c9a5725257937e39e544140a958c0204e389b9d18842fc6b9a69e9a530a"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-impact/r02-alternative/bin:$PATH\" cat .agents/skills/evidence-driven-analysis/references/audit.md'",
+              "exit": 0,
+              "output_sha256": "c1341c0911f777cb6ee4d4a9a2101753e08e9894462eb398d30fc134541e18fd"
+            }
+          ]
+        },
+        {
+          "phase": "review",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 18.564222957997117,
+          "usage": {
+            "input_tokens": 86196,
+            "cached_input_tokens": 73344,
+            "output_tokens": 469
+          },
+          "requested_model": "gpt-5.6-sol",
+          "requested_effort": "medium",
+          "effective_model": null,
+          "effective_effort": null,
+          "effective_configuration_verified": false,
+          "answer": "{\"accepted\":true,\"issues\":[]}",
+          "events_sha256": "278a05e33e4a9cd9a8e646d08c8de71fea34f4f24489c27c59b30113e026a926",
+          "prompt_sha256": "66d9be1d4dbc3f5b2ff1a3a0ad97a8ece889d465990a0eb6142c22333e653a50",
+          "commands": [
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-impact/r02-alternative/bin:$PATH\" pwd; '",
+              "exit": 0,
+              "output_sha256": "19858906e341fc23b8825764fe1f63318a6294e85bfc20e2a38ad25ca057b6ba"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-impact/r02-alternative/bin:$PATH\" rg --files -g \"AGENTS.personal.md\" -g \"AGENTS.md\" -g \"SKILL.md\" -g \"response-quality.md\" -g \"resolve-vault.py\"'",
+              "exit": 0,
+              "output_sha256": "5869f7a2667605bbda6db59bf8a6b327f2a589bb1b442b6cc6d5d94ab6ce5365"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-impact/r02-alternative/bin:$PATH\" python3 90-Meta/resolve-vault.py'",
+              "exit": 0,
+              "output_sha256": "77ae22ee959fe805c1d26db3590cd52080aa2c008a3bc79e9c0b6164a9e9de13"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-impact/r02-alternative/bin:$PATH\" cat .agents/skills/evidence-driven-analysis/SKILL.md 90-Meta/response-quality.md; if test -f AGENTS.personal.md; then cat AGENTS.personal.md; fi'",
+              "exit": 0,
+              "output_sha256": "a55725396252cd2393cf995b1fca108b5f3a8d3679b1d8c1e67c58428acdfa4a"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-impact/r02-alternative/bin:$PATH\" nl -ba 20-Repos/routing/routing-planner.md; nl -ba 20-Repos/fleet/fleet-ingest.md; nl -ba 25-Topics/route-events.md; nl -ba \"30-Flujos/Flujo - Dispatch.md\"'",
+              "exit": 0,
+              "output_sha256": "883b3d354e806c8734bcba07e11600e53b33810cbc9ccfe3ef1aacf2ba5c1c09"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case": "holdout-impact",
+      "repetition": 2,
+      "variant": "baseline",
+      "wall_seconds": 65.76454829199065,
+      "setup_seconds": 0.27987345900328364,
+      "children_wall_seconds": 0.0,
+      "phase_wall_seconds_sum": 65.75981645900174,
+      "usage": {
+        "input_tokens": 360397,
+        "cached_input_tokens": 302848,
+        "output_tokens": 1762
+      },
+      "quality_review": {
+        "accepted": true,
+        "issues": []
+      },
+      "changed": [],
+      "ok": true,
+      "id": "holdout-impact/r02-baseline",
+      "answer": "Debes revisar:\n\n- **Productor:** [routing-planner](20-Repos/routing/routing-planner.md:27), que publica `route-events`.\n- **Consumidor:** [fleet-ingest](20-Repos/fleet/fleet-ingest.md:27), que consume esos eventos para actualizar asignaciones de vehículos.\n\nAmbos participan en [Flujo - Dispatch](<30-Flujos/Flujo - Dispatch.md:10>).\n\n**No puedes asegurar con estas notas que la operación actual quedará sin impacto.** Documentan la relación, pero no prueban compatibilidad del cambio ni comportamiento actual. Los análisis están fechados el **2026-08-01**; además, el productor conserva un [contrato pendiente y cobertura de datos por confirmar](20-Repos/routing/routing-planner.md:15). Haría falta evidencia del contrato modificado, las versiones desplegadas y su funcionamiento conjunto; aquí no se verificó.",
+      "phases": [
+        {
+          "phase": "parent",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 33.83884024999861,
+          "usage": {
+            "input_tokens": 184774,
+            "cached_input_tokens": 146944,
+            "output_tokens": 1006
+          },
+          "requested_model": "gpt-5.6-sol",
+          "requested_effort": "medium",
+          "effective_model": null,
+          "effective_effort": null,
+          "effective_configuration_verified": false,
+          "answer": "Debes revisar:\n\n- **Productor:** [routing-planner](20-Repos/routing/routing-planner.md:27), que publica `route-events`.\n- **Consumidor:** [fleet-ingest](20-Repos/fleet/fleet-ingest.md:27), que consume esos eventos para actualizar asignaciones de vehículos.\n\nAmbos participan en [Flujo - Dispatch](<30-Flujos/Flujo - Dispatch.md:10>).\n\n**No puedes asegurar con estas notas que la operación actual quedará sin impacto.** Documentan la relación, pero no prueban compatibilidad del cambio ni comportamiento actual. Los análisis están fechados el **2026-08-01**; además, el productor conserva un [contrato pendiente y cobertura de datos por confirmar](20-Repos/routing/routing-planner.md:15). Haría falta evidencia del contrato modificado, las versiones desplegadas y su funcionamiento conjunto; aquí no se verificó.",
+          "events_sha256": "3c5979e7366b8bda8b700e04ae8f1bec7c61dbe000824e309a83846fd12a469f",
+          "prompt_sha256": "9a9bac7b2c947e7bb1b69bdb3ac08afefd2d8d70e57634f3a4517020ec1c23ed",
+          "commands": [
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-impact/r02-baseline/bin:$PATH\" python3 90-Meta/resolve-vault.py'",
+              "exit": 0,
+              "output_sha256": "3652a8534dc38048acd84212ac3882904909dba97e8d075508632929afcb1c4c"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-impact/r02-baseline/bin:$PATH\" sh -c '\"'if [ -f AGENTS.personal.md ]; then cat AGENTS.personal.md; fi; cat .agents/skills/map-ecosystem/SKILL.md'\"",
+              "exit": 0,
+              "output_sha256": "9ded4db2d91372bed05f2313dba2614c8c0b0686de7c8fb15dd12150483dbc9c"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-impact/r02-baseline/bin:$PATH\" cat .agents/skills/map-ecosystem/references/interrogation.md 90-Meta/response-quality.md 90-Meta/vault-resolution.md'",
+              "exit": 0,
+              "output_sha256": "10bff5328c480fa9863a72f9681ced2bc5efb03c0d1aa28e655c699af516b625"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-impact/r02-baseline/bin:$PATH\" python3 90-Meta/graph-query.py --help'",
+              "exit": 0,
+              "output_sha256": "64c7a9093f4de75e18f39d1b54e498cacdcd2c1fd74d36452d32d8e5aa725dca"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-impact/r02-baseline/bin:$PATH\" python3 -B 90-Meta/graph-query.py --root \"$PWD\" neighbors --node route-events'",
+              "exit": 0,
+              "output_sha256": "eeb7d97cb8a79ffe791dafe4fa8c4b3e649343102bd4dde30568ff0b133cd5bc"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-impact/r02-baseline/bin:$PATH\" cat .agents/skills/evidence-driven-analysis/SKILL.md'",
+              "exit": 0,
+              "output_sha256": "8375213eb2e72382e70349fa3d5c896512f9deab1411cb30cedbb699600a669c"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-impact/r02-baseline/bin:$PATH\" sh -c '\"'nl -ba 25-Topics/route-events.md; nl -ba 20-Repos/routing-planner.md; nl -ba 20-Repos/fleet-ingest.md; nl -ba \\\"30-Flujos/Flujo - Dispatch.md\\\"; cat .agents/skills/evidence-driven-analysis/references/audit.md'\"",
+              "exit": 0,
+              "output_sha256": "f4c4dc853678b6e850d9468a6068eec0dd84aa18735721be8be86a10edafa89d"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-impact/r02-baseline/bin:$PATH\" python3 -B 90-Meta/graph-query.py --root \"$PWD\" neighbors --node routing-planner'",
+              "exit": 0,
+              "output_sha256": "1cf5fd88b9f0cce1b92ad938dbc083fca3a22a1e2c94bd51f15e87b575a6d871"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-impact/r02-baseline/bin:$PATH\" python3 -B 90-Meta/graph-query.py --root \"$PWD\" neighbors --node fleet-ingest'",
+              "exit": 0,
+              "output_sha256": "b531c271ebc95fbe38d15db8404e58e733bbc4c135ca24edb849701210f374db"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-impact/r02-baseline/bin:$PATH\" sh -c '\"'nl -ba 20-Repos/routing/routing-planner.md; nl -ba 20-Repos/fleet/fleet-ingest.md'\"",
+              "exit": 0,
+              "output_sha256": "fe4af7ba36a03cf1a9222f68f15f1b9d8cf8a7e5cc15c91be25c2dca5e8d3535"
+            }
+          ]
+        },
+        {
+          "phase": "review",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 31.92097620900313,
+          "usage": {
+            "input_tokens": 175623,
+            "cached_input_tokens": 155904,
+            "output_tokens": 756
+          },
+          "requested_model": "gpt-5.6-sol",
+          "requested_effort": "medium",
+          "effective_model": null,
+          "effective_effort": null,
+          "effective_configuration_verified": false,
+          "answer": "{\"accepted\":true,\"issues\":[]}",
+          "events_sha256": "06a72c23ff73ca12f464314df5cf252dd7e1cae337d43202250738ccdd8a7689",
+          "prompt_sha256": "43a73abbb711c6b47babe2cb849f62166f17ec0a7de63c43df5e45863554133a",
+          "commands": [
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-impact/r02-baseline/bin:$PATH\" pwd;'",
+              "exit": 0,
+              "output_sha256": "388910735b7f249b83e39081dd227a2c7dc251cb319028edde484fe2a7ec82cc"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-impact/r02-baseline/bin:$PATH\" rg --files -g AGENTS.personal.md -g AGENTS.md -g response-quality.md -g SKILL.md -g resolve-vault.py'",
+              "exit": 0,
+              "output_sha256": "5869f7a2667605bbda6db59bf8a6b327f2a589bb1b442b6cc6d5d94ab6ce5365"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-impact/r02-baseline/bin:$PATH\" if [ -f AGENTS.personal.md ]; then cat AGENTS.personal.md; fi\nPATH=\"${CAMPAIGN}/workers/holdout-impact/r02-baseline/bin:$PATH\" python3 90-Meta/resolve-vault.py'",
+              "exit": 1,
+              "output_sha256": "778150be7bd0a61441b4d67fad1448ebf167934934d24443cb3eba6db9661d93"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-impact/r02-baseline/bin:$PATH\" cat .agents/skills/map-ecosystem/SKILL.md 90-Meta/response-quality.md'",
+              "exit": 0,
+              "output_sha256": "77b9de910e11c6dd687e76f5de36d776e037356a2a862d6f85a6b84156431647"
+            },
+            {
+              "command": "/bin/zsh -lc 'export PATH=\"${CAMPAIGN}/workers/holdout-impact/r02-baseline/bin:$PATH\"\nif [ -f AGENTS.personal.md ]; then cat AGENTS.personal.md; fi\ncat 90-Meta/vault-resolution.md\npython3 90-Meta/resolve-vault.py'",
+              "exit": 0,
+              "output_sha256": "3652a8534dc38048acd84212ac3882904909dba97e8d075508632929afcb1c4c"
+            },
+            {
+              "command": "/bin/zsh -lc 'export PATH=\"${CAMPAIGN}/workers/holdout-impact/r02-baseline/bin:$PATH\"\ncat .agents/skills/map-ecosystem/references/interrogation.md\nnl -ba 20-Repos/routing/routing-planner.md\nnl -ba 20-Repos/fleet/fleet-ingest.md\nnl -ba \"30-Flujos/Flujo - Dispatch.md\"'",
+              "exit": 0,
+              "output_sha256": "78afaad71439b162b10e902ee2455f91877640ef6864489928cd2d2a05a2cd83"
+            },
+            {
+              "command": "/bin/zsh -lc 'export PATH=\"${CAMPAIGN}/workers/holdout-impact/r02-baseline/bin:$PATH\"\ncat .agents/skills/evidence-driven-analysis/SKILL.md\nrg --files 25-Topics\npython3 -B 90-Meta/graph-query.py --root \"$PWD\" neighbors --node route-events'",
+              "exit": 0,
+              "output_sha256": "ac7b825a125386ad4d702c9016569c8c49dd93f2a13a9d54a0631a70634018fd"
+            },
+            {
+              "command": "/bin/zsh -lc 'export PATH=\"${CAMPAIGN}/workers/holdout-impact/r02-baseline/bin:$PATH\"\nnl -ba 25-Topics/route-events.md\ncat .agents/skills/evidence-driven-analysis/references/audit.md'",
+              "exit": 0,
+              "output_sha256": "c0c63562099adc58da16d14306970bced349297e3bf54f7236906a56fde330cb"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case": "holdout-known",
+      "repetition": 3,
+      "variant": "baseline",
+      "wall_seconds": 84.14813758300443,
+      "setup_seconds": 0.33047320900368504,
+      "children_wall_seconds": 0.0,
+      "phase_wall_seconds_sum": 84.14160891600477,
+      "usage": {
+        "input_tokens": 402452,
+        "cached_input_tokens": 359936,
+        "output_tokens": 1581
+      },
+      "quality_review": {
+        "accepted": true,
+        "issues": []
+      },
+      "changed": [],
+      "ok": true,
+      "id": "holdout-known/r03-baseline",
+      "answer": "Según [fleet-ui.md](${CAMPAIGN}/workers/holdout-known/r03-baseline/vault/20-Repos/fleet/fleet-ui.md), **consulta el estado de asignaciones en `fleet-ingest`**.\n\n**Su vigencia documental no está acreditada**: las cinco coberturas figuran `por-confirmar`, las fechas son `1970-01-01` y el commit registrado es `000000000000`. El inventario oficial tampoco pudo comprobarla: falló porque falta `sources.github_org`.",
+      "phases": [
+        {
+          "phase": "parent",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 55.037909332997515,
+          "usage": {
+            "input_tokens": 250811,
+            "cached_input_tokens": 228736,
+            "output_tokens": 1032
+          },
+          "requested_model": "gpt-5.6-sol",
+          "requested_effort": "medium",
+          "effective_model": null,
+          "effective_effort": null,
+          "effective_configuration_verified": false,
+          "answer": "Según [fleet-ui.md](${CAMPAIGN}/workers/holdout-known/r03-baseline/vault/20-Repos/fleet/fleet-ui.md), **consulta el estado de asignaciones en `fleet-ingest`**.\n\n**Su vigencia documental no está acreditada**: las cinco coberturas figuran `por-confirmar`, las fechas son `1970-01-01` y el commit registrado es `000000000000`. El inventario oficial tampoco pudo comprobarla: falló porque falta `sources.github_org`.",
+          "events_sha256": "fc322ee6942f79f47999da2dbe59bed98daff9988e768e8591a87f4617a8631a",
+          "prompt_sha256": "e53fba2fb3211b245cba63fdab2495a3d604d486d6b5c5c39edc0fe992df3e50",
+          "commands": [
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-known/r03-baseline/bin:$PATH\" ; if [ -f AGENTS.personal.md ]; then cat AGENTS.personal.md; fi\nPATH=\"${CAMPAIGN}/workers/holdout-known/r03-baseline/bin:$PATH\" python3 90-Meta/resolve-vault.py --path 20-Repos/fleet/fleet-ui.md'",
+              "exit": 0,
+              "output_sha256": "77cce4a8685426e57bcc7fc4280ec9595e29c2a81a52a3069cd0fc53a3d9efde"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-known/r03-baseline/bin:$PATH\" cat .agents/skills/map-ecosystem/SKILL.md'",
+              "exit": 0,
+              "output_sha256": "9ded4db2d91372bed05f2313dba2614c8c0b0686de7c8fb15dd12150483dbc9c"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-known/r03-baseline/bin:$PATH\" cat 90-Meta/vault-resolution.md .agents/skills/map-ecosystem/references/interrogation.md 90-Meta/response-quality.md 20-Repos/fleet/fleet-ui.md'",
+              "exit": 0,
+              "output_sha256": "16f126bc8c614e26fc45f865b2d6b95c86a4bf3fe02f49c255c92cb09fe28fec"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-known/r03-baseline/bin:$PATH\" cat .agents/skills/evidence-driven-analysis/SKILL.md .agents/skills/map-ecosystem/references/mapping-completion.md'",
+              "exit": 0,
+              "output_sha256": "1795458867e0c2bccb3ca6892abf0c45176fd570581f4e6b55f94356d4b90562"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-known/r03-baseline/bin:$PATH\" rg -n \"coverage|cobertura|status\" 90-Meta/coverage* 00-Home.md 90-Meta/*state*.py'",
+              "exit": 1,
+              "output_sha256": "0b6c250cda25c6cd0ed5d8fcd47dcc625dfc0747a25fc12dda377c9836d778f7"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-known/r03-baseline/bin:$PATH\" rg -n \"coverage|cobertura|status\" 00-Home.md .agents/skills/map-ecosystem/references/vault-synchronization.md\nPATH=\"${CAMPAIGN}/workers/holdout-known/r03-baseline/bin:$PATH\" rg --files 90-Meta | rg \"sync|coverage|inventory\"'",
+              "exit": 0,
+              "output_sha256": "26358c2d7a3977c3adf190adb5ba8f8523764a41a87a1bd3868d8a596e6c1267"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-known/r03-baseline/bin:$PATH\" python3 -B 90-Meta/vault-inventory.py --help'",
+              "exit": 0,
+              "output_sha256": "9ecc7be806a456b5b972fe5f9cc60fc114a87c88e3ea369a90c1a864a4f67508"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-known/r03-baseline/bin:$PATH\" python3 -B 90-Meta/vault-inventory.py --repo fleet-ui --format json'",
+              "exit": 2,
+              "output_sha256": "968b9309c7f98ceafc18d338aa8c22ad5625e76ab3e5a25cd1f4b39d8e27a834"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-known/r03-baseline/bin:$PATH\" rg -n \"fleet-ui|cobertura|coverage\" 90-Meta --glob \"*.md\" --glob \"*.yaml\" --glob \"*.json\"\nPATH=\"${CAMPAIGN}/workers/holdout-known/r03-baseline/bin:$PATH\" cat 00-Home.md'",
+              "exit": 0,
+              "output_sha256": "0870611ab4691b11c288a4eafd9a19de6dc55e0061b25930e6a8fb1de0f3c0bf"
+            }
+          ]
+        },
+        {
+          "phase": "review",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 29.103699583007256,
+          "usage": {
+            "input_tokens": 151641,
+            "cached_input_tokens": 131200,
+            "output_tokens": 549
+          },
+          "requested_model": "gpt-5.6-sol",
+          "requested_effort": "medium",
+          "effective_model": null,
+          "effective_effort": null,
+          "effective_configuration_verified": false,
+          "answer": "{\"accepted\":true,\"issues\":[]}",
+          "events_sha256": "617b4e0e87f7dc582c86bd32746d656ce7362e43adf132c72898078dec242573",
+          "prompt_sha256": "decdd6548ed69fd2a86fd57f3d44c002afa5b00f01692de076547ec9f1a7acd7",
+          "commands": [
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-known/r03-baseline/bin:$PATH\" ; pwd; rg --files -g \"AGENTS.personal.md\" -g \"AGENTS.md\" -g \"response-quality.md\" -g \"SKILL.md\" -g \"fleet-ui.md\" -g \"resolve-vault.py\"'",
+              "exit": 0,
+              "output_sha256": "5f2054602c89ebf8466c15e4ac8149e5f4c4c4701eca24a36cc27e856a51ffd1"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-known/r03-baseline/bin:$PATH\" ; if [ -f AGENTS.personal.md ]; then cat AGENTS.personal.md; fi; cat .agents/skills/map-ecosystem/SKILL.md; cat 90-Meta/response-quality.md; python3 90-Meta/resolve-vault.py --path 20-Repos/fleet/fleet-ui.md'",
+              "exit": 0,
+              "output_sha256": "77cce4a8685426e57bcc7fc4280ec9595e29c2a81a52a3069cd0fc53a3d9efde"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-known/r03-baseline/bin:$PATH\" ; cat 20-Repos/fleet/fleet-ui.md; cat .agents/skills/map-ecosystem/references/interrogation.md; cat 90-Meta/vault-resolution.md; rg -n \"sources.github_org|inventory|inventario\" 90-Meta/*.py instance.yaml'",
+              "exit": 0,
+              "output_sha256": "2193b794b21ba1962ae9202c0dedc8c0337d5fc9c8a07796d4c2e5429d389fb8"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-known/r03-baseline/bin:$PATH\" ; cat .agents/skills/evidence-driven-analysis/SKILL.md; cat .agents/skills/map-ecosystem/references/mapping-completion.md; sed -n '\"'690,730p' 90-Meta/vault-inventory.py; cat instance.yaml\"",
+              "exit": 0,
+              "output_sha256": "6a9750f689e21f3c3b3c69e7f37a2d6d94a9f4e3d43380d302baf05894e3a6dc"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-known/r03-baseline/bin:$PATH\" python3 -B 90-Meta/vault-inventory.py --repo fleet-ui --format json'",
+              "exit": 2,
+              "output_sha256": "968b9309c7f98ceafc18d338aa8c22ad5625e76ab3e5a25cd1f4b39d8e27a834"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case": "holdout-known",
+      "repetition": 3,
+      "variant": "alternative",
+      "wall_seconds": 55.012358874999336,
+      "setup_seconds": 0.2780913330061594,
+      "children_wall_seconds": 0.0,
+      "phase_wall_seconds_sum": 55.00725599900761,
+      "usage": {
+        "input_tokens": 259069,
+        "cached_input_tokens": 215680,
+        "output_tokens": 1070
+      },
+      "quality_review": {
+        "accepted": true,
+        "issues": []
+      },
+      "changed": [],
+      "ok": true,
+      "id": "holdout-known/r03-alternative",
+      "answer": "fleet-ui consulta el **estado de asignaciones de fleet-ingest**. Su cobertura documental **no está acreditada como vigente**: las cinco coberturas figuran `por-confirmar`, las fechas son `1970-01-01` y el commit analizado es `000000000000`.\n\nFuente: [fleet-ui.md, líneas 13–27](${CAMPAIGN}/workers/holdout-known/r03-alternative/vault/20-Repos/fleet/fleet-ui.md:13).",
+      "phases": [
+        {
+          "phase": "parent",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 33.687145083007636,
+          "usage": {
+            "input_tokens": 172098,
+            "cached_input_tokens": 140544,
+            "output_tokens": 795
+          },
+          "requested_model": "gpt-5.6-sol",
+          "requested_effort": "medium",
+          "effective_model": null,
+          "effective_effort": null,
+          "effective_configuration_verified": false,
+          "answer": "fleet-ui consulta el **estado de asignaciones de fleet-ingest**. Su cobertura documental **no está acreditada como vigente**: las cinco coberturas figuran `por-confirmar`, las fechas son `1970-01-01` y el commit analizado es `000000000000`.\n\nFuente: [fleet-ui.md, líneas 13–27](${CAMPAIGN}/workers/holdout-known/r03-alternative/vault/20-Repos/fleet/fleet-ui.md:13).",
+          "events_sha256": "2aad7551af65b2951b755271aace3abd9a5aefcd128e7143fcf2f6cead4eb21f",
+          "prompt_sha256": "0208819b31691a8a873083c07ffb1bade30546b29205c9c7c40a0417881e0590",
+          "commands": [
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-known/r03-alternative/bin:$PATH\" pwd;'",
+              "exit": 0,
+              "output_sha256": "fa3b7556d1b688de899c47e832932b6590fa62d1606aa6d190e78de3aaf4cdb5"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-known/r03-alternative/bin:$PATH\" rg --files -g \"AGENTS.personal.md\" -g \"AGENTS.md\" -g \"SKILL.md\" -g \"resolve-vault.py\" -g \"response-quality.md\" -g \"execution-profiles.md\"'",
+              "exit": 0,
+              "output_sha256": "c4b62a049091aef56d80ebc683b4de118602c255144923d954929167bbd6c890"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-known/r03-alternative/bin:$PATH\" if [ -f AGENTS.personal.md ]; then cat AGENTS.personal.md; fi\ncat .agents/skills/map-ecosystem/SKILL.md\npython3 90-Meta/resolve-vault.py --path 20-Repos/fleet/fleet-ui.md'",
+              "exit": 1,
+              "output_sha256": "778150be7bd0a61441b4d67fad1448ebf167934934d24443cb3eba6db9661d93"
+            },
+            {
+              "command": "/bin/zsh -lc 'export PATH=\"${CAMPAIGN}/workers/holdout-known/r03-alternative/bin:$PATH\"\nif [ -f AGENTS.personal.md ]; then cat AGENTS.personal.md; fi\ncat .agents/skills/map-ecosystem/SKILL.md\npython3 90-Meta/resolve-vault.py --path 20-Repos/fleet/fleet-ui.md'",
+              "exit": 0,
+              "output_sha256": "1f1dba080fccc08976dc8b9a96442777b3852d1d3ffe4be67cf84ef9e9483b4e"
+            },
+            {
+              "command": "/bin/zsh -lc 'export PATH=\"${CAMPAIGN}/workers/holdout-known/r03-alternative/bin:$PATH\"\ncat 90-Meta/vault-resolution.md 90-Meta/response-quality.md 90-Meta/execution-profiles.md .agents/skills/map-ecosystem/references/interrogation.md\npython3 90-Meta/graph-query.py --help'",
+              "exit": 0,
+              "output_sha256": "4cdd33bf72f4751bac7b8dbdf5f0deead01be3387ed1f74669839aa4af117bb7"
+            },
+            {
+              "command": "/bin/zsh -lc 'export PATH=\"${CAMPAIGN}/workers/holdout-known/r03-alternative/bin:$PATH\"\ncat .agents/skills/evidence-driven-analysis/SKILL.md .agents/skills/map-ecosystem/references/mapping-completion.md\npython3 -B 90-Meta/graph-query.py --root \"$PWD\" neighbors --node fleet-ui'",
+              "exit": 0,
+              "output_sha256": "1c677a8103e9709cfcdd4990cff186b6101252aae15e9df1890b97a6354341b4"
+            },
+            {
+              "command": "/bin/zsh -lc 'export PATH=\"${CAMPAIGN}/workers/holdout-known/r03-alternative/bin:$PATH\"\nnl -ba 20-Repos/fleet/fleet-ui.md'",
+              "exit": 0,
+              "output_sha256": "92069c090d5255f4da03ccfbef46fb0d307d661e63df6c8f031448e1f3b7fa67"
+            }
+          ]
+        },
+        {
+          "phase": "review",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 21.320110915999976,
+          "usage": {
+            "input_tokens": 86971,
+            "cached_input_tokens": 75136,
+            "output_tokens": 275
+          },
+          "requested_model": "gpt-5.6-sol",
+          "requested_effort": "medium",
+          "effective_model": null,
+          "effective_effort": null,
+          "effective_configuration_verified": false,
+          "answer": "{\"accepted\":true,\"issues\":[]}",
+          "events_sha256": "068e2c5ffb12cb45d6518aeaaa2cb2e06366727700a388cd4e1399e714403926",
+          "prompt_sha256": "236442d6ea8100a5a487e9f18f96d02566ff585c828102c656c57ab356842905",
+          "commands": [
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-known/r03-alternative/bin:$PATH\" pwd; PATH=\"${CAMPAIGN}/workers/holdout-known/r03-alternative/bin:$PATH\" cat AGENTS.personal.md 90-Meta/response-quality.md .agents/skills/evidence-driven-analysis/SKILL.md'",
+              "exit": 1,
+              "output_sha256": "72fda59e3899ab4fbac7640e53858f9a7bf68dd20acf534b00fef3e7fa276541"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-known/r03-alternative/bin:$PATH\" python3 90-Meta/resolve-vault.py --path 20-Repos/fleet/fleet-ui.md'",
+              "exit": 0,
+              "output_sha256": "1f1dba080fccc08976dc8b9a96442777b3852d1d3ffe4be67cf84ef9e9483b4e"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-known/r03-alternative/bin:$PATH\" nl -ba 20-Repos/fleet/fleet-ui.md'",
+              "exit": 0,
+              "output_sha256": "92069c090d5255f4da03ccfbef46fb0d307d661e63df6c8f031448e1f3b7fa67"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case": "holdout-impact",
+      "repetition": 3,
+      "variant": "baseline",
+      "wall_seconds": 70.94131041699438,
+      "setup_seconds": 0.33054820899269544,
+      "children_wall_seconds": 0.0,
+      "phase_wall_seconds_sum": 70.93407987500541,
+      "usage": {
+        "input_tokens": 318364,
+        "cached_input_tokens": 279296,
+        "output_tokens": 1876
+      },
+      "quality_review": {
+        "accepted": true,
+        "issues": []
+      },
+      "changed": [],
+      "ok": true,
+      "id": "holdout-impact/r03-baseline",
+      "answer": "Debes revisar al productor **[routing-planner](20-Repos/routing/routing-planner.md:27)**, que publica `route-events`, y al consumidor **[fleet-ingest](20-Repos/fleet/fleet-ingest.md:27)**, que lo consume para actualizar asignaciones de vehículos. Ambos participan en **[Flujo - Dispatch](<30-Flujos/Flujo - Dispatch.md:10>)**.\n\n**Estas notas no permiten asegurar que la operación actual quedará intacta.** Documentan la relación, pero no demuestran compatibilidad del cambio ni ejecución actual. Los análisis están fechados el 1 de agosto de 2026; además, el productor mantiene un [contrato pendiente de resolver](20-Repos/routing/routing-planner.md:29). La ausencia de impacto requeriría evidencia del contrato cambiado, las versiones desplegadas y pruebas del flujo; aquí no se verificaron.",
+      "phases": [
+        {
+          "phase": "parent",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 43.73536350000359,
+          "usage": {
+            "input_tokens": 178011,
+            "cached_input_tokens": 157952,
+            "output_tokens": 1224
+          },
+          "requested_model": "gpt-5.6-sol",
+          "requested_effort": "medium",
+          "effective_model": null,
+          "effective_effort": null,
+          "effective_configuration_verified": false,
+          "answer": "Debes revisar al productor **[routing-planner](20-Repos/routing/routing-planner.md:27)**, que publica `route-events`, y al consumidor **[fleet-ingest](20-Repos/fleet/fleet-ingest.md:27)**, que lo consume para actualizar asignaciones de vehículos. Ambos participan en **[Flujo - Dispatch](<30-Flujos/Flujo - Dispatch.md:10>)**.\n\n**Estas notas no permiten asegurar que la operación actual quedará intacta.** Documentan la relación, pero no demuestran compatibilidad del cambio ni ejecución actual. Los análisis están fechados el 1 de agosto de 2026; además, el productor mantiene un [contrato pendiente de resolver](20-Repos/routing/routing-planner.md:29). La ausencia de impacto requeriría evidencia del contrato cambiado, las versiones desplegadas y pruebas del flujo; aquí no se verificaron.",
+          "events_sha256": "d73c8b66acf8749f7542a4db35457af4f2c9e9f01a8aadfc1bdd132c7c7a8a6c",
+          "prompt_sha256": "db1e9d98965b851862a89426dbeed45046d071ec1a92291e1d5f3d287327f60a",
+          "commands": [
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-impact/r03-baseline/bin:$PATH\" pwd; PATH=\"${CAMPAIGN}/workers/holdout-impact/r03-baseline/bin:$PATH\" rg --files -g \"AGENTS.personal.md\" -g \"AGENTS.md\" -g \"resolve-vault.py\" -g \"SKILL.md\" -g \"response-quality.md\" -g \"execution-profiles.md\"'",
+              "exit": 0,
+              "output_sha256": "d88dd635654b823d61d9974ec5862532f6bc130c835858d83d2fe8619eed5332"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-impact/r03-baseline/bin:$PATH\" python 90-Meta/resolve-vault.py'",
+              "exit": 127,
+              "output_sha256": "5e4e795afaf7b2ac3694348801079911c9a51af17a801a9a9ee5368403a2d58a"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-impact/r03-baseline/bin:$PATH\" cat .agents/skills/map-ecosystem/SKILL.md 90-Meta/response-quality.md; if [ -f AGENTS.personal.md ]; then cat AGENTS.personal.md; fi'",
+              "exit": 0,
+              "output_sha256": "77b9de910e11c6dd687e76f5de36d776e037356a2a862d6f85a6b84156431647"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-impact/r03-baseline/bin:$PATH\" cat 90-Meta/vault-resolution.md .agents/skills/map-ecosystem/references/interrogation.md .agents/skills/map-ecosystem/references/orientation.md'",
+              "exit": 0,
+              "output_sha256": "4c86ec061cf7a21e73870e33aaecb99c4cc08980ab6a8c2ca1e848e58eaf105a"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-impact/r03-baseline/bin:$PATH\" python3 90-Meta/resolve-vault.py'",
+              "exit": 0,
+              "output_sha256": "ba3ad15fe121474cc13d301ad48ccc66122c99e6c9aa25678e9c57206a0fa7c7"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-impact/r03-baseline/bin:$PATH\" cat .agents/skills/evidence-driven-analysis/SKILL.md'",
+              "exit": 0,
+              "output_sha256": "8375213eb2e72382e70349fa3d5c896512f9deab1411cb30cedbb699600a669c"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-impact/r03-baseline/bin:$PATH\" python3 -B 90-Meta/graph-query.py --root \"${CAMPAIGN}/workers/holdout-impact/r03-baseline/vault\" neighbors --node \"route-events\"'",
+              "exit": 0,
+              "output_sha256": "eeb7d97cb8a79ffe791dafe4fa8c4b3e649343102bd4dde30568ff0b133cd5bc"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-impact/r03-baseline/bin:$PATH\" rg --files 20-Repos 30-Flujos 25-Topics; PATH=\"${CAMPAIGN}/workers/holdout-impact/r03-baseline/bin:$PATH\" cat .agents/skills/evidence-driven-analysis/references/audit.md'",
+              "exit": 0,
+              "output_sha256": "20b0e98959a48175ee7a8332c59ae2e54a31df588bc1ab51a0994aa6e02c950c"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-impact/r03-baseline/bin:$PATH\" nl -ba 25-Topics/route-events.md; PATH=\"${CAMPAIGN}/workers/holdout-impact/r03-baseline/bin:$PATH\" nl -ba 20-Repos/routing-planner.md; PATH=\"${CAMPAIGN}/workers/holdout-impact/r03-baseline/bin:$PATH\" nl -ba 20-Repos/fleet-ingest.md; PATH=\"${CAMPAIGN}/workers/holdout-impact/r03-baseline/bin:$PATH\" nl -ba \"30-Flujos/Flujo - Dispatch.md\"'",
+              "exit": 0,
+              "output_sha256": "44691e61cebdcf47289f445931e6cacc9c83aabf67449df8fe961977ab821a9e"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-impact/r03-baseline/bin:$PATH\" nl -ba 20-Repos/routing/routing-planner.md; PATH=\"${CAMPAIGN}/workers/holdout-impact/r03-baseline/bin:$PATH\" nl -ba 20-Repos/fleet/fleet-ingest.md'",
+              "exit": 0,
+              "output_sha256": "fe4af7ba36a03cf1a9222f68f15f1b9d8cf8a7e5cc15c91be25c2dca5e8d3535"
+            }
+          ]
+        },
+        {
+          "phase": "review",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 27.198716375001823,
+          "usage": {
+            "input_tokens": 140353,
+            "cached_input_tokens": 121344,
+            "output_tokens": 652
+          },
+          "requested_model": "gpt-5.6-sol",
+          "requested_effort": "medium",
+          "effective_model": null,
+          "effective_effort": null,
+          "effective_configuration_verified": false,
+          "answer": "{\"accepted\":true,\"issues\":[]}",
+          "events_sha256": "3e5a26cb97050086fc10d1be619510229e626a5894e0dbd141be8f72981f83e1",
+          "prompt_sha256": "25a57079a956aecbfd208aaaa2aeda13cbb3ee5eac594d96cc316628cdd147ad",
+          "commands": [
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-impact/r03-baseline/bin:$PATH\" pwd;'",
+              "exit": 0,
+              "output_sha256": "b0bf89a5c82e200a825a40dd01e8bf5b85160b5918764aac3afe29f93a2c9d6a"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-impact/r03-baseline/bin:$PATH\" rg --files -g AGENTS.personal.md -g AGENTS.md -g response-quality.md -g SKILL.md -g resolve-vault.py'",
+              "exit": 0,
+              "output_sha256": "5869f7a2667605bbda6db59bf8a6b327f2a589bb1b442b6cc6d5d94ab6ce5365"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-impact/r03-baseline/bin:$PATH\" if test -f AGENTS.personal.md; then cat AGENTS.personal.md; fi\ncat .agents/skills/map-ecosystem/SKILL.md\npython3 90-Meta/resolve-vault.py\ncat 90-Meta/response-quality.md'",
+              "exit": 1,
+              "output_sha256": "778150be7bd0a61441b4d67fad1448ebf167934934d24443cb3eba6db9661d93"
+            },
+            {
+              "command": "/bin/zsh -lc 'export PATH=\"${CAMPAIGN}/workers/holdout-impact/r03-baseline/bin:$PATH\"\nif test -f AGENTS.personal.md; then cat AGENTS.personal.md; fi\ncat .agents/skills/map-ecosystem/SKILL.md\npython3 90-Meta/resolve-vault.py\ncat 90-Meta/response-quality.md'",
+              "exit": 0,
+              "output_sha256": "d8ee3e3617f2426069436d322b284f6153f0ad7bb9d975723eb9c0a653b58931"
+            },
+            {
+              "command": "/bin/zsh -lc 'export PATH=\"${CAMPAIGN}/workers/holdout-impact/r03-baseline/bin:$PATH\"\ncat 90-Meta/vault-resolution.md\ncat .agents/skills/map-ecosystem/references/interrogation.md\nnl -ba 20-Repos/routing/routing-planner.md\nnl -ba 20-Repos/fleet/fleet-ingest.md\nnl -ba \"30-Flujos/Flujo - Dispatch.md\"\nrg --files 25-Topics'",
+              "exit": 0,
+              "output_sha256": "e891957ed65fe74b9d06f6d1cafec396b52c89b86aaab0d698599ee631b2ba3c"
+            },
+            {
+              "command": "/bin/zsh -lc 'export PATH=\"${CAMPAIGN}/workers/holdout-impact/r03-baseline/bin:$PATH\"\ncat .agents/skills/evidence-driven-analysis/SKILL.md\nnl -ba 25-Topics/route-events.md\npython3 -B 90-Meta/graph-query.py --root \"$PWD\" neighbors --node route-events'",
+              "exit": 0,
+              "output_sha256": "846f3b05ef2feba7c267a16364e28f72082ee2d649d055316cdde3455a7d6506"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case": "holdout-impact",
+      "repetition": 3,
+      "variant": "alternative",
+      "wall_seconds": 73.08528991699859,
+      "setup_seconds": 0.29798016700078733,
+      "children_wall_seconds": 0.0,
+      "phase_wall_seconds_sum": 73.07430954101437,
+      "usage": {
+        "input_tokens": 318451,
+        "cached_input_tokens": 278528,
+        "output_tokens": 1930
+      },
+      "quality_review": {
+        "accepted": true,
+        "issues": []
+      },
+      "changed": [],
+      "ok": true,
+      "id": "holdout-impact/r03-alternative",
+      "answer": "Debes revisar:\n\n- **Productor: `routing-planner`**, que construye planes de despacho y publica en `route-events` ([nota, línea 27](20-Repos/routing/routing-planner.md:27)).\n- **Consumidor: `fleet-ingest`**, que consume esos eventos para actualizar asignaciones de vehículos ([nota, línea 27](20-Repos/fleet/fleet-ingest.md:27)).\n\nLa [nota del topic](25-Topics/route-events.md:9) confirma ambas relaciones, y el [Flujo - Dispatch](30-Flujos/Flujo%20-%20Dispatch.md:10) reúne los tres participantes.\n\n**No puedes asegurar con estas notas que la operación actual no se verá afectada.** Documentan relaciones, pero no acreditan compatibilidad del cambio ni ejecución actual. Los análisis de ambos componentes datan del **1 de agosto de 2026**; además, el productor conserva un [contrato pendiente mediante `MissingNode`](20-Repos/routing/routing-planner.md:29). Falta evidencia del cambio concreto, del despliegue vigente y de su resultado funcional. Esto limita la garantía; no demuestra que habrá una afectación.",
+      "phases": [
+        {
+          "phase": "parent",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 39.86050645800424,
+          "usage": {
+            "input_tokens": 172962,
+            "cached_input_tokens": 152064,
+            "output_tokens": 1136
+          },
+          "requested_model": "gpt-5.6-sol",
+          "requested_effort": "medium",
+          "effective_model": null,
+          "effective_effort": null,
+          "effective_configuration_verified": false,
+          "answer": "Debes revisar:\n\n- **Productor: `routing-planner`**, que construye planes de despacho y publica en `route-events` ([nota, línea 27](20-Repos/routing/routing-planner.md:27)).\n- **Consumidor: `fleet-ingest`**, que consume esos eventos para actualizar asignaciones de vehículos ([nota, línea 27](20-Repos/fleet/fleet-ingest.md:27)).\n\nLa [nota del topic](25-Topics/route-events.md:9) confirma ambas relaciones, y el [Flujo - Dispatch](30-Flujos/Flujo%20-%20Dispatch.md:10) reúne los tres participantes.\n\n**No puedes asegurar con estas notas que la operación actual no se verá afectada.** Documentan relaciones, pero no acreditan compatibilidad del cambio ni ejecución actual. Los análisis de ambos componentes datan del **1 de agosto de 2026**; además, el productor conserva un [contrato pendiente mediante `MissingNode`](20-Repos/routing/routing-planner.md:29). Falta evidencia del cambio concreto, del despliegue vigente y de su resultado funcional. Esto limita la garantía; no demuestra que habrá una afectación.",
+          "events_sha256": "4a4a91b5ba48e6bcde73b2edd6fbbbb7fdad042846cf718bfd95b0e51d49ef56",
+          "prompt_sha256": "b18a7eaffe890c45af3a69e379960b44c4fd022b20429433184bee6bfb36bbac",
+          "commands": [
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-impact/r03-alternative/bin:$PATH\" pwd; PATH=\"${CAMPAIGN}/workers/holdout-impact/r03-alternative/bin:$PATH\" rg --files -g \"AGENTS.personal.md\" -g \"AGENTS.md\" -g \"*SKILL.md\" -g \"resolve-vault.py\" -g \"response-quality.md\" -g \"execution-profiles.md\"'",
+              "exit": 0,
+              "output_sha256": "662204efaa199914d8b5dd2e99f4d858b1f6f391cc94b750601fab3a33bcda08"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-impact/r03-alternative/bin:$PATH\" python3 90-Meta/resolve-vault.py --help\nPATH=\"${CAMPAIGN}/workers/holdout-impact/r03-alternative/bin:$PATH\" cat .agents/skills/map-ecosystem/SKILL.md 90-Meta/response-quality.md 90-Meta/execution-profiles.md\nPATH=\"${CAMPAIGN}/workers/holdout-impact/r03-alternative/bin:$PATH\" if test -f AGENTS.personal.md; then cat AGENTS.personal.md; fi'",
+              "exit": 1,
+              "output_sha256": "77bc282febcbd244bc63876d2eeac81c2b62b993c5ef5cb4bd14146576e89277"
+            },
+            {
+              "command": "/bin/zsh -lc 'export PATH=\"${CAMPAIGN}/workers/holdout-impact/r03-alternative/bin:$PATH\"\npython3 90-Meta/resolve-vault.py --help\ncat .agents/skills/map-ecosystem/SKILL.md 90-Meta/response-quality.md 90-Meta/execution-profiles.md\nif test -f AGENTS.personal.md; then cat AGENTS.personal.md; fi'",
+              "exit": 0,
+              "output_sha256": "c660390707b67540239dcbc47d34b8f2417ed1a591f33ae3743dfd19ba54018a"
+            },
+            {
+              "command": "/bin/zsh -lc 'export PATH=\"${CAMPAIGN}/workers/holdout-impact/r03-alternative/bin:$PATH\"\ncat 90-Meta/vault-resolution.md .agents/skills/map-ecosystem/references/interrogation.md\npython3 90-Meta/resolve-vault.py --path ${CAMPAIGN}/workers/holdout-impact/r03-alternative/vault'",
+              "exit": 0,
+              "output_sha256": "0a131268604bcef4e493e9b5bba0e0e2fde7db36357801e45034d17deb9b2155"
+            },
+            {
+              "command": "/bin/zsh -lc 'export PATH=\"${CAMPAIGN}/workers/holdout-impact/r03-alternative/bin:$PATH\"\ncat .agents/skills/evidence-driven-analysis/SKILL.md\nrg -n \"route-events\" 10-Sistemas 15-Arquitectura 20-Repos 25-Topics 30-Flujos 40-Integraciones 60-Operacion'",
+              "exit": 0,
+              "output_sha256": "b2eb23bc9d9b2746f90a3b867cf1da670ba82c11b873da940d89525c8d81c8e1"
+            },
+            {
+              "command": "/bin/zsh -lc 'export PATH=\"${CAMPAIGN}/workers/holdout-impact/r03-alternative/bin:$PATH\"\nnl -ba 25-Topics/route-events.md\nnl -ba 20-Repos/routing/routing-planner.md\nnl -ba 20-Repos/fleet/fleet-ingest.md\nnl -ba \"30-Flujos/Flujo - Dispatch.md\"\ncat .agents/skills/evidence-driven-analysis/references/audit.md'",
+              "exit": 0,
+              "output_sha256": "f458897c3814854cce6298d68076be57090df35284379ce1ae0a801e3a4eaf3b"
+            }
+          ]
+        },
+        {
+          "phase": "review",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 33.213803083010134,
+          "usage": {
+            "input_tokens": 145489,
+            "cached_input_tokens": 126464,
+            "output_tokens": 794
+          },
+          "requested_model": "gpt-5.6-sol",
+          "requested_effort": "medium",
+          "effective_model": null,
+          "effective_effort": null,
+          "effective_configuration_verified": false,
+          "answer": "{\"accepted\":true,\"issues\":[]}",
+          "events_sha256": "64effff7ad9811297b77a5a1486312e97e82225cc53b9f13876e29cf922cc68f",
+          "prompt_sha256": "9c9ea140828d2357538a342f52bc39de0fd9399bcc7f21cc43f56c3e9378d5aa",
+          "commands": [
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-impact/r03-alternative/bin:$PATH\" pwd; '",
+              "exit": 0,
+              "output_sha256": "1ffffffad469cf063bacdb6397b3318ae1c6de63cf604fe1a16572449e14c711"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-impact/r03-alternative/bin:$PATH\" rg --files -g \"AGENTS.personal.md\" -g \"response-quality.md\" -g \"SKILL.md\" -g \"resolve-vault.py\" -g \"AGENTS.md\"'",
+              "exit": 0,
+              "output_sha256": "5869f7a2667605bbda6db59bf8a6b327f2a589bb1b442b6cc6d5d94ab6ce5365"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-impact/r03-alternative/bin:$PATH\" python3 90-Meta/resolve-vault.py'",
+              "exit": 0,
+              "output_sha256": "84821d1bd71e69be23b83e404cfbfc84663847ca3e0bb40a3d69d8337fa06a86"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-impact/r03-alternative/bin:$PATH\" cat .agents/skills/map-ecosystem/SKILL.md 90-Meta/response-quality.md'",
+              "exit": 0,
+              "output_sha256": "77b9de910e11c6dd687e76f5de36d776e037356a2a862d6f85a6b84156431647"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-impact/r03-alternative/bin:$PATH\" if [ -f AGENTS.personal.md ]; then cat AGENTS.personal.md; fi\nPATH=\"${CAMPAIGN}/workers/holdout-impact/r03-alternative/bin:$PATH\" cat 90-Meta/vault-resolution.md .agents/skills/map-ecosystem/references/interrogation.md'",
+              "exit": 1,
+              "output_sha256": "778150be7bd0a61441b4d67fad1448ebf167934934d24443cb3eba6db9661d93"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-impact/r03-alternative/bin:$PATH\" nl -ba 20-Repos/routing/routing-planner.md\nPATH=\"${CAMPAIGN}/workers/holdout-impact/r03-alternative/bin:$PATH\" nl -ba 20-Repos/fleet/fleet-ingest.md\nPATH=\"${CAMPAIGN}/workers/holdout-impact/r03-alternative/bin:$PATH\" nl -ba 25-Topics/route-events.md\nPATH=\"${CAMPAIGN}/workers/holdout-impact/r03-alternative/bin:$PATH\" nl -ba \"30-Flujos/Flujo - Dispatch.md\"'",
+              "exit": 0,
+              "output_sha256": "883b3d354e806c8734bcba07e11600e53b33810cbc9ccfe3ef1aacf2ba5c1c09"
+            },
+            {
+              "command": "/bin/zsh -lc 'export PATH=\"${CAMPAIGN}/workers/holdout-impact/r03-alternative/bin:$PATH\"\nif [ -f AGENTS.personal.md ]; then cat AGENTS.personal.md; fi\ncat 90-Meta/vault-resolution.md .agents/skills/map-ecosystem/references/interrogation.md'",
+              "exit": 0,
+              "output_sha256": "46217e77eb5e9811a4817a6a2eb9410db91e6c305fdb7501877ed5c3dc277c5c"
+            },
+            {
+              "command": "/bin/zsh -lc 'PATH=\"${CAMPAIGN}/workers/holdout-impact/r03-alternative/bin:$PATH\" cat .agents/skills/evidence-driven-analysis/SKILL.md'",
+              "exit": 0,
+              "output_sha256": "8375213eb2e72382e70349fa3d5c896512f9deab1411cb30cedbb699600a669c"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "evidence_note": "Command output hashes refer to retained raw captures; fixture sources and final answers are available for independent scoring. No repeated instruction dumps are included."
+}

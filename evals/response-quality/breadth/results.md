@@ -1,5 +1,7 @@
 # Breadth campaign — Sol / medium
 
+Release follow-up: the tested response policy was subsequently released in **0.10.0** (`61a8fe7`) and propagated through local consumer commits `8c9087a` (Cell A) and `453cec4` (Cells B/C). Candidate-time statements below about uncommitted work describe the test snapshot, not the final release status. The later 0.10.2 retains this policy with source-resolution corrections; see the [session closure](../../session-closure.md).
+
 ## Executor and boundaries
 
 Behavioral workers and reviewers were explicitly dispatched through collaboration with model gpt-5.6-sol and reasoning_effort medium. The API returned task identity, not independent effective-model telemetry; no alternative was silently substituted. Fixture preparation and deterministic test orchestration are not behavioral samples. An earlier inherited-model write attempt was interrupted and excluded, then repeated with a new consumer under explicit Sol/medium.
