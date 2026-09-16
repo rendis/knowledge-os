@@ -571,6 +571,55 @@ def next_command(run: dict[str, Any]) -> str:
     return "close" if not run["units"] and run.get("gate_digest") else "seal-gate"
 
 
+def next_action(state_root: Path, run: dict[str, Any]) -> dict[str, Any]:
+    """Describe the next existing CLI operation without inventing fresh inputs."""
+    command = next_command(run)
+    argv = [command, "--state-root", str(state_root), "--run-id", run["run_id"]]
+    action: dict[str, Any] = {"command": command, "argv": argv, "missing_inputs": []}
+    missing = action["missing_inputs"]
+    if command == "checkpoint-package":
+        package = next(
+            item for item in run["packages"]
+            if item["status"] in {"pending", "stale"}
+        )
+        action["repository"] = package["repository"]
+        action["oid"] = package["oid"]
+        argv.extend(["--repository", package["repository"]])
+        missing.append("--artifact")
+    elif command == "seal-gate":
+        missing.append("--gate")
+    elif command in {"validate-unit", "review-unit", "apply-unit"}:
+        if command == "validate-unit":
+            unit = next(
+                item for item in run["units"]
+                if item["status"] in {"pending", "projection-invalid", "stale"}
+            )
+            # Existing checkpoints may be stale: do not choose them as inputs.
+            missing.extend(["--projection", "--patch"])
+        elif command == "review-unit":
+            unit = next(
+                item for item in run["units"]
+                if item["unit_type"] == "write-group"
+                and item["status"] in {"validated", "apply-failed"}
+                and not item["note_review_digest"]
+            )
+            missing.extend(["--candidate", "--evidence-root", "--manifest", "--review"])
+        else:
+            unit = next(
+                item for item in run["units"]
+                if item["status"] in {"validated", "apply-failed"}
+            )
+        action["unit_id"] = unit["unit_id"]
+        argv.extend(["--unit-id", unit["unit_id"]])
+        if command in {"review-unit", "apply-unit"}:
+            vault = resolve_vault(state_root, run["vault_locator"])
+            if vault is None:
+                missing.append("--vault")
+            else:
+                argv.extend(["--vault", str(vault)])
+    return action
+
+
 def receipt_view(run: dict[str, Any]) -> dict[str, Any]:
     return {
         "version": RUN_VERSION,
@@ -736,6 +785,7 @@ def public_status(state_root: Path, run: dict[str, Any]) -> dict[str, Any]:
         "package_counters": package_counters(run),
         "receipt_digest": canonical_digest(receipt_view(run)),
         "next_command": next_command(run),
+        "next_action": next_action(state_root, run),
     }
 
 

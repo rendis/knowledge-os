@@ -238,3 +238,5 @@ Persist one durable direction. Inverse lists are backlinks.
 ## Agent execution
 
 For delegation and executor selection, consult [[execution-profiles]]. Personal execution preferences take precedence over its defaults.
+
+For evidence-backed conversational and retained answers, apply [[response-quality]] before delivery. It defines review, reuse and clear-language criteria; publication gates still apply.

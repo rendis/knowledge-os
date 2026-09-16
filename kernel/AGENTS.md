@@ -14,7 +14,7 @@ This vault is an evidence-backed map of one cell's systems. Load skills by name;
 `tracker` means one external work-tracking instance declared in `instance.yaml`. A `work item` is one externally tracked unit identified by its exact tracker and provider-native reference.
 
 1. Classify the request and select one primary skill from the catalog below. Auxiliary methods and access capabilities return to that owner without restarting routing.
-2. For orientation or interrogation, start with `90-Meta/graph-query.py` (JSON stems and edges, no note bodies).
+2. For orientation or relationship discovery, start with `90-Meta/graph-query.py` (JSON stems and edges, no note bodies). Read an already identified source directly for a bounded question that needs no graph discovery; source identity and access contracts still apply.
 3. After classification, load only the context required by these triggers:
    - Cell identity: `instance.yaml` and `00-Home.md`.
    - Cell-specific scope, allowlists, or exceptions: `90-Meta/Alcance.md`.
@@ -64,7 +64,9 @@ Instance files (`instance.yaml`, `00-Home.md`, notes under `10/`–`70/`) are ne
 ## Guardrails
 
 - Apply `90-Meta/evidence-policy.md` when assessing a technical write. Cell identity and capability bindings come from onboarding, never inferred company conventions.
-- Before material conclusions, inspect relevant available sources and verify they support the precise claim. Distinguish observations, inferences, and proposals; check alternatives that could change the conclusion. Limit unsupported claims and name the missing verification. Scale inquiry to uncertainty and impact; reuse valid evidence.
+- Before material conclusions, inspect evidence supporting the exact claim and apply [response quality](90-Meta/response-quality.md), including its review and reuse conditions. This applies to conversational answers as well as retained documents. New operational status, eligibility and cause classifications require independent review before delivery, even for read-only questions; reuse prior independent acceptance only under the linked reuse conditions.
+- Communicate in clear, concise language: answer first, explain unfamiliar terms, and retain evidence and limits that affect the decision. Match detail to the reader; omit repetition and the search diary.
+- Execute only after required deterministic checks pass for the exact operation. Correct a rejected input and recheck, or report the blocker; a tool failure never grants permission to bypass its contract.
 - Never persist secrets.
 - Canonical wikilinks target the note basename.
 - Persist one durable relationship direction; use backlinks for the inverse.

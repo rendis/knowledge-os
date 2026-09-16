@@ -2,6 +2,8 @@
 
 Use this contract after a synchronization interruption, validation failure, or source/destination change. The coordinator reads `status` or `resume`; it does not infer state from logs or rerun semantic work speculatively.
 
+Active-run responses retain `next_command` and add `next_action`: the same `command`, an `argv` array beginning with that subcommand and its known CLI arguments, the selected `repository`/`oid` or `unit_id` when applicable, and `missing_inputs` listing required CLI flags whose values are not known. Supply those inputs before invoking `90-Meta/sync-run.py` with the arguments; an empty list only means CLI inputs are complete, not that validation or authorization has passed. Hints do not execute anything or reuse potentially stale projection, gate, or review artifacts. Closed receipts retain their existing format.
+
 ## Durable records
 
 `STATE_ROOT` defaults to `.agents/state/map-ecosystem/sync` relative to the vault.
