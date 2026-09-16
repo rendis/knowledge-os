@@ -17,9 +17,11 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlparse
+from typing import Any
 
 from instance import load_instance
 from cell_scope import approved_cross_scope_repositories
+from vault_frontmatter import split_frontmatter
 
 ROOT = Path(__file__).resolve().parents[1]
 NOTES_ROOT = ROOT / "20-Repos"
@@ -109,13 +111,14 @@ def is_in_scope_repository(name: str) -> bool:
 class Note:
     path: Path
     name: str
-    frontmatter: dict[str, str]
+    frontmatter: dict[str, Any]
     body: str
 
     @property
     def aliases(self) -> list[str]:
-        raw = self.frontmatter.get("aliases", "")
-        return re.findall(r"[A-Za-z0-9_.-]+", raw)
+        raw = self.frontmatter.get("aliases", [])
+        values = raw if isinstance(raw, list) else [raw]
+        return [str(value) for value in values if value]
 
     @property
     def source_repo_name(self) -> str:
@@ -126,32 +129,16 @@ class Note:
         return prefix + self.name
 
 
-def run_git(repo: Path, *args: str) -> str:
+def run_git(repo: Path, *args: str, preserve_output: bool = False) -> str:
     try:
-        return subprocess.check_output(
+        output = subprocess.check_output(
             ["git", "-C", str(repo), *args],
             stderr=subprocess.DEVNULL,
             text=True,
-        ).strip()
+        )
+        return output if preserve_output else output.strip()
     except (subprocess.CalledProcessError, FileNotFoundError):
         return ""
-
-
-def split_frontmatter(text: str) -> tuple[dict[str, str], str]:
-    if not text.startswith("---\n"):
-        return {}, text
-    end = text.find("\n---\n", 4)
-    if end == -1:
-        return {}, text
-    raw = text[4:end]
-    body = text[end + 5 :]
-    fields: dict[str, str] = {}
-    for line in raw.splitlines():
-        if not line.strip() or line.startswith((" ", "\t")) or ":" not in line:
-            continue
-        key, value = line.split(":", 1)
-        fields[key.strip()] = value.strip()
-    return fields, body
 
 
 def read_note(path: Path) -> Note:
@@ -169,9 +156,25 @@ def should_skip(path: Path) -> bool:
 
 
 def iter_source_files(repo: Path) -> list[Path]:
+    """Select tracked regular files and read their current working-tree bytes.
+
+    Untracked local artifacts (including ignored ones) and symlinks are excluded. A tracked file
+    may be dirty; HEAD identifies the checkout baseline, not the scanned bytes.
+    """
+    raw = run_git(repo, "ls-files", "-z", "--cached", preserve_output=True)
     files: list[Path] = []
-    for path in repo.rglob("*"):
-        if path.is_dir() or should_skip(path.relative_to(repo)):
+    for name in sorted(set(raw.split("\0"))):
+        if not name:
+            continue
+        path = repo / name
+        relative = Path(name)
+        ancestors = [repo.joinpath(*relative.parts[:index]) for index in range(1, len(relative.parts) + 1)]
+        if (
+            should_skip(relative)
+            or any(candidate.is_symlink() for candidate in ancestors)
+            or not path.resolve().is_relative_to(repo.resolve())
+            or not path.is_file()
+        ):
             continue
         if path.stat().st_size > 1_500_000:
             continue
@@ -187,23 +190,19 @@ def read_text(path: Path) -> str:
 
 
 def deploy_inventory(repo: Path) -> list[str]:
-    found: list[str] = []
-    for marker in DEPLOY_MARKERS:
-        path = repo / marker
-        if path.exists():
-            found.append(marker)
-    workflows = repo / ".github" / "workflows"
-    if workflows.exists():
-        found.extend(
-            str(path.relative_to(repo))
-            for path in sorted(workflows.glob("*"))
-            if path.is_file()
-        )
-    return sorted(dict.fromkeys(found))
+    found: set[str] = set()
+    for path in iter_source_files(repo):
+        relative = path.relative_to(repo).as_posix()
+        for marker in DEPLOY_MARKERS:
+            if relative == marker or relative.startswith(marker + "/"):
+                found.add(marker)
+        if relative.startswith(".github/workflows/"):
+            found.add(relative)
+    return sorted(found)
 
 
 def extract_tokens(note: Note) -> list[str]:
-    text = note.body + "\n" + "\n".join(note.frontmatter.values())
+    text = note.body + "\n" + "\n".join(str(value) for value in note.frontmatter.values())
     tokens = set(note.aliases + [note.name, note.source_repo_name])
     tokens.update(re.findall(r"\b[A-Z][A-Z0-9_]{3,}\b", text))
     tokens.update(re.findall(r"\bproj-[a-z0-9][a-z0-9-]{8,}\b", text))
@@ -453,8 +452,9 @@ def report_note(
     commit = source.commit[:12]
     files = [path for path in iter_source_files(repo) if ".git" not in path.parts]
     deploy = deploy_inventory(repo)
-    print(f"- Rama/commit local: `{branch}` / `{commit}`")
-    print(f"- Archivos fuente/versionados escaneados: {len(files)}")
+    print(f"- Rama/HEAD de referencia: `{branch}` / `{commit}` (no identifica los bytes escaneados)")
+    print("- Evidencia: archivos rastreados del working tree local; incluye cambios sin commit")
+    print(f"- Archivos rastreados locales escaneados: {len(files)}")
     print(f"- Deploy/config estático: {', '.join(f'`{d}`' for d in deploy) if deploy else 'no observado'}")
 
     limitations = limitation_lines(note)
@@ -522,7 +522,7 @@ def main() -> int:
     print()
     print(f"- Notas seleccionadas: {len(notes)}")
     print(f"- Repos fuente disponibles: {len(repositories)}")
-    print("- Modo: solo lectura; no usa logs, pruebas ni fuentes externas no versionadas")
+    print("- Modo: solo lectura; escanea archivos rastreados locales, incluidos cambios sin commit; excluye archivos no rastreados (incluidos ignorados) y enlaces simbólicos; no prueba contenido de HEAD ni runtime")
     for warning in [*resolver_warnings, *duplicate_warnings]:
         print(f"- Advertencia de fuentes: {warning}")
     print()

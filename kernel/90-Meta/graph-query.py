@@ -60,7 +60,7 @@ def _stems_from_value(value: Any) -> list[str]:
 
 
 def _iter_notes(root: Path):
-    for path in root.rglob("*.md"):
+    for path in sorted(root.rglob("*.md")):
         parts = path.relative_to(root).parts
         if parts == ("AGENTS.personal.md",):
             continue
@@ -76,6 +76,8 @@ def build_graph(root: Path) -> dict[str, Any]:
     for path in _iter_notes(root):
         stem = path.stem
         rel = path.relative_to(root).as_posix()
+        if stem in paths:
+            raise ValueError(f"duplicate note basename {stem!r}: {paths[stem]}, {rel}")
         paths[stem] = rel
         fields = read_frontmatter(path)
         body = path.read_text(encoding="utf-8")
@@ -113,6 +115,8 @@ def hygiene(root: Path) -> dict[str, Any]:
         "unresolved_targets": unresolved_targets,
         "orphans": verify["orphans"],
         "alias_targets": verify["alias_targets"],
+        "hidden": verify["hidden"],
+        "duplicates": verify["duplicates"],
     }
 
 

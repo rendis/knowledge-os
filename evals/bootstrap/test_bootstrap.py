@@ -2923,11 +2923,13 @@ change:
             with (
                 self.subTest(return_codes=return_codes),
                 mock.patch.object(module.importlib.util, "find_spec", return_value=object()),
-                mock.patch.object(module, "run", side_effect=return_codes) as run_mock,
+                mock.patch.object(module, "run", return_value=return_codes[0]) as run_mock,
+                mock.patch.object(module, "run_bandit", side_effect=return_codes[1:]) as bandit_mock,
                 mock.patch.object(sys, "argv", [str(helper), "--root", str(DIST)]),
             ):
                 self.assertEqual(module.main(), expected)
-                self.assertEqual(run_mock.call_count, 3)
+                self.assertEqual(run_mock.call_count, 1)
+                self.assertEqual(bandit_mock.call_count, 2)
 
     def test_kernel_has_no_product_leak(self) -> None:
         leaks = []

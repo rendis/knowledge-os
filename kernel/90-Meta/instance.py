@@ -39,100 +39,187 @@ class InstanceError(ValueError):
 
 
 def _parse_simple_yaml(text: str) -> dict[str, Any]:
-    """Parse the closed instance.yaml subset (maps, lists of scalars/maps)."""
+    """Use the same closed parser regardless of optional installed packages."""
     try:
-        import yaml  # type: ignore
+        return _parse_minimal_yaml(text)
+    except InstanceError as error:
+        # Public callers persist this stable error code in their reports.
+        raise InstanceError("invalid instance.yaml syntax") from error
 
-        try:
-            data = yaml.safe_load(text)
-        except yaml.YAMLError as error:
-            raise InstanceError("invalid instance.yaml syntax") from error
-        if not isinstance(data, dict):
-            raise InstanceError("instance.yaml must be a mapping")
-        return data
-    except ImportError:
-        pass
-    return _parse_minimal_yaml(text)
+
+def _syntax(detail: str) -> InstanceError:
+    return InstanceError(f"invalid instance.yaml syntax: {detail}")
+
+
+def _outside_quotes(value: str, *, flow: bool = False, comments: bool = False) -> list[int]:
+    """Scan syntax positions; quotes only delimit a scalar at its beginning.
+
+    Quotes and brackets inside a block plain scalar are literal text. Flow-list
+    commas delimit new scalars, while a block plain scalar may contain commas.
+    """
+    positions = []
+    quote = None
+    scalar_start = True
+    index = 0
+    while index < len(value):
+        char = value[index]
+        if quote == '"' and char == "\\":
+            index += 2
+            continue
+        if quote == "'" and char == "'" and value[index:index + 2] == "''":
+            index += 2
+            continue
+        if quote:
+            if char == quote:
+                quote = None
+                scalar_start = False
+        elif comments and char == "#" and (index == 0 or value[index - 1].isspace()):
+            positions.append(index)
+            return positions
+        elif scalar_start and char in "\"'":
+            quote = char
+        else:
+            positions.append(index)
+            if char.isspace():
+                pass
+            elif char == ":" and (index + 1 == len(value) or value[index + 1].isspace()):
+                scalar_start = True
+            elif scalar_start and char == "[":
+                flow = True
+            elif flow and char == ",":
+                scalar_start = True
+            elif scalar_start and char == "-" and index + 1 < len(value) and value[index + 1].isspace():
+                pass
+            else:
+                scalar_start = False
+        index += 1
+    if quote:
+        raise _syntax("unterminated quoted scalar")
+    return positions
+
+
+def _mapping_entry(value: str) -> tuple[str, str] | None:
+    for index in _outside_quotes(value):
+        if value[index] == ":" and (index + 1 == len(value) or value[index + 1].isspace()):
+            key = _scalar(value[:index].strip())
+            if not isinstance(key, str) or not key:
+                raise _syntax("mapping keys must be non-empty strings")
+            return key, value[index + 1:].strip()
+    return None
 
 
 def _parse_minimal_yaml(text: str) -> dict[str, Any]:
-    """Indentation-based subset sufficient for dump_instance output."""
-    raw_lines = [line.rstrip() for line in text.splitlines()]
-    lines = [line for line in raw_lines if line.strip() and not line.lstrip().startswith("#")]
-    root: dict[str, Any] = {}
-    stack: list[tuple[int, Any, str | None]] = [(-1, root, None)]
+    """Parse block maps/sequences and single-line scalar lists, without YAML deps.
 
-    def parent(indent: int) -> tuple[int, Any, str | None]:
-        while stack and stack[-1][0] >= indent:
-            stack.pop()
-        return stack[-1]
-
-    for index, line in enumerate(lines):
-        indent = len(line) - len(line.lstrip(" "))
-        stripped = line.strip()
-        _indent, container, _ = parent(indent)
-        if stripped.startswith("- "):
-            item = stripped[2:]
-            if isinstance(container, dict):
-                # convert last empty dict assignment to a list
-                raise InstanceError(f"list item with dict container: {stripped}")
-            if not isinstance(container, list):
-                raise InstanceError(f"list item outside a list: {stripped}")
-            if ":" in item and not item.startswith("["):
-                key, _, raw = item.partition(":")
-                mapping: dict[str, Any] = {key.strip(): _scalar(raw.strip())}
-                container.append(mapping)
-                stack.append((indent, mapping, None))
-            else:
-                container.append(_scalar(item))
+    Strings may be plain, JSON double-quoted, or YAML single-quoted. Comments,
+    booleans, decimal integers and empty {} are supported. Other YAML features
+    (tags, anchors, aliases, multiline strings and flow maps) fail explicitly.
+    """
+    lines: list[tuple[int, str]] = []
+    for line in text.splitlines():
+        if "\t" in line[:len(line) - len(line.lstrip())]:
+            raise _syntax("tabs in indentation")
+        # Comment text is not syntax; the shared scan respects scalar context.
+        positions = _outside_quotes(line, comments=True)
+        for index in positions:
+            if line[index] == "#" and (index == 0 or line[index - 1].isspace()):
+                line = line[:index]
+                break
+        if not line.strip():
             continue
-        key, _, raw = stripped.partition(":")
-        key = _scalar(key.strip())
-        raw = raw.strip()
-        if not isinstance(container, dict):
-            raise InstanceError(f"key {key} inside a list")
-        if raw == "" or raw == "|":
-            next_kind = _next_kind(lines, index, indent)
-            if next_kind == "list":
-                value: Any = []
+        stripped = line.strip()
+        lines.append((len(line) - len(line.lstrip(" ")), stripped))
+
+    def block(index: int, indent: int) -> tuple[Any, int]:
+        sequence = lines[index][1].startswith("- ") or lines[index][1] == "-"
+        result: Any = [] if sequence else {}
+        while index < len(lines) and lines[index][0] == indent:
+            value = lines[index][1]
+            is_item = value.startswith("- ") or value == "-"
+            if is_item != sequence:
+                raise _syntax("mixed mapping and sequence")
+            if sequence:
+                value = value[1:].strip()
+                entry = _mapping_entry(value)
+                if entry is not None:
+                    # A compact mapping item has its first key two columns
+                    # beyond the sequence indentation, like emitted YAML.
+                    lines[index] = (indent + 2, value)
+                    item, index = block(index, indent + 2)
+                elif not value and index + 1 < len(lines) and lines[index + 1][0] > indent:
+                    item, index = block(index + 1, lines[index + 1][0])
+                else:
+                    item = _scalar(value)
+                    index += 1
+                result.append(item)
             else:
-                value = {}
-            container[key] = value
-            stack.append((indent, value, key))
-        else:
-            container[key] = _scalar(raw)
+                entry = _mapping_entry(value)
+                if entry is None:
+                    raise _syntax("expected mapping entry")
+                key, raw = entry
+                if key in result:
+                    raise _syntax(f"duplicate mapping key: {key}")
+                index += 1
+                if not raw and index < len(lines) and lines[index][0] > indent:
+                    item, index = block(index, lines[index][0])
+                else:
+                    item = _scalar(raw) if raw else {}
+                result[key] = item
+            if index < len(lines) and lines[index][0] > indent:
+                raise _syntax("unexpected indentation")
+        return result, index
+
+    if not lines or lines[0][0] != 0:
+        raise _syntax("expected root mapping")
+    root, end = block(0, 0)
+    if end != len(lines) or not isinstance(root, dict):
+        raise _syntax("expected root mapping")
     return root
 
 
-def _next_kind(lines: list[str], index: int, indent: int) -> str:
-    for line in lines[index + 1 :]:
-        if not line.strip():
-            continue
-        nxt = len(line) - len(line.lstrip(" "))
-        if nxt <= indent:
-            return "map"
-        return "list" if line.lstrip().startswith("- ") else "map"
-    return "map"
-
-
-def _scalar(value: str) -> Any:
-    if value in {"[]", ""}:
-        return [] if value == "[]" else ""
-    if value.startswith("[") and value.endswith("]"):
+def _scalar(value: str, *, flow: bool = False) -> Any:
+    if value == "[]":
+        return []
+    if value == "{}":
+        return {}
+    if value.startswith("["):
+        if not value.endswith("]"):
+            raise _syntax("unterminated flow list")
         inner = value[1:-1].strip()
         if not inner:
             return []
-        return [part.strip().strip("\"'") for part in inner.split(",") if part.strip()]
-    if value.startswith('"') and value.endswith('"'):
+        commas = [index for index in _outside_quotes(inner, flow=True) if inner[index] == ","]
+        boundaries = [-1, *commas, len(inner)]
+        parts = [inner[left + 1:right].strip() for left, right in zip(boundaries, boundaries[1:])]
+        if not parts[-1]:
+            parts.pop()  # YAML permits a trailing comma.
+        if any(not part for part in parts):
+            raise _syntax("empty flow-list item")
+        items = [_scalar(part, flow=True) for part in parts]
+        if any(isinstance(item, (dict, list)) for item in items):
+            raise _syntax("flow lists support scalars only")
+        return items
+    if value.startswith('"'):
         try:
-            return json.loads(value)
+            result = json.loads(value)
         except json.JSONDecodeError as error:
-            raise InstanceError("invalid quoted scalar") from error
-    if value.startswith("'") and value.endswith("'"):
+            raise _syntax("invalid double-quoted scalar") from error
+        if not isinstance(result, str):
+            raise _syntax("expected quoted string")
+        return result
+    if value.startswith("'"):
+        if re.fullmatch(r"'(?:[^']|'')*'", value) is None:
+            raise _syntax("invalid single-quoted scalar")
         return value[1:-1].replace("''", "'")
+    if not value or value.startswith(("!", "&", "*", "|", ">", "{", "]", ",", "%", "@", "`")) or value in {"---", "...", "-"}:
+        raise _syntax("unsupported scalar syntax")
+    if any((flow and value[index] in "[]{}") or (value[index] == ":" and (index + 1 == len(value) or value[index + 1].isspace())) for index in _outside_quotes(value)):
+        raise _syntax("unsupported plain scalar syntax")
     if value in {"true", "false"}:
         return value == "true"
-    if re.fullmatch(r"-?\d+", value):
+    if value in {"null", "Null", "NULL", "~"}:
+        return None
+    if re.fullmatch(r"-?(?:0|[1-9]\d*)", value):
         return int(value)
     return value
 

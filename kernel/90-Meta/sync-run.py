@@ -14,7 +14,7 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path, PurePosixPath
-from typing import Any, NoReturn
+from typing import Any, NoReturn, cast
 
 
 RUN_VERSION = 1
@@ -538,50 +538,60 @@ def run_fingerprint(
     })
 
 
-def next_command(run: dict[str, Any]) -> str:
+def next_step(run: dict[str, Any]) -> tuple[str, dict[str, Any] | None]:
+    """Select an operation and its target once for both public hints."""
     if any(
         unit["status"] == "stale"
         and unit["stale_reason"] == "source"
         and unit["receipt_digest"]
         for unit in run["units"]
     ):
-        return "resume"
-    if any(item["status"] in {"pending", "stale"} for item in run["packages"]):
-        return "checkpoint-package"
-    if run.get("gate_stale"):
-        return "seal-gate"
-    if not run.get("gate_digest"):
-        return "seal-gate"
-    if any(
-        unit["status"] in {"pending", "projection-invalid", "stale"}
-        for unit in run["units"]
-    ):
-        return "validate-unit"
-    if any(
-        unit["unit_type"] == "write-group"
-        and unit["status"] in {"validated", "apply-failed"}
-        and not unit["note_review_digest"]
-        for unit in run["units"]
-    ):
-        return "review-unit"
-    if any(unit["status"] in {"validated", "apply-failed"} for unit in run["units"]):
-        return "apply-unit"
+        return "resume", None
+    package = next((
+        item for item in run["packages"]
+        if item["status"] in {"pending", "stale"}
+    ), None)
+    if package is not None:
+        return "checkpoint-package", package
+    if run.get("gate_stale") or not run.get("gate_digest"):
+        return "seal-gate", None
+    unit = next((
+        item for item in run["units"]
+        if item["status"] in {"pending", "projection-invalid", "stale"}
+    ), None)
+    if unit is not None:
+        return "validate-unit", unit
+    unit = next((
+        item for item in run["units"]
+        if item["unit_type"] == "write-group"
+        and item["status"] in {"validated", "apply-failed"}
+        and not item["note_review_digest"]
+    ), None)
+    if unit is not None:
+        return "review-unit", unit
+    unit = next((
+        item for item in run["units"]
+        if item["status"] in {"validated", "apply-failed"}
+    ), None)
+    if unit is not None:
+        return "apply-unit", unit
     if run["units"] and all(unit["status"] == "applied" for unit in run["units"]):
-        return "close"
-    return "close" if not run["units"] and run.get("gate_digest") else "seal-gate"
+        return "close", None
+    return ("close" if not run["units"] and run.get("gate_digest") else "seal-gate"), None
+
+
+def next_command(run: dict[str, Any]) -> str:
+    return next_step(run)[0]
 
 
 def next_action(state_root: Path, run: dict[str, Any]) -> dict[str, Any]:
     """Describe the next existing CLI operation without inventing fresh inputs."""
-    command = next_command(run)
+    command, target = next_step(run)
     argv = [command, "--state-root", str(state_root), "--run-id", run["run_id"]]
     action: dict[str, Any] = {"command": command, "argv": argv, "missing_inputs": []}
     missing = action["missing_inputs"]
     if command == "checkpoint-package":
-        package = next(
-            item for item in run["packages"]
-            if item["status"] in {"pending", "stale"}
-        )
+        package = cast(dict[str, Any], target)
         action["repository"] = package["repository"]
         action["oid"] = package["oid"]
         argv.extend(["--repository", package["repository"]])
@@ -589,26 +599,12 @@ def next_action(state_root: Path, run: dict[str, Any]) -> dict[str, Any]:
     elif command == "seal-gate":
         missing.append("--gate")
     elif command in {"validate-unit", "review-unit", "apply-unit"}:
+        unit = cast(dict[str, Any], target)
         if command == "validate-unit":
-            unit = next(
-                item for item in run["units"]
-                if item["status"] in {"pending", "projection-invalid", "stale"}
-            )
             # Existing checkpoints may be stale: do not choose them as inputs.
             missing.extend(["--projection", "--patch"])
         elif command == "review-unit":
-            unit = next(
-                item for item in run["units"]
-                if item["unit_type"] == "write-group"
-                and item["status"] in {"validated", "apply-failed"}
-                and not item["note_review_digest"]
-            )
             missing.extend(["--candidate", "--evidence-root", "--manifest", "--review"])
-        else:
-            unit = next(
-                item for item in run["units"]
-                if item["status"] in {"validated", "apply-failed"}
-            )
         action["unit_id"] = unit["unit_id"]
         argv.extend(["--unit-id", unit["unit_id"]])
         if command in {"review-unit", "apply-unit"}:
