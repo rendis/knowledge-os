@@ -1,6 +1,18 @@
 # Source-access correction closure — 2026-09-16
 
-**Accepted: 8/8 scoped scenarios with observable evidence.** The final independent Sol/medium review found no unresolved failure in the tested criteria. Changes remain local; no new version or consumer propagation is claimed.
+**Accepted: 8/8 scoped scenarios with observable evidence.** The final independent Sol/medium review found no unresolved failure in the tested criteria. Released as 0.10.2 and propagated to both consumer vaults on 2026-09-16 through local commits; no push was performed.
+
+## Release and propagation
+
+| Repository | Version | Local commit |
+| --- | --- | --- |
+| Distribution | 0.10.2 | `ca5a698` |
+| Cell A vault | 0.10.2 | `56d1d51` |
+| Cells B/C vault | 0.10.2 | `33c81a4` |
+
+Propagation used a clean checkout of the distribution release, excluding the separate user-guide work. Release checks passed: 35 bootstrap tests, 14 instance tests, Ruff and Bandit.
+
+Both consumers passed `doctor --strict`, vault audit, link verification and Bases validation. Final doctor results reported `reproducible_distribution: true`, `managed_matches_dist: true` and no drift. Each consumer changed only five managed files: `AGENTS.md`, `90-Meta/vault-resolution.md`, `90-Meta/response-quality.md`, `VERSION` and `.knowledge-os.lock.yaml`. File fingerprints and Git status comparisons confirmed that pre-existing work and non-managed content were preserved.
 
 ## Final change
 
@@ -43,6 +55,6 @@ Earlier failures remain in the evidence; no failure was relabeled as a pass. Pol
 
 ## Additional verification and limits
 
-Final candidate bootstrap: 35/35. Instance tests: 14/14. Eval runner Ruff and diff whitespace checks pass. No code-tool implementation, consumer vault, real source repository or existing user-guide work was changed by this correction. The candidate excludes that unrelated user-guide work.
+Final candidate bootstrap: 35/35. Instance tests: 14/14. Eval runner Ruff and diff whitespace checks pass. The isolated behavioral campaign did not change consumer vaults, real source repositories or existing user-guide work. The subsequent authorized propagation changed only the managed consumer files listed above. No tool implementation changed; the separate user-guide work remains outside this release and campaign scope.
 
 This closes the observed source-access, recovery, citation and ownership defects for these scenarios. It does not guarantee every future model response, establish statistical reliability, demonstrate token savings, or validate production/real Obsidian behavior. Author-only answer-review execution remains unobservable in CLI events; it was not inferred from policy reads.
