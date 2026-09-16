@@ -1,0 +1,178 @@
+[
+  {
+    "attempt": "smoke",
+    "role": "initial smoke; excluded from comparisons",
+    "completed_phase_summaries": 6,
+    "reported_usage_lower_bound": {
+      "input_tokens": 901622,
+      "cached_input_tokens": 778624,
+      "output_tokens": 5775
+    },
+    "partial_unreported_usage_possible": false,
+    "manifest": {
+      "distribution": "${FROZEN_DISTRIBUTION}",
+      "version": "0.10.2",
+      "model": "gpt-5.6-sol",
+      "effort": "medium",
+      "repetitions": 1,
+      "workers": 2,
+      "concurrency": 1,
+      "source_sha256": {
+        "cases": "13ec60917a60916dca6dab7f59f5aa18f17aba1c2136a5b4703516f08468f512",
+        "runner": "844f9ee6385cd43bf1aba94ddf03cf56f7764a73ee93562f545eb301d87603a8",
+        "criteria": "ec901ef5cca7ed54f072a199e22fa804abbce36474142d1e4ae36f535527a36f"
+      },
+      "distribution_head": "ca5a6985d677c2b3e2a699edac67285b05f81fb4",
+      "cases": [
+        {
+          "id": "two-repositories",
+          "prompt": "Compara lo documentado sobre routing-planner y fleet-ingest: función, relación mediante route-events y qué prueba existe de funcionamiento actual en producción.",
+          "alternative": "Sintetiza los hallazgos de los dos trabajadores, comprueba coherencia y citas sin repetir toda su búsqueda.",
+          "children": [
+            "Inspecciona lo documentado sobre routing-planner: función, publicación y evidencia de funcionamiento actual en producción. Devuelve hechos con rutas y límites.",
+            "Inspecciona lo documentado sobre fleet-ingest: función, suscripción y evidencia de funcionamiento actual en producción. Devuelve hechos con rutas y límites."
+          ]
+        }
+      ],
+      "decomposition": "fixed experiment tasks"
+    }
+  },
+  {
+    "attempt": "main",
+    "role": "interrupted: read-only lock incompatibility; excluded",
+    "completed_phase_summaries": 25,
+    "reported_usage_lower_bound": {
+      "input_tokens": 5132513,
+      "cached_input_tokens": 4543232,
+      "output_tokens": 25616
+    },
+    "partial_unreported_usage_possible": true,
+    "manifest": {
+      "distribution": "${FROZEN_DISTRIBUTION}",
+      "version": "0.10.2",
+      "model": "gpt-5.6-sol",
+      "effort": "medium",
+      "repetitions": 3,
+      "workers": 2,
+      "concurrency": 6,
+      "source_sha256": {
+        "cases": "13ec60917a60916dca6dab7f59f5aa18f17aba1c2136a5b4703516f08468f512",
+        "runner": "c6323e7dd178bdff3231a1c6acb084b381b80b5d782e4e78e539d666ad189dbb",
+        "criteria": "ec901ef5cca7ed54f072a199e22fa804abbce36474142d1e4ae36f535527a36f"
+      },
+      "fixture_sha256": {
+        "investigations/20260820-090000-stale-gps-write/investigation.md": "32fab4cd6ed32186610fa76586dc66a473e4d073c5463b6cf84a97e3b52722be",
+        "investigations/20260820-090001-unrelated-billing/investigation.md": "4e644a64e424bff6ebe42aed3d446e0a9ef22b05968cee1cca088b99b56361fa",
+        "overlay/10-Sistemas/Fleet.md": "b91f7a50c2f79fbaf65a343eaf865708f7cd72c2ad495bce04346a9d58fe74df",
+        "overlay/10-Sistemas/Routing.md": "29490d2fd979544a23f807a6ceec4f50dc4c36f3f2b7f32b05dacb95fd8aa396",
+        "overlay/20-Repos/fleet/fleet-ingest.md": "f8ae6f4cb739bc70763448a02b9803192b94fb522e2de0d1035541b3c7c7526c",
+        "overlay/20-Repos/fleet/fleet-ui.md": "ed274c23e5c755f90e5e2063f33e3e42c41f2d20ca4effb16e466718dab602f8",
+        "overlay/20-Repos/routing/routing-api.md": "a1be995b031c77d4539f59e0476c0d48bd71bbf08558ff93f322021769ed523f",
+        "overlay/20-Repos/routing/routing-planner.md": "81caee5f2f6b4ce145d53b89596e453f0131fa7419c06a1b203f3c1521879c12",
+        "overlay/25-Topics/route-events.md": "4e6f99b6dd364433b628eae7a0b87704c967645e34d97652bc9580d2d135f26b",
+        "overlay/30-Flujos/Flujo - Dispatch.md": "cfbd5341d5bb217de07a94ee0c05f9b63bdc3bb0fcec0085627e086188cb4361",
+        "overlay/40-Integraciones/Maps Vendor.md": "716689d5c7cfb1cc0ce5042ac625c3024d83a093380991a1b2c7e1cf1fe320b2",
+        "overlay/50-Glosario/Orphan Scratch.md": "db23d8be94cbcfc7166709686f1e4ead9c238ce29c2f1c11e052d6c82c40b1bc",
+        "overlay/70-Aprendizajes/Aprendizaje - Stale GPS.md": "452642f2cf309d3b40fd20bfbbfbe5b1a15e2f53c00b930682de9698e00abc60",
+        "materialize.py": "b23985e6b6edf6c25b5c8c810bda9c01b7f78310466ebd3f33e79f0f3fa0a3f5"
+      },
+      "distribution_head": "ca5a6985d677c2b3e2a699edac67285b05f81fb4",
+      "cases": [
+        {
+          "id": "known-file",
+          "prompt": "Según 20-Repos/routing/routing-planner.md, ¿qué hace routing-planner y qué publica? Dos frases como máximo con fuente.",
+          "alternative": "Tras resolver el vault y cargar las instrucciones necesarias, lee directamente el archivo proporcionado; evita descubrimiento por grafo salvo que falte evidencia."
+        },
+        {
+          "id": "dependencies",
+          "prompt": "¿Qué cadena documentada conecta routing-planner con fleet-ui? Distingue vínculos documentados de impacto operativo no demostrado.",
+          "alternative": "Usa graph-query para descubrir las relaciones y después lee únicamente las notas necesarias para corroborarlas."
+        },
+        {
+          "id": "two-repositories",
+          "prompt": "Compara lo documentado sobre routing-planner y fleet-ingest: función, relación mediante route-events y qué prueba existe de funcionamiento actual en producción.",
+          "alternative": "Sintetiza los hallazgos de los dos trabajadores, comprueba coherencia y citas sin repetir toda su búsqueda.",
+          "children": [
+            "Inspecciona lo documentado sobre routing-planner: función, publicación y evidencia de funcionamiento actual en producción. Devuelve hechos con rutas y límites.",
+            "Inspecciona lo documentado sobre fleet-ingest: función, suscripción y evidencia de funcionamiento actual en producción. Devuelve hechos con rutas y límites."
+          ]
+        },
+        {
+          "id": "reuse-investigation",
+          "prompt": "Resume el hallazgo y aprendizaje registrado sobre GPS antiguo en investigations/20260820-090000-stale-gps-write/investigation.md y 70-Aprendizajes/Aprendizaje - Stale GPS.md. ¿Demuestra que el problema ya se corrigió?",
+          "alternative": "Reutiliza los dos documentos identificados tras el preflight obligatorio; busca más solo si una afirmación necesaria no está respaldada. No reabras la investigación."
+        },
+        {
+          "id": "ambiguous",
+          "prompt": "¿Está bien el planner y podemos dar por cerrado el problema? Responde con lo que permite la evidencia disponible y aclara lo necesario.",
+          "alternative": "Busca primero evidencia dirigida sobre planner y su investigación. Distingue identidad, significado de bien y evidencia de cierre; no recorras documentos ajenos si falta una decisión del usuario."
+        },
+        {
+          "id": "false-premise",
+          "prompt": "Como routing-planner llama directamente a Maps Vendor, si falla Maps necesariamente deja de publicar route-events. Confírmalo y explica brevemente la dependencia.",
+          "alternative": "Verifica primero cada premisa en las notas de routing-planner, routing-api y Maps Vendor. Corrige lo no respaldado, sin convertir ausencia de documentación en prueba de imposibilidad."
+        }
+      ],
+      "decomposition": "fixed experiment tasks"
+    }
+  },
+  {
+    "attempt": "smoke2",
+    "role": "corrected instrument smoke; excluded from comparison sample",
+    "completed_phase_summaries": 10,
+    "reported_usage_lower_bound": {
+      "input_tokens": 1505342,
+      "cached_input_tokens": 1302016,
+      "output_tokens": 8328
+    },
+    "partial_unreported_usage_possible": false,
+    "manifest": {
+      "distribution": "${FROZEN_DISTRIBUTION}",
+      "version": "0.10.2",
+      "model": "gpt-5.6-sol",
+      "effort": "medium",
+      "repetitions": 1,
+      "workers": 2,
+      "concurrency": 2,
+      "source_sha256": {
+        "cases": "60cae6697d31e7b355bbd00dd5b79a6b15c778f2cfb02979cfdde5f28ea854be",
+        "runner": "af440a6474b04b3affa385369c001b6e5533ea10260f19a798ec461fa49bde95",
+        "criteria": "7fa436f7ef670c4b4a32cc0163bd80daa6de33c81e33c9ec89268027f2e1138e"
+      },
+      "fixture_sha256": {
+        "investigations/20260820-090000-stale-gps-write/investigation.md": "32fab4cd6ed32186610fa76586dc66a473e4d073c5463b6cf84a97e3b52722be",
+        "investigations/20260820-090001-unrelated-billing/investigation.md": "4e644a64e424bff6ebe42aed3d446e0a9ef22b05968cee1cca088b99b56361fa",
+        "overlay/10-Sistemas/Fleet.md": "b91f7a50c2f79fbaf65a343eaf865708f7cd72c2ad495bce04346a9d58fe74df",
+        "overlay/10-Sistemas/Routing.md": "29490d2fd979544a23f807a6ceec4f50dc4c36f3f2b7f32b05dacb95fd8aa396",
+        "overlay/20-Repos/fleet/fleet-ingest.md": "f8ae6f4cb739bc70763448a02b9803192b94fb522e2de0d1035541b3c7c7526c",
+        "overlay/20-Repos/fleet/fleet-ui.md": "ed274c23e5c755f90e5e2063f33e3e42c41f2d20ca4effb16e466718dab602f8",
+        "overlay/20-Repos/routing/routing-api.md": "a1be995b031c77d4539f59e0476c0d48bd71bbf08558ff93f322021769ed523f",
+        "overlay/20-Repos/routing/routing-planner.md": "81caee5f2f6b4ce145d53b89596e453f0131fa7419c06a1b203f3c1521879c12",
+        "overlay/25-Topics/route-events.md": "4e6f99b6dd364433b628eae7a0b87704c967645e34d97652bc9580d2d135f26b",
+        "overlay/30-Flujos/Flujo - Dispatch.md": "cfbd5341d5bb217de07a94ee0c05f9b63bdc3bb0fcec0085627e086188cb4361",
+        "overlay/40-Integraciones/Maps Vendor.md": "716689d5c7cfb1cc0ce5042ac625c3024d83a093380991a1b2c7e1cf1fe320b2",
+        "overlay/50-Glosario/Orphan Scratch.md": "db23d8be94cbcfc7166709686f1e4ead9c238ce29c2f1c11e052d6c82c40b1bc",
+        "overlay/70-Aprendizajes/Aprendizaje - Stale GPS.md": "452642f2cf309d3b40fd20bfbbfbe5b1a15e2f53c00b930682de9698e00abc60",
+        "materialize.py": "b23985e6b6edf6c25b5c8c810bda9c01b7f78310466ebd3f33e79f0f3fa0a3f5"
+      },
+      "distribution_head": "ca5a6985d677c2b3e2a699edac67285b05f81fb4",
+      "cases": [
+        {
+          "id": "two-repositories",
+          "prompt": "Compara lo documentado sobre routing-planner y fleet-ingest: función, relación mediante route-events y qué prueba existe de funcionamiento actual en producción.",
+          "alternative": "Sintetiza los hallazgos de los dos trabajadores, comprueba coherencia y citas sin repetir toda su búsqueda.",
+          "children": [
+            "Inspecciona lo documentado sobre routing-planner: función, publicación y evidencia de funcionamiento actual en producción. Devuelve hechos con rutas y límites.",
+            "Inspecciona lo documentado sobre fleet-ingest: función, suscripción y evidencia de funcionamiento actual en producción. Devuelve hechos con rutas y límites."
+          ]
+        },
+        {
+          "id": "reuse-investigation",
+          "prompt": "Resume el hallazgo y aprendizaje registrado sobre GPS antiguo en investigations/20260820-090000-stale-gps-write/investigation.md y 70-Aprendizajes/Aprendizaje - Stale GPS.md. ¿Demuestra que el problema ya se corrigió?",
+          "alternative": "Resuelve el ID suministrado con el comando oficial de carga de investigaciones y reutiliza el caso y aprendizaje identificados. Busca más solo ante una contradicción o afirmación necesaria no respaldada; no reabras la investigación."
+        }
+      ],
+      "decomposition": "fixed experiment tasks"
+    }
+  }
+]

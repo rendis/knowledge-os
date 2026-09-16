@@ -1,0 +1,924 @@
+{
+  "runs": [
+    {
+      "id": "holdout-known/r01-baseline",
+      "case": "holdout-known",
+      "repetition": 1,
+      "variant": "baseline",
+      "wall_seconds": 60.15543025000079,
+      "setup_seconds": 0.30164837501069997,
+      "ok": true,
+      "changed": [],
+      "usage": {
+        "input_tokens": 284826,
+        "cached_input_tokens": 246144,
+        "output_tokens": 1221,
+        "uncached_input_tokens": 38682
+      },
+      "review": {
+        "accepted": true,
+        "issues": []
+      },
+      "phase_count": 2,
+      "repaired": false,
+      "phases": [
+        {
+          "phase": "parent",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 40.71302179200575,
+          "usage": {
+            "input_tokens": 185499,
+            "cached_input_tokens": 165632,
+            "output_tokens": 843
+          }
+        },
+        {
+          "phase": "review",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 19.436400833001244,
+          "usage": {
+            "input_tokens": 99327,
+            "cached_input_tokens": 80512,
+            "output_tokens": 378
+          }
+        }
+      ],
+      "semantic": {
+        "id": "holdout-known/r01-baseline",
+        "accepted": true,
+        "reason": "Responde consulta y vigencia documental con nota y metadatos exactos; evita inferir operación desde placeholders.",
+        "critical": false,
+        "blind_id": "6731f7132736",
+        "trace_verified": true
+      },
+      "trace_verified": true,
+      "accepted": true
+    },
+    {
+      "id": "holdout-known/r01-alternative",
+      "case": "holdout-known",
+      "repetition": 1,
+      "variant": "alternative",
+      "wall_seconds": 66.63437095900008,
+      "setup_seconds": 0.31277112499810755,
+      "ok": true,
+      "changed": [],
+      "usage": {
+        "input_tokens": 323191,
+        "cached_input_tokens": 279552,
+        "output_tokens": 1500,
+        "uncached_input_tokens": 43639
+      },
+      "review": {
+        "accepted": true,
+        "issues": []
+      },
+      "phase_count": 2,
+      "repaired": false,
+      "phases": [
+        {
+          "phase": "parent",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 40.160449667004286,
+          "usage": {
+            "input_tokens": 204297,
+            "cached_input_tokens": 179456,
+            "output_tokens": 935
+          }
+        },
+        {
+          "phase": "review",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 26.467310083011398,
+          "usage": {
+            "input_tokens": 118894,
+            "cached_input_tokens": 100096,
+            "output_tokens": 565
+          }
+        }
+      ],
+      "semantic": {
+        "id": "holdout-known/r01-alternative",
+        "accepted": true,
+        "reason": "Respuesta breve completa; fuente y líneas sostienen consulta, cinco áreas pendientes y placeholders sin clasificación operativa.",
+        "critical": false,
+        "blind_id": "40e3a31fdc71",
+        "trace_verified": true
+      },
+      "trace_verified": true,
+      "accepted": true
+    },
+    {
+      "id": "holdout-impact/r01-baseline",
+      "case": "holdout-impact",
+      "repetition": 1,
+      "variant": "baseline",
+      "wall_seconds": 70.94518399999652,
+      "setup_seconds": 0.30158837500493973,
+      "ok": true,
+      "changed": [],
+      "usage": {
+        "input_tokens": 339642,
+        "cached_input_tokens": 297216,
+        "output_tokens": 1701,
+        "uncached_input_tokens": 42426
+      },
+      "review": {
+        "accepted": true,
+        "issues": []
+      },
+      "phase_count": 2,
+      "repaired": false,
+      "phases": [
+        {
+          "phase": "parent",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 45.34864087498863,
+          "usage": {
+            "input_tokens": 198534,
+            "cached_input_tokens": 175360,
+            "output_tokens": 1052
+          }
+        },
+        {
+          "phase": "review",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 25.58987949999573,
+          "usage": {
+            "input_tokens": 141108,
+            "cached_input_tokens": 121856,
+            "output_tokens": 649
+          }
+        }
+      ],
+      "semantic": {
+        "id": "holdout-impact/r01-baseline",
+        "accepted": true,
+        "reason": "Roles, flujo y contrato pendiente citados; niega garantía actual sin convertir ausencia de evidencia en afectación confirmada.",
+        "critical": false,
+        "blind_id": "142b52d9cceb",
+        "trace_verified": true
+      },
+      "trace_verified": true,
+      "accepted": true
+    },
+    {
+      "id": "holdout-impact/r01-alternative",
+      "case": "holdout-impact",
+      "repetition": 1,
+      "variant": "alternative",
+      "wall_seconds": 64.58258400000341,
+      "setup_seconds": 0.26870137501100544,
+      "ok": true,
+      "changed": [],
+      "usage": {
+        "input_tokens": 319736,
+        "cached_input_tokens": 276480,
+        "output_tokens": 1741,
+        "uncached_input_tokens": 43256
+      },
+      "review": {
+        "accepted": true,
+        "issues": []
+      },
+      "phase_count": 2,
+      "repaired": false,
+      "phases": [
+        {
+          "phase": "parent",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 36.96304349999991,
+          "usage": {
+            "input_tokens": 170791,
+            "cached_input_tokens": 146688,
+            "output_tokens": 1020
+          }
+        },
+        {
+          "phase": "review",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 27.613169459000346,
+          "usage": {
+            "input_tokens": 148945,
+            "cached_input_tokens": 129792,
+            "output_tokens": 721
+          }
+        }
+      ],
+      "semantic": {
+        "id": "holdout-impact/r01-alternative",
+        "accepted": true,
+        "reason": "Roles y límites citados; resultado determinista confirma enlace roto MissingNode y la nota confirma placeholder contractual; no infiere daño operativo.",
+        "critical": false,
+        "blind_id": "a1f0cb4718f4",
+        "trace_verified": true
+      },
+      "trace_verified": true,
+      "accepted": true
+    },
+    {
+      "id": "holdout-known/r02-alternative",
+      "case": "holdout-known",
+      "repetition": 2,
+      "variant": "alternative",
+      "wall_seconds": 46.363296957992134,
+      "setup_seconds": 0.3181027499958873,
+      "ok": true,
+      "changed": [],
+      "usage": {
+        "input_tokens": 265022,
+        "cached_input_tokens": 201472,
+        "output_tokens": 1053,
+        "uncached_input_tokens": 63550
+      },
+      "review": {
+        "accepted": true,
+        "issues": []
+      },
+      "phase_count": 2,
+      "repaired": false,
+      "phases": [
+        {
+          "phase": "parent",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 29.30561912500707,
+          "usage": {
+            "input_tokens": 174983,
+            "cached_input_tokens": 127616,
+            "output_tokens": 744
+          }
+        },
+        {
+          "phase": "review",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 17.05229041700659,
+          "usage": {
+            "input_tokens": 90039,
+            "cached_input_tokens": 73856,
+            "output_tokens": 309
+          }
+        }
+      ],
+      "semantic": {
+        "id": "holdout-known/r02-alternative",
+        "accepted": true,
+        "reason": "Contesta ambas partes con evidencia exacta y conserva separación entre documentación y estado actual del código.",
+        "critical": false,
+        "blind_id": "aded26059855",
+        "trace_verified": true
+      },
+      "trace_verified": true,
+      "accepted": true
+    },
+    {
+      "id": "holdout-known/r02-baseline",
+      "case": "holdout-known",
+      "repetition": 2,
+      "variant": "baseline",
+      "wall_seconds": 43.08310541699757,
+      "setup_seconds": 0.27540216701163445,
+      "ok": true,
+      "changed": [],
+      "usage": {
+        "input_tokens": 226879,
+        "cached_input_tokens": 188672,
+        "output_tokens": 1097,
+        "uncached_input_tokens": 38207
+      },
+      "review": {
+        "accepted": true,
+        "issues": []
+      },
+      "phase_count": 2,
+      "repaired": false,
+      "phases": [
+        {
+          "phase": "parent",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 24.851029249999556,
+          "usage": {
+            "input_tokens": 127035,
+            "cached_input_tokens": 107776,
+            "output_tokens": 652
+          }
+        },
+        {
+          "phase": "review",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 18.22648341600143,
+          "usage": {
+            "input_tokens": 99844,
+            "cached_input_tokens": 80896,
+            "output_tokens": 445
+          }
+        }
+      ],
+      "semantic": {
+        "id": "holdout-known/r02-baseline",
+        "accepted": true,
+        "reason": "Consulta fleet-ingest y describe cobertura no acreditada con metadatos exactos y fuente; respuesta breve y acotada.",
+        "critical": false,
+        "blind_id": "02a22156148a",
+        "trace_verified": true
+      },
+      "trace_verified": true,
+      "accepted": true
+    },
+    {
+      "id": "holdout-impact/r02-alternative",
+      "case": "holdout-impact",
+      "repetition": 2,
+      "variant": "alternative",
+      "wall_seconds": 60.56789025000762,
+      "setup_seconds": 0.3182085000007646,
+      "ok": true,
+      "changed": [],
+      "usage": {
+        "input_tokens": 228512,
+        "cached_input_tokens": 193280,
+        "output_tokens": 1509,
+        "uncached_input_tokens": 35232
+      },
+      "review": {
+        "accepted": true,
+        "issues": []
+      },
+      "phase_count": 2,
+      "repaired": false,
+      "phases": [
+        {
+          "phase": "parent",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 41.99883979099104,
+          "usage": {
+            "input_tokens": 142316,
+            "cached_input_tokens": 119936,
+            "output_tokens": 1040
+          }
+        },
+        {
+          "phase": "review",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 18.564222957997117,
+          "usage": {
+            "input_tokens": 86196,
+            "cached_input_tokens": 73344,
+            "output_tokens": 469
+          }
+        }
+      ],
+      "semantic": {
+        "id": "holdout-impact/r02-alternative",
+        "accepted": true,
+        "reason": "Identifica participantes y fuentes relevantes; límite de acceso es consistente con alcance común y no presume impacto.",
+        "critical": false,
+        "blind_id": "bfa1a6f3fe5f",
+        "trace_verified": true
+      },
+      "trace_verified": true,
+      "accepted": true
+    },
+    {
+      "id": "holdout-impact/r02-baseline",
+      "case": "holdout-impact",
+      "repetition": 2,
+      "variant": "baseline",
+      "wall_seconds": 65.76454829199065,
+      "setup_seconds": 0.27987345900328364,
+      "ok": true,
+      "changed": [],
+      "usage": {
+        "input_tokens": 360397,
+        "cached_input_tokens": 302848,
+        "output_tokens": 1762,
+        "uncached_input_tokens": 57549
+      },
+      "review": {
+        "accepted": true,
+        "issues": []
+      },
+      "phase_count": 2,
+      "repaired": false,
+      "phases": [
+        {
+          "phase": "parent",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 33.83884024999861,
+          "usage": {
+            "input_tokens": 184774,
+            "cached_input_tokens": 146944,
+            "output_tokens": 1006
+          }
+        },
+        {
+          "phase": "review",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 31.92097620900313,
+          "usage": {
+            "input_tokens": 175623,
+            "cached_input_tokens": 155904,
+            "output_tokens": 756
+          }
+        }
+      ],
+      "semantic": {
+        "id": "holdout-impact/r02-baseline",
+        "accepted": true,
+        "reason": "Cubre ambos participantes y cambio contractual; citas sostienen roles y cobertura pendiente; distingue documentación de funcionamiento actual.",
+        "critical": false,
+        "blind_id": "5831b60ffddd",
+        "trace_verified": true
+      },
+      "trace_verified": true,
+      "accepted": true
+    },
+    {
+      "id": "holdout-known/r03-baseline",
+      "case": "holdout-known",
+      "repetition": 3,
+      "variant": "baseline",
+      "wall_seconds": 84.14813758300443,
+      "setup_seconds": 0.33047320900368504,
+      "ok": true,
+      "changed": [],
+      "usage": {
+        "input_tokens": 402452,
+        "cached_input_tokens": 359936,
+        "output_tokens": 1581,
+        "uncached_input_tokens": 42516
+      },
+      "review": {
+        "accepted": true,
+        "issues": []
+      },
+      "phase_count": 2,
+      "repaired": false,
+      "phases": [
+        {
+          "phase": "parent",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 55.037909332997515,
+          "usage": {
+            "input_tokens": 250811,
+            "cached_input_tokens": 228736,
+            "output_tokens": 1032
+          }
+        },
+        {
+          "phase": "review",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 29.103699583007256,
+          "usage": {
+            "input_tokens": 151641,
+            "cached_input_tokens": 131200,
+            "output_tokens": 549
+          }
+        }
+      ],
+      "semantic": {
+        "id": "holdout-known/r03-baseline",
+        "accepted": true,
+        "reason": "Cubre consulta y vigencia con nota; fallo acotado de inventario está confirmado por resultado determinista y no sustituye respuesta ni implica falla operativa.",
+        "critical": false,
+        "blind_id": "25f4d7c599ba",
+        "trace_verified": true
+      },
+      "trace_verified": true,
+      "accepted": true
+    },
+    {
+      "id": "holdout-known/r03-alternative",
+      "case": "holdout-known",
+      "repetition": 3,
+      "variant": "alternative",
+      "wall_seconds": 55.012358874999336,
+      "setup_seconds": 0.2780913330061594,
+      "ok": true,
+      "changed": [],
+      "usage": {
+        "input_tokens": 259069,
+        "cached_input_tokens": 215680,
+        "output_tokens": 1070,
+        "uncached_input_tokens": 43389
+      },
+      "review": {
+        "accepted": true,
+        "issues": []
+      },
+      "phase_count": 2,
+      "repaired": false,
+      "phases": [
+        {
+          "phase": "parent",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 33.687145083007636,
+          "usage": {
+            "input_tokens": 172098,
+            "cached_input_tokens": 140544,
+            "output_tokens": 795
+          }
+        },
+        {
+          "phase": "review",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 21.320110915999976,
+          "usage": {
+            "input_tokens": 86971,
+            "cached_input_tokens": 75136,
+            "output_tokens": 275
+          }
+        }
+      ],
+      "semantic": {
+        "id": "holdout-known/r03-alternative",
+        "accepted": true,
+        "reason": "Contesta consulta y vigencia documental con metadatos exactos y nota; breve, claro y sin inferencias operativas.",
+        "critical": false,
+        "blind_id": "549ee422647e",
+        "trace_verified": true
+      },
+      "trace_verified": true,
+      "accepted": true
+    },
+    {
+      "id": "holdout-impact/r03-baseline",
+      "case": "holdout-impact",
+      "repetition": 3,
+      "variant": "baseline",
+      "wall_seconds": 70.94131041699438,
+      "setup_seconds": 0.33054820899269544,
+      "ok": true,
+      "changed": [],
+      "usage": {
+        "input_tokens": 318364,
+        "cached_input_tokens": 279296,
+        "output_tokens": 1876,
+        "uncached_input_tokens": 39068
+      },
+      "review": {
+        "accepted": true,
+        "issues": []
+      },
+      "phase_count": 2,
+      "repaired": false,
+      "phases": [
+        {
+          "phase": "parent",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 43.73536350000359,
+          "usage": {
+            "input_tokens": 178011,
+            "cached_input_tokens": 157952,
+            "output_tokens": 1224
+          }
+        },
+        {
+          "phase": "review",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 27.198716375001823,
+          "usage": {
+            "input_tokens": 140353,
+            "cached_input_tokens": 121344,
+            "output_tokens": 652
+          }
+        }
+      ],
+      "semantic": {
+        "id": "holdout-impact/r03-baseline",
+        "accepted": true,
+        "reason": "Identifica productor y consumidor con citas y explica límite de garantía actual; requisitos adicionales de evidencia son pertinentes y claros.",
+        "critical": false,
+        "blind_id": "0777b5b8d0cc",
+        "trace_verified": true
+      },
+      "trace_verified": true,
+      "accepted": true
+    },
+    {
+      "id": "holdout-impact/r03-alternative",
+      "case": "holdout-impact",
+      "repetition": 3,
+      "variant": "alternative",
+      "wall_seconds": 73.08528991699859,
+      "setup_seconds": 0.29798016700078733,
+      "ok": true,
+      "changed": [],
+      "usage": {
+        "input_tokens": 318451,
+        "cached_input_tokens": 278528,
+        "output_tokens": 1930,
+        "uncached_input_tokens": 39923
+      },
+      "review": {
+        "accepted": true,
+        "issues": []
+      },
+      "phase_count": 2,
+      "repaired": false,
+      "phases": [
+        {
+          "phase": "parent",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 39.86050645800424,
+          "usage": {
+            "input_tokens": 172962,
+            "cached_input_tokens": 152064,
+            "output_tokens": 1136
+          }
+        },
+        {
+          "phase": "review",
+          "exit": 0,
+          "error": null,
+          "wall_seconds": 33.213803083010134,
+          "usage": {
+            "input_tokens": 145489,
+            "cached_input_tokens": 126464,
+            "output_tokens": 794
+          }
+        }
+      ],
+      "semantic": {
+        "id": "holdout-impact/r03-alternative",
+        "accepted": true,
+        "reason": "Identifica productor y consumidor con fuentes; limita explícitamente garantía operativa y apoya contrato pendiente y fechas en notas.",
+        "critical": false,
+        "blind_id": "3f8929721aa3",
+        "trace_verified": true
+      },
+      "trace_verified": true,
+      "accepted": true
+    }
+  ],
+  "comparisons": [
+    {
+      "case": "holdout-impact",
+      "all_attempts": {
+        "baseline": {
+          "accepted": 3,
+          "runs": 3,
+          "input_tokens": {
+            "total": 1018403,
+            "per_accepted": 339467.6666666667
+          },
+          "cached_input_tokens": {
+            "total": 879360,
+            "per_accepted": 293120.0
+          },
+          "uncached_input_tokens": {
+            "total": 139043,
+            "per_accepted": 46347.666666666664
+          },
+          "output_tokens": {
+            "total": 5339,
+            "per_accepted": 1779.6666666666667
+          },
+          "wall_seconds": {
+            "total": 207.65104270898155,
+            "per_accepted": 69.21701423632719
+          }
+        },
+        "alternative": {
+          "accepted": 3,
+          "runs": 3,
+          "input_tokens": {
+            "total": 866699,
+            "per_accepted": 288899.6666666667
+          },
+          "cached_input_tokens": {
+            "total": 748288,
+            "per_accepted": 249429.33333333334
+          },
+          "uncached_input_tokens": {
+            "total": 118411,
+            "per_accepted": 39470.333333333336
+          },
+          "output_tokens": {
+            "total": 5180,
+            "per_accepted": 1726.6666666666667
+          },
+          "wall_seconds": {
+            "total": 198.23576416700962,
+            "per_accepted": 66.07858805566987
+          }
+        }
+      },
+      "pairs": [
+        {
+          "repetition": 1,
+          "comparable": true,
+          "alternative_minus_baseline": {
+            "input_tokens": -19906,
+            "cached_input_tokens": -20736,
+            "uncached_input_tokens": 830,
+            "output_tokens": 40,
+            "wall_seconds": -6.362599999993108
+          },
+          "percent_change": {
+            "input_tokens": -5.860877041119772,
+            "cached_input_tokens": -6.976744186046513,
+            "uncached_input_tokens": 1.956347522745494,
+            "output_tokens": 2.351557907113455,
+            "wall_seconds": -8.968332508649802
+          }
+        },
+        {
+          "repetition": 2,
+          "comparable": true,
+          "alternative_minus_baseline": {
+            "input_tokens": -131885,
+            "cached_input_tokens": -109568,
+            "uncached_input_tokens": -22317,
+            "output_tokens": -253,
+            "wall_seconds": -5.196658041983028
+          },
+          "percent_change": {
+            "input_tokens": -36.59436676775889,
+            "cached_input_tokens": -36.17920540997465,
+            "uncached_input_tokens": -38.779127352343224,
+            "output_tokens": -14.358683314415433,
+            "wall_seconds": -7.901913990057652
+          }
+        },
+        {
+          "repetition": 3,
+          "comparable": true,
+          "alternative_minus_baseline": {
+            "input_tokens": 87,
+            "cached_input_tokens": -768,
+            "uncached_input_tokens": 855,
+            "output_tokens": 54,
+            "wall_seconds": 2.143979500004207
+          },
+          "percent_change": {
+            "input_tokens": 0.027327210362981802,
+            "cached_input_tokens": -0.2749770852429001,
+            "uncached_input_tokens": 2.1884918603460646,
+            "output_tokens": 2.8784648187633266,
+            "wall_seconds": 3.0221876187539465
+          }
+        }
+      ],
+      "median_paired_delta": {
+        "input_tokens": -19906,
+        "cached_input_tokens": -20736,
+        "uncached_input_tokens": 830,
+        "output_tokens": 40,
+        "wall_seconds": -5.196658041983028
+      },
+      "median_paired_percent_change": {
+        "input_tokens": -5.860877041119772,
+        "cached_input_tokens": -6.976744186046513,
+        "uncached_input_tokens": 1.956347522745494,
+        "output_tokens": 2.351557907113455,
+        "wall_seconds": -7.901913990057652
+      }
+    },
+    {
+      "case": "holdout-known",
+      "all_attempts": {
+        "baseline": {
+          "accepted": 3,
+          "runs": 3,
+          "input_tokens": {
+            "total": 914157,
+            "per_accepted": 304719.0
+          },
+          "cached_input_tokens": {
+            "total": 794752,
+            "per_accepted": 264917.3333333333
+          },
+          "uncached_input_tokens": {
+            "total": 119405,
+            "per_accepted": 39801.666666666664
+          },
+          "output_tokens": {
+            "total": 3899,
+            "per_accepted": 1299.6666666666667
+          },
+          "wall_seconds": {
+            "total": 187.3866732500028,
+            "per_accepted": 62.462224416667596
+          }
+        },
+        "alternative": {
+          "accepted": 3,
+          "runs": 3,
+          "input_tokens": {
+            "total": 847282,
+            "per_accepted": 282427.3333333333
+          },
+          "cached_input_tokens": {
+            "total": 696704,
+            "per_accepted": 232234.66666666666
+          },
+          "uncached_input_tokens": {
+            "total": 150578,
+            "per_accepted": 50192.666666666664
+          },
+          "output_tokens": {
+            "total": 3623,
+            "per_accepted": 1207.6666666666667
+          },
+          "wall_seconds": {
+            "total": 168.01002679199155,
+            "per_accepted": 56.00334226399718
+          }
+        }
+      },
+      "pairs": [
+        {
+          "repetition": 1,
+          "comparable": true,
+          "alternative_minus_baseline": {
+            "input_tokens": 38365,
+            "cached_input_tokens": 33408,
+            "uncached_input_tokens": 4957,
+            "output_tokens": 279,
+            "wall_seconds": 6.478940708999289
+          },
+          "percent_change": {
+            "input_tokens": 13.469627070562385,
+            "cached_input_tokens": 13.572542901716078,
+            "uncached_input_tokens": 12.814745876635136,
+            "output_tokens": 22.850122850122844,
+            "wall_seconds": 10.77033392010225
+          }
+        },
+        {
+          "repetition": 2,
+          "comparable": true,
+          "alternative_minus_baseline": {
+            "input_tokens": 38143,
+            "cached_input_tokens": 12800,
+            "uncached_input_tokens": 25343,
+            "output_tokens": -44,
+            "wall_seconds": 3.280191540994565
+          },
+          "percent_change": {
+            "input_tokens": 16.812045187082102,
+            "cached_input_tokens": 6.7842605156037905,
+            "uncached_input_tokens": 66.33077708273353,
+            "output_tokens": -4.0109389243391025,
+            "wall_seconds": 7.613637664337047
+          }
+        },
+        {
+          "repetition": 3,
+          "comparable": true,
+          "alternative_minus_baseline": {
+            "input_tokens": -143383,
+            "cached_input_tokens": -144256,
+            "uncached_input_tokens": 873,
+            "output_tokens": -511,
+            "wall_seconds": -29.13577870800509
+          },
+          "percent_change": {
+            "input_tokens": -35.62735431803047,
+            "cached_input_tokens": -40.07823613086771,
+            "uncached_input_tokens": 2.0533446232006813,
+            "output_tokens": -32.32131562302341,
+            "wall_seconds": -34.624389255514195
+          }
+        }
+      ],
+      "median_paired_delta": {
+        "input_tokens": 38143,
+        "cached_input_tokens": 12800,
+        "uncached_input_tokens": 4957,
+        "output_tokens": -44,
+        "wall_seconds": 3.280191540994565
+      },
+      "median_paired_percent_change": {
+        "input_tokens": 13.469627070562385,
+        "cached_input_tokens": 6.7842605156037905,
+        "uncached_input_tokens": 12.814745876635136,
+        "output_tokens": -4.0109389243391025,
+        "wall_seconds": 7.613637664337047
+      }
+    }
+  ]
+}

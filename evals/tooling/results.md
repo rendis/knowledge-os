@@ -1,6 +1,6 @@
 # Installed-tool corrections — verification
 
-Date: 2026-09-16. Base distribution: `61a8fe7` (0.10.0). Corrections are local working-tree changes; this report does not claim a new release or consumer propagation.
+Date: 2026-09-16. Tested base distribution: `61a8fe7` (0.10.0). The sections below record candidate-time verification. Subsequent release: **0.10.1**, distribution `715beda`, Cell A `fc165e5`, Cells B/C `abfec73`, all local commits. The later 0.10.2 release retains these corrections; see the [session closure](../session-closure.md).
 
 ## Changes and protected behavior
 
