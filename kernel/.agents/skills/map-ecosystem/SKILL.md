@@ -9,7 +9,7 @@ metadata:
 
 ## Activation Contract
 
-Use this skill for a cell-vault query, documentation update, ecosystem synchronization, or preflight for a specified operation. Workspace configuration status and repair belong to `configure-workspace`; Git policy maintenance belongs to `manage-git-workflow`. A `SYNC_PACKAGE_WORKER_V1` card selects the package-worker path only.
+Use this skill for a cell-vault query, documentation update, ecosystem synchronization, related-vault catalog maintenance, or preflight for a specified operation. Workspace configuration status and repair belong to `configure-workspace`; Git policy maintenance belongs to `manage-git-workflow`. A `SYNC_PACKAGE_WORKER_V1` card selects the package-worker path only.
 
 ## Hard Rules
 
@@ -21,6 +21,8 @@ Use this skill for a cell-vault query, documentation update, ecosystem synchroni
 - External reconciliation publishes through an ordinary documentation transaction and an independent final-note review; later observations never enter a closed Git synchronization package.
 
 ## Mapping scope
+
+When mapping discovers a related domain vault, use [references/vault-catalog.md](references/vault-catalog.md) to validate and propose its entry. Keep catalog registration separate from ordinary map publication authority.
 
 For repository mapping and synchronization, [references/repository-map.md](references/repository-map.md) defines the default: purpose, main entrypoints → meaningful logic → connectors/effects, stack and evidence. Reuse valid existing knowledge. Accepted local maps expose stable connection claims; resolve selected external ends afterward with [references/connection-reconciliation.md](references/connection-reconciliation.md).
 
@@ -41,6 +43,7 @@ Choose the next action from the existing knowledge, not from the number of pendi
 | Incomplete bootstrap or where-to-start request | Load `references/orientation.md`. |
 | Context, dependency, or impact question | Load `references/interrogation.md`. |
 | A related vault is discovered in authorized repository exploration or supplied by the user | Load `references/cross-vault-consultation.md` before consulting it; return to the active branch. |
+| Register, update, list or remove related vaults; or a mapping discovers a candidate to register | Load `references/vault-catalog.md`; discovery requires confirmation before registration. |
 | One durable node | Load `references/single-unit-documentation.md`. |
 | Several related units | Load `references/multi-unit-documentation.md`. |
 | Pending-work or campaign-completion question | Load `references/mapping-completion.md`; keep the query read-only. |

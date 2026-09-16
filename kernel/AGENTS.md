@@ -22,6 +22,8 @@ Before reading domain notes or source code, run `90-Meta/resolve-vault.py` (with
    - Cell-specific scope, allowlists, or exceptions: `90-Meta/Alcance.md`.
    - Schema, node type, or evidence gate: the relevant section of `90-Meta/Convenciones.md` or `90-Meta/Auditoria - Framework.md`.
 
+For related-vault registration, maintenance or discovery proposals, use `map-ecosystem` and its [catalog procedure](.agents/skills/map-ecosystem/references/vault-catalog.md).
+
 When a question crosses into another vault, follow [cross-vault consultation](.agents/skills/map-ecosystem/references/cross-vault-consultation.md) before reading its domain content.
 
 Operational audit procedures belong to the registered audit area; link the technologies they inspect through related areas.
