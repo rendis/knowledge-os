@@ -1,6 +1,6 @@
 # Resolve and interact with the canonical vault
 
-Load this reference before reading any repository-relative instruction or operating on the cell map. The skill may run from the vault, a source repository, or an unrelated working directory.
+Load this reference as bootstrap context, then resolve the vault before reading domain notes or operating on the cell map. Router, personal instructions and skill/access references may be read to perform this bootstrap. The skill may run from the vault, a source repository, or an unrelated working directory.
 
 ## Contents
 
@@ -66,7 +66,12 @@ Resolve again after a new user-supplied vault path, configuration change, clone,
 
 `SOURCE_ROOTS` are discovery inputs; a successful semantic response is the only checkout binding. Before reading a source repository or assigning it to a worker, obtain its expected Git remote and run `python3 -B 90-Meta/workspace-config.py --vault-root "<VAULT_ROOT>" locate-repository "<GIT_REMOTE>" --format json`. Use only the `path` returned by that command, and repeat the resolution for every required repository. A configured discovery root represents itself when it is a Git repository; otherwise only its immediate child directories are candidates. The semantic API normalizes SSH and HTTPS remotes, performs no recursive scan, and rejects zero or multiple matches without writing configuration.
 
-When `source_context.status` is `unavailable` or `invalid`, a vault-only task may continue with that limitation. A task that needs source evidence must load `configure-workspace`, complete onboarding or repair, rerun the resolver, and then resume. No consumer may write the YAML directly.
+A failed checkout binding keeps source reads blocked; a vault-only task may continue with that limitation. Recover through these supported paths:
+
+- **Unavailable/invalid configuration or ambiguous matches:** load `configure-workspace`. Ask which repository root/checkout should be configured and for authorization to make the required configuration change. If configuration changes are forbidden, state that the source question cannot be completed under that constraint and ask whether the user wants to authorize that bounded configuration repair. Resume source reading only after the repaired configuration returns one successful checkout binding.
+- **`not_found` under valid roots:** request an existing matching checkout within those roots, or authorization to configure another root. Repeat checkout resolution before reading.
+
+The recovery question requests configuration or a matching checkout, never permission to skip identity resolution. Confirming an ambiguous path without resolving its configuration does not complete recovery. `configure-workspace` remains the sole configuration writer.
 
 The order of `SOURCE_ROOTS` is the configured order and every record has `origin: config`. A root whose exact resolved path is also `CLONE_ROOT` is marked `managed: true`; parent/child overlap does not transfer authority. Duplicate or inconsistent candidates require the configuration workflow and an explicit user choice; consumers must not invent a preference.
 
