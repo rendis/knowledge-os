@@ -1,0 +1,105 @@
+{
+  "case": "wrong-remote",
+  "round": "round2",
+  "policy_hashes": {
+    "AGENTS.md": "ac522a401c7d10e06dca3195161fa00484897198b0a22cf01bd9761774820c8b",
+    "90-Meta/vault-resolution.md": "713cc825d962cb7ad5e04daca26a64f0fe66d879bbde557d2a55ff6a4287564a",
+    "90-Meta/response-quality.md": "c627033ebdc2ed850e995455f9b77c52d107c44ee1977d3006ca99bd58caccba"
+  },
+  "source_events_sha256": "b30a82c5f01174c00888a6f1f4b010682a1a21afd8494cf05e4d988d013b4243",
+  "summary": {
+    "case": "wrong-remote",
+    "exit": 0,
+    "changed": [],
+    "requested_model": "gpt-5.6-sol",
+    "requested_effort": "medium"
+  },
+  "events": [
+    {
+      "type": "thread.started",
+      "thread_id": "01a0aba7-d886-7890-a32f-6f9c3582f4dd"
+    },
+    {
+      "type": "item.completed",
+      "item": {
+        "id": "item_0",
+        "type": "agent_message",
+        "text": "Voy a comprobar la identidad del repositorio y la evidencia de `DISPLAY_LABEL` con consultas locales de solo lectura."
+      }
+    },
+    {
+      "type": "item.completed",
+      "item": {
+        "id": "item_1",
+        "type": "command_execution",
+        "command": "/bin/zsh -lc 'PATH=\"${CASE_ROOT}/bin:$PATH\" pwd; PATH=\"${CASE_ROOT}/bin:$PATH\" cat AGENTS.personal.md 2>/dev/null; PATH=\"${CASE_ROOT}/bin:$PATH\" python3 90-Meta/resolve-vault.py; PATH=\"${CASE_ROOT}/bin:$PATH\" cat .agents/skills/map-ecosystem/SKILL.md'",
+        "aggregated_output": "{\n  \"status\": \"resolved\",\n  \"vault_root\": \"${CASE_ROOT}/vault\",\n  \"obsidian_vault\": null,\n  \"obsidian_available\": false,\n  \"interaction_mode\": \"filesystem\",\n  \"source_context\": {\n    \"status\": \"resolved\",\n    \"roots\": [\n      {\n        \"path\": \"${CASE_ROOT}/re\n[policy/reference output omitted; full trace retained in temporary evidence]",
+        "exit_code": 0,
+        "status": "completed",
+        "aggregated_output_sha256": "ad20a4390587bb162c9e3a9069ee48ffdf6d20f73a68019a9c99658938e0abeb"
+      }
+    },
+    {
+      "type": "item.completed",
+      "item": {
+        "id": "item_2",
+        "type": "agent_message",
+        "text": "Estoy aplicando la skill `map-ecosystem` para verificar que la carpeta corresponda al repositorio declarado en la nota. El nombre de la carpeta, por sí solo, no confirma esa identidad."
+      }
+    },
+    {
+      "type": "item.completed",
+      "item": {
+        "id": "item_3",
+        "type": "command_execution",
+        "command": "/bin/zsh -lc 'PATH=\"${CASE_ROOT}/bin:$PATH\" cat 90-Meta/vault-resolution.md .agents/skills/map-ecosystem/references/interrogation.md .agents/skills/map-ecosystem/references/operational-readiness.md 90-Meta/response-quality.md 20-Repos/Palette.md'",
+        "aggregated_output": "# Resolve and interact with the canonical vault\n\nLoad this reference as bootstrap context, then resolve the vault before reading domain notes or operating on the cell map. Router, personal instructions and skill/access references may be read to perform this bootstrap. The skill may run from the vault, a source repository, or an unrelated working di\n[policy/reference output omitted; full trace retained in temporary evidence]",
+        "exit_code": 0,
+        "status": "completed",
+        "aggregated_output_sha256": "aaae6abc0ae0f3327d9d17e8bd2d73a760c557f653783eb6fab656e59efe0a4b"
+      }
+    },
+    {
+      "type": "item.completed",
+      "item": {
+        "id": "item_4",
+        "type": "command_execution",
+        "command": "/bin/zsh -lc 'PATH=\"${CASE_ROOT}/bin:$PATH\" cat .agents/skills/evidence-driven-analysis/SKILL.md; PATH=\"${CASE_ROOT}/bin:$PATH\" python3 -B 90-Meta/workspace-config.py --vault-root \"${CASE_ROOT}/vault\" locate-repository \"https://example.invalid/lab/palette.git\" --format json'",
+        "aggregated_output": "---\nname: evidence-driven-analysis\ndescription: Diagnose failures or assess claims when no specialized workflow owns the request; provide an auxiliary evidence method to other workflows. Vault knowledge and dependency questions belong to map-ecosystem.\n---\n\n# Evidence-driven analysis\n\nUse the smallest inquiry that can support the requested conclusi\n[policy/reference output omitted; full trace retained in temporary evidence]",
+        "exit_code": 2,
+        "status": "failed",
+        "aggregated_output_sha256": "6a371a42505538b14357bcdfe3d4418069318e2215aeaa899265c8d7406cfa5b"
+      }
+    },
+    {
+      "type": "item.completed",
+      "item": {
+        "id": "item_5",
+        "type": "command_execution",
+        "command": "/bin/zsh -lc 'PATH=\"${CASE_ROOT}/bin:$PATH\" git --no-optional-locks -C \"${CASE_ROOT}/repos/palette\" remote -v; PATH=\"${CASE_ROOT}/bin:$PATH\" cat .agents/skills/configure-workspace/SKILL.md'",
+        "aggregated_output": "origin\thttps://example.invalid/other/palette.git (fetch)\norigin\thttps://example.invalid/other/palette.git (push)\n---\nname: configure-workspace\ndescription: \"Trigger: onboard cell identity/capabilities or inspect and change local workspace config when `.knowledge-os-config.yaml` is missing or invalid, the user asks whether the workspace is initializ\n[policy/reference output omitted; full trace retained in temporary evidence]",
+        "exit_code": 0,
+        "status": "completed",
+        "aggregated_output_sha256": "103c1814ff6f9d7ecc22622750257167fd214d79a03e8dcae812db5fb1fae5dd"
+      }
+    },
+    {
+      "type": "item.completed",
+      "item": {
+        "id": "item_6",
+        "type": "agent_message",
+        "text": "Tu afirmación no se confirma: los remotos son distintos.\n\n- [Palette.md](${CASE_ROOT}/vault/20-Repos/Palette.md) declara `https://example.invalid/lab/palette.git`.\n- `repos/palette` tiene como `origin` `https://example.invalid/other/palette.git`.\n- La búsqueda por el remoto esperado devuelve `not_found`.\n\nNo puedo determinar `DISPLAY_LABEL`: la nota no registra su valor y esa carpeta no cumple la identidad requerida para consultar `labels.py`.\n\n¿Dónde está el checkout local de `https://example.invalid/lab/palette.git`?"
+      }
+    },
+    {
+      "type": "turn.completed",
+      "usage": {
+        "input_tokens": 129450,
+        "cached_input_tokens": 97152,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 770,
+        "reasoning_output_tokens": 64
+      }
+    }
+  ]
+}

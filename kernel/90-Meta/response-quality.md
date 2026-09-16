@@ -25,6 +25,6 @@ A defect requires a targeted correction or the smallest authorized missing check
 
 ## Communication
 
-Lead with the answer. Use a professional, formal tone, direct sentences and familiar, concrete language that the intended reader can understand. Explain technical terms when the reader needs them. Give only the reasoning, source references and uncertainty necessary to understand and use the conclusion. Expand for consequential complexity; a short answer must not hide a decisive condition. Never replace an available necessary check with confident wording or an unsupported assumption.
+Lead with the answer. Use a professional, formal tone, direct sentences and familiar, concrete language that the intended reader can understand. Explain technical terms when the reader needs them. Give only the reasoning, source references and uncertainty necessary to understand and use the conclusion. Include the decisive file or source reference even when the answer is one sentence. Expand for consequential complexity; a short answer must not hide a decisive condition. Never replace an available necessary check with confident wording or an unsupported assumption.
 
 These communication guidelines are informed by the relevance, findability, understandability and usability principles of [ISO 24495-1:2023](https://www.iso.org/standard/78907.html); they are not a claim of formal conformity. Clear writing and review reduce risk, not guarantee truth. Validate behavior using blind evidence-based scenarios, including users who do not ask corrective questions.

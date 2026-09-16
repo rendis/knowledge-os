@@ -1,0 +1,126 @@
+{
+  "case": "wrong-remote",
+  "round": "round3",
+  "policy_hashes": {
+    "AGENTS.md": "ac522a401c7d10e06dca3195161fa00484897198b0a22cf01bd9761774820c8b",
+    "90-Meta/vault-resolution.md": "8a45dabaadf625fba3bc491e9e661c75d010e8b53482ca1ca8d56803a02ebadd",
+    "90-Meta/response-quality.md": "c627033ebdc2ed850e995455f9b77c52d107c44ee1977d3006ca99bd58caccba"
+  },
+  "source_events_sha256": "0046ae6cb7d1ebcd2c04ac34087171e82eaff97fba9a24f27cd046ffcadbf4e8",
+  "summary": {
+    "case": "wrong-remote",
+    "exit": 0,
+    "changed": [],
+    "requested_model": "gpt-5.6-sol",
+    "requested_effort": "medium"
+  },
+  "events": [
+    {
+      "type": "thread.started",
+      "thread_id": "01a0aba9-e047-7f83-ae00-39a1da4e4805"
+    },
+    {
+      "type": "item.completed",
+      "item": {
+        "id": "item_0",
+        "type": "agent_message",
+        "text": "Voy a comprobar la identidad del repositorio con la evidencia local y consultar `DISPLAY_LABEL`, respetando el modo de solo lectura y sin usar red."
+      }
+    },
+    {
+      "type": "item.completed",
+      "item": {
+        "id": "item_1",
+        "type": "command_execution",
+        "command": "/bin/zsh -lc 'PATH=\"${CASE_ROOT}/bin:$PATH\" python3 90-Meta/resolve-vault.py'",
+        "aggregated_output": "{\n  \"status\": \"resolved\",\n  \"vault_root\": \"${CASE_ROOT}/vault\",\n  \"obsidian_vault\": null,\n  \"obsidian_available\": false,\n  \"interaction_mode\": \"filesystem\",\n  \"source_context\": {\n    \"status\": \"resolved\",\n    \"roots\": [\n      {\n        \"path\": \"${CASE_ROOT}/repos\",\n        \"origin\": \"config\",\n        \"managed\": false\n      }\n    ],\n    \"clone_root\": null,\n    \"clone_origin\": null,\n    \"clone_authorized\": false,\n    \"warnings\": []\n  },\n  \"orientation\": {\n    \"ready\": true,\n    \"reason\": \"ready\",\n    \"cell\": {\n      \"name\": \"Palette lab\",\n      \"purpose\": \"Synthetic source identity checks\"\n    },\n    \"systems\": [\n      \"Palette\"\n    ],\n    \"issues\": [],\n    \"start_here\": [\n      \"00-Home.md\",\n      \"instance.yaml\",\n      \"10-Sistemas/\"\n    ],\n    \"evidence_profile\": \"production-gate\",\n    \"enabled_types\": [\n      \"sistema\",\n      \"servicio\",\n      \"componente\",\n      \"recurso-runtime\",\n      \"repositorio\",\n      \"topic\",\n      \"flujo\",\n      \"integracion-externa\",\n      \"glosario\",\n      \"operacional\",\n      \"aprendizaje\",\n      \"indice\"\n    ],\n    \"pending_inventory\": false\n  },\n  \"resolution_source\": \"cwd\",\n  \"declared_remote\": \"\"\n}\n",
+        "exit_code": 0,
+        "status": "completed"
+      }
+    },
+    {
+      "type": "item.completed",
+      "item": {
+        "id": "item_2",
+        "type": "command_execution",
+        "command": "/bin/zsh -lc 'PATH=\"${CASE_ROOT}/bin:$PATH\" sh -c '\"'if [ -f AGENTS.personal.md ]; then cat AGENTS.personal.md; fi; cat .agents/skills/map-ecosystem/SKILL.md'\"",
+        "aggregated_output": "---\nname: map-ecosystem\ndescription: \"Trigger: query, document, synchronize, or check prerequisites for a specific cell-vault operation. Orient first when bootstrap is incomplete.\"\nlicense: Apache-2.0\nmetadata:\n  author: documentation-vault maintainers\n  version: \"1.0\"\n---\n\n## Activation Contract\n\nUse this skill for a cell-vault query, documentatio\n[policy/reference output omitted; full trace retained in temporary evidence]",
+        "exit_code": 0,
+        "status": "completed",
+        "aggregated_output_sha256": "9ded4db2d91372bed05f2313dba2614c8c0b0686de7c8fb15dd12150483dbc9c"
+      }
+    },
+    {
+      "type": "item.completed",
+      "item": {
+        "id": "item_3",
+        "type": "agent_message",
+        "text": "Estoy aplicando la habilidad `map-ecosystem`. El nombre de la carpeta no basta para confirmar su identidad; comprobaré el remoto Git frente al declarado en la nota."
+      }
+    },
+    {
+      "type": "item.completed",
+      "item": {
+        "id": "item_4",
+        "type": "command_execution",
+        "command": "/bin/zsh -lc 'PATH=\"${CASE_ROOT}/bin:$PATH\" cat .agents/skills/map-ecosystem/references/interrogation.md 90-Meta/vault-resolution.md 90-Meta/response-quality.md 20-Repos/Palette.md'",
+        "aggregated_output": "# Query the vault\n\n## Input and authority\n\nAccept a question, proposed change, or starting node. Resolve aliases only to find a note; navigate and report using canonical basenames. Keep this branch entirely read-only.\n\nWhen evidence needs to be obtained or evaluated, read [evidence-driven-analysis](../../evidence-driven-analysis/SKILL.md) in full b\n[policy/reference output omitted; full trace retained in temporary evidence]",
+        "exit_code": 0,
+        "status": "completed",
+        "aggregated_output_sha256": "87253865b9bc58d1546104c13fb63891f1b7083120dc674e9b7da0ed0492b902"
+      }
+    },
+    {
+      "type": "item.completed",
+      "item": {
+        "id": "item_5",
+        "type": "command_execution",
+        "command": "/bin/zsh -lc 'PATH=\"${CASE_ROOT}/bin:$PATH\" cat .agents/skills/evidence-driven-analysis/SKILL.md'",
+        "aggregated_output": "---\nname: evidence-driven-analysis\ndescription: Diagnose failures or assess claims when no specialized workflow owns the request; provide an auxiliary evidence method to other workflows. Vault knowledge and dependency questions belong to map-ecosystem.\n---\n\n# Evidence-driven analysis\n\nUse the smallest inquiry that can support the requested conclusi\n[policy/reference output omitted; full trace retained in temporary evidence]",
+        "exit_code": 0,
+        "status": "completed",
+        "aggregated_output_sha256": "8375213eb2e72382e70349fa3d5c896512f9deab1411cb30cedbb699600a669c"
+      }
+    },
+    {
+      "type": "item.completed",
+      "item": {
+        "id": "item_6",
+        "type": "command_execution",
+        "command": "/bin/zsh -lc 'PATH=\"${CASE_ROOT}/bin:$PATH\" python3 -B 90-Meta/workspace-config.py --vault-root \"${CASE_ROOT}/vault\" locate-repository \"https://example.invalid/lab/palette.git\" --format json'",
+        "aggregated_output": "{\n  \"status\": \"not_found\",\n  \"remote\": \"example.invalid/lab/palette\"\n}\n",
+        "exit_code": 2,
+        "status": "failed"
+      }
+    },
+    {
+      "type": "item.completed",
+      "item": {
+        "id": "item_7",
+        "type": "command_execution",
+        "command": "/bin/zsh -lc 'PATH=\"${CASE_ROOT}/bin:$PATH\" git -C \"${CASE_ROOT}/repos/palette\" remote -v'",
+        "aggregated_output": "origin\thttps://example.invalid/other/palette.git (fetch)\norigin\thttps://example.invalid/other/palette.git (push)\n",
+        "exit_code": 0,
+        "status": "completed"
+      }
+    },
+    {
+      "type": "item.completed",
+      "item": {
+        "id": "item_8",
+        "type": "agent_message",
+        "text": "Tu afirmación no se confirma: `repos/palette` tiene el remoto `https://example.invalid/other/palette.git`, mientras [Palette.md](${CASE_ROOT}/vault/20-Repos/Palette.md) declara `https://example.invalid/lab/palette.git`. El localizador devolvió `not_found`.\n\nNo puedo determinar `DISPLAY_LABEL`: la nota no registra su valor y la identidad no validada bloquea la lectura del código.\n\n¿Puedes proporcionar un checkout del remoto declarado dentro de la raíz configurada `repos`?"
+      }
+    },
+    {
+      "type": "turn.completed",
+      "usage": {
+        "input_tokens": 122823,
+        "cached_input_tokens": 105600,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 750,
+        "reasoning_output_tokens": 113
+      }
+    }
+  ]
+}
