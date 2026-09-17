@@ -17,3 +17,6 @@ __pycache__/
 *.pyc
 .venv/
 .python-version
+kernel/90-Meta/user-guide.md
+kernel/90-Meta/user-guide/
+kernel/90-Meta/test_user_guide.py
