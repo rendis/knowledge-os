@@ -16,13 +16,14 @@ class Transactions(unittest.TestCase):
         self.addCleanup(self.tmp.cleanup)
         self.root = Path(self.tmp.name) / 'investigations'
         self.root.mkdir()
+        self.unpublished = Path(self.tmp.name) / '.investigations'
         subprocess.run(['git', 'init', '-q', self.tmp.name], check=True)
         subprocess.run(['git', '-C', self.tmp.name, 'config', 'user.name', 'Test Recorder'], check=True)
         subprocess.run(['git', '-C', self.tmp.name, 'config', 'user.email', 'recorder@example.invalid'], check=True)
 
         self.case_id = '20260908-120000-binding'
         self.run_cli('open', '--id', self.case_id, '--title', 'Binding', '--objective', 'Verify binding', '--request-summary', 'Verify one development handoff binding.', '--dedupe-key', 'binding', '--purpose', 'knowledge', '--vault-outcome', 'none', '--learning-outcome', 'not-evaluated')
-        self.case = self.root / self.case_id / 'investigation.md'
+        self.case = self.unpublished / self.case_id / 'investigation.md'
 
     def run_cli(self, *args, ok=True):
         result = subprocess.run([sys.executable, '-B', str(HELPER), '--root', str(self.root), *args], capture_output=True, text=True)
@@ -68,7 +69,7 @@ class Transactions(unittest.TestCase):
         observation['materialized-at'] = '2026-09-10T12:00:00+00:00'
         bind()
         self.run_cli('validate')
-        self.assertFalse((self.root / '.open.lock').exists())
+        self.assertFalse((self.unpublished / '.open.lock').exists())
 
     def test_reconciliation_content_then_lifecycle_uses_fresh_snapshot(self):
         before = self.case.read_bytes()
@@ -355,7 +356,7 @@ class Transactions(unittest.TestCase):
             '--dedupe-key', 'prior-public-case', '--purpose', 'development',
             '--vault-outcome', 'none', '--learning-outcome', 'not-evaluated',
         )
-        second = self.root / second_id / 'investigation.md'
+        second = self.unpublished / second_id / 'investigation.md'
         self.case.write_text(self.case.read_text().replace('status: investigating', 'status: intake', 1))
         second.write_text(second.read_text().replace('status: investigating', 'status: ready-to-export', 1))
 
@@ -454,7 +455,7 @@ class Transactions(unittest.TestCase):
             '--dedupe-key', 'undecided-case', '--purpose', 'undecided',
             '--vault-outcome', 'not-evaluated', '--learning-outcome', 'not-evaluated',
         )
-        path = self.root / undecided_id / 'investigation.md'
+        path = self.unpublished / undecided_id / 'investigation.md'
         self.assertIn('status: investigating', path.read_text())
         before = path.read_bytes()
         rejected = self.run_cli(
@@ -487,7 +488,7 @@ class Transactions(unittest.TestCase):
                 '--dedupe-key', f'{purpose}-scope', '--purpose', purpose,
                 '--vault-outcome', 'none', '--learning-outcome', 'not-evaluated',
             )
-            path = self.root / case_id / 'investigation.md'
+            path = self.unpublished / case_id / 'investigation.md'
             before = path.read_bytes()
             candidate = Path(self.tmp.name) / f'{purpose}-scope.md'
             candidate.write_bytes(before.replace(
@@ -697,7 +698,7 @@ class Transactions(unittest.TestCase):
                 capture_output=True, text=True,
             )
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            text = (root / '20260910-120000-spanish-case' / 'investigation.md').read_text()
+            text = (Path(tmp) / '.investigations' / '20260910-120000-spanish-case' / 'investigation.md').read_text()
             self.assertIn('## Resumen de la solicitud', text)
             self.assertIn('## Historial', text)
             self.assertIn('Expediente creado; registrado por Registrador', text)
@@ -734,6 +735,7 @@ class Transactions(unittest.TestCase):
         )
         self.assertIn('invalid_timestamp', rejected_open.stderr)
         self.assertFalse((self.root / '20260914-100000-naive-open').exists())
+        self.assertFalse((self.unpublished / '20260914-100000-naive-open').exists())
 
         self.case.write_bytes(before.replace(
             b'updated-at: ', b'updated-at: 2026-09-14T10:00:00\nlegacy-updated-at: ', 1
@@ -764,7 +766,7 @@ class Transactions(unittest.TestCase):
             f'retired-id: {retired_id}\ndrafts: none\nlearning-assessment: reset\n\nReviewed mapping: no unique registers.\n',
             encoding='utf-8',
         )
-        retired = self.root / retired_id / 'investigation.md'
+        retired = self.unpublished / retired_id / 'investigation.md'
         canonical_hash = hashlib.sha256(self.case.read_bytes()).hexdigest()
         stale_retired_hash = hashlib.sha256(retired.read_bytes()).hexdigest()
         retired.write_text(retired.read_text() + '\n', encoding='utf-8')
@@ -777,6 +779,81 @@ class Transactions(unittest.TestCase):
         self.assertIn('stale_retiring_snapshot', stale.stderr)
         self.assertTrue(retired.exists())
         self.assertNotIn(retired_id, self.case.read_text())
+
+    def test_open_defaults_to_unpublished_and_publish_moves_the_case(self):
+        listed = json.loads(self.run_cli('list').stdout)
+        self.assertEqual(listed['cases'][0]['visibility'], 'unpublished')
+        loaded = json.loads(self.run_cli('load', '--id', self.case_id).stdout)
+        self.assertEqual(loaded['visibility'], 'unpublished')
+        published = self.run_cli(
+            'publish', '--id', self.case_id,
+            '--expected-public-sha256', hashlib.sha256(self.case.read_bytes()).hexdigest(),
+            '--source', 'synthetic publish review',
+        )
+        self.assertIn('published', published.stdout)
+        self.assertFalse(self.case.exists())
+        public = self.root / self.case_id / 'investigation.md'
+        self.assertTrue(public.is_file())
+        self.assertIn('Published investigation', public.read_text())
+        listed = json.loads(self.run_cli('list').stdout)
+        self.assertEqual(listed['cases'][0]['visibility'], 'published')
+
+    def test_publish_rejects_local_working_artifacts(self):
+        dump = self.case.parent / 'artifacts' / 'yaak-collection.json'
+        dump.write_text('{"name": "local-only"}\n', encoding='utf-8')
+        rejected = self.run_cli(
+            'publish', '--id', self.case_id,
+            '--expected-public-sha256', hashlib.sha256(self.case.read_bytes()).hexdigest(),
+            '--source', 'synthetic publish review',
+            ok=False,
+        )
+        self.assertIn('publish_unsafe', rejected.stderr)
+        self.assertTrue(self.case.exists())
+        self.assertFalse((self.root / self.case_id).exists())
+
+    def test_visibility_conflict_and_legacy_unpublished_are_reported(self):
+        self.run_cli(
+            'publish', '--id', self.case_id,
+            '--expected-public-sha256', hashlib.sha256(self.case.read_bytes()).hexdigest(),
+            '--source', 'synthetic publish review',
+        )
+        duplicate = self.unpublished / self.case_id
+        duplicate.mkdir(parents=True)
+        (duplicate / 'investigation.md').write_text(self.case.read_text() if self.case.exists() else (self.root / self.case_id / 'investigation.md').read_text())
+        conflict = self.run_cli('load', '--id', self.case_id, ok=False)
+        self.assertIn('visibility_conflict', conflict.stderr)
+
+        legacy_id = '20260908-130000-legacy-filter'
+        legacy_dir = self.unpublished / legacy_id
+        legacy_dir.mkdir()
+        (legacy_dir / 'investigation.md').write_text(
+            '---\nid: 20260908-130000-legacy-filter\nstatus: intake\n---\n\n## Original request\n\nOld case.\n',
+            encoding='utf-8',
+        )
+        loaded = json.loads(self.run_cli('load', '--id', legacy_id).stdout)
+        self.assertEqual(loaded['status'], 'legacy')
+
+    def test_unpublished_retirement_does_not_write_the_public_ledger(self):
+        closed = self.run_cli(
+            'close', '--id', self.case_id, '--decision', 'abandoned',
+            '--reason', 'Local-only experiment ended',
+            '--limitations', 'Never published',
+            '--source', 'synthetic local close',
+            '--expected-public-sha256', hashlib.sha256(self.case.read_bytes()).hexdigest(),
+        )
+        self.assertIn('closed', closed.stdout)
+        retired = self.run_cli(
+            'retire', '--id', self.case_id, '--authorized',
+            '--expected-public-sha256', hashlib.sha256(self.case.read_bytes()).hexdigest(),
+            '--reason', 'Discard unpublished experiment',
+            '--source', 'synthetic local retirement',
+            '--dependency-review', 'No published consumers',
+            '--absorption-review', 'No durable knowledge',
+            '--summary', 'Unpublished case discarded locally',
+        )
+        self.assertIn('"visibility": "unpublished"', retired.stdout)
+        self.assertFalse(self.case.parent.exists())
+        self.assertFalse((self.root / 'retired.md').exists())
 
 if __name__ == '__main__':
     unittest.main()

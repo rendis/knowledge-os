@@ -157,7 +157,7 @@ def seed_retirement(vault, output, historical):
                   "--objective", "Identify the marker in the supplied synthetic receipt attachment",
                   "--dedupe-key", "receipt-marker", "--purpose", "knowledge", "--vault-outcome", "none",
                   "--learning-outcome", "no-learning", "--request-summary", "Answer a one-off attachment lookup",
-                  "--timestamp", "2026-09-15T10:00:00+00:00"])
+                  "--timestamp", "2026-09-15T10:00:00+00:00", "--visibility", "published"])
     case_dir = root / RETIREMENT_CASE_ID
     case = case_dir / "investigation.md"
     write(case_dir, "artifacts/receipt.txt", "Synthetic receipt audit, 2026-09-15T10:00:00Z\nmarker=ACK-073\nSingle local fixture receipt; no live deployment or business-flow verification.\n")
@@ -219,7 +219,7 @@ def prepare(distribution, output, evaluation, scenario):
          "--dedupe-key", "parcel-reconciliation", "--purpose", "development",
          "--vault-outcome", "not-evaluated", "--learning-outcome", "not-evaluated",
          "--request-summary", "Continue receiver and reporter delivery with explicit evidence",
-         "--timestamp", "2026-09-15T09:00:00+00:00"])
+         "--timestamp", "2026-09-15T09:00:00+00:00", "--visibility", "published"])
     case = root / CASE_ID / "investigation.md"
     before = case.read_bytes()
     body = before.decode().replace("### Facts\n", "### Facts\n\n- E-001: Receipt uniqueness is scoped by tenant and receipt ID; the same ID from another tenant is independent. Source: sources/contract.md and sources/contract-email.md; normative contract evidence, not production runtime proof.\n- E-002: Receiver https://example.invalid/parcel/receiver.git revision rx-17 is observing in lab; duplicate observation is outstanding (AC-001). Source: sources/release.md.\n- E-003: Reporter https://example.invalid/parcel/reporter.git revision rp-23 is developing; local format tests passed, operator release receipt is absent (Q-001). Source: sources/delivery.md.\n")

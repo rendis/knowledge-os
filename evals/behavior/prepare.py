@@ -23,7 +23,7 @@ def setup(label,dist):
   p=vault/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_text(content)
  (vault/'investigations').mkdir()
  caseid='20260908-090000-reader-units'
- command(['python3','-B',str(vault/'.agents/skills/manage-investigation/scripts/investigation-case.py'),'--root',str(vault/'investigations'),'open','--id',caseid,'--title','Reader unit discrepancy','--objective','Explain fractional availability','--dedupe-key','reader-units','--purpose','knowledge','--vault-outcome','none','--learning-outcome','no-learning','--request-summary','Explain why availability is 8.5 rather than 9. No software change is requested.','--timestamp','2026-09-08T09:00:00+00:00'])
+ command(['python3','-B',str(vault/'.agents/skills/manage-investigation/scripts/investigation-case.py'),'--root',str(vault/'investigations'),'open','--id',caseid,'--title','Reader unit discrepancy','--objective','Explain fractional availability','--dedupe-key','reader-units','--purpose','knowledge','--vault-outcome','none','--learning-outcome','no-learning','--request-summary','Explain why availability is 8.5 rather than 9. No software change is requested.','--timestamp','2026-09-08T09:00:00+00:00','--visibility','published'])
  case=vault/'investigations'/caseid/'investigation.md';s=case.read_text();s=s.replace('### Facts\n','### Facts\n\n- E-001: The source contract defines milliunits; 1500 / 1000 = 1.5 units.\n- E-002: With physical 10, available is 8.5.\n');s=s.replace('## Readiness\n','## Readiness\n\nThe local source contract was inspected. The requester accepts the explanation; there are no open questions or implementation outcomes. Live deployment was not checked and is outside this question.\n');case.write_text(s)
  package=root/'package.md';package.write_bytes((DIST/'evals/bootstrap/fixtures/handoff-sufficiency/candidate-c.md').read_bytes())
  wt=root/'worktree';wt.mkdir();(wt/'AGENTS.md').write_text('This isolated repository implements the supplied availability contract. Read package.md in the parent. Keep reservation_writer.py unchanged. Record definition changes/questions/evidence in implementation-updates.md.\n')
@@ -44,7 +44,7 @@ Work only within this assigned directory. Read vault/AGENTS.md and the relevant 
 def lifecycle(root, dist):
  vault=root/'vault';helper=vault/'.agents/skills/manage-investigation/scripts/investigation-case.py';investigations=vault/'investigations';private=vault/'.investigations-private'
  def open_case(caseid,title,objective,dedupe,purpose,vault_outcome='none'):
-  command(['python3','-B',str(helper),'--root',str(investigations),'open','--id',caseid,'--title',title,'--objective',objective,'--dedupe-key',dedupe,'--purpose',purpose,'--vault-outcome',vault_outcome,'--learning-outcome','not-evaluated','--request-summary',objective+'.','--source-ref',f'synthetic lifecycle fixture {caseid}','--timestamp','2026-09-14T09:00:00+00:00'])
+  command(['python3','-B',str(helper),'--root',str(investigations),'open','--id',caseid,'--title',title,'--objective',objective,'--dedupe-key',dedupe,'--purpose',purpose,'--vault-outcome',vault_outcome,'--learning-outcome','not-evaluated','--request-summary',objective+'.','--source-ref',f'synthetic lifecycle fixture {caseid}','--timestamp','2026-09-14T09:00:00+00:00','--visibility','published'])
   return investigations/caseid/'investigation.md'
  def save_seed(caseid,path,replacements,source,targets,timestamp):
   before=path.read_bytes();text=before.decode()
