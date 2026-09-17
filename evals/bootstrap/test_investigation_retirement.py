@@ -39,6 +39,7 @@ class RetirementTests(unittest.TestCase):
             requester_role="maintainer", export_intent="undecided", purpose="knowledge",
             vault_outcome="none", learning_outcome="no-learning", request_summary="Bounded case",
             timestamp=None, note_locale="en", identity=M.effective_git_identity(self.vault),
+            visibility="published",
         )
         self.open_args = args
         with patch.object(M, "emit"):

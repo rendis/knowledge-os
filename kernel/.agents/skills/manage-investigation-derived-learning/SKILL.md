@@ -10,7 +10,7 @@ Turn completed or sufficiently evidenced investigation work into bounded, cumula
 ## Preflight
 
 1. Load `../../../90-Meta/vault-resolution.md` and run `../../../90-Meta/resolve-vault.py` relative to this skill directory before reading any vault-relative path. Require one canonical remote- and marker-verified result, then bind every path below to its `VAULT_ROOT`; an unresolved or ambiguous vault blocks the workflow.
-2. Resolve the exact case ID and invoke `../manage-investigation/scripts/investigation-case.py --root <VAULT_ROOT>/investigations load --id <id>`. For a present case, read the complete returned public path and the private path when `private.available` is true, even when the user did not mention an overlay; keep their authority distinct. For a retired result, follow `../manage-investigation/references/knowledge-and-retirement.md` to inspect the exact public Git snapshot read-only; never assume a live/private path or restore the case. Unavailable history is an explicit evidence limit. Loading is read-only and does not enter a case-update route.
+2. Resolve the exact case ID and invoke `../manage-investigation/scripts/investigation-case.py --root <VAULT_ROOT>/investigations load --id <id>`. For a present case, read `public.path` (the case file at the returned `visibility`) and the private path when `private.available` is true, even when the user did not mention an overlay; keep their authority distinct. For a retired result, follow `../manage-investigation/references/knowledge-and-retirement.md` to inspect the exact published Git snapshot read-only; never assume a live/private path or restore the case. Unavailable history is an explicit evidence limit. Loading is read-only and does not enter a case-update route.
 3. Treat the case as collaborative provenance and a source map, never as proof of production behavior by itself. Do not expose private-overlay content in the learning output.
 4. Load [references/assessment-contract.md](references/assessment-contract.md), [references/learning-note-contract.md](references/learning-note-contract.md), `VAULT_ROOT/90-Meta/Convenciones.md`, and the **Gate de aprendizaje durable** in `VAULT_ROOT/90-Meta/Auditoria - Framework.md`.
 5. Load `../../../90-Meta/node-selection.md` before selecting or planning a durable target. When the conclusion depends on cell implementation context or source repositories, also load the `map-ecosystem` read-only interrogation branch and resolve every source repository through that workflow before inspecting it.
@@ -27,7 +27,7 @@ Assessment is always read-only: do not edit the investigation, create a draft, o
 When a candidate requires additional evidence or inference review, apply [evidence-driven-analysis](../evidence-driven-analysis/SKILL.md) as an auxiliary method. Return to this assessment's outcome and publication gates; already supported inputs do not require repeating analysis. Neither the method nor navigation helpers change the investigation or publish learning.
 
 1. State the stable problem or question and the applicability context independently of the investigation title, story, implementation, or session.
-2. Trace every candidate claim to directly inspected evidence. Use the case to locate experiments, measurements, stories, implementation revisions, deployments, and prior decisions; do not cite its narrative as a substitute for those sources. Versioning the public case makes its provenance reviewable, not its behavioral claims true. Locate a durable primary source or reproducible versioned tooling for the decisive claim; when the case narrative or a private/local artifact is the only support, select `insufficient-evidence`.
+2. Trace every candidate claim to directly inspected evidence. Use the case to locate experiments, measurements, stories, implementation revisions, deployments, and prior decisions; do not cite its narrative as a substitute for those sources. Versioning the published case makes its provenance reviewable, not its behavioral claims true. Locate a durable primary source or reproducible versioned tooling for the decisive claim; when the case narrative or a private/local artifact is the only support, select `insufficient-evidence`.
 3. Search `70-Aprendizajes/` by question, context, `aplica-a`, dimensions, aliases in prose, and backlinks. Compare the candidate with the full existing note, including its limits and evidence entries.
 4. Apply the durable-learning gate claim by claim. Distinguish missing evidence from a fully evidenced conclusion that has no reusable teaching.
 5. Select exactly one assessment outcome and one lifecycle action from the assessment contract.
@@ -37,17 +37,19 @@ When a candidate requires additional evidence or inference review, apply [eviden
 
 ## Plan the durable effect
 
-Continue only for `extractable`.
+Continue only for `extractable` on a published case. An unpublished `extractable` assessment is complete after the outcome card; return it so `manage-investigation` can record `learning-outcome: candidate`. Durable `70/` writes wait for investigation Publish.
 
 1. Select the canonical learning identity and target from the assessment. Prefer the existing note for `enrich` or `challenge`; use `create` only for a genuinely new identity or a materially different context that can change the conclusion.
 2. For `supersede`, prove that the previous conclusion is no longer the active guidance in its stated context. A new investigation or newer date alone is insufficient.
 3. Prepare an exact effect plan naming every note to create or modify, the new `EV-###` evidence entry, state/result changes, relationship changes, and index or technical-node propagation decisions.
-4. If the user requested only assessment, present the plan and stop. A publication instruction in the current request authorizes the planned local vault effect; any material target or scope expansion requires a new decision.
+4. If the user requested only assessment, present the plan and stop. A durable-learning write instruction in the current request authorizes the planned local vault effect; any material target or scope expansion requires a new decision.
 5. When an adopted change asserts current technical behavior, require the production-evidence gate independently. If that technical state also belongs in the ecosystem map, hand it to the appropriate `map-ecosystem` documentation workflow rather than copying it into technical nodes as a side effect.
 
 **Complete when:** the effect is minimal, deduplicated, gate-qualified, and either explicitly authorized by the request or left as a no-write proposal.
 
 ## Publish or revalidate
+
+Continue only when `load` reports `visibility: published`.
 
 1. Create a new note from [assets/learning-template.md](assets/learning-template.md), or edit the canonical note using the learning-note contract.
 2. Keep the current teaching readable in place and append new evidence with the next immutable `EV-###` identifier. Never rewrite an older evidence entry to make it agree with the latest conclusion.

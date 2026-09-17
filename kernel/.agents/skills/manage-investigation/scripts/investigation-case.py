@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Transactional filesystem mechanics for shareable investigation case files."""
+"""Transactional filesystem mechanics for investigation case files."""
 from __future__ import annotations
 
 import argparse
@@ -32,6 +32,14 @@ SECRET_PATTERN = re.compile(
 LOCAL_PATH_PATTERN = re.compile(
     r"(?<![A-Za-z0-9])(?:/(?:Users|home|tmp|var/tmp)/[^\s`]+|[A-Za-z]:\\[^\s`]+)"
 )
+LOCAL_WORKING_PATH_RE = re.compile(
+    r"(?:^|/)(?:yaak|insomnia|postman|http-client|smoke)(?:[-_/]|$)|"
+    r"\.(?:yaak|postman_collection)(?:$|\.)",
+    re.IGNORECASE,
+)
+UNPUBLISHED_ROOT_NAME = ".investigations"
+PRIVATE_ROOT_NAME = ".investigations-private"
+ORIGINAL_REQUEST_HEADINGS = {"Original request", "Solicitud original"}
 GENERIC_SOURCE_REFS = {"", "unknown", "message", "customer conversation", "conversation"}
 PURPOSES = {"knowledge", "development", "mixed", "undecided"}
 VAULT_OUTCOMES = {
@@ -200,6 +208,13 @@ class CaseRecord:
 
 
 @dataclass(frozen=True)
+class LocatedCase:
+    record: CaseRecord
+    visibility: str
+    store: Path
+
+
+@dataclass(frozen=True)
 class GitIdentity:
     name: str
     email: str
@@ -311,7 +326,116 @@ def public_content_errors(case_dir: Path) -> list[str]:
             errors.append(f"{relative}: contains a credential-like value")
         if LOCAL_PATH_PATTERN.search(text):
             errors.append(f"{relative}: contains an absolute local path")
+        if LOCAL_WORKING_PATH_RE.search(relative):
+            errors.append(
+                f"{relative}: local-working material belongs in "
+                f"{PRIVATE_ROOT_NAME}/<id>/local/"
+            )
     return errors
+
+
+def unpublished_root(public_root: Path) -> Path:
+    return public_root.parent / UNPUBLISHED_ROOT_NAME
+
+
+def private_store_root(public_root: Path) -> Path:
+    return public_root.parent / PRIVATE_ROOT_NAME
+
+
+def local_working_dir(public_root: Path, case_id: str) -> Path:
+    return private_store_root(public_root) / case_id / "local"
+
+
+def is_legacy_case_text(text: str) -> bool:
+    try:
+        fields = parse_frontmatter(text)
+    except CaseError:
+        return True
+    if any(not fields.get(field) for field in REQUIRED_FIELDS):
+        return True
+    headings = {
+        line[3:].strip()
+        for line in text.splitlines()
+        if line.startswith("## ")
+    }
+    return bool(
+        headings.intersection(ORIGINAL_REQUEST_HEADINGS)
+        and not headings.intersection(REQUIRED_SECTIONS[0])
+    )
+
+
+def ensure_unpublished_root(public_root: Path) -> Path:
+    path = unpublished_root(public_root)
+    if path.is_symlink():
+        raise CaseError("root_symlink", "The unpublished investigation root must not be a symlink")
+    if not path.exists():
+        path.mkdir(mode=0o700)
+    elif not path.is_dir():
+        raise CaseError("invalid_root", "The unpublished investigation root is not a directory")
+    return path
+
+
+def vault_lock_root(public_root: Path) -> Path:
+    return ensure_unpublished_root(public_root)
+
+
+def live_record_items(public_root: Path) -> list[tuple[str, CaseRecord]]:
+    items = [("published", record) for record in load_records(public_root)]
+    unpublished = unpublished_root(public_root)
+    if unpublished.is_dir():
+        items.extend(
+            ("unpublished", record)
+            for record in load_records(unpublished, skip_legacy=True, retirement_root=public_root)
+        )
+    seen_ids: dict[str, str] = {}
+    seen_keys: dict[str, str] = {}
+    for visibility, record in items:
+        previous = seen_ids.get(record.case_id)
+        if previous is not None and previous != visibility:
+            raise CaseError(
+                "visibility_conflict",
+                "An investigation ID cannot exist as both published and unpublished",
+                case_id=record.case_id,
+            )
+        seen_ids[record.case_id] = visibility
+        if record.dedupe_key:
+            previous_key = seen_keys.get(record.dedupe_key)
+            if previous_key is not None and previous_key != record.case_id:
+                raise CaseError(
+                    "visibility_conflict",
+                    "A dedupe key cannot identify both a published and an unpublished case",
+                    dedupe_key=record.dedupe_key,
+                )
+            seen_keys[record.dedupe_key] = record.case_id
+    return items
+
+
+def locate_live_case(public_root: Path, case_id: str) -> LocatedCase:
+    matches = [
+        (visibility, record)
+        for visibility, record in live_record_items(public_root)
+        if case_id == record.case_id or case_id in record.consolidated_from
+    ]
+    if len(matches) != 1:
+        raise CaseError(
+            "case_not_found" if not matches else "case_ambiguous",
+            "Exactly one live investigation must resolve from the supplied ID",
+            matches=[record.case_id for _, record in matches],
+        )
+    visibility, record = matches[0]
+    store = public_root if visibility == "published" else unpublished_root(public_root)
+    return LocatedCase(record=record, visibility=visibility, store=store)
+
+
+def locate_legacy_unpublished(public_root: Path, case_id: str) -> Path | None:
+    path = unpublished_root(public_root) / case_id / "investigation.md"
+    if not path.is_file():
+        return None
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return None
+    return path if is_legacy_case_text(text) else None
 
 
 def resolve_root(raw_root: Path, *, create: bool = False) -> Path:
@@ -410,8 +534,15 @@ def parse_frontmatter(text: str) -> dict[str, Any]:
     return fields
 
 
-def load_records(root: Path) -> list[CaseRecord]:
+def load_records(
+    root: Path,
+    *,
+    skip_legacy: bool = False,
+    retirement_root: Path | None = None,
+) -> list[CaseRecord]:
     records: list[CaseRecord] = []
+    if not root.exists():
+        return records
     for case_dir in sorted(root.iterdir()):
         if case_dir.name.startswith("."):
             continue
@@ -426,13 +557,15 @@ def load_records(root: Path) -> list[CaseRecord]:
             continue
         require_child(root, record_path, must_exist=True)
         text = record_path.read_text(encoding="utf-8")
+        if skip_legacy and is_legacy_case_text(text):
+            continue
         records.append(CaseRecord(record_path, text, parse_frontmatter(text)))
-    retired = retirement_records(root)
+    retired = retirement_records(retirement_root or root)
     retired_ids = {value for entry in retired.values()
                    for value in [entry["id"], *entry["consolidated-from"]]}
     for record in records:
         if record.case_id in retired_ids or any(value in retired_ids for value in record.consolidated_from):
-            raise CaseError("retirement_conflict", "A retired ID still resolves to a public case")
+            raise CaseError("retirement_conflict", "A retired ID still resolves to a live case")
     return records
 
 
@@ -510,7 +643,7 @@ def retirement_git_path(root: Path, path: Path) -> str:
     try:
         return path.relative_to(top).as_posix()
     except ValueError as error:
-        raise CaseError("retirement_git_failed", "Public case is outside its Git repository") from error
+        raise CaseError("retirement_git_failed", "Published case is outside its Git repository") from error
 
 
 def retirement_view(root: Path, entry: dict[str, Any]) -> dict[str, Any]:
@@ -533,15 +666,42 @@ def retirement_view(root: Path, entry: dict[str, Any]) -> dict[str, Any]:
             "commit_state": "committed" if retirement_commit else "pending"}
 
 
+def list_legacy_unpublished(public_root: Path) -> list[dict[str, str]]:
+    entries: list[dict[str, str]] = []
+    uroot = unpublished_root(public_root)
+    if not uroot.is_dir():
+        return entries
+    for case_dir in sorted(uroot.iterdir()):
+        if case_dir.name.startswith(".") or not case_dir.is_dir():
+            continue
+        record_path = case_dir / "investigation.md"
+        if not record_path.is_file():
+            continue
+        text = record_path.read_text(encoding="utf-8")
+        if is_legacy_case_text(text):
+            entries.append({"id": case_dir.name, "path": str(record_path)})
+    return entries
+
+
 def list_cases(root: Path) -> int:
     with locked(root):
-        cases = [{"id": record.case_id, "title": record.title,
-                  "status": record.fields.get("status"),
-                  "summary": "\n".join(named_section(record.text, REQUIRED_SECTIONS[0])[0] or []).strip(),
-                  "updated-at": record.fields.get("updated-at")}
-                 for record in load_records(root)]
+        cases = []
+        for visibility, record in live_record_items(root):
+            cases.append(
+                {
+                    "id": record.case_id,
+                    "title": record.title,
+                    "status": record.fields.get("status"),
+                    "visibility": visibility,
+                    "summary": "\n".join(
+                        named_section(record.text, REQUIRED_SECTIONS[0])[0] or []
+                    ).strip(),
+                    "updated-at": record.fields.get("updated-at"),
+                }
+            )
         retired = [retirement_view(root, entry) for entry in retirement_records(root).values()]
-    emit({"status": "listed", "cases": cases, "retired": retired})
+        legacy = list_legacy_unpublished(root)
+    emit({"status": "listed", "cases": cases, "retired": retired, "legacy": legacy})
     return 0
 
 
@@ -554,26 +714,33 @@ def retire_case(args: argparse.Namespace, root: Path) -> int:
                           recorded_by=args.identity.display, summary=args.summary)
     for destination in args.destination:
         validate_event_inputs("retirement_invalid", destination=destination)
-    if re.fullmatch(r"[a-f0-9]{40}|[a-f0-9]{64}", args.snapshot_commit) is None:
-        raise CaseError("retirement_snapshot_invalid", "Snapshot must be an exact full Git commit ID")
     timestamp = timestamp_value(args.timestamp)
     with locked(root):
-        records = {record.case_id: record for record in load_records(root)}
-        record = records.get(args.id)
-        if record is None:
-            raise CaseError("case_not_found", "Exact public case does not exist")
+        located = locate_live_case(root, args.id)
+        record = located.record
         if record.fields.get("status") != "closed":
             raise CaseError("retirement_not_closed", "Only a closed investigation may be retired")
         if digest_bytes(record.path.read_bytes()) != args.expected_public_sha256:
-            raise CaseError("stale_public_snapshot", "Public case changed after review", exit_code=3)
+            raise CaseError("stale_public_snapshot", "Investigation changed after review", exit_code=3)
         validate_event_inputs("retirement_invalid", title=record.title)
-        errors, _ = validate_root(root, ignore_lock=True)
-        if errors:
-            raise CaseError("retirement_validation_failed", "Public cases are invalid", errors=errors)
         case_dir = record.path.parent
+        if located.visibility == "unpublished":
+            errors, _ = validate_store(located.store, public_root=root, ignore_lock=True)
+            if errors:
+                raise CaseError("retirement_validation_failed", "Unpublished cases are invalid", errors=errors)
+            shutil.rmtree(case_dir)
+            emit({"status": "retired", "id": args.id, "visibility": "unpublished"})
+            return 0
+        if args.snapshot_commit is None or re.fullmatch(
+            r"[a-f0-9]{40}|[a-f0-9]{64}", args.snapshot_commit
+        ) is None:
+            raise CaseError("retirement_snapshot_invalid", "Snapshot must be an exact full Git commit ID")
+        errors, _ = validate_store(root, public_root=root, ignore_lock=True)
+        if errors:
+            raise CaseError("retirement_validation_failed", "Published cases are invalid", errors=errors)
         if any(path.is_symlink() or not (path.is_dir() or path.is_file())
                for path in case_dir.rglob("*")):
-            raise CaseError("retirement_snapshot_invalid", "Public case contains non-regular filesystem entries")
+            raise CaseError("retirement_snapshot_invalid", "Published case contains non-regular filesystem entries")
         relative = retirement_git_path(root, case_dir)
         commit = retirement_git(root, "rev-parse", "--verify", f"{args.snapshot_commit}^{{commit}}").decode().strip()
         if commit != args.snapshot_commit:
@@ -595,11 +762,11 @@ def retire_case(args: argparse.Namespace, root: Path) -> int:
             content = retirement_git(root, "cat-file", "blob", blob.decode())
             if (target.is_symlink() or not target.is_file() or target.read_bytes() != content
                     or bool(target.stat().st_mode & 0o111) != (mode == b"100755")):
-                raise CaseError("retirement_snapshot_changed", "Snapshot does not match the entire public case")
+                raise CaseError("retirement_snapshot_changed", "Snapshot does not match the entire published case")
             originals[suffix] = (content, target.stat().st_mode & 0o777)
         actual = {path.relative_to(case_dir) for path in case_dir.rglob("*") if path.is_file()}
         if not originals or actual != set(originals):
-            raise CaseError("retirement_snapshot_changed", "Snapshot omits public files, including ignored files")
+            raise CaseError("retirement_snapshot_changed", "Snapshot omits published files, including ignored files")
         entry = {"id": args.id, "title": record.title, "snapshot-commit": commit,
                  "public-sha256": args.expected_public_sha256, "retired-at": timestamp,
                  "recorded-by": args.identity.display, "reason": args.reason, "source": args.source,
@@ -638,7 +805,7 @@ def retire_case(args: argparse.Namespace, root: Path) -> int:
 
 
 def acquire_lock(root: Path, timeout_seconds: float = 2.0) -> Path:
-    lock = root / ".open.lock"
+    lock = vault_lock_root(root) / ".open.lock"
     deadline = time.monotonic() + timeout_seconds
     while True:
         try:
@@ -835,12 +1002,24 @@ def open_case(args: argparse.Namespace, root: Path) -> int:
         *args.source_ref,
     )
     timestamp = timestamp_value(args.timestamp)
+    visibility = getattr(args, "visibility", "unpublished") or "unpublished"
+    if visibility not in {"unpublished", "published"}:
+        raise CaseError("invalid_visibility", "Visibility must be unpublished or published")
+    store = root if visibility == "published" else ensure_unpublished_root(root)
 
     with locked(root):
-        records = load_records(root)
+        live = live_record_items(root)
+        records = [record for _, record in live]
+        visibility_by_id = {record.case_id: vis for vis, record in live}
         if any(args.id == entry["id"] or args.id in entry["consolidated-from"]
                for entry in retirement_records(root).values()):
             raise CaseError("case_retired", "A retired investigation ID cannot be reused")
+        if locate_legacy_unpublished(root, args.id) is not None:
+            raise CaseError(
+                "legacy_unpublished",
+                "A legacy unpublished investigation with this ID requires Migrate",
+                case_id=args.id,
+            )
         definite = match_records(
             records,
             case_id=args.id,
@@ -853,17 +1032,21 @@ def open_case(args: argparse.Namespace, root: Path) -> int:
                 {
                     "status": "definite_match",
                     "cases": [
-                        {"id": record.case_id, "path": str(record.path.parent)}
+                        {
+                            "id": record.case_id,
+                            "path": str(record.path.parent),
+                            "visibility": visibility_by_id.get(record.case_id),
+                        }
                         for record in sorted(definite, key=lambda item: item.case_id)
                     ],
                 }
             )
             return 0
-        target = require_child(root, root / args.id)
+        target = require_child(store, store / args.id)
         if target.exists():
             raise CaseError("case_exists", "The investigation directory already exists")
-        staging = root / f".open-{uuid.uuid4().hex}.tmp"
-        require_child(root, staging)
+        staging = store / f".open-{uuid.uuid4().hex}.tmp"
+        require_child(store, staging)
         try:
             staging.mkdir(mode=0o700)
             (staging / "artifacts").mkdir(mode=0o700)
@@ -878,7 +1061,7 @@ def open_case(args: argparse.Namespace, root: Path) -> int:
             if staging.exists():
                 shutil.rmtree(staging)
 
-    emit({"status": "created", "id": args.id, "path": str(target)})
+    emit({"status": "created", "id": args.id, "path": str(target), "visibility": visibility})
     return 0
 
 
@@ -888,31 +1071,31 @@ def load_case(args: argparse.Namespace, root: Path) -> int:
 
 
 def load_case_unlocked(args: argparse.Namespace, root: Path) -> int:
-    records = load_records(root)
     for entry in retirement_records(root).values():
         if args.id == entry["id"] or args.id in entry["consolidated-from"]:
             emit({"status": "retired", **retirement_view(root, entry)})
             return 0
-    matches = [
-        record
-        for record in records
-        if args.id == record.case_id or args.id in record.consolidated_from
-    ]
-    if len(matches) != 1:
-        raise CaseError(
-            "case_not_found" if not matches else "case_ambiguous",
-            "Exactly one public investigation must resolve from the supplied ID",
-            matches=[record.case_id for record in matches],
+    legacy = locate_legacy_unpublished(root, args.id)
+    if legacy is not None:
+        emit(
+            {
+                "status": "legacy",
+                "id": args.id,
+                "path": str(legacy),
+                "visibility": "unpublished",
+            }
         )
-    record = matches[0]
+        return 0
+    located = locate_live_case(root, args.id)
+    record = located.record
     public_errors = public_content_errors(record.path.parent)
     if public_errors:
         raise CaseError(
             "public_validation_failed",
-            "Public investigation is unsafe to load",
+            "Investigation is unsafe to load",
             errors=public_errors,
         )
-    private_path = root.parent / ".investigations-private" / record.case_id / "private.md"
+    private_path = private_store_root(root) / record.case_id / "private.md"
     if private_path.is_symlink() or private_path.parent.is_symlink():
         raise CaseError("case_symlink", "Private overlay paths must not be symlinks")
     private_exists = private_path.is_file()
@@ -931,10 +1114,13 @@ def load_case_unlocked(args: argparse.Namespace, root: Path) -> int:
                 "Private overlay is unsafe or invalid",
                 errors=private_errors,
             )
+    local_path = local_working_dir(root, record.case_id)
+    local_available = local_path.is_dir() and any(local_path.rglob("*"))
     emit(
         {
             "status": "loaded",
             "id": record.case_id,
+            "visibility": located.visibility,
             "public": {
                 "path": str(record.path),
                 "sha256": digest_bytes(record.path.read_bytes()),
@@ -943,6 +1129,10 @@ def load_case_unlocked(args: argparse.Namespace, root: Path) -> int:
                 "available": private_exists,
                 "path": str(private_path) if private_exists else None,
                 "sha256": digest_bytes(private_bytes),
+            },
+            "local": {
+                "available": local_available,
+                "path": str(local_path) if local_available else None,
             },
         }
     )
@@ -1474,16 +1664,26 @@ def validate_archive(archive: Path) -> list[str]:
     return errors
 
 
-def validate_root(root: Path, *, ignore_lock: bool = False) -> tuple[list[str], list[str]]:
+def validate_root(
+    root: Path,
+    *,
+    ignore_lock: bool = False,
+    skip_legacy: bool = False,
+    retirement_root: Path | None = None,
+    lock_root: Path | None = None,
+) -> tuple[list[str], list[str]]:
     errors: list[str] = []
     warnings: list[str] = []
-    if not ignore_lock and (root / ".open.lock").exists():
+    if not root.exists():
+        return errors, warnings
+    lock_dir = vault_lock_root(lock_root or root) if (lock_root or root).name == "investigations" else root
+    if not ignore_lock and (lock_dir / ".open.lock").exists():
         errors.append("live mutation lock exists")
     for path in root.iterdir():
-        if path.name.startswith((".open-", ".retire-")) and path.name.endswith(".tmp"):
+        if path.name.startswith((".open-", ".retire-", ".publish-")) and path.name.endswith(".tmp"):
             errors.append(f"incomplete staging directory: {path.name}")
 
-    records = load_records(root)
+    records = load_records(root, skip_legacy=skip_legacy, retirement_root=retirement_root)
     ids: dict[str, Path] = {}
     keys: dict[str, Path] = {}
     lineage: dict[str, Path] = {}
@@ -1623,8 +1823,39 @@ def validate_root(root: Path, *, ignore_lock: bool = False) -> tuple[list[str], 
     return errors, warnings
 
 
+def validate_store(
+    store: Path,
+    *,
+    public_root: Path,
+    ignore_lock: bool = False,
+) -> tuple[list[str], list[str]]:
+    skip_legacy = store.name == UNPUBLISHED_ROOT_NAME
+    return validate_root(
+        store,
+        ignore_lock=ignore_lock,
+        skip_legacy=skip_legacy,
+        retirement_root=public_root,
+        lock_root=public_root,
+    )
+
+
+def validate_vault(public_root: Path, *, ignore_lock: bool = False) -> tuple[list[str], list[str]]:
+    errors, warnings = validate_store(public_root, public_root=public_root, ignore_lock=ignore_lock)
+    unpublished = unpublished_root(public_root)
+    extra_errors, extra_warnings = validate_store(
+        unpublished, public_root=public_root, ignore_lock=True
+    )
+    errors.extend(extra_errors)
+    warnings.extend(extra_warnings)
+    try:
+        live_record_items(public_root)
+    except CaseError as error:
+        errors.append(error.message)
+    return errors, warnings
+
+
 def validate_command(root: Path) -> int:
-    errors, warnings = validate_root(root)
+    errors, warnings = validate_vault(root)
     if errors:
         emit(
             {"status": "invalid", "errors": errors, "warnings": warnings},
@@ -1634,7 +1865,7 @@ def validate_command(root: Path) -> int:
     emit(
         {
             "status": "valid",
-            "cases": len(load_records(root)),
+            "cases": len(live_record_items(root)),
             "warnings": warnings,
         }
     )
@@ -1656,7 +1887,7 @@ def validate_private_text(text: str, case_id: str) -> list[str]:
     if set(fields) != {"id", "authority", "updated-at"}:
         errors.append("private overlay frontmatter must contain only id, authority, and updated-at")
     if fields.get("id") != case_id:
-        errors.append("private overlay id must match the public investigation")
+        errors.append("private overlay id must match the investigation")
     if fields.get("authority") != "private-overlay":
         errors.append("private overlay authority must be private-overlay")
     if not has_offset_timestamp(str(fields.get("updated-at", ""))):
@@ -1718,7 +1949,7 @@ def declared_export_ids(case_dir: Path, case_id: str) -> set[str]:
 
 
 def save_case(args: argparse.Namespace, root: Path) -> int:
-    """Atomically replace a reviewed public snapshot and optional private overlay."""
+    """Atomically replace a reviewed case snapshot and optional private overlay."""
     candidate = args.public_candidate.read_bytes()
     try:
         public_text = candidate.decode("utf-8")
@@ -1757,20 +1988,18 @@ def save_case(args: argparse.Namespace, root: Path) -> int:
         if private_root.name != ".investigations-private":
             raise CaseError("invalid_private_root", "Private root must be named .investigations-private")
         if private_root.parent.resolve(strict=True) != root.parent:
-            raise CaseError("invalid_private_root", "Private and public roots must share the vault root")
+            raise CaseError("invalid_private_root", "Private overlay and investigation roots must share the vault root")
     if (private_candidate is not None or args.delete_private) and private_root is None:
         raise CaseError("private_root_required", "A private mutation requires --private-root")
 
     with locked(root):
-        records = {record.case_id: record for record in load_records(root)}
-        record = records.get(args.id)
-        if record is None:
-            raise CaseError("case_not_found", "Exact public investigation does not exist")
+        located = locate_live_case(root, args.id)
+        record = located.record
         original_public = record.path.read_bytes()
         if digest_bytes(original_public) != args.expected_public_sha256:
             raise CaseError(
                 "stale_public_snapshot",
-                "Public investigation changed after it was read",
+                "Investigation changed after it was read",
                 exit_code=3,
                 current_sha256=digest_bytes(original_public),
             )
@@ -1895,7 +2124,7 @@ def save_case(args: argparse.Namespace, root: Path) -> int:
                     private_dir.mkdir(mode=0o700)
                     created_private_dir = True
                 atomic_write(private_path, private_candidate)
-            errors, warnings = validate_root(root, ignore_lock=True)
+            errors, warnings = validate_vault(root, ignore_lock=True)
             if errors:
                 raise CaseError("save_validation_failed", "Candidate failed validation", errors=errors)
         except Exception:
@@ -2048,14 +2277,15 @@ def consolidate_case(args: argparse.Namespace, root: Path) -> int:
     timestamp = timestamp_value(args.timestamp)
 
     with locked(root):
-        records = {record.case_id: record for record in load_records(root)}
-        if args.canonical not in records or args.retire not in records:
+        canonical_located = locate_live_case(root, args.canonical)
+        retiring_located = locate_live_case(root, args.retire)
+        if canonical_located.visibility != retiring_located.visibility:
             raise CaseError(
-                "case_not_found",
-                "Canonical and retiring investigation IDs must both exist",
+                "visibility_conflict",
+                "Canonical and retiring investigations must share the same visibility",
             )
-        canonical = records[args.canonical]
-        retiring = records[args.retire]
+        canonical = canonical_located.record
+        retiring = retiring_located.record
         canonical_snapshot = canonical.path.read_bytes()
         retiring_snapshot = retiring.path.read_bytes()
         if digest_bytes(canonical_snapshot) != args.expected_canonical_sha256:
@@ -2160,7 +2390,7 @@ def consolidate_case(args: argparse.Namespace, root: Path) -> int:
             atomic_write(canonical.path, updated.encode("utf-8"))
             shutil.rmtree(retiring_dir)
             removed = True
-            errors, warnings = validate_root(root, ignore_lock=True)
+            errors, warnings = validate_vault(root, ignore_lock=True)
             if errors:
                 raise CaseError(
                     "consolidation_validation_failed",
@@ -2202,15 +2432,12 @@ def transition_case(args: argparse.Namespace, root: Path) -> int:
     validate_event_inputs("transition_invalid", **values)
     timestamp = timestamp_value(args.timestamp)
     with locked(root):
-        records = {record.case_id: record for record in load_records(root)}
-        record = records.get(args.id)
-        if record is None:
-            raise CaseError("case_not_found", "Exact source case does not exist")
+        record = locate_live_case(root, args.id).record
         original = record.path.read_bytes()
         if digest_bytes(original) != args.expected_public_sha256:
             raise CaseError(
                 "stale_public_snapshot",
-                "Public investigation changed after it was read",
+                "Investigation changed after it was read",
                 exit_code=3,
                 current_sha256=digest_bytes(original),
             )
@@ -2223,7 +2450,7 @@ def transition_case(args: argparse.Namespace, root: Path) -> int:
                 and record.fields.get("closure-outcome") not in CLOSURE_OUTCOMES
             )
         )
-        preexisting_errors, _ = validate_root(root, ignore_lock=True)
+        preexisting_errors, _ = validate_vault(root, ignore_lock=True)
         allowed = {
             ("investigating", "blocked"),
             ("blocked", "investigating"),
@@ -2300,7 +2527,7 @@ def transition_case(args: argparse.Namespace, root: Path) -> int:
         )
         try:
             atomic_write(record.path, updated.encode("utf-8"))
-            errors, warnings = validate_root(root, ignore_lock=True)
+            errors, warnings = validate_vault(root, ignore_lock=True)
             new_errors = sorted(set(errors) - set(preexisting_errors))
             if errors and (not migration_mode or new_errors):
                 raise CaseError(
@@ -2338,10 +2565,7 @@ def close_case(args: argparse.Namespace, root: Path) -> int:
     )
     timestamp = timestamp_value(args.timestamp)
     with locked(root):
-        records = {record.case_id: record for record in load_records(root)}
-        if args.id not in records:
-            raise CaseError("case_not_found", "Exact source case does not exist")
-        record = records[args.id]
+        record = locate_live_case(root, args.id).record
         current_status = str(record.fields.get("status", ""))
         if current_status == "closed":
             raise CaseError("closure_gate_failed", "Investigation is already closed")
@@ -2357,7 +2581,7 @@ def close_case(args: argparse.Namespace, root: Path) -> int:
         if not lifecycle_metadata_valid:
             raise CaseError(
                 "closure_gate_failed",
-                "Investigation lifecycle must be valid and prior public states must be "
+                "Investigation lifecycle must be valid and prior published states must be "
                 "migrated to investigating before closure",
                 current=current_status,
             )
@@ -2365,7 +2589,7 @@ def close_case(args: argparse.Namespace, root: Path) -> int:
         if digest_bytes(original) != args.expected_public_sha256:
             raise CaseError(
                 "stale_public_snapshot",
-                "Public investigation changed after it was read",
+                "Investigation changed after it was read",
                 exit_code=3,
                 current_sha256=digest_bytes(original),
             )
@@ -2418,7 +2642,7 @@ def close_case(args: argparse.Namespace, root: Path) -> int:
         updated = append_history_event(updated, event)
         try:
             atomic_write(record.path, updated.encode("utf-8"))
-            errors, warnings = validate_root(root, ignore_lock=True)
+            errors, warnings = validate_vault(root, ignore_lock=True)
             if errors:
                 raise CaseError("closure_validation_failed", "Closure failed validation", errors=errors)
         except Exception:
@@ -2442,18 +2666,15 @@ def bind_case(args: argparse.Namespace, root: Path) -> int:
     reject_secret_input(*(str(value) for value in observation.values()))
     fields = dict(zip(DEVELOPMENT_HANDOFF_FIELDS, (observation[k] for k in keys)))
     with locked(root):
-        records = {record.case_id: record for record in load_records(root)}
-        if args.id not in records:
-            raise CaseError("case_not_found", "Exact source case does not exist")
-        record = records[args.id]
+        record = locate_live_case(root, args.id).record
         original = record.path.read_bytes()
         if digest_bytes(original) != args.expected_public_sha256:
             raise CaseError(
-                "stale_public_snapshot", "Public investigation changed after binding review",
+                "stale_public_snapshot", "Investigation changed after binding review",
                 exit_code=3, current_sha256=digest_bytes(original),
             )
         text = original.decode("utf-8")
-        errors, warnings = validate_root(root, ignore_lock=True)
+        errors, warnings = validate_vault(root, ignore_lock=True)
         if errors:
             raise CaseError("binding_validation_failed", "Source case is invalid", errors=errors)
         stories = []
@@ -2520,13 +2741,101 @@ def bind_case(args: argparse.Namespace, root: Path) -> int:
         updated = updated[:position].rstrip() + "\n\n" + event + "\n" + updated[position:]
         try:
             atomic_write(record.path, updated.encode("utf-8"))
-            errors, warnings = validate_root(root, ignore_lock=True)
+            errors, warnings = validate_vault(root, ignore_lock=True)
             if errors:
                 raise CaseError("binding_validation_failed", "Binding failed validation", errors=errors)
         except Exception:
             atomic_write(record.path, original)
             raise
     emit({"status": "bound", "id": args.id, "dh": entry_id, "warnings": warnings})
+    return 0
+
+
+def publish_case(args: argparse.Namespace, root: Path) -> int:
+    timestamp = timestamp_value(args.timestamp)
+    if not args.source.strip() or "\n" in args.source or "\r" in args.source:
+        raise CaseError("source_invalid", "Publish source must be one nonempty line")
+    reject_secret_input(args.source)
+    if LOCAL_PATH_PATTERN.search(args.source):
+        raise CaseError("source_invalid", "Publish source must be portable")
+    with locked(root):
+        located = locate_live_case(root, args.id)
+        if located.visibility != "unpublished":
+            raise CaseError("already_published", "Investigation is already published")
+        record = located.record
+        original = record.path.read_bytes()
+        if digest_bytes(original) != args.expected_public_sha256:
+            raise CaseError(
+                "stale_public_snapshot",
+                "Unpublished investigation changed after it was read",
+                exit_code=3,
+                current_sha256=digest_bytes(original),
+            )
+        source_dir = record.path.parent
+        content_errors = public_content_errors(source_dir)
+        if content_errors:
+            raise CaseError(
+                "publish_unsafe",
+                "Unpublished investigation is not safe to publish",
+                errors=content_errors,
+            )
+        dest = require_child(root, root / args.id)
+        if dest.exists():
+            raise CaseError(
+                "visibility_conflict",
+                "A published directory already exists for this investigation",
+            )
+        staging = root / f".publish-{uuid.uuid4().hex}.tmp"
+        require_child(root, staging)
+        published_bytes = original
+        try:
+            shutil.copytree(source_dir, staging, symlinks=False)
+            published_path = staging / "investigation.md"
+            locale = record_locale(record.text)
+            action = (
+                "Investigación publicada"
+                if locale == "es"
+                else "Published investigation"
+            )
+            published_text = replace_frontmatter_scalar(
+                published_path.read_text(encoding="utf-8"),
+                "updated-at",
+                timestamp,
+            )
+            published_text = append_history_event(
+                published_text,
+                attributed_event(timestamp, action, args.identity, args.source, locale),
+            )
+            atomic_write(published_path, published_text.encode("utf-8"))
+            os.replace(staging, dest)
+            shutil.rmtree(source_dir)
+            errors, warnings = validate_vault(root, ignore_lock=True)
+            if errors:
+                raise CaseError(
+                    "publish_validation_failed",
+                    "Published investigation failed validation",
+                    errors=errors,
+                )
+            published_bytes = (dest / "investigation.md").read_bytes()
+        except Exception:
+            if dest.exists() and source_dir.exists() is False:
+                shutil.copytree(dest, source_dir, symlinks=False)
+                shutil.rmtree(dest)
+            elif dest.exists() and source_dir.exists():
+                shutil.rmtree(dest)
+            if staging.exists():
+                shutil.rmtree(staging)
+            raise
+    emit(
+        {
+            "status": "published",
+            "id": args.id,
+            "path": str(dest / "investigation.md"),
+            "visibility": "published",
+            "public_sha256": digest_bytes(published_bytes),
+            "warnings": warnings,
+        }
+    )
     return 0
 
 
@@ -2569,21 +2878,43 @@ def build_parser() -> argparse.ArgumentParser:
     )
     open_parser.add_argument("--request-summary", required=True)
     open_parser.add_argument("--timestamp")
+    open_parser.add_argument(
+        "--visibility",
+        choices=("unpublished", "published"),
+        default="unpublished",
+    )
 
     load_parser = commands.add_parser(
         "load",
-        help="resolve one public case and discover its optional private overlay",
+        help="resolve one unpublished or published case and discover overlay and local working store",
     )
     load_parser.add_argument("--id", required=True)
 
     commands.add_parser("list", help="derive active cases and retired entries")
-    retire_parser = commands.add_parser("retire", help="retire a closed case backed by an exact Git snapshot")
-    for option in ("id", "expected-public-sha256", "snapshot-commit", "reason", "source",
+    retire_parser = commands.add_parser(
+        "retire",
+        help="delete a closed unpublished case, or retire a closed published case with a Git snapshot",
+    )
+    for option in ("id", "expected-public-sha256", "reason", "source",
                    "dependency-review", "absorption-review", "summary"):
         retire_parser.add_argument("--" + option, required=True)
+    retire_parser.add_argument("--snapshot-commit")
     retire_parser.add_argument("--destination", action="append", default=[])
     retire_parser.add_argument("--authorized", action="store_true")
     retire_parser.add_argument("--timestamp")
+
+    publish_parser = commands.add_parser(
+        "publish",
+        help="move one unpublished case into versioned investigations/",
+    )
+    publish_parser.add_argument("--id", required=True)
+    publish_parser.add_argument(
+        "--expected-public-sha256",
+        required=True,
+        help="unpublished investigation.md SHA-256 from load public.sha256",
+    )
+    publish_parser.add_argument("--source", required=True)
+    publish_parser.add_argument("--timestamp")
 
     consolidate_parser = commands.add_parser(
         "consolidate",
@@ -2625,7 +2956,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     save_parser = commands.add_parser(
         "save",
-        help="atomically save one reviewed public snapshot and optional private overlay",
+        help="atomically save one reviewed case snapshot and optional private overlay",
     )
     save_parser.add_argument("--id", required=True)
     save_parser.add_argument("--public-candidate", required=True, type=Path)
@@ -2647,7 +2978,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         args = build_parser().parse_args(argv)
         root = resolve_root(args.root, create=args.command == "open")
-        if args.command in {"open", "save", "consolidate", "transition", "close", "bind", "retire"}:
+        if args.command in {"open", "save", "consolidate", "transition", "close", "bind", "retire", "publish"}:
             args.identity = effective_git_identity(root.parent)
             args.note_locale = notes_locale(root.parent)
         if args.command == "open":
@@ -2658,6 +2989,8 @@ def main(argv: list[str] | None = None) -> int:
             return list_cases(root)
         if args.command == "retire":
             return retire_case(args, root)
+        if args.command == "publish":
+            return publish_case(args, root)
         if args.command == "transition":
             return transition_case(args, root)
         if args.command == "close":

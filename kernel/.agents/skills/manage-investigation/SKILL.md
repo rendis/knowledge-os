@@ -1,11 +1,11 @@
 ---
 name: manage-investigation
-description: Maintain shareable investigation case files with an optional private overlay. Use to open, resume, reconcile, validate, prepare a production handover, absorb knowledge, or explicitly retire an investigation, as well as migrate, export, learn from or promote it.
+description: Maintain investigation case files. New cases are unpublished by default; publish moves a sanitized copy into the versioned tree. Use to open, resume, publish, reconcile, validate, prepare a production handover, absorb knowledge, or explicitly retire an investigation, as well as migrate, export, learn from or promote it.
 ---
 
 # Manage investigations
 
-Treat `investigations/<id>/investigation.md` as the canonical, versionable case. An optional `.investigations-private/<id>/private.md` may add necessary sensitive context but never overrides public status, evidence, decisions, acceptance criteria, or history.
+Treat `investigations/<id>/investigation.md` as the published, versionable case. New cases open under `.investigations/<id>/` with the same contract. An optional `.investigations-private/<id>/private.md` may add necessary sensitive context but never overrides case status, evidence, decisions, acceptance criteria, or history. Machine-local tool workspaces belong in `.investigations-private/<id>/local/`, not in case `artifacts/`.
 
 Own documentary persistence and traceability, not the general inquiry method. Answering a question does not require a case. Open only when the user requests one or accepts a recommendation; recommend one when continuity or collaboration would benefit from retained evidence, decisions, or pending work. For already-supported updates, proceed directly to the documentary checks. When evidence still needs to be obtained or evaluated, read [evidence-driven-analysis](../evidence-driven-analysis/SKILL.md) in full before that analysis unless it is already loaded in the current context. Retain this workflow as owner, reuse valid checks, and consume the result without routing back.
 
@@ -13,11 +13,11 @@ Own documentary persistence and traceability, not the general inquiry method. An
 
 Always:
 
-1. Load `../../../90-Meta/vault-resolution.md` and run `../../../90-Meta/resolve-vault.py` relative to this skill directory. Bind one canonical `VAULT_ROOT`; use `VAULT_ROOT/investigations/` as the public root.
-2. Require `investigations/` to be eligible for tracking. Require both `.investigations-private/` and the legacy `.investigations/` to be ignored and absent from `git ls-files` when they exist.
-3. Resolve `scripts/investigation-case.py` relative to this skill. Use it for Open, Load, List, Save, Transition, Consolidate, Bind, Close, Retire, and validation; do not reproduce its discovery, locking, attribution, or rollback logic manually.
+1. Load `../../../90-Meta/vault-resolution.md` and run `../../../90-Meta/resolve-vault.py` relative to this skill directory. Bind one canonical `VAULT_ROOT`; use `VAULT_ROOT/investigations/` as the published root. The helper also resolves `.investigations/` and `.investigations-private/` beside it.
+2. Require `investigations/` to be eligible for tracking. Require both `.investigations-private/` and `.investigations/` to be ignored and absent from `git ls-files` when they exist.
+3. Resolve `scripts/investigation-case.py` relative to this skill. Use it for Open, Load, List, Save, Publish, Transition, Consolidate, Bind, Close, Retire, and validation; do not reproduce its discovery, locking, attribution, or rollback logic manually. `--root` is always `$VAULT_ROOT/investigations` even when the live case is unpublished.
 
-Read-only lookup is complete when the public root is trackable and private/legacy roots are ignored. It does not require Git author identity or the record contract.
+Read-only lookup is complete when the published root is trackable and ignored investigation roots stay untracked. It does not require Git author identity or the record contract.
 
 Before a mutating route, additionally:
 
@@ -30,6 +30,7 @@ Before a mutating route, additionally:
 | --- | --- |
 | **Open** | [deduplication-and-consolidation.md](references/deduplication-and-consolidation.md), then the Open steps below |
 | **Resume** / read-only case question | Resume steps below |
+| **Publish** | Publish steps below |
 | **Migrate** | [migration.md](references/migration.md) |
 | **Reconcile collaboration** | [investigation-reconciliation.md](references/investigation-reconciliation.md) |
 | **Update case** | [update-case.md](references/update-case.md) |
@@ -49,7 +50,7 @@ Use no parallel active index. The helper's `list` derives the overview from curr
 
 ## Open
 
-1. Load [references/deduplication-and-consolidation.md](references/deduplication-and-consolidation.md), derive the immutable ID and stable `dedupe-key`, classify `purpose`, set the initial `vault-outcome` and `learning-outcome: not-evaluated`, then invoke the helper's `open` command.
+1. Load [references/deduplication-and-consolidation.md](references/deduplication-and-consolidation.md), derive the immutable ID and stable `dedupe-key`, classify `purpose`, set the initial `vault-outcome` and `learning-outcome: not-evaluated`, then invoke the helper's `open` command. Open creates an unpublished case unless the user explicitly requests a published case.
 2. Resolve semantic ambiguity before invoking the helper. Route `definite_match` to **Resume** and continue only from `created`.
 3. Formalize only the relevant request. Do not preserve the conversation transcript or literal informal wording. Capture a durable source reference when available and process attachments under the record contract.
 4. Set `status: investigating`. `purpose: undecided` may remain while the requested outcome is being classified, but resolve it before completing the case or producing an external or development output. `vault-outcome: not-evaluated` may remain while the investigation still lacks the evidence needed to assess a durable current-state candidate.
@@ -58,15 +59,24 @@ Complete when the case has no equivalent active case, has a unique ID, professio
 
 ## Resume
 
-1. Search `investigations/` first. For an exact ID, use helper `load` to distinguish present, consolidated, retired and missing. A retired result supplies historical provenance and destinations, not an active public path; follow the retirement reference rather than recreating or reopening it automatically. If a public match uses a prior lifecycle state or obsolete lifecycle metadata, require **Migrate** before ordinary mutation. If only `.investigations/` contains the match, read it as legacy and require **Migrate** before any mutation.
-2. Invoke `load --id <id>` after selecting the case. For a present case, read the entire returned public path and, when `private.available` is true, the returned private path. For a retired result, use the historical lookup above and stop the live-case route. This lookup is mandatory even when the user does not mention private context. Label private provenance and keep it supplementary and non-authoritative. When it is absent, state that the requested private fact is unavailable instead of inferring it; the public case must remain intelligible.
+1. Search unpublished `.investigations/` and published `investigations/`. For an exact ID, use helper `load` to distinguish present unpublished, present published, legacy unpublished, consolidated, retired and missing. A retired result supplies historical provenance and destinations, not an active path; follow the retirement reference rather than recreating or reopening it automatically. If a published match uses a prior lifecycle state or obsolete lifecycle metadata, require **Migrate** before ordinary mutation. If `load` returns `legacy`, require **Migrate** into an unpublished current-schema case before any mutation.
+2. Invoke `load --id <id>` after selecting the case. For a present case, read `public.path` (the case file at the returned `visibility`, not a published-only path) and, when `private.available` is true, the returned private path. When `local.available` is true, treat that directory as machine-local tool workspace, not case evidence. For a retired result, use the historical lookup above and stop the live-case route. This lookup is mandatory even when the user does not mention private context. Label private and local provenance and keep them supplementary and non-authoritative. When they are absent, state that the requested private or local fact is unavailable instead of inferring it; the case file must remain intelligible without them.
 3. When `exports/` contains drafts, load [references/export-contract.md](references/export-contract.md) and inspect their source timestamps and register references.
-4. Reconstruct authoritative state from the public frontmatter and **Current state**; use public **History** only for provenance.
-5. Report the status, closure outcome when closed, purpose, independent outcomes, current understanding, blockers, open questions, handoffs, stale drafts, private-overlay availability, and next useful action.
+4. Reconstruct authoritative state from the case frontmatter and **Current state**; use **History** only for provenance. After publish, the published case is the sole authority for status, evidence, decisions, and acceptance criteria.
+5. Report the status, visibility, closure outcome when closed, purpose, independent outcomes, current understanding, blockers, open questions, handoffs, stale drafts, private-overlay availability, local-working availability, and next useful action.
 
-For a question about an existing case, use the same load and overlay discovery, then answer only the requested scope without writes, lifecycle transitions, or a mandatory full status report. Read-only lookup does not require Git author identity or the mutating preflight. Public/shareable responses exclude restricted details; an authorized local response may use necessary private context with its provenance identified.
+For a question about an existing case, use the same load and overlay discovery, then answer only the requested scope without writes, lifecycle transitions, or a mandatory full status report. Read-only lookup does not require Git author identity or the mutating preflight. Shareable responses exclude restricted details and local tool workspaces; an authorized local response may use necessary private or local context with its provenance identified.
 
 Complete when one case file is selected, draft freshness is known, and the next action follows the current state without reviving superseded understanding.
+
+## Publish
+
+1. Require an explicit request to make the unpublished case versionable. Load the case and re-classify every item under the record contract: case knowledge stays in the case; local-working material stays in `.investigations-private/<id>/local/`; sensitive context stays in the overlay; omit chatter; exclude secrets.
+2. Acceptance criteria and review steps must stay stack-agnostic unless the cell has a declared shared procedure for that tool. Do not copy Yaak collections, HTTP-client dumps, host paths, or similar tool workspaces into the published tree.
+3. Invoke helper `publish --id <id> --expected-public-sha256 <sha> --source <portable source>` with the unpublished `public.sha256` from load. The helper copies the sanitized unpublished directory into `investigations/<id>/`, appends the publication event, and removes the unpublished directory. Overlay and `local/` stay in `.investigations-private/`. There is no unpublish.
+4. Durable vault writes under `10/`–`70/` and investigation-derived learning that needs a versioned source require this published case. Local exports and development handoffs may exist before publish.
+
+Complete when `load` reports `visibility: published`, the unpublished directory for that ID is gone, validation passes, and no local-working file remains in the published tree.
 
 ## Reconcile development
 
@@ -87,16 +97,16 @@ Complete when the selected case alone represents the reconciled implementation a
 4. Invoke the helper's `close` command with the exact SHA-256 returned by the latest load, decision, formalized reason, limitations, portable source, and every closure evidence ID. Never set `status` or `closure-outcome` through a normal save.
 5. If a closed case receives material new evidence, invoke `transition --to investigating` with the current SHA-256 and preserve the former closure in History before applying the evidence.
 
-Closure makes the case a candidate for the selective retention assessment in [references/knowledge-and-retirement.md](references/knowledge-and-retirement.md), not automatic publication or deletion. When the objective includes observation, apply the agreed coverage and outcome conditions from the operational run; elapsed time or a completed audit alone does not satisfy them.
+Closure makes the case a candidate for the selective retention assessment in [references/knowledge-and-retirement.md](references/knowledge-and-retirement.md), not automatic investigation Publish or deletion. When the objective includes observation, apply the agreed coverage and outcome conditions from the operational run; elapsed time or a completed audit alone does not satisfy them.
 
 Complete when the helper validates and atomically records `status: closed`, the explicit `closure-outcome`, attribution, reason, evidence boundary, and limitations, or when a failed semantic gate leaves the loaded bytes unchanged.
 
 ## Guardrails
 
-- Keep `investigations/` versionable. Keep `.investigations-private/` and legacy `.investigations/` local and ignored.
+- Keep `investigations/` versionable. Keep `.investigations/` and `.investigations-private/` local and ignored.
 - Use the cell's configured note locale for records and drafts; keep this skill and its references in English.
-- Public is the sole source of investigation knowledge and decisions. Private is exceptional, supplementary, and safe to omit when sharing.
+- After publish, the published case is the sole source of investigation knowledge and decisions. Unpublished is the working case until then. Private overlay is exceptional, supplementary, and safe to omit when sharing. Local working material is machine-specific and never authoritative.
 - Git identity names the recorder only. Record the decision-maker or approver separately only when an inspected source establishes that role; never infer approval from the recorder.
-- Persist secret existence, location, and behavior only with values redacted. Stop before copying sensitive values into the case file.
+- Persist secret existence, location, and behavior only with values redacted. Stop before copying sensitive values into the case file, overlay, or local working store.
 - Treat the investigation as context and provenance, never as evidence that a behavior exists in production.
-- Route publication, ticket creation, and other external writes through `manage-operational-workflow`; keep commits, pushes, and pull requests behind their own explicit authorization.
+- Investigation **Publish** stays in this skill. Durable `10/`–`70/` writes go through **Promote** or **Learn**. Ticket creation, story/export platform writes, and other external writes go through `manage-operational-workflow`. Keep commits, pushes, and pull requests behind their own explicit authorization.

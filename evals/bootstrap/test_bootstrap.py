@@ -607,7 +607,8 @@ class BootstrapEval(unittest.TestCase):
             self.assertEqual(valid.returncode, 0, valid.stdout + valid.stderr)
 
             case = (
-                root
+                Path(tmp)
+                / ".investigations"
                 / "20260826-120000-responsibility-boundary"
                 / "investigation.md"
             )
@@ -2745,6 +2746,8 @@ change:
             self.assertIn("/.investigations/", gitignore)
             self.assertIn("/.investigations-private/", gitignore)
             self.assertNotIn("/investigations/", gitignore)
+            self.assertNotIn("yaak", gitignore)
+            self.assertNotIn("artifacts/", gitignore)
             self.assertNotIn("/plan/", gitignore)
             obsidian_app = json.loads(
                 (dest / ".obsidian" / "app.json").read_text(encoding="utf-8")

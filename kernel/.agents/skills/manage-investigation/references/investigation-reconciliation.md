@@ -6,7 +6,7 @@ Check helper `load`/`list` and `retired.md` before reconciling an old branch. A 
 
 ## Inputs
 
-Bind three complete public snapshots: the common base, canonical current, and contribution. Verify the same investigation ID and preserve the private overlay outside the comparison. Compare `base -> canonical current` and `base -> contribution` across Current state, evidence, questions, decisions, acceptance criteria, handoffs, readiness, and History.
+Bind three complete case snapshots: the common base, canonical current, and contribution. Verify the same investigation ID and preserve the private overlay outside the comparison. Compare `base -> canonical current` and `base -> contribution` across Current state, evidence, questions, decisions, acceptance criteria, handoffs, readiness, and History.
 
 ## Semantic review
 

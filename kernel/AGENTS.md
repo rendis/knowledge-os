@@ -26,7 +26,7 @@ Operational audit procedures belong to the registered audit area; link the techn
 
 Answer questions without a persistent record by default. Recommend an investigation when preserving evidence, decisions or pending questions would make continuation or sharing easier; open it through `manage-investigation` only when the user requests it or accepts the recommendation. A declined recommendation leaves the conversation unrecorded. An explicitly requested operational audit retains its `.operations/` workflow, not a second investigation.
 
-Before using an existing case as context, use the read-only case load in `manage-investigation` to discover its private overlay by ID, even for an informational query. Public search results locate cases; they are not a substitute for loading their context. Preserve the returned private provenance and disclosure restrictions.
+Before using an existing case as context, use the read-only case load in `manage-investigation` to discover its unpublished or published path and private overlay by ID, even for an informational query. Search results locate cases; they are not a substitute for loading their context. Preserve the returned private and local-working provenance and disclosure restrictions.
 
 ## Delegation and execution
 
@@ -40,7 +40,7 @@ Personal executor preferences override these defaults; evidence, authorization, 
 - `map-ecosystem` — vault navigation, dependency questions, knowledge publication, related-vault catalog, and placement of facts. First step is **orientation** when bootstrap is incomplete.
 - `synchronize-ecosystem` — inventory, knowledge-map synchronization, resume of a recorded sync run, or a `SYNC_PACKAGE_WORKER_V1` card.
 - `configure-workspace` — sole writer of local `.knowledge-os-config.yaml`. Onboarding is demand-triggered when a skill cannot resolve repositories or the user asks whether the workspace is initialized or configured.
-- `manage-investigation` — versionable cases under `investigations/` with optional private overlays.
+- `manage-investigation` — unpublished cases under `.investigations/` by default, published cases under `investigations/`, optional private overlays and local working stores.
 - `manage-investigation-derived-learning` — assess and publish `70-Aprendizajes/` notes.
 - `manage-development-handoff` — persistent work-item worktrees and handoff files.
 - `reconcile-development-handoff` — pull one selected handoff's implementation evidence into its source case while preserving its worktree-local lifecycle state.
@@ -84,7 +84,7 @@ Treat the distributed kernel and skills as managed dependencies. When a vault ta
 
 ## Investigation and local stores
 
-`investigations/` is versionable but excluded from the knowledge graph. Local ignored stores are `.investigations-private/` · legacy `.investigations/` · `.operations/` · `.knowledge-os-handoffs/` · `.plan/` · `.knowledge-os-config.yaml`.
+`investigations/` is versionable but excluded from the knowledge graph. Local ignored stores are `.investigations/` · `.investigations-private/` · `.operations/` · `.knowledge-os-handoffs/` · `.plan/` · `.knowledge-os-config.yaml`.
 
 Local implementation plans belong only in `.plan/`. Never create a visible
 `plan/` directory inside a cell vault: Obsidian indexes it as graph content.

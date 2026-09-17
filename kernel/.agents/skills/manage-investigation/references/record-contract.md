@@ -7,17 +7,28 @@ Load this reference before creating or changing an investigation.
 Generate an immutable ID as `YYYYMMDD-HHmmss-<slug>` in local time. Normalize the slug to lowercase ASCII words separated by hyphens. If the directory exists, append `-02`, `-03`, and the first available two-digit suffix.
 
 ```text
-investigations/
+investigations/                         # published, versionable
 └── <investigation-id>/
     ├── investigation.md
     ├── artifacts/
     ├── exports/
     └── handoffs/
+
+.investigations/                        # unpublished, same contract, ignored
+└── <investigation-id>/
+    ├── investigation.md
+    ├── artifacts/
+    ├── exports/
+    └── handoffs/
+
+.investigations-private/<investigation-id>/
+    ├── private.md                      # sensitive overlay, non-authoritative
+    └── local/                          # machine-local tool workspaces
 ```
 
-The public directory is canonical and versionable. A necessary private overlay may exist at `.investigations-private/<investigation-id>/private.md`; it is ignored, supplementary, and may contain only `id`, `authority: private-overlay`, `updated-at`, and the ordered sections **Sensitive context**, **Private references**, and **History**. It must not restate or override public decisions, evidence, status, scope, acceptance criteria, or history. Do not create an empty overlay.
+A new case is unpublished. Publish is a one-way sanitized move into `investigations/`; afterwards that ID has exactly one `investigation.md`. The published directory is canonical and versionable. An unpublished current-schema case is the working case until publish. A necessary private overlay may exist at `.investigations-private/<investigation-id>/private.md`; it is ignored, supplementary, and may contain only `id`, `authority: private-overlay`, `updated-at`, and the ordered sections **Sensitive context**, **Private references**, and **History**. It must not restate or override case decisions, evidence, status, scope, acceptance criteria, or history. Do not create an empty overlay. Local working material (HTTP collections, smoke dumps, host-specific configs) belongs only under `local/`; never in case `artifacts/` and never as extra gitignore rules for those tools.
 
-Do not maintain a separate active index. Use helper `load` for exact IDs, including consolidated/retired identities, and `list` for the derived overview. For discovery, search public frontmatter/content by `source-ref`, then title or keywords; require user selection only for multiple matches. The minimal `retired.md` register under [knowledge-and-retirement.md](knowledge-and-retirement.md) records removed cases only, never a duplicate active state.
+Do not maintain a separate active index. Use helper `load` for exact IDs, including unpublished, published, consolidated/retired identities, and prior-schema unpublished files, and `list` for the derived overview with `visibility`. `public.path` and `public.sha256` are the case file at that visibility, paired with `private` and `local`; they do not mean the case is published. `--root` is the published tree `$VAULT_ROOT/investigations`; the helper resolves `.investigations/` beside it. For discovery, search unpublished then published frontmatter/content by `source-ref`, then title or keywords; require user selection only for multiple matches. The minimal `retired.md` register under [knowledge-and-retirement.md](knowledge-and-retirement.md) records removed published cases only, never unpublished discards or a duplicate active state.
 
 Use `handoffs/` only for repository-specific development input packages that conform to the `manage-development-handoff` input contract. Create one package per target repository; the consumer receives the package directory, never authority to read or mutate the investigation case.
 
@@ -193,7 +204,9 @@ Treat decision statements as immutable. A decision records date, state (`active`
 
 ## Attachments
 
-Classify an attachment before copying it. Put an exact byte-for-byte copy in public `artifacts/` only after reviewing that the entire file is shareable and contains no credential value or local-environment detail. For sensitive necessary material, keep only a protected reference in the private overlay; otherwise omit it. Name public copies `A-<number>-<safe-original-name>` and record a portable origin, capture time, repository-relative copied path, and SHA-256.
+Classify an attachment before copying it. Put an exact byte-for-byte copy in case `artifacts/` only after reviewing that the entire file is shareable investigation evidence, contains no credential value, and is not local-working material. For sensitive necessary material, keep only a protected reference in the private overlay. For tool workspaces (Yaak collections, HTTP-client dumps, machine configs, smoke outputs), copy them to `.investigations-private/<id>/local/` and cite that a local workspace exists; do not put those files in the case tree. Otherwise omit the attachment. Name shareable case copies `A-<number>-<safe-original-name>` and record a portable origin, capture time, repository-relative copied path, and SHA-256.
+
+Acceptance criteria describe the verifiable result, not the local tool. A tool-specific recipe is local working material unless the cell has a declared shared procedure for that tool.
 
 If copying fails but reading succeeds, offer a source summary created from [../assets/source-summary-template.md](../assets/source-summary-template.md). Mark it explicitly as a summary and record:
 
@@ -218,16 +231,17 @@ Stage and validate the complete unit before replacing any retained files. Regist
 
 Before every write, classify proposed content:
 
-- Public: relevant, shareable, professionally worded investigation knowledge needed to understand state, evidence, decisions, or next steps.
-- Private: only sensitive context necessary to continue the case that cannot be safely generalized in public. It is never authoritative.
-- Omit: transcripts, hidden reasoning, incidental local details, informal phrasing, and process chatter that do not improve the investigation.
-- Forbidden: credentials, tokens, private keys, cookies, and equivalent secret values in either store.
+- Case knowledge: relevant, shareable, professionally worded investigation knowledge needed to understand state, evidence, decisions, or next steps. Lives in the unpublished or published `investigation.md` and shareable case `artifacts/`.
+- Local-working: tool collections, client dumps, host paths, and other machine-specific files needed to continue locally. Lives only in `.investigations-private/<id>/local/`.
+- Private overlay: only sensitive context necessary to continue the case that cannot be safely generalized in the case file. It is never authoritative.
+- Omit: transcripts, hidden reasoning, incidental chatter, and informal phrasing that do not improve the investigation.
+- Forbidden: credentials, tokens, private keys, cookies, and equivalent secret values in the case, overlay, or local working store.
 
 Use repository remote and branch as portable development identity. Record an observed commit only when it identifies the exact evidence behind a claim. Never persist an absolute worktree path. A derived location is only a candidate until current Git inspection proves the repository and branch are present there.
 
 ## Sensitive material
 
-Inspect before persisting. When a source exposes credentials, tokens, private keys, cookies, or equivalent secrets, record only their redacted existence, protected location, and behavioral relevance. Keep the value out of public and private case files, artifacts, summaries, exports, logs, and responses.
+Inspect before persisting. When a source exposes credentials, tokens, private keys, cookies, or equivalent secrets, record only their redacted existence, protected location, and behavioral relevance. Keep the value out of case files, overlays, local working stores, artifacts, summaries, exports, logs, and responses.
 
 ## Completion criterion
 
