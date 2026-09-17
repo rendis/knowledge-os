@@ -47,10 +47,10 @@ For a bounded question about an already identified source, read it directly when
 
 ## Output
 
-Return the conclusion, decisive evidence and material limits. Include affected nodes and flows for impact questions, and the minimum note/source context package only when implementation context is requested. Scale the answer to the question.
+Return the conclusion, decisive evidence and material limits. Include affected nodes and flows for impact questions, and the minimum note/source context package only when implementation context is requested. Scale the answer to the question. Do not turn a glob, filename prefix, or neighbor sample into a vault-wide type inventory; if the question does not need a census, omit it.
 
 ## Completion criterion
 
-The question is complete when the inspected sources support the answer and remaining uncertainties are explicit. Stop when another read cannot change the answer; preserve read-only scope and create no persistent case unless continuity was requested.
+The question is complete when the inspected sources support the answer and remaining uncertainties are explicit. Stop when another read cannot change the answer; preserve read-only scope and create no persistent case unless continuity was requested. A typed census is a separate exhaustive query, not a by-product of answering one unit.
 
 If this read-only inquiry establishes a material error or omission in a canonical map during an investigation, return the exact discrepancy and evidence to `manage-investigation` and its `references/map-correction.md` route. The query itself grants no write authority; an authorized correction switches explicitly to the ordinary documentation and independent-review recipe without repeating extraction.
