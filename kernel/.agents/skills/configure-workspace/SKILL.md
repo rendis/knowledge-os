@@ -7,7 +7,7 @@ description: "Trigger: onboard cell identity/capabilities or inspect and change 
 
 Treat `<VAULT_ROOT>/.knowledge-os-config.yaml` as local state. This skill is the sole writer of local workspace configuration. Portable identity, evidence profile and procedure bindings live in `instance.yaml`; local roots and access preferences stay in `.knowledge-os-config.yaml`. Use the semantic CLI for local workspace configuration; never edit its YAML directly.
 
-This skill reports stored identity, capability bindings and local configuration; it does not certify that an operation can execute. Return the configuration result to the initiating workflow. Checks for a specific map operation remain in `map-ecosystem` readiness; query orientation remains in its orientation branch.
+This skill reports stored identity, capability bindings and local configuration; it does not certify that an operation can execute. Return the configuration result to the initiating workflow. Checks for a specific map operation remain in `map-ecosystem` readiness; inventory and synchronization readiness belong to `synchronize-ecosystem`; query orientation remains in `map-ecosystem`'s orientation branch.
 
 Only the canonical `.knowledge-os-config.yaml` is configuration. `status` and every semantic read are read-only; they neither inspect nor migrate similarly named files. Development worktree root and database proxy ports are independent capabilities; their absence does not make repository discovery incomplete.
 

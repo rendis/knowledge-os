@@ -381,6 +381,9 @@ class BootstrapEval(unittest.TestCase):
         owner = (
             DIST / "kernel/.agents/skills/manage-investigation/SKILL.md"
         ).read_text(encoding="utf-8")
+        bind = (
+            DIST / "kernel/.agents/skills/manage-investigation/references/bind-handoff.md"
+        ).read_text(encoding="utf-8")
         export_contract = (
             DIST
             / "kernel/.agents/skills/manage-investigation/references/export-contract.md"
@@ -393,15 +396,16 @@ class BootstrapEval(unittest.TestCase):
         self.assertIn("`DH-001`", contract)
         self.assertIn("exact Git branch", contract)
         self.assertIn("**Bind development handoff**", consumer)
-        self.assertIn("## Bind development handoff", owner)
-        self.assertIn("exact-retry no-op", owner)
+        self.assertIn("bind-handoff.md", owner)
+        self.assertIn("# Bind development handoff", bind)
+        self.assertIn("exact-retry no-op", bind)
         self.assertIn("byte-level case no-op", contract)
         self.assertIn(
             "No materialization or activation is complete until",
             consumer,
         )
-        self.assertIn("component or implementation scope", owner)
-        self.assertIn("existing `DH-NNN`", owner)
+        self.assertIn("component or implementation scope", export_contract)
+        self.assertIn("existing `DH-NNN`", export_contract)
         self.assertIn("separate worktree", export_contract)
         self.assertIn("shared group", consumer)
         self.assertIn("collision-safe work-item token", repository_state)
@@ -2698,6 +2702,11 @@ change:
             home = (dest / "00-Home.md").read_text(encoding="utf-8")
             self.assertIn("Payments", home)
             self.assertIn("[[Ledger]]", home)
+            self.assertNotIn("user-guide", home)
+            self.assertFalse((dest / "90-Meta" / "user-guide.md").exists())
+            self.assertFalse((dest / "90-Meta" / "user-guide").exists())
+            self.assertFalse((dest / "90-Meta" / "test_user_guide.py").exists())
+            self.assertNotIn("user-guide", (dest / "AGENTS.md").read_text(encoding="utf-8"))
             self.assertTrue((dest / "10-Sistemas" / "Payments.md").is_file())
             self.assertTrue((dest / "instance.yaml").is_file())
             self.assertTrue((dest / "AGENTS.md").is_file())
@@ -3414,6 +3423,33 @@ change:
             self.assertEqual(doctor.returncode, 0, doctor.stderr)
             self.assertTrue(json.loads(doctor.stdout)["personal_instructions"]["tracked"])
             self.assertEqual(strict_status(), 2)
+
+    def test_router_defers_rare_workflows_and_ships_sync_skill(self) -> None:
+        router = (DIST / "kernel" / "AGENTS.md").read_text(encoding="utf-8")
+        self.assertNotIn("vault-catalog.md", router)
+        self.assertNotIn("cross-vault-consultation.md", router)
+        self.assertNotIn("user-guide", router)
+        self.assertIn("`synchronize-ecosystem`", router)
+        self.assertIn("only when dispatching or reconsidering a subagent", router)
+        map_skill = (
+            DIST / "kernel/.agents/skills/map-ecosystem/SKILL.md"
+        ).read_text(encoding="utf-8")
+        self.assertIn("synchronize-ecosystem", map_skill)
+        self.assertNotIn(
+            "Load `references/synchronization-package-worker.md`",
+            map_skill,
+        )
+        self.assertTrue(
+            (DIST / "kernel/.agents/skills/synchronize-ecosystem/SKILL.md").is_file()
+        )
+        investigation = (
+            DIST / "kernel/.agents/skills/manage-investigation/SKILL.md"
+        ).read_text(encoding="utf-8")
+        self.assertIn(
+            "It does not require Git author identity or the record contract.",
+            investigation,
+        )
+        self.assertNotIn("classify every proposed item", investigation)
 
 
 if __name__ == "__main__":

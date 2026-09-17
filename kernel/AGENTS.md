@@ -22,10 +22,6 @@ Before reading domain notes or source code, run `90-Meta/resolve-vault.py` (with
    - Cell-specific scope, allowlists, or exceptions: `90-Meta/Alcance.md`.
    - Schema, node type, or evidence gate: the relevant section of `90-Meta/Convenciones.md` or `90-Meta/Auditoria - Framework.md`.
 
-For related-vault registration, maintenance or discovery proposals, use `map-ecosystem` and its [catalog procedure](.agents/skills/map-ecosystem/references/vault-catalog.md).
-
-When a question crosses into another vault, follow [cross-vault consultation](.agents/skills/map-ecosystem/references/cross-vault-consultation.md) before reading its domain content.
-
 Operational audit procedures belong to the registered audit area; link the technologies they inspect through related areas.
 
 Answer questions without a persistent record by default. Recommend an investigation when preserving evidence, decisions or pending questions would make continuation or sharing easier; open it through `manage-investigation` only when the user requests it or accepts the recommendation. A declined recommendation leaves the conversation unrecorded. An explicitly requested operational audit retains its `.operations/` workflow, not a second investigation.
@@ -34,12 +30,15 @@ Before using an existing case as context, use the read-only case load in `manage
 
 ## Delegation and execution
 
-Delegate bounded, autonomous work when context isolation, independent review, specialization, or parallel execution outweighs coordination overhead. Keep small or tightly coupled work with the current agent; avoid creating a separate agent solely for a deterministic command. Before selecting or reconsidering an executor, follow [execution profiles](90-Meta/execution-profiles.md) for task classification, personal precedence, supported model/effort selection, and bounded escalation. Preserve the primary workflow, its evidence gates, authorized scope, and exclusive ownership of shared-state writes across delegation.
+Stay with the current agent unless a subtask is bounded, independently checkable, and cheaper than coordinating another executor. For that subtask, use the cheapest capable executor the harness exposes. Run deterministic checks as tools. Keep operational status, eligibility, enablement, and failure-cause classification with the coordinating agent.
+
+Personal executor preferences override these defaults; evidence, authorization, and workflow ownership still apply. Load [execution profiles](90-Meta/execution-profiles.md) only when dispatching or reconsidering a subagent. Preserve the primary workflow, its evidence gates, authorized scope, and exclusive ownership of shared-state writes across delegation.
 
 ## Skills
 
 - `evidence-driven-analysis` — analysis, diagnosis or audit without a specialized workflow; with or without a case.
-- `map-ecosystem` — vault navigation, dependency questions, knowledge publication and synchronization, map-operation prerequisites, and placement of facts. First step is **orientation** when bootstrap is incomplete.
+- `map-ecosystem` — vault navigation, dependency questions, knowledge publication, related-vault catalog, and placement of facts. First step is **orientation** when bootstrap is incomplete.
+- `synchronize-ecosystem` — inventory, knowledge-map synchronization, resume of a recorded sync run, or a `SYNC_PACKAGE_WORKER_V1` card.
 - `configure-workspace` — sole writer of local `.knowledge-os-config.yaml`. Onboarding is demand-triggered when a skill cannot resolve repositories or the user asks whether the workspace is initialized or configured.
 - `manage-investigation` — versionable cases under `investigations/` with optional private overlays.
 - `manage-investigation-derived-learning` — assess and publish `70-Aprendizajes/` notes.
@@ -51,7 +50,7 @@ Delegate bounded, autonomous work when context isolation, independent review, sp
 - `explain-visually` — auxiliary static or interactive explanations when requested or materially useful; temporary aids or source-linked retained artifacts.
 - `obsidian-cli`, `obsidian-markdown`, `obsidian-bases` — user-invoked Obsidian helpers.
 
-For mapping closure or pending-work status, follow the skill's [mapping completion contract](.agents/skills/map-ecosystem/references/mapping-completion.md).
+For mapping closure or pending-work status, use `map-ecosystem`.
 
 Adapters (only if listed in `instance.yaml` `adapters`):
 

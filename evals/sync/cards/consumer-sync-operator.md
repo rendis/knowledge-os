@@ -1,7 +1,7 @@
 # AGT-008 installed consumer synchronization card
 
 Use `gpt-5.6-sol`, reasoning `xhigh`, and the assigned consumer checkout. Read
-its installed `map-ecosystem` skill and state-machine reference. The consumer
+its installed `synchronize-ecosystem` skill and state-machine reference. The consumer
 vault and its ignored synchronization state are the only writable surfaces;
 all source checkouts are read-only. Never initialize, force-update, restart a
 recoverable run, or use a graph index.

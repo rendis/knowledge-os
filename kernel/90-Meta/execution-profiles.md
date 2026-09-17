@@ -1,28 +1,52 @@
 # Execution profiles
 
-## Select an executor
+Load this file when dispatching or reconsidering a subagent, not for ordinary tool calls or inlined work.
 
-Use this reference when selecting or reconsidering an executor, not for every tool call. These are initial role recommendations, not measured model equivalences or proof of account access. Codex behavior is evaluated separately; other harnesses remain untested candidates.
+These are starting recommendations, not measured model equivalences or proof of account access. Codex behavior is evaluated separately; other harnesses remain untested candidates.
 
-1. Classify the current phase by unresolved decisions, uncertainty, and consequences. Writing SQL, infrastructure configuration, or an investigation conclusion can require analysis. Recommend a lower-cost subagent for bounded work with identified inputs and clear acceptance criteria when expected savings cover context preparation, verification and likely repairs. Use measured cost when available; otherwise label the choice a starting recommendation, not demonstrated savings. Delegate economical execution once its decisions and acceptance criteria are sufficiently resolved. Small tasks stay inline; deterministic commands do not require another model.
-2. Apply current user direction first. Personal execution preferences in the optional root `AGENTS.personal.md` always override this matrix and generic execution defaults. This precedence selects execution strategy; permissions, evidence gates, source authority, and workflow ownership still apply. A preference can prohibit delegation or require a specific executor.
-3. Select only among capabilities exposed by the active harness. Reuse its available model/effort information for the session; refresh on an availability failure or relevant configuration change. A catalog entry is not proof of usable credentials, quota, or successful dispatch. Access in another application does not establish access here. Cross-harness execution requires an explicitly configured and authorized capability.
-4. Explicitly set model and effort when supported. Translate friendly names below to the exact identifier exposed by the harness. Do not invent effort controls, or assume identical effort names have equivalent cost or reasoning depth. Check native configuration precedence when a custom agent could override dispatch values.
-5. Distinguish preferred from required selections. Resolve a required executor before starting its assigned phase. If unavailable, report the missing executor and the authorization needed to resume that phase. Independent prerequisite checks may resolve the vault and executor; keep their domain findings out of the blocker response. Do not execute or deliver the blocked analysis inline or through another executor unless a personal or current user instruction authorizes that alternative. For an unavailable preference, use its authorized alternatives first. When delegation is optional and no explicit executor restriction prevents it, continue directly if appropriate. Otherwise report the missing selection and request a choice for dependent work. Never represent inherited or substituted execution as the requested model.
-6. When several families are usable, follow the user's family order. Without one, prefer the active harness's native family when identifiable. If no native family resolves the choice, use an exposed configured default that matches the task; request a choice only when no suitable selection can be established. Do not infer relative cost from brand or effort labels.
+## Policy
 
-## Default matrix
+1. Stay with the current agent unless a subtask is bounded, independently checkable, and cheaper than preparing context, reviewing, and likely repairs.
+2. For that subtask, use the cheapest capable executor the active harness exposes. Simple, specified work does not inherit the coordinator's model or effort.
+3. Run deterministic checks as tools. Do not start another model for a command whose contract already decides the result.
+4. Keep operational status, eligibility, enablement, and failure-cause classification with the coordinating agent (or a same-class reviewer). Do not send those decisions to a weaker executor.
 
-| Phase | OpenAI | Claude | Grok / Composer |
+Small or tightly coupled work stays inline. Personal executor preferences in the optional root `AGENTS.personal.md` override these defaults and the examples below; they select strategy only. Permissions, evidence gates, source authority, and workflow ownership still apply. A preference can prohibit delegation or require a specific executor.
+
+## Availability
+
+Select only among capabilities exposed by the active harness. Reuse its available model/effort information for the session; refresh on an availability failure or relevant configuration change. A catalog entry is not proof of usable credentials, quota, or successful dispatch. Access in another application does not establish access here. Cross-harness execution requires an explicitly configured and authorized capability.
+
+Set model and effort when the harness supports it. Translate the task shape below to an identifier the harness actually exposes. Do not invent effort controls, or assume identical effort names have equivalent cost or reasoning depth. Check native configuration precedence when a custom agent could override dispatch values.
+
+Distinguish preferred from required selections. Resolve a required executor before starting its assigned phase. If unavailable, report the missing executor and the authorization needed to resume that phase. Independent prerequisite checks may resolve the vault and executor; keep their domain findings out of the blocker response. Do not execute or deliver the blocked analysis inline or through another executor unless a personal or current user instruction authorizes that alternative. For an unavailable preference, use its authorized alternatives first. When delegation is optional and no explicit executor restriction prevents it, continue directly if appropriate. Otherwise report the missing selection and request a choice for dependent work. Never represent inherited or substituted execution as the requested model.
+
+When several families are usable, follow the user's family order. Without one, prefer the active harness's native family when identifiable. If no native family resolves the choice, use an exposed configured default that matches the task; request a choice only when no suitable selection can be established. Do not infer relative cost from brand or effort labels.
+
+## Task shape
+
+| Shape | What to dispatch |
+| --- | --- |
+| Extract, list, or format with identified inputs | Cheapest available specialist |
+| Specified implementation or visual generation with clear acceptance | Mid-cost / faster specialist |
+| Bounded analysis with a checkable artifact | Strong enough to meet the criterion; not automatically the coordinator |
+| Ambiguous diagnosis, planning, or operational classification | Coordinating agent or same-class reviewer |
+| Deterministic checks | Direct tool execution |
+
+Use measured cost when available; otherwise label the choice a starting recommendation, not demonstrated savings.
+
+## Examples (dated)
+
+Open translation table, not an allowlist. Updated 2026-09-16 independently of workflow and output contracts. `AGENTS.personal.md` and current user direction override it. Select other exposed models when documented capabilities or task-relevant observations support the role; version numbers and similar names do not establish equivalence. Columns are alternatives within the available environment, not instructions to switch providers. Composer effort is unspecified; other effort settings apply only where exposed. Luna/high has user-reported visual pilot evidence, not a general quality guarantee.
+
+| Shape | OpenAI | Claude | Grok / Composer |
 | --- | --- | --- | --- |
-| Simple search and extraction | gpt-5.6-luna / medium | Sonnet 5 / medium | Composer 2.5 |
+| Extract, list, or format | gpt-5.6-luna / medium | Sonnet 5 / medium | Composer 2.5 |
 | Specified execution and visual generation | gpt-5.6-luna / high | Sonnet 5 / medium | Composer 2.5 |
 | Bounded analysis and semantic extraction | gpt-5.6-sol / low | Opus 5 / low | Grok 4.6 / high |
 | Planning and semantic review | gpt-5.6-sol / medium | Opus 5 / medium | Grok 4.6 / high |
 | Ambiguous diagnosis and complex decisions | gpt-5.6-sol / high | Opus 5 / high | Grok 4.6 / high, non-preferred fallback when available options require it |
 | Deterministic checks | Direct tool execution | Direct tool execution | Direct tool execution |
-
-The matrix is an open set of starting examples, not an allowlist. Select other exposed models when documented capabilities or task-relevant observations support the role; version numbers and similar names do not establish equivalence. Explicit user/personal requirements and family restrictions still govern substitutions. Columns are alternatives within the available environment, not instructions to switch providers. Composer effort is unspecified; other effort settings apply only where exposed. Luna/high has user-reported visual pilot evidence, not a general quality guarantee. Update these examples independently of workflow and output contracts.
 
 ## Delegate and verify
 
@@ -36,7 +60,7 @@ Review the result against its acceptance criteria without repeating the full inv
 
 Record requested model/effort and effective values when the runtime exposes them. Otherwise label the effective configuration unverified. Report measured usage and time only when available; a smaller principal context does not establish lower total token cost.
 
-## Sources and maintenance
+## Sources
 
 Documented mechanisms checked on 2026-09-14; task assignments above are project recommendations.
 
