@@ -157,7 +157,7 @@ Un levantamiento o sincronización termina cuando:
 - cada aprendizaje creado o modificado supera su gate independiente, conserva evidencia acumulativa y aplicabilidad, y toda evaluación no extractable terminó sin escritura;
 - las notas cumplen [[Convenciones]] y separan hechos de límites;
 - topics, integraciones, arquitectura, flujos y MOCs afectados fueron propagados;
-- cuando cambia el dominio operacional, su índice, MOCs, Base, guías, catálogos, estándares, procedimientos, reportes, resolvedor y routing de skills fueron propagados;
+- cuando cambia el dominio operacional, su índice, MOCs, Base, políticas, guías, catálogos, estándares, procedimientos, reportes, resolvedor y routing de skills fueron propagados;
 - cuando cambia el dominio de aprendizajes, su índice, contrato, routing, notas relacionadas y validator fueron propagados;
 - each published documentation update records its analyzed production branch and commit; accepted no-change acknowledgements and unaccepted reviews preserve the note baseline;
 - each inspected repository without an accepted semantic package has an operational cursor matching its branch and SHA; `no-durable-node` follows an accepted review and cannot coexist with a note; `no-documentation-change` follows an accepted existing-repository review and requires a note;

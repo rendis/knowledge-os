@@ -19,7 +19,7 @@ Schema for a cell knowledge vault. Cell identity, systems, and source prefixes l
 | `30-Flujos/` | End-to-end business flows with Mermaid |
 | `40-Integraciones/` | External systems with a stable business role |
 | `50-Glosario/` | Domain terms used in two or more durable nodes |
-| `60-Operacion/` | Team procedures, standards, catalogs, guides |
+| `60-Operacion/` | Team policies, procedures, standards, catalogs, guides |
 | `70-Aprendizajes/` | Evidence-bounded engineering learnings |
 | `90-Meta/` | Schema, evidence framework, validators |
 
@@ -35,7 +35,7 @@ Choose the type from the observed identity. Search basename, `aliases`, `nombre-
 
 | Destination | Create when | Do not use for |
 |---|---|---|
-| `00-Home.md` or `tipo: indice` | Curated navigation | Domain contracts |
+| `00-Home.md` or `tipo: indice` | Brief scope, high-level synthesis, and curated links | Policies, standards, guides, procedures, or other domain contracts |
 | `10-Sistemas/` `tipo: sistema` | A system listed in `instance.yaml` | A capability or brand treated as a new system |
 | `15-Arquitectura/` `tipo: servicio` | A stable capability composed of two or more repos/components | A 1:1 repo duplicate or an end-to-end sequence |
 | `15-Arquitectura/` `tipo: componente` | One repo with several deployables that have their own identity | An extra layer on the normal 1:1 repo case |
@@ -45,11 +45,11 @@ Choose the type from the observed identity. Search basename, `aliases`, `nombre-
 | `30-Flujos/` `tipo: flujo` | An end-to-end business outcome crossing two durable nodes or a system boundary | Internal methods or a service composition copy |
 | `40-Integraciones/` `tipo: integracion-externa` | An external system with a stable business role | Internal repos or isolated endpoints |
 | `50-Glosario/` `tipo: glosario` | A term used in two or more durable nodes, or needed to disambiguate a contract | Generic technical terms |
-| `60-Operacion/` `tipo: operacional` | A stable human/team procedure, catalog, or report contract | Business flows or a single run |
+| `60-Operacion/` `tipo: operacional` | A stable human/team policy, standard, guide, procedure, catalog, or report contract | Business flows, a single run, or area navigation |
 | `70-Aprendizajes/` `tipo: aprendizaje` | A reusable, evidence-bounded conclusion from `manage-investigation-derived-learning` | Session logs or undeployed designs |
 | `90-Meta/` or a root Base | Schema, gates, helpers, derived views | Ecosystem facts |
 
-Operational areas are discovered from `60-Operacion/<Area>/<Area>.md` and consistent `operacion/area/<slug>` tags. Classify a procedure by its primary outcome; use `relacionado-con` for other registered areas. A cross-system audit belongs in the registered audit area; access guides and corrective procedures retain their own purpose-based area. The closed operational contract is maintained in `manage-operational-workflow` under `references/procedure-contract.md`.
+Operational areas are discovered from `60-Operacion/<Area>/<Area>.md` and consistent `operacion/area/<slug>` tags. The homonymous note is the area index: it briefly describes scope and links the area's specific operational notes; it is not a policy, standard, guide, or procedure. Classify an operational note by its primary outcome; use `relacionado-con` for other registered areas. A cross-system audit belongs in the registered audit area; access guides and corrective procedures retain their own purpose-based area. The closed operational contract is maintained in `manage-operational-workflow` under `references/procedure-contract.md`.
 
 Decision rules: update before duplicating; a service is not a flow; a business flow is not an operational procedure; a learning is not a technical production claim; runtime is not an integration; low-level tables/buckets stay as strings; ambiguity does not create a node; do not invent folder types locally.
 

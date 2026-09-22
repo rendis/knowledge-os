@@ -1,6 +1,6 @@
 # Git and GitHub defaults
 
-Use these conventions only where the target repository and `60-Operacion/Git/Git.md` are silent. They are fallback decisions, not a replacement for live repository rules.
+Use these conventions only where the target repository instructions and applicable specific notes linked from `60-Operacion/Git/Git.md` are silent. The area index itself is navigation, not policy. These are fallback decisions, not a replacement for live repository rules.
 
 ## Tool and identity
 
@@ -26,7 +26,7 @@ Use these conventions only where the target repository and `60-Operacion/Git/Git
 ## Pull requests and merges
 
 - Resolve the actual base branch and inspect the branch diff, commits, repository instructions, templates, and live rules before creating or updating a pull request.
-- Validate the title and required ticket against the vault policy before creation. Do not generalize a rule that applies only to one base branch or workflow.
+- Validate the title and required ticket against the applicable specific Git notes before creation. Do not generalize a rule that applies only to one base branch or workflow.
 - Read the pull request back after a write and verify base, head, title, body, state, and required checks.
 - Merge only with the policy-approved method after required checks and reviews are observed. Branch deletion is a separate effect unless the request or repository workflow explicitly includes it.
 
