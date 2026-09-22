@@ -21,9 +21,9 @@ From `VAULT_ROOT`, use `90-Meta/Convenciones.md` as the only normative catalog. 
    - System, provider, platform, or API outside the cell boundary → external integration.
    - End-to-end sequence with a business outcome → flow.
    - Shared domain term needed to interpret nodes or a critical contract → glossary.
-   - Human/team guide, catalog, standard, ordered procedure, or individual report contract → operational; place it under the single owning area and represent secondary areas with typed links. Git/GitHub policy maintenance belongs to `manage-git-workflow`, including its policy note and index link; technical mapping recipes consume that policy as context rather than rewriting it.
+   - Human/team policy, guide, catalog, standard, ordered procedure, or individual report contract → operational; place it in a specific note under the single owning area and represent secondary areas with typed links. Git/GitHub policy maintenance belongs to `manage-git-workflow`, including its specific policy notes and their area-index links; technical mapping recipes consume those notes as context rather than rewriting them.
    - Reusable, evidence-bounded conclusion derived from an investigation → learning; route assessment and publication to `manage-investigation-derived-learning`.
-   - Curated navigation or system-wide aggregation → index or system MOC.
+   - Brief scope, high-level synthesis, and curated navigation → index or system MOC. Keep domain rules and procedures in their specific typed notes.
    - Documentation contract, validator, reusable helper, or derived view → Meta or Base.
 4. If two tests appear to match, use the distinction rules in Convenciones. Do not create a node until the ambiguity is resolved by evidence; record a business-relevant limitation in the nearest canonical node when it cannot be resolved.
 5. Select exactly one lifecycle action: create, update, consolidate/rename, retire, or no change. The profile-specific policy in [[evidence-policy]] is a prerequisite for technical create or update; when it fails, select no change even if the candidate comes from an approved investigation or planned implementation. For a learning, defer to the domain actions `create`, `enrich`, `challenge`, `supersede`, or `none` and its independent durable-learning gate.
@@ -45,7 +45,7 @@ Evaluate every affected node and record a decision:
 - Flow → participant notes and `participa-en` where supported by their contracts.
 - Service/runtime → system MOC, flows, and architecture views.
 - Glossary → canonical wikilinks at meaningful uses; keep usage discovery backlink-driven.
-- Operational note → owning-area MOC, operational index/Base, linked operational notes, AGENTS routing, catalog resolver, and execution-skill references; do not add it to business-flow participation.
+- Operational note → owning-area MOC navigation link, operational index/Base, linked operational notes, AGENTS routing, catalog resolver, and execution-skill references; keep its contract out of the MOC and do not add it to business-flow participation.
 - Learning note → learning index, canonical `aplica-a` links, supersession links, AGENTS routing, validator, and any independently qualified technical-map candidate; do not mutate technical node contracts merely to add a forward link.
 - Schema or folder change → AGENTS routing, README structure, affected Bases, validators, and Framework documentation.
 

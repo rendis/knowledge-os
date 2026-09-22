@@ -1,11 +1,24 @@
 # Operational procedure contract
 
-Use `60-Operacion/<Area>/` as the versioned source for operational knowledge. `Operacion.md` is the only Markdown at the domain root; each registered area has one homonymous MOC. The closed frontmatter for every non-index note is:
+Use `60-Operacion/<Area>/` as the versioned source for operational knowledge. `Operacion.md` is the only Markdown at the domain root; each registered area has one homonymous MOC. The MOC contains a brief scope description, an optional high-level synthesis, and links to the area's specific notes. Policies, standards, guides, catalogs, procedures, and report contracts live in separate non-index notes; the MOC never substitutes for one of those documents.
+
+Use this frontmatter for an area MOC:
+
+```yaml
+---
+tipo: indice
+tags: [moc, operacion, operacion/area/devops]
+---
+```
+
+When creating or updating a specific operational note, add or update its MOC link without copying the note's rules or steps into the MOC. A misplaced contract in an existing MOC is a structural issue: propose an explicit move to a specific note and preserve the current bytes until that move is authorized.
+
+The closed frontmatter for every non-index note is:
 
 ```yaml
 ---
 tipo: operacional
-clase: procedimiento # guia | catalogo | estandar | procedimiento | reporte
+clase: procedimiento # politica | guia | catalogo | estandar | procedimiento | reporte
 estado: borrador      # borrador | vigente | retirado
 owner: por-definir
 ultima-verificacion: 2026-07-23
@@ -21,6 +34,10 @@ tags: [operacion, operacion/procedimiento, operacion/area/devops]
 Resolve registered areas through `90-Meta/operational-catalog.py list-areas` and choose one owning area by the primary outcome and completion evidence. For a cross-system audit, prefer a registered audit area over an execution technology. The directory, `area`, and area tag must agree. Use `relacionado-con` for secondary area MOCs and keep one canonical note.
 
 ## Classes
+
+### Policy
+
+Use `clase: politica` for durable governance rules that define required, permitted, or prohibited behavior across one or more workflows. Require: Objetivo, Alcance, Reglas, Excepciones, Escalamiento, and Mantenimiento.
 
 ### Guide
 

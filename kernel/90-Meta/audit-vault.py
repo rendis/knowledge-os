@@ -187,9 +187,24 @@ OPERATIONAL_OPTIONAL = {"relacionado-con"}
 OPERATIONAL_ALLOWED = OPERATIONAL_COMMON_REQUIRED | OPERATIONAL_OPTIONAL | {"report-id"}
 OPERATIONAL_STATES = {"borrador", "vigente", "retirado"}
 OPERATIONAL_AREAS: dict[str, str] = {}
-OPERATIONAL_CLASSES = {"guia", "catalogo", "estandar", "procedimiento", "reporte"}
+OPERATIONAL_CLASSES = {
+    "politica",
+    "guia",
+    "catalogo",
+    "estandar",
+    "procedimiento",
+    "reporte",
+}
 REPORT_ID = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 OPERATIONAL_SECTIONS = {
+    "politica": {
+        "Objetivo",
+        "Alcance",
+        "Reglas",
+        "Excepciones",
+        "Escalamiento",
+        "Mantenimiento",
+    },
     "guia": {
         "Objetivo",
         "Prerrequisitos",
