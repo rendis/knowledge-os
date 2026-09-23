@@ -301,7 +301,7 @@ INVESTIGATION_ID = re.compile(
 LOCAL_IGNORED_REFERENCE = re.compile(
     r"(?:\.investigations|\.investigations-private|\.operations|\.knowledge-os-handoffs)[/\\]"
     r"|(?<![A-Za-z0-9_.-])investigations[/\\]"
-    r"|(?<![A-Za-z0-9_-])\.plan[/\\]"
+    r"|(?<![A-Za-z0-9_-])\.(?:plan|scratch)[/\\]"
 )
 LEARNING_EVIDENCE_FIELDS = (
     "Investigación",

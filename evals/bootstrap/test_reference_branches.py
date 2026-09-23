@@ -65,6 +65,25 @@ class ReferenceBranchTests(unittest.TestCase):
             issues = self.audit.audit_repo(note, self.vault)
             self.assertEqual(not any("rama-analizada" in issue for issue in issues), allowed)
 
+    def test_learning_rejects_scratch_as_durable_evidence(self):
+        note = self.vault / "70-Aprendizajes/Aprendizaje - scratch source.md"
+        note.write_text(
+            "---\ntipo: aprendizaje\n---\n"
+            "## Evidencia acumulada\n### EV-001\n"
+            "- Fuentes durables: `.scratch/report/method.py`\n",
+            encoding="utf-8",
+        )
+        issues = self.audit.audit_learning(note, self.vault)
+        self.assertTrue(any("reference local ignored workspaces" in issue for issue in issues))
+        note.write_text(
+            note.read_text(encoding="utf-8").replace(
+                ".scratch/report/method.py", "https://example.test/method.py"
+            ),
+            encoding="utf-8",
+        )
+        issues = self.audit.audit_learning(note, self.vault)
+        self.assertFalse(any("reference local ignored workspaces" in issue for issue in issues))
+
     def test_branch_change_with_same_sha_needs_reanalysis(self):
         tool = self.inventory
         note = {"repo": SOURCE_REPOSITORY, "note": "display-name", "recorded_branch": "main", "recorded_sha": "a" * 12, "valid": True}
