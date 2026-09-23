@@ -802,6 +802,12 @@ class Transactions(unittest.TestCase):
         self.assertIn('Published investigation', public.read_text())
         listed = json.loads(self.run_cli('list').stdout)
         self.assertEqual(listed['cases'][0]['visibility'], 'published')
+        legacy = self.unpublished / self.case_id
+        legacy.mkdir()
+        (legacy / 'investigation.md').write_text('---\nid: ' + self.case_id + '\nstatus: intake\n---\n')
+        loaded = json.loads(self.run_cli('load', '--id', self.case_id).stdout)
+        self.assertEqual(loaded['visibility'], 'published')
+        self.assertEqual(Path(loaded['public']['path']).resolve(), public.resolve())
 
     def test_publish_rejects_unshareable_content_even_with_reviewed_name(self):
         dump = self.case.parent / 'yaak-collection.json'
