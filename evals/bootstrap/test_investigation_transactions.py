@@ -2,6 +2,7 @@
 import hashlib
 import json
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -29,6 +30,9 @@ class Transactions(unittest.TestCase):
         result = subprocess.run([sys.executable, '-B', str(HELPER), '--root', str(self.root), *args], capture_output=True, text=True)
         self.assertEqual(result.returncode == 0, ok, result.stdout + result.stderr)
         return result
+
+    def tree_sha(self, case_dir=None):
+        return json.loads(self.run_cli('snapshot', '--case-dir', str(case_dir or self.case.parent)).stdout)['tree_sha256']
 
     def test_bind_retry_advance_and_rollback_preserve_freshness(self):
         (self.case.parent / 'exports' / 'S-001-story.md').write_text(f'---\nstory-id: S-001\nsource-investigation: {self.case_id}\n---\n# Story\n')
@@ -788,6 +792,7 @@ class Transactions(unittest.TestCase):
         published = self.run_cli(
             'publish', '--id', self.case_id,
             '--expected-public-sha256', hashlib.sha256(self.case.read_bytes()).hexdigest(),
+            '--expected-tree-sha256', loaded['public']['tree_sha256'],
             '--source', 'synthetic publish review',
         )
         self.assertIn('published', published.stdout)
@@ -798,12 +803,13 @@ class Transactions(unittest.TestCase):
         listed = json.loads(self.run_cli('list').stdout)
         self.assertEqual(listed['cases'][0]['visibility'], 'published')
 
-    def test_publish_rejects_local_working_artifacts(self):
+    def test_publish_rejects_unshareable_content_even_with_reviewed_name(self):
         dump = self.case.parent / 'artifacts' / 'yaak-collection.json'
-        dump.write_text('{"name": "local-only"}\n', encoding='utf-8')
+        dump.write_text('{"path": "/Users/example/local-only"}\n', encoding='utf-8')
         rejected = self.run_cli(
             'publish', '--id', self.case_id,
             '--expected-public-sha256', hashlib.sha256(self.case.read_bytes()).hexdigest(),
+            '--expected-tree-sha256', self.tree_sha(),
             '--source', 'synthetic publish review',
             ok=False,
         )
@@ -811,10 +817,107 @@ class Transactions(unittest.TestCase):
         self.assertTrue(self.case.exists())
         self.assertFalse((self.root / self.case_id).exists())
 
+    def test_publish_binds_resource_tree_and_retains_excluded_bytes(self):
+        method = self.case.parent / 'artifacts' / 'A-001-smoke-check.py'
+        method.write_text('print("portable verifier")\n', encoding='utf-8')
+        local = self.case.parent / 'artifacts' / 'scratch.txt'
+        local.write_text('local draft\n', encoding='utf-8')
+        reviewed = self.tree_sha()
+        method.write_text('print("changed after review")\n', encoding='utf-8')
+        stale = self.run_cli(
+            'publish', '--id', self.case_id,
+            '--expected-public-sha256', hashlib.sha256(self.case.read_bytes()).hexdigest(),
+            '--expected-tree-sha256', reviewed,
+            '--retain-local', 'artifacts/scratch.txt',
+            '--source', 'synthetic resource review', ok=False,
+        )
+        self.assertIn('stale_case_tree', stale.stderr)
+        self.assertTrue(self.case.exists())
+        self.assertFalse((self.root / self.case_id).exists())
+        reviewed = self.tree_sha()
+        self.run_cli(
+            'publish', '--id', self.case_id,
+            '--expected-public-sha256', hashlib.sha256(self.case.read_bytes()).hexdigest(),
+            '--expected-tree-sha256', reviewed,
+            '--retain-local', 'artifacts/scratch.txt',
+            '--source', 'synthetic resource review',
+        )
+        self.assertEqual((self.root / self.case_id / 'artifacts' / method.name).read_text(), 'print("changed after review")\n')
+        self.assertFalse((self.root / self.case_id / 'artifacts' / 'scratch.txt').exists())
+        retained = Path(self.tmp.name) / '.investigations-private' / self.case_id / 'local' / 'publish-retained' / reviewed / 'artifacts' / 'scratch.txt'
+        self.assertEqual(retained.read_bytes(), b'local draft\n')
+
+    def test_save_resources_is_scoped_and_rolls_back_invalid_candidate(self):
+        self.run_cli(
+            'publish', '--id', self.case_id,
+            '--expected-public-sha256', hashlib.sha256(self.case.read_bytes()).hexdigest(),
+            '--expected-tree-sha256', self.tree_sha(),
+            '--source', 'synthetic initial publication',
+        )
+        live = self.root / self.case_id
+        candidate = Path(self.tmp.name) / 'candidate'
+        shutil.copytree(live, candidate)
+        note = candidate / 'investigation.md'
+        note.write_text(note.read_text().replace('## Evidence', '- A-001 — Reviewed case method at `artifacts/A-001-method/check.py`.\n\n## Evidence'))
+        method = candidate / 'artifacts' / 'A-001-method' / 'check.py'
+        method.parent.mkdir()
+        method.write_text('print("reviewed")\n')
+        live_digest = self.tree_sha(live)
+        candidate_digest = self.tree_sha(candidate)
+        method.write_text('print("changed after review")\n')
+        stale = self.run_cli(
+            'save-resources', '--id', self.case_id, '--candidate-dir', str(candidate),
+            '--expected-tree-sha256', live_digest,
+            '--expected-candidate-tree-sha256', candidate_digest,
+            '--target', 'A-001', '--source', 'synthetic method review', ok=False,
+        )
+        self.assertIn('stale_candidate_tree', stale.stderr)
+        self.assertFalse((live / 'artifacts' / 'A-001-method').exists())
+        method.write_text('print("reviewed")\n')
+        candidate_digest = self.tree_sha(candidate)
+        scope_file = candidate / 'exports' / 'unreviewed.txt'
+        scope_file.write_text('wrong scope\n')
+        invalid = self.run_cli(
+            'save-resources', '--id', self.case_id, '--candidate-dir', str(candidate),
+            '--expected-tree-sha256', live_digest,
+            '--expected-candidate-tree-sha256', self.tree_sha(candidate),
+            '--target', 'A-001', '--source', 'synthetic method review', ok=False,
+        )
+        self.assertIn('resource_scope_invalid', invalid.stderr)
+        scope_file.unlink()
+        note.write_text(note.read_text().replace('## Evidence\n', '## Evidence\n\n- E-001 — Unreviewed collateral change.\n'))
+        collateral = self.run_cli(
+            'save-resources', '--id', self.case_id, '--candidate-dir', str(candidate),
+            '--expected-tree-sha256', live_digest,
+            '--expected-candidate-tree-sha256', self.tree_sha(candidate),
+            '--target', 'A-001', '--source', 'synthetic method review', ok=False,
+        )
+        self.assertIn('resource_scope_invalid', collateral.stderr)
+        self.assertNotIn('Unreviewed collateral change', (live / 'investigation.md').read_text())
+        note.write_text(note.read_text().replace('\n- E-001 — Unreviewed collateral change.\n', ''))
+        candidate_digest = self.tree_sha(candidate)
+        result = self.run_cli(
+            'save-resources', '--id', self.case_id, '--candidate-dir', str(candidate),
+            '--expected-tree-sha256', live_digest,
+            '--expected-candidate-tree-sha256', candidate_digest,
+            '--target', 'A-001', '--source', 'synthetic method review',
+        )
+        self.assertIn('resources_saved', result.stdout)
+        self.assertEqual((live / 'artifacts' / 'A-001-method' / 'check.py').read_text(), 'print("reviewed")\n')
+        self.assertIn('A-001', (live / 'investigation.md').read_text())
+        self.assertFalse((live / 'investigation.md').read_bytes().endswith(b'\n\n'))
+        self.assertIn('stale_case_tree', self.run_cli(
+            'save-resources', '--id', self.case_id, '--candidate-dir', str(candidate),
+            '--expected-tree-sha256', live_digest,
+            '--expected-candidate-tree-sha256', candidate_digest,
+            '--target', 'A-001', '--source', 'synthetic method review', ok=False,
+        ).stderr)
+
     def test_visibility_conflict_and_legacy_unpublished_are_reported(self):
         self.run_cli(
             'publish', '--id', self.case_id,
             '--expected-public-sha256', hashlib.sha256(self.case.read_bytes()).hexdigest(),
+            '--expected-tree-sha256', self.tree_sha(),
             '--source', 'synthetic publish review',
         )
         duplicate = self.unpublished / self.case_id
