@@ -37,9 +37,9 @@ The subsequent distribution commit `7ba0c24` records the 0.10.2 closure; it does
 
 ## Remaining work
 
-1. **Repository closure completed:** this local eval-only commit records the efficiency suite/results, consolidated decision and release follow-up notes in older eval reports. No version bump or consumer propagation is required. All user-guide work is excluded.
+1. **Repository closure completed:** this local eval-only commit records the efficiency suite/results, consolidated decision and release follow-up notes in older eval reports. No version bump or consumer propagation is required.
 2. **Conditional follow-up, not a release blocker:** the rejected fixed-delegation alternative produced two confusing syntheses and one reviewer preflight with missing captured output. They remain failures/unknown evidence in the comparison; they are not missing implementation in the selected 0.10.2 baseline. Before reconsidering that alternative, improve the experiment's final-answer separation and capture, then repeat the affected cases under unchanged quality criteria. Do not count the existing outcomes as passes or add global rules without evidence.
 
-There is no other agreed functional implementation outstanding in this session. Comparing cheaper models, broader real-workload economics, long-run reliability or other harnesses remains optional future investigation, not a promise established by these results. The user guide is a separate task explicitly excluded by the user. Remote push/publication is also outside this closure; local versioning/propagation was the recorded delivery.
+There is no other agreed functional implementation outstanding in this session. Comparing cheaper models, broader real-workload economics, long-run reliability or other harnesses remains optional future investigation, not a promise established by these results. Remote push/publication is also outside this closure; local versioning/propagation was the recorded delivery.
 
 Later kernel routing thinning and the type-census rule are recorded in [kernel-thinning-closure.md](kernel-thinning-closure.md) (0.10.4 and 0.10.5). That file does not change the 0.10.2 decision above.

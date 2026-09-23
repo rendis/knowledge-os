@@ -6,12 +6,10 @@ Recorded 2026-09-17. Distribution-only; not a cell instruction. Local commits on
 
 Keep the 0.10.4 always-on thinning and the 0.10.5 census rule.
 
-- Catalog, cross-vault, and user-guide stay off the router. Load `execution-profiles.md` only when dispatching or reconsidering a subagent.
+- Catalog and cross-vault stay off the router. Load `execution-profiles.md` only when dispatching or reconsidering a subagent.
 - Query/document stays `map-ecosystem`. Inventory, sync, resume, and `SYNC_PACKAGE_WORKER_V1` stay `synchronize-ecosystem`.
 - Investigation read-only preflight does not load `record-contract.md`.
 - A filename glob, prefix, or neighbor sample is not a census of a type. Owner and type come from declared note fields. That bar lives in `90-Meta/response-quality.md` (cell-wide, before material conclusions) and in `map-ecosystem` interrogation output. It is not a Cell A special case.
-
-User-guide HTML/handbook remains local WIP under `kernel/90-Meta/`, gitignored and skipped by the installer. Do not ship it until it is a finished human reference.
 
 ## Local release record
 
@@ -34,7 +32,6 @@ Traces lived in ephemeral local directories and are not part of this repository.
 
 ## Remaining work
 
-- User-guide: finish as a self-contained Meta human UI; add a small agent pointer only when it is done.
 - Remote push of distribution or consumers: not part of this session.
 - Optional: one false-premise smoke on high/composer after 0.10.5. Not a release blocker.
 

@@ -120,11 +120,6 @@ def _source_files(root: Path, target_root: str) -> dict[str, Path]:
         rel = path.relative_to(root)
         if any(part == "__pycache__" or part.endswith(".pyc") for part in rel.parts):
             continue
-        if rel.parts[:1] == ("user-guide",) or rel.name in {
-            "user-guide.md",
-            "test_user_guide.py",
-        }:
-            continue
         files[(Path(target_root) / rel).as_posix()] = path
     return files
 
