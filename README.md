@@ -70,11 +70,11 @@ Local implementation plans live under `.plan/`. Init, adopt, and update keep tha
 directory ignored by Git and merge it into Obsidian's excluded-file settings;
 never create a visible `plan/` directory inside a cell vault.
 
-Generated task-specific scripts without a selected investigation go under a unique
-`.scratch/<task>/` directory in the cell vault. Init, adopt, and update ignore
-`.scratch/` in Git and Obsidian. When a task is later attached to an investigation,
-move the relevant local work or reviewed methods into that case under its record
-contract.
+Vault-local helper scripts without a selected investigation or workflow-defined
+working location go under a unique `.scratch/<task>/` directory in the cell
+vault. Init, adopt, and update ignore `.scratch/` in Git and Obsidian. When a
+task is later attached to an investigation, move the relevant local work or
+reviewed methods into that case under its record contract.
 
 ## Layout of this repo
 
