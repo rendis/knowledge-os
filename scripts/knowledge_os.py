@@ -297,6 +297,7 @@ def ensure_gitignore_lines(dest: Path) -> None:
         "/.knowledge-os-config.*.tmp",
         "/.agents/state/map-ecosystem/",
         "/.plan/",
+        "/.scratch/",
         "/.venv/",
     )
     path = dest / ".gitignore"
@@ -356,6 +357,8 @@ def ensure_obsidian_ignore_filters(dest: Path) -> None:
     filters = [item for item in raw_filters if item not in {"plan/", "/plan/"}]
     if ".plan/" not in filters:
         filters.append(".plan/")
+    if ".scratch/" not in filters:
+        filters.append(".scratch/")
     if "investigations/" not in filters:
         filters.append("investigations/")
     if PERSONAL_AGENTS not in filters:
@@ -486,6 +489,7 @@ def write_bootstrap(dest: Path, instance: dict[str, Any]) -> None:
                 "/.knowledge-os-config.yaml",
                 "/.knowledge-os-config.*.tmp",
                 "/.plan/",
+                "/.scratch/",
                 "/output/",
                 "__pycache__/",
                 "",
