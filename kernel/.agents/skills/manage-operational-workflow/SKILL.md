@@ -94,6 +94,8 @@ For Audit, use the evidence completion criteria in its reference. A completed au
 
 For Execute, close when every required step is `completed` or procedure-backed `not-applicable`, every created artifact and required reference has passed the integrity checks, external identifiers and completion evidence are recorded, optional omissions are visible, and no approval or blocker remains pending. Return the resulting keys or links, publication timestamp, verification result, and every unresolved limitation to the caller.
 
+When the verified result includes a production deployment, identify the exact deployed revision or portable artifact, configuration or migration identity, environment and supporting evidence in the handoff. If it came from an investigation, return those facts to `manage-investigation` for its component and absorption assessment. Offer the user a bounded vault mapping action when eligible knowledge remains; execute it only under existing vault and case authority. A deployment receipt alone does not establish which claims are documented or authorize another write.
+
 For Advise or a non-persistent Draft, return the validated guidance or artifacts and their limitations without creating a completed run.
 
 For a persistent Draft, close when the required local artifacts are validated against the procedure and delivered, their evidence and limitations are recorded, and no required drafting step remains pending. Publication or external read-back is not a Draft completion requirement.

@@ -2,6 +2,8 @@
 
 This vault is an evidence-backed map of one cell's systems. Load skills by name; do not restate them here.
 
+At the start of each session, read @90-Meta/SOUL.md from the vault root and apply its shared initiative guidance. Read it once unless it changes. For a map, sync or verified production deployment, check relevant investigation contributions and existing canonical destinations; pursue only eligible, unabsorbed knowledge through the responsible skill.
+
 ## Personal instructions
 
 - Load @AGENTS.personal.md from the vault root before classifying requests, if present. Absence is valid.
@@ -41,6 +43,7 @@ Personal executor preferences override these defaults; evidence, authorization, 
 - `evidence-driven-analysis` — analysis, diagnosis or audit without a specialized workflow; with or without a case.
 - `map-ecosystem` — vault navigation, dependency questions, knowledge publication, related-vault catalog, and placement of facts. First step is **orientation** when bootstrap is incomplete.
 - `synchronize-ecosystem` — inventory, knowledge-map synchronization, resume of a recorded sync run, or a `SYNC_PACKAGE_WORKER_V1` card.
+- `scheduled-vault-refresh` — guide an authorized manual or scheduled mapping cycle that reconciles source and investigation deltas, then follows the team's review or Git publication path.
 - `configure-workspace` — sole writer of local `.knowledge-os-config.yaml`. Onboarding is demand-triggered when a skill cannot resolve repositories or the user asks whether the workspace is initialized or configured.
 - `manage-investigation` — unpublished cases under `.investigations/` by default, published cases under `investigations/`, optional private overlays and local working stores.
 - `manage-investigation-derived-learning` — assess and publish `70-Aprendizajes/` notes.
@@ -70,7 +73,6 @@ Instance files (`instance.yaml`, `00-Home.md`, notes under `10/`–`70/`) are ne
 
 - Apply `90-Meta/evidence-policy.md` when assessing a technical write. Cell identity and capability bindings come from onboarding, never inferred company conventions.
 - Before material conclusions, inspect evidence supporting the exact claim and apply [response quality](90-Meta/response-quality.md), including its review and reuse conditions. This applies to conversational answers as well as retained documents. New operational status, eligibility and cause classifications require independent review before delivery, even for read-only questions; reuse prior independent acceptance only under the linked reuse conditions.
-- Communicate in clear, concise language: answer first, explain unfamiliar terms, and retain evidence and limits that affect the decision. Match detail to the reader; omit repetition and the search diary.
 - Execute only after required deterministic checks pass for the exact operation. Correct a rejected input and recheck, or report the blocker; a tool failure never grants permission to bypass its contract.
 - Never persist secrets.
 - Canonical wikilinks target the note basename.
