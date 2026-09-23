@@ -1957,6 +1957,47 @@ def declares_register(text: str, register_id: str) -> bool:
     ) is not None
 
 
+def artifact_unit_id(relative: str) -> str | None:
+    parts = Path(relative).parts
+    if len(parts) < 2 or parts[0] != "artifacts":
+        return None
+    match = re.match(r"^(A-[0-9]{3,})(?=$|[-.])", parts[1])
+    return match.group(1) if match else None
+
+
+def artifact_entry(text: str, register_id: str) -> str:
+    lines, count = named_section(text, REGISTER_SECTION_ALIASES["A"])
+    if count != 1 or lines is None:
+        return ""
+    header = re.compile(r"^(?:-\s+|###\s+)`?(A-[0-9]{3,})`?(?=$|[\s:—(])")
+    start = next((i for i, line in enumerate(lines)
+                  if (match := header.match(line)) and match.group(1) == register_id), None)
+    if start is None:
+        return ""
+    end = next((i for i in range(start + 1, len(lines)) if header.match(lines[i])), len(lines))
+    return "\n".join(lines[start:end])
+
+
+def artifact_integrity_errors(entries: list[dict[str, Any]], text: str,
+                              targets: set[str] | None = None) -> list[str]:
+    """Check every selected case artifact against its register's file inventory."""
+    errors: list[str] = []
+    for item in entries:
+        if item.get("type") != "file":
+            continue
+        relative = str(item["path"])
+        unit = artifact_unit_id(relative)
+        if unit is None or (targets is not None and unit not in targets):
+            continue
+        entry = artifact_entry(text, unit)
+        if not entry:
+            errors.append(f"{relative}: missing {unit} register entry")
+            continue
+        if not any(relative in line and item["sha256"] in line for line in entry.splitlines()):
+            errors.append(f"{relative}: {unit} must record path and SHA-256 on one line")
+    return errors
+
+
 def without_targeted_artifact_entries(text: str, targets: set[str]) -> str:
     """Remove only declared A entries for a scoped resource-note comparison."""
     lines = text.splitlines(keepends=True)
@@ -2266,6 +2307,10 @@ def save_resources(args: argparse.Namespace, root: Path) -> int:
                 raise CaseError("resource_scope_invalid", "Only targeted A-NNN units may change", path=path)
         if not changed or changed == ["investigation.md"]:
             raise CaseError("resource_scope_invalid", "Resource update requires an artifact change")
+        integrity_errors = artifact_integrity_errors(candidate_entries, candidate_text, targets)
+        if integrity_errors:
+            raise CaseError("artifact_integrity_invalid", "Resource register does not inventory the reviewed unit",
+                            errors=integrity_errors)
 
         transaction_id = uuid.uuid4().hex
         staging = located.store / f".resource-{transaction_id}.tmp"
@@ -2930,7 +2975,7 @@ def publish_case(args: argparse.Namespace, root: Path) -> int:
                 exit_code=3,
                 current_sha256=digest_bytes(original),
             )
-        current_tree_sha256, _ = case_tree_snapshot(record.path.parent)
+        current_tree_sha256, current_entries = case_tree_snapshot(record.path.parent)
         if current_tree_sha256 != args.expected_tree_sha256:
             raise CaseError(
                 "stale_case_tree",
@@ -2961,6 +3006,16 @@ def publish_case(args: argparse.Namespace, root: Path) -> int:
             if any(relative == previous or previous in relative.parents or relative in previous.parents for previous in retained):
                 raise CaseError("retain_path_duplicate", "Retained paths overlap", path=raw)
             retained.append(relative)
+        for relative in retained:
+            selected = [entry["path"] for entry in current_entries
+                        if entry.get("type") == "file" and
+                        (Path(entry["path"]) == relative or relative in Path(entry["path"]).parents)]
+            for path in selected:
+                unit = artifact_unit_id(path)
+                if (unit and declares_register(record.text, unit)) or path in record.text:
+                    raise CaseError("retain_referenced_resource",
+                                    "A registered or referenced resource must remain with the published case",
+                                    path=path)
         retained_target: Path | None = None
         if retained:
             local_root = local_working_dir(root, args.id)
@@ -2991,6 +3046,11 @@ def publish_case(args: argparse.Namespace, root: Path) -> int:
                     if staged_path.read_bytes() != retained_path.read_bytes() or stat.S_IMODE(staged_path.stat().st_mode) != stat.S_IMODE(retained_path.stat().st_mode):
                         raise CaseError("retain_copy_failed", "Retained file differs from reviewed bytes", path=str(relative))
                     staged_path.unlink()
+            integrity_errors = artifact_integrity_errors(case_tree_snapshot(staging)[1], record.text)
+            if integrity_errors:
+                raise CaseError("artifact_integrity_invalid",
+                                "Published artifacts require a path and SHA-256 in their A-NNN entries",
+                                errors=integrity_errors)
             content_errors = public_content_errors(staging)
             if content_errors:
                 raise CaseError(

@@ -834,7 +834,28 @@ class Transactions(unittest.TestCase):
         self.assertIn('stale_case_tree', stale.stderr)
         self.assertTrue(self.case.exists())
         self.assertFalse((self.root / self.case_id).exists())
+        unregistered = self.run_cli(
+            'publish', '--id', self.case_id,
+            '--expected-public-sha256', hashlib.sha256(self.case.read_bytes()).hexdigest(),
+            '--expected-tree-sha256', self.tree_sha(),
+            '--retain-local', 'artifacts/scratch.txt',
+            '--source', 'synthetic resource review', ok=False,
+        )
+        self.assertIn('artifact_integrity_invalid', unregistered.stderr)
+        method_digest = hashlib.sha256(method.read_bytes()).hexdigest()
+        self.case.write_text(self.case.read_text().replace(
+            '## Evidence',
+            f'- A-001 — Reviewed method. `artifacts/{method.name}` SHA-256 `{method_digest}`.\n\n## Evidence',
+        ))
         reviewed = self.tree_sha()
+        rejected = self.run_cli(
+            'publish', '--id', self.case_id,
+            '--expected-public-sha256', hashlib.sha256(self.case.read_bytes()).hexdigest(),
+            '--expected-tree-sha256', reviewed,
+            '--retain-local', f'artifacts/{method.name}',
+            '--source', 'synthetic resource review', ok=False,
+        )
+        self.assertIn('retain_referenced_resource', rejected.stderr)
         self.run_cli(
             'publish', '--id', self.case_id,
             '--expected-public-sha256', hashlib.sha256(self.case.read_bytes()).hexdigest(),
@@ -858,7 +879,9 @@ class Transactions(unittest.TestCase):
         candidate = Path(self.tmp.name) / 'candidate'
         shutil.copytree(live, candidate)
         note = candidate / 'investigation.md'
-        note.write_text(note.read_text().replace('## Evidence', '- A-001 — Reviewed case method at `artifacts/A-001-method/check.py`.\n\n## Evidence'))
+        method_digest = hashlib.sha256(b'print("reviewed")\n').hexdigest()
+        note.write_text(note.read_text().replace('## Evidence',
+            f'- A-001 — Reviewed case method: `artifacts/A-001-method/check.py` SHA-256 `{method_digest}`.\n\n## Evidence'))
         method = candidate / 'artifacts' / 'A-001-method' / 'check.py'
         method.parent.mkdir()
         method.write_text('print("reviewed")\n')
@@ -895,6 +918,16 @@ class Transactions(unittest.TestCase):
         self.assertIn('resource_scope_invalid', collateral.stderr)
         self.assertNotIn('Unreviewed collateral change', (live / 'investigation.md').read_text())
         note.write_text(note.read_text().replace('\n- E-001 — Unreviewed collateral change.\n', ''))
+        note.write_text(note.read_text().replace(f' SHA-256 `{method_digest}`', ''))
+        missing_digest = self.run_cli(
+            'save-resources', '--id', self.case_id, '--candidate-dir', str(candidate),
+            '--expected-tree-sha256', live_digest,
+            '--expected-candidate-tree-sha256', self.tree_sha(candidate),
+            '--target', 'A-001', '--source', 'synthetic method review', ok=False,
+        )
+        self.assertIn('artifact_integrity_invalid', missing_digest.stderr)
+        note.write_text(note.read_text().replace('`artifacts/A-001-method/check.py`.',
+                                                 f'`artifacts/A-001-method/check.py` SHA-256 `{method_digest}`.'))
         candidate_digest = self.tree_sha(candidate)
         result = self.run_cli(
             'save-resources', '--id', self.case_id, '--candidate-dir', str(candidate),
