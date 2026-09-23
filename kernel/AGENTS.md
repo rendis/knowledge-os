@@ -86,7 +86,7 @@ Treat the distributed kernel and skills as managed dependencies. When a vault ta
 
 ## Investigation and local stores
 
-`investigations/` is versionable but excluded from the knowledge graph. Local ignored stores are `.investigations/` · `.investigations-private/` · `.operations/` · `.knowledge-os-handoffs/` · `.plan/` · `.knowledge-os-config.yaml`.
+`investigations/` is versionable but excluded from the knowledge graph. Local ignored stores are `.investigations/` · `.investigations-private/` · `.operations/` · `.knowledge-os-handoffs/` · `.plan/` · `.scratch/` · `.knowledge-os-config.yaml`.
 
 Local implementation plans belong only in `.plan/`. Never create a visible
 `plan/` directory inside a cell vault: Obsidian indexes it as graph content.
