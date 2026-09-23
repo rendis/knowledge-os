@@ -30,6 +30,8 @@ SECRET_PATTERN = re.compile(
     r"\b(?:gh[pousr]_|github_pat_|sk-(?:proj-|svcacct-)?|xox[baprs]-)\S+",
     re.IGNORECASE,
 )
+LARGE_ARTIFACT_BYTES = 10 * 1024 * 1024
+LARGE_ARTIFACT_APPROVAL = re.compile(r"\blarge-artifact-approval:\s*user:[^\s`]+")
 LOCAL_PATH_PATTERN = re.compile(
     r"(?<![A-Za-z0-9])(?:/(?:Users|home|tmp|var/tmp)/[^\s`]+|[A-Za-z]:\\[^\s`]+)"
 )
@@ -1849,6 +1851,11 @@ def validate_root(
                     strict=record.fields.get("artifact-integrity") == "sha256-v1",
                 )
             )
+            if record.fields.get("artifact-integrity") == "sha256-v1":
+                errors.extend(
+                    f"{relative}: {message}"
+                    for message in large_artifact_errors(record.path.parent, record.text)
+                )
 
         for retired_id in record.consolidated_from:
             if retired_id in lineage:
@@ -2021,6 +2028,29 @@ def artifact_integrity_errors(entries: list[dict[str, Any]], text: str,
             continue
         if not any(relative in line and item["sha256"] in line for line in entry.splitlines()):
             errors.append(f"{relative}: {unit} must record path and SHA-256 on one line")
+    return errors
+
+
+def large_artifact_errors(case_dir: Path, text: str,
+                          targets: set[str] | None = None) -> list[str]:
+    """Require an exact user authorization reference for oversized case files."""
+    errors: list[str] = []
+    for path in (case_dir / "artifacts").rglob("*"):
+        if not path.is_file() or path.stat().st_size <= LARGE_ARTIFACT_BYTES:
+            continue
+        relative = path.relative_to(case_dir).as_posix()
+        unit = artifact_unit_id(relative)
+        if targets is not None and unit not in targets:
+            continue
+        entry = artifact_entry(text, unit) if unit else ""
+        approved = any(
+            relative in line and LARGE_ARTIFACT_APPROVAL.search(line)
+            for line in entry.splitlines()
+        )
+        if not approved:
+            errors.append(
+                f"{relative}: exceeds 10 MiB without large-artifact-approval: user:<source>"
+            )
     return errors
 
 
@@ -2371,6 +2401,10 @@ def save_resources(args: argparse.Namespace, root: Path) -> int:
         if integrity_errors:
             raise CaseError("artifact_integrity_invalid", "Resource register does not inventory the reviewed unit",
                             errors=integrity_errors)
+        size_errors = large_artifact_errors(candidate_dir, candidate_text, targets)
+        if size_errors:
+            raise CaseError("large_artifact_unapproved", "Large resources require explicit user authorization",
+                            errors=size_errors)
 
         transaction_id = uuid.uuid4().hex
         staging = located.store / f".resource-{transaction_id}.tmp"
@@ -3120,6 +3154,11 @@ def publish_case(args: argparse.Namespace, root: Path) -> int:
                 raise CaseError("artifact_integrity_invalid",
                                 "Published artifacts require a path and SHA-256 in their A-NNN entries",
                                 errors=integrity_errors)
+            size_errors = large_artifact_errors(staging, record.text)
+            if size_errors:
+                raise CaseError("large_artifact_unapproved",
+                                "Large resources require explicit user authorization",
+                                errors=size_errors)
             content_errors = public_content_errors(staging)
             if content_errors:
                 raise CaseError(

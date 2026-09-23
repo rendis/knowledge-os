@@ -937,6 +937,60 @@ class Transactions(unittest.TestCase):
         self.assertIn('artifact_integrity_invalid', result.stderr)
         self.assertIn('outside an A-NNN unit', result.stderr)
 
+    def test_large_artifact_requires_explicit_user_reference(self):
+        artifact = self.case.parent / 'artifacts' / 'A-001-report.csv'
+        artifact.write_bytes(b'x' * (10 * 1024 * 1024 + 1))
+        digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
+        entry = f'- A-001 — Reviewed evidence: `artifacts/A-001-report.csv` SHA-256 `{digest}`.'
+        self.case.write_text(self.case.read_text().replace('## Evidence', entry + '\n\n## Evidence'))
+        publish = lambda ok=True: self.run_cli(
+            'publish', '--id', self.case_id,
+            '--expected-public-sha256', hashlib.sha256(self.case.read_bytes()).hexdigest(),
+            '--expected-tree-sha256', self.tree_sha(),
+            '--source', 'synthetic publication review', ok=ok,
+        )
+        rejected = publish(False)
+        self.assertIn('large_artifact_unapproved', rejected.stderr)
+        self.assertTrue(self.case.exists())
+        self.case.write_text(self.case.read_text().replace(
+            entry, entry + ' large-artifact-approval: user:synthetic-request-001'
+        ))
+        publish()
+        self.run_cli('validate')
+        public = self.root / self.case_id / 'investigation.md'
+        public.write_text(public.read_text().replace(' large-artifact-approval: user:synthetic-request-001', ''))
+        invalid = self.run_cli('validate', ok=False)
+        self.assertIn('exceeds 10 MiB', invalid.stderr)
+
+    def test_save_resources_rejects_large_artifact_without_approval(self):
+        self.run_cli('publish', '--id', self.case_id,
+                     '--expected-public-sha256', hashlib.sha256(self.case.read_bytes()).hexdigest(),
+                     '--expected-tree-sha256', self.tree_sha(),
+                     '--source', 'synthetic initial publication')
+        live = self.root / self.case_id
+        candidate = Path(self.tmp.name) / 'candidate-large'
+        shutil.copytree(live, candidate)
+        artifact = candidate / 'artifacts' / 'A-001-report.csv'
+        artifact.write_bytes(b'x' * (10 * 1024 * 1024 + 1))
+        digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
+        entry = f'- A-001 — Reviewed evidence: `artifacts/A-001-report.csv` SHA-256 `{digest}`.'
+        note = candidate / 'investigation.md'
+        note.write_text(note.read_text().replace('## Evidence', entry + '\n\n## Evidence'))
+        def save(ok=True):
+            return self.run_cli(
+                'save-resources', '--id', self.case_id, '--candidate-dir', str(candidate),
+                '--expected-tree-sha256', self.tree_sha(live),
+                '--expected-candidate-tree-sha256', self.tree_sha(candidate),
+                '--target', 'A-001', '--source', 'synthetic resource review', ok=ok,
+            )
+        self.assertIn('large_artifact_unapproved', save(False).stderr)
+        self.assertFalse((live / 'artifacts' / artifact.name).exists())
+        note.write_text(note.read_text().replace(
+            entry, entry + ' large-artifact-approval: user:synthetic-request-002'
+        ))
+        save()
+        self.run_cli('validate')
+
     def test_save_resources_is_scoped_and_rolls_back_invalid_candidate(self):
         self.run_cli(
             'publish', '--id', self.case_id,
