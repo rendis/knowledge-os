@@ -18,6 +18,7 @@ At the start of each session, read @90-Meta/SOUL.md from the vault root and appl
 Before reading domain notes or source code, run `90-Meta/resolve-vault.py` (with `--path` when supplied) and bind its successful result. Load the router, personal instructions and relevant skill/access references as bootstrap context; domain-note reads start only after resolution. Reuse that binding until its inputs change.
 
 1. Classify the request and select one primary skill from the catalog below. Loading an auxiliary skill supplies a method, not a new owner: keep the selected workflow through evidence gathering and the answer.
+   Reclassify each follow-up for newly requested methods or presentation. Keep the existing owner and applicable evidence; an explicit diagram or visual explanation invokes `explain-visually` as an auxiliary.
 2. For orientation or relationship discovery, start with `90-Meta/graph-query.py` (JSON stems and edges, no note bodies). Read an already identified source directly for a bounded question that needs no graph discovery; For repository identity and failed-binding recovery, load [vault resolution](90-Meta/vault-resolution.md) before locating or reading a checkout.
 3. After classification, load only the context required by these triggers:
    - Cell identity: `instance.yaml` and `00-Home.md`.

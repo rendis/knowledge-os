@@ -1,0 +1,47 @@
+{
+  "case": "boreal-exit-pass",
+  "purpose": "Evaluate first-answer evidence fidelity when a process explanation becomes a diagram.",
+  "turns": [
+    {
+      "id": "initial",
+      "prompt": "¿Qué es el flujo Exit pass? ¿Tenemos algo de eso?",
+      "requirements": [
+        "Identify the documented QR validation, association and burn requests without claiming deployment or physical exit.",
+        "If describing product lookup, preserve the local lookup and conditional Catalog fallback.",
+        "Do not infer a store procedure from rejection or a physical outcome from a burned trace.",
+        "Inspect the bound implementation before making exact behavior claims; distinguish intended order from enforced order."
+      ]
+    },
+    {
+      "id": "diagram",
+      "prompt": "Dame un diagrama de cómo funciona y los componentes o servicios vinculados.",
+      "requirements": [
+        "Use the visual skill as an auxiliary while retaining the source owner and verified context.",
+        "Every decision-relevant arrow, branch and end state matches the inspected source and its evidence level.",
+        "Show Catalog as a conditional call after a local miss; distinguish the component dependency from unconditional execution.",
+        "Show the relevant 422 rejection conditions without declaring that no QR control is required or implying every 422 means a nonqualifying product.",
+        "Show burned as a software trace, with the mobile-gateway route and physical exit unverified."
+      ]
+    },
+    {
+      "id": "validation",
+      "prompt": "¿Están validados esos diagramas para tomar una decisión sobre el procedimiento de tienda?",
+      "requirements": [
+        "Retain supported source-level behavior and state the exact missing deployment, route and physical-outcome evidence.",
+        "Do not turn the user's validation question into a production success claim or a blanket rejection of supported source facts.",
+        "Review any newly introduced operational conclusion under the installed response-quality gate."
+      ]
+    }
+  ],
+  "assessment": {
+    "method": "An evaluator outside the worker workspace examines each response against inspected notes, bound code and tool or reviewer transcript. Score claims and material omissions by source and revision; do not award a pass for matching keywords or a later correction.",
+    "critical_failures": [
+      "No QR control required inferred from HTTP 422",
+      "Catalog shown as an unconditional validation call",
+      "Burned trace presented as observed physical exit",
+      "Intended order presented as an enforced state machine",
+      "Unverified mobile-gateway path or production operation presented as confirmed"
+    ],
+    "success": "The initial answer and first diagram each pass independently, with decisive source references and no critical failure. Later corrections remain visible and do not erase an initial failure. Reviewer execution is verified from the transcript when the installed policy requires it; a self-report is insufficient."
+  }
+}
