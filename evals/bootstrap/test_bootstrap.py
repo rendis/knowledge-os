@@ -2737,6 +2737,7 @@ change:
             self.assertIn("/.agents/state/map-ecosystem/", gitignore)
             self.assertIn("/AGENTS.personal.md", gitignore)
             self.assertIn("/.plan/", gitignore)
+            self.assertIn("/.scratch/", gitignore)
             self.assertIn("/.venv/", gitignore)
             self.assertIn("/.investigations/", gitignore)
             self.assertIn("/.investigations-private/", gitignore)
@@ -2747,7 +2748,7 @@ change:
             obsidian_app = json.loads(
                 (dest / ".obsidian" / "app.json").read_text(encoding="utf-8")
             )
-            self.assertEqual(obsidian_app["userIgnoreFilters"], [".plan/", "investigations/", "AGENTS.personal.md"])
+            self.assertEqual(obsidian_app["userIgnoreFilters"], [".plan/", ".scratch/", "investigations/", "AGENTS.personal.md"])
             self.assertNotIn(".agents/state/map-ecosystem/sync", lock)
             doctor = run(["sh", str(INSTALL), "doctor", "--dest", str(dest)])
             self.assertEqual(doctor.returncode, 0, doctor.stderr)
@@ -3191,6 +3192,7 @@ change:
             self.assertIn("/custom-ignore", gitignore)
             self.assertNotIn(".knowledge-os.lock.yaml", gitignore)
             self.assertIn("/.plan/", gitignore)
+            self.assertIn("/.scratch/", gitignore)
             self.assertIn("/.venv/", gitignore)
             self.assertIn("/AGENTS.personal.md", gitignore)
             self.assertNotIn("/plan/", gitignore)
@@ -3200,7 +3202,7 @@ change:
             self.assertTrue(obsidian_app["livePreview"])
             self.assertEqual(
                 obsidian_app["userIgnoreFilters"],
-                ["archive/", ".plan/", "investigations/", "AGENTS.personal.md"],
+                ["archive/", ".plan/", ".scratch/", "investigations/", "AGENTS.personal.md"],
             )
             lock = (dest / ".knowledge-os.lock.yaml").read_text(encoding="utf-8")
             self.assertIn('version: "3"', lock)
