@@ -2,6 +2,8 @@
 
 Store resumable runs only under `VAULT_ROOT/.operations/<run-id>/run.md`. Keep the directory ignored by Git and outside Obsidian's durable graph.
 
+The run is the ledger for one execution: scope, authorization, steps, observations, external effects and their verification. A method created to support an investigation belongs to that case's reviewed `artifacts/`; the run records the exact method revision and parameters it used. If a run later prompts an investigation, transfer selected evidence or method into the case with its run provenance. Preserve the run identity and historical observations rather than maintaining two editable copies of the method. A calculation within a case does not require an operational run unless it has its own operational scope or effect to track.
+
 ## Run identity
 
 Build the ID as `YYYYMMDD-HHMMSS-<short-slug>`. Before creating it, search active records for the same procedure, requester, target, and source anchor. Matching stable anchors select the existing run.

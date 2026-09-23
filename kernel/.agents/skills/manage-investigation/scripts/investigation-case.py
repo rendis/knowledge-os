@@ -8,6 +8,7 @@ import json
 import os
 import re
 import shutil
+import stat
 import subprocess
 import sys
 import time
@@ -31,11 +32,6 @@ SECRET_PATTERN = re.compile(
 )
 LOCAL_PATH_PATTERN = re.compile(
     r"(?<![A-Za-z0-9])(?:/(?:Users|home|tmp|var/tmp)/[^\s`]+|[A-Za-z]:\\[^\s`]+)"
-)
-LOCAL_WORKING_PATH_RE = re.compile(
-    r"(?:^|/)(?:yaak|insomnia|postman|http-client|smoke)(?:[-_/]|$)|"
-    r"\.(?:yaak|postman_collection)(?:$|\.)",
-    re.IGNORECASE,
 )
 UNPUBLISHED_ROOT_NAME = ".investigations"
 PRIVATE_ROOT_NAME = ".investigations-private"
@@ -291,7 +287,8 @@ def append_history_event(text: str, event: str) -> str:
     position = text.find("\n## ", history.end())
     if position < 0:
         position = len(text)
-    return text[:position].rstrip() + "\n\n" + event.rstrip() + "\n\n" + text[position:].lstrip("\n")
+    suffix = text[position:].lstrip("\n")
+    return text[:position].rstrip() + "\n\n" + event.rstrip() + ("\n\n" + suffix if suffix else "\n")
 
 
 def attributed_event(
@@ -326,12 +323,35 @@ def public_content_errors(case_dir: Path) -> list[str]:
             errors.append(f"{relative}: contains a credential-like value")
         if LOCAL_PATH_PATTERN.search(text):
             errors.append(f"{relative}: contains an absolute local path")
-        if LOCAL_WORKING_PATH_RE.search(relative):
-            errors.append(
-                f"{relative}: local-working material belongs in "
-                f"{PRIVATE_ROOT_NAME}/<id>/local/"
-            )
     return errors
+
+
+def case_tree_snapshot(case_dir: Path) -> tuple[str, list[dict[str, Any]]]:
+    """Bind reviewed case bytes, paths, and file and directory permissions."""
+    if case_dir.is_symlink() or not case_dir.is_dir():
+        raise CaseError("case_tree_invalid", "Case snapshot must be a real directory")
+    entries: list[dict[str, Any]] = []
+    for path in sorted(case_dir.rglob("*")):
+        relative = path.relative_to(case_dir).as_posix()
+        if path.is_symlink():
+            raise CaseError("case_symlink", "Case snapshot must not contain symlinks", path=relative)
+        if path.is_dir():
+            entries.append({"path": relative, "type": "directory", "mode": stat.S_IMODE(path.stat().st_mode)})
+            continue
+        if not path.is_file():
+            raise CaseError("case_tree_invalid", "Case snapshot contains a special file", path=relative)
+        digest = hashlib.sha256()
+        with path.open("rb") as handle:
+            for block in iter(lambda: handle.read(1024 * 1024), b""):
+                digest.update(block)
+        entries.append({
+            "path": relative,
+            "type": "file",
+            "mode": stat.S_IMODE(path.stat().st_mode),
+            "sha256": digest.hexdigest(),
+        })
+    encoded = json.dumps(entries, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest(), entries
 
 
 def unpublished_root(public_root: Path) -> Path:
@@ -1116,6 +1136,7 @@ def load_case_unlocked(args: argparse.Namespace, root: Path) -> int:
             )
     local_path = local_working_dir(root, record.case_id)
     local_available = local_path.is_dir() and any(local_path.rglob("*"))
+    tree_sha256, _ = case_tree_snapshot(record.path.parent)
     emit(
         {
             "status": "loaded",
@@ -1124,6 +1145,7 @@ def load_case_unlocked(args: argparse.Namespace, root: Path) -> int:
             "public": {
                 "path": str(record.path),
                 "sha256": digest_bytes(record.path.read_bytes()),
+                "tree_sha256": tree_sha256,
             },
             "private": {
                 "available": private_exists,
@@ -1136,6 +1158,12 @@ def load_case_unlocked(args: argparse.Namespace, root: Path) -> int:
             },
         }
     )
+    return 0
+
+
+def snapshot_case(args: argparse.Namespace) -> int:
+    digest, entries = case_tree_snapshot(args.case_dir)
+    emit({"status": "snapshotted", "tree_sha256": digest, "files": entries})
     return 0
 
 
@@ -1929,6 +1957,31 @@ def declares_register(text: str, register_id: str) -> bool:
     ) is not None
 
 
+def without_targeted_artifact_entries(text: str, targets: set[str]) -> str:
+    """Remove only declared A entries for a scoped resource-note comparison."""
+    lines = text.splitlines(keepends=True)
+    starts = [i for i, line in enumerate(lines)
+              if line.startswith("## ") and line[3:].strip() in REGISTER_SECTION_ALIASES["A"]]
+    if len(starts) != 1:
+        raise CaseError("resource_scope_invalid", "Case requires one artifact register")
+    start = starts[0] + 1
+    end = next((i for i in range(start, len(lines)) if lines[i].startswith("## ")), len(lines))
+    header = re.compile(r"^(?:-\s+|###\s+)`?(A-[0-9]{3,})`?(?=$|[\s:—(])")
+    boundaries = [i for i in range(start, end) if header.match(lines[i])]
+    boundaries.append(end)
+    kept: list[str] = []
+    cursor = start
+    for pos, following in zip(boundaries, boundaries[1:]):
+        kept.extend(lines[cursor:pos])
+        if header.match(lines[pos]).group(1) not in targets:
+            kept.extend(lines[pos:following])
+        cursor = following
+    kept.extend(lines[cursor:end])
+    # An added or removed targeted entry can leave one more separator line.
+    section = "".join(kept).strip("\n")
+    return "".join(lines[:start]) + section + "\n" + "".join(lines[end:])
+
+
 def declared_export_ids(case_dir: Path, case_id: str) -> set[str]:
     story_ids: set[str] = set()
     for draft in (case_dir / "exports").glob("*.md"):
@@ -2151,6 +2204,112 @@ def save_case(args: argparse.Namespace, root: Path) -> int:
             "warnings": warnings,
         }
     )
+    return 0
+
+
+def save_resources(args: argparse.Namespace, root: Path) -> int:
+    """Replace a reviewed case resource unit and its register entry together."""
+    if not args.source.strip() or "\n" in args.source or "\r" in args.source:
+        raise CaseError("source_invalid", "Resource source must be one portable line")
+    reject_secret_input(args.source)
+    if LOCAL_PATH_PATTERN.search(args.source):
+        raise CaseError("source_invalid", "Resource source must be portable")
+    targets = set(args.target)
+    if not targets or any(re.fullmatch(r"A-[0-9]{3,}", target) is None for target in targets):
+        raise CaseError("target_invalid", "Resource changes require A-NNN targets")
+    candidate_dir = args.candidate_dir
+    candidate_sha256, candidate_entries = case_tree_snapshot(candidate_dir)
+    if candidate_sha256 != args.expected_candidate_tree_sha256:
+        raise CaseError("stale_candidate_tree", "Reviewed resource candidate changed", exit_code=3)
+    candidate_path = candidate_dir / "investigation.md"
+    if not candidate_path.is_file():
+        raise CaseError("candidate_invalid", "Resource candidate requires investigation.md")
+    candidate_text = candidate_path.read_text(encoding="utf-8")
+    reject_secret_input(candidate_text)
+    candidate_fields = parse_frontmatter(candidate_text)
+    if candidate_fields.get("id") != args.id:
+        raise CaseError("candidate_invalid", "Resource candidate id does not match the target")
+    for target in targets:
+        if not declares_register(candidate_text, target):
+            raise CaseError("traceability_target_missing", "Resource target is absent from case", target=target)
+
+    with locked(root):
+        located = locate_live_case(root, args.id)
+        record = located.record
+        source_dir = record.path.parent
+        if candidate_dir.resolve() == source_dir.resolve() or source_dir.resolve() in candidate_dir.resolve().parents:
+            raise CaseError("candidate_invalid", "Stage resource candidates outside the live case")
+        source_sha256, source_entries = case_tree_snapshot(source_dir)
+        if source_sha256 != args.expected_tree_sha256:
+            raise CaseError("stale_case_tree", "Case resources changed after review", exit_code=3,
+                            current_sha256=source_sha256)
+        if candidate_sha256 == source_sha256:
+            emit({"status": "unchanged", "id": args.id, "tree_sha256": source_sha256})
+            return 0
+        for field in ("status", "blocked-on", "closure-outcome", "resume-to"):
+            if candidate_fields.get(field) != record.fields.get(field):
+                raise CaseError("status_transition_required", "Lifecycle changes require transition or close", field=field)
+        if without_targeted_artifact_entries(candidate_text, targets) != without_targeted_artifact_entries(record.text, targets):
+            raise CaseError("resource_scope_invalid", "Case note changes must stay within targeted A-NNN entries")
+        before = {entry["path"]: entry for entry in source_entries}
+        after = {entry["path"]: entry for entry in candidate_entries}
+        changed = [path for path in before.keys() | after.keys() if before.get(path) != after.get(path)]
+        for path in changed:
+            if path == "investigation.md":
+                continue
+            parts = Path(path).parts
+            if path == "artifacts" and after.get(path, before.get(path)).get("type") == "directory":
+                continue
+            if len(parts) < 2 or parts[0] != "artifacts" or not any(
+                parts[1] == target or parts[1].startswith(target + "-") for target in targets
+            ):
+                raise CaseError("resource_scope_invalid", "Only targeted A-NNN units may change", path=path)
+        if not changed or changed == ["investigation.md"]:
+            raise CaseError("resource_scope_invalid", "Resource update requires an artifact change")
+
+        transaction_id = uuid.uuid4().hex
+        staging = located.store / f".resource-{transaction_id}.tmp"
+        backup = located.store / f".resource-{transaction_id}.backup"
+        try:
+            shutil.copytree(candidate_dir, staging, symlinks=False)
+            if case_tree_snapshot(staging)[0] != candidate_sha256:
+                raise CaseError("stale_candidate_tree", "Resource candidate changed while staging", exit_code=3)
+            errors = public_content_errors(staging)
+            if errors:
+                raise CaseError("resource_unsafe", "Resource candidate failed content checks", errors=errors)
+            timestamp = timestamp_value(args.timestamp)
+            locale = record_locale(candidate_text)
+            updated = replace_frontmatter_scalar(candidate_text, "updated-at", timestamp)
+            action = ("Artefactos revisados " if locale == "es" else "Reviewed resources ") + ", ".join(
+                f"`{target}`" for target in sorted(targets)
+            )
+            updated = append_history_event(
+                updated, attributed_event(timestamp, action, args.identity, args.source, locale)
+            )
+            atomic_write(staging / "investigation.md", updated.encode("utf-8"))
+            if case_tree_snapshot(source_dir)[0] != source_sha256:
+                raise CaseError("stale_case_tree", "Case changed during resource staging", exit_code=3)
+            os.replace(source_dir, backup)
+            os.replace(staging, source_dir)
+            validation_errors, warnings = validate_vault(root, ignore_lock=True)
+            if validation_errors:
+                raise CaseError("resource_validation_failed", "Resource candidate failed validation",
+                                errors=validation_errors)
+        except Exception:
+            if backup.exists():
+                if source_dir.exists():
+                    shutil.rmtree(source_dir)
+                os.replace(backup, source_dir)
+            if staging.exists():
+                shutil.rmtree(staging)
+            raise
+        try:
+            shutil.rmtree(backup)
+        except OSError:
+            warnings.append(f"Committed resource backup remains at {backup}")
+    emit({"status": "resources_saved", "id": args.id,
+          "tree_sha256": case_tree_snapshot(source_dir)[0], "changed": sorted(changed),
+          "warnings": warnings})
     return 0
 
 
@@ -2771,25 +2930,74 @@ def publish_case(args: argparse.Namespace, root: Path) -> int:
                 exit_code=3,
                 current_sha256=digest_bytes(original),
             )
-        source_dir = record.path.parent
-        content_errors = public_content_errors(source_dir)
-        if content_errors:
+        current_tree_sha256, _ = case_tree_snapshot(record.path.parent)
+        if current_tree_sha256 != args.expected_tree_sha256:
             raise CaseError(
-                "publish_unsafe",
-                "Unpublished investigation is not safe to publish",
-                errors=content_errors,
+                "stale_case_tree",
+                "Case resources changed after publication review",
+                exit_code=3,
+                current_sha256=current_tree_sha256,
             )
+        source_dir = record.path.parent
         dest = require_child(root, root / args.id)
         if dest.exists():
             raise CaseError(
                 "visibility_conflict",
                 "A published directory already exists for this investigation",
             )
-        staging = root / f".publish-{uuid.uuid4().hex}.tmp"
+        transaction_id = uuid.uuid4().hex
+        staging = root / f".publish-{transaction_id}.tmp"
+        backup = source_dir.parent / f".publish-{transaction_id}.backup"
         require_child(root, staging)
+        retained: list[Path] = []
+        for raw in args.retain_local:
+            relative = Path(raw)
+            if relative.is_absolute() or not relative.parts or any(part in {".", ".."} for part in relative.parts):
+                raise CaseError("retain_path_invalid", "Retained paths must be case-relative", path=raw)
+            if relative.as_posix() == "investigation.md":
+                raise CaseError("retain_path_invalid", "The case file must be published")
+            if not (source_dir / relative).exists():
+                raise CaseError("retain_path_missing", "Retained source does not exist", path=raw)
+            if any(relative == previous or previous in relative.parents or relative in previous.parents for previous in retained):
+                raise CaseError("retain_path_duplicate", "Retained paths overlap", path=raw)
+            retained.append(relative)
+        retained_target: Path | None = None
+        if retained:
+            local_root = local_working_dir(root, args.id)
+            if any(path.is_symlink() for path in (local_root, local_root.parent, local_root.parent.parent)):
+                raise CaseError("case_symlink", "Local retention path must not be a symlink")
+            retained_target = local_root / "publish-retained" / current_tree_sha256
+            if retained_target.exists():
+                raise CaseError("retain_conflict", "Reviewed case snapshot was already retained locally")
         published_bytes = original
         try:
             shutil.copytree(source_dir, staging, symlinks=False)
+            staged_tree_sha256, _ = case_tree_snapshot(staging)
+            if staged_tree_sha256 != current_tree_sha256:
+                raise CaseError("stale_case_tree", "Case changed during publication staging", exit_code=3)
+            if retained_target is not None:
+                retained_target.mkdir(parents=True)
+            for relative in retained:
+                staged_path = staging / relative
+                retained_path = retained_target / relative
+                retained_path.parent.mkdir(parents=True, exist_ok=True)
+                if staged_path.is_dir():
+                    shutil.copytree(staged_path, retained_path)
+                    if case_tree_snapshot(staged_path) != case_tree_snapshot(retained_path):
+                        raise CaseError("retain_copy_failed", "Retained directory differs from reviewed bytes", path=str(relative))
+                    shutil.rmtree(staged_path)
+                else:
+                    shutil.copy2(staged_path, retained_path)
+                    if staged_path.read_bytes() != retained_path.read_bytes() or stat.S_IMODE(staged_path.stat().st_mode) != stat.S_IMODE(retained_path.stat().st_mode):
+                        raise CaseError("retain_copy_failed", "Retained file differs from reviewed bytes", path=str(relative))
+                    staged_path.unlink()
+            content_errors = public_content_errors(staging)
+            if content_errors:
+                raise CaseError(
+                    "publish_unsafe",
+                    "Selected investigation content is not safe to publish",
+                    errors=content_errors,
+                )
             published_path = staging / "investigation.md"
             locale = record_locale(record.text)
             action = (
@@ -2807,8 +3015,10 @@ def publish_case(args: argparse.Namespace, root: Path) -> int:
                 attributed_event(timestamp, action, args.identity, args.source, locale),
             )
             atomic_write(published_path, published_text.encode("utf-8"))
+            if case_tree_snapshot(source_dir)[0] != current_tree_sha256:
+                raise CaseError("stale_case_tree", "Case changed during publication", exit_code=3)
+            os.replace(source_dir, backup)
             os.replace(staging, dest)
-            shutil.rmtree(source_dir)
             errors, warnings = validate_vault(root, ignore_lock=True)
             if errors:
                 raise CaseError(
@@ -2818,14 +3028,19 @@ def publish_case(args: argparse.Namespace, root: Path) -> int:
                 )
             published_bytes = (dest / "investigation.md").read_bytes()
         except Exception:
-            if dest.exists() and source_dir.exists() is False:
-                shutil.copytree(dest, source_dir, symlinks=False)
+            if dest.exists():
                 shutil.rmtree(dest)
-            elif dest.exists() and source_dir.exists():
-                shutil.rmtree(dest)
+            if backup.exists():
+                os.replace(backup, source_dir)
             if staging.exists():
                 shutil.rmtree(staging)
+            if retained_target is not None and retained_target.exists():
+                shutil.rmtree(retained_target)
             raise
+        try:
+            shutil.rmtree(backup)
+        except OSError:
+            warnings.append(f"Committed publication backup remains at {backup}")
     emit(
         {
             "status": "published",
@@ -2833,6 +3048,8 @@ def publish_case(args: argparse.Namespace, root: Path) -> int:
             "path": str(dest / "investigation.md"),
             "visibility": "published",
             "public_sha256": digest_bytes(published_bytes),
+            "tree_sha256": case_tree_snapshot(dest)[0],
+            "retained_local": [path.as_posix() for path in retained],
             "warnings": warnings,
         }
     )
@@ -2890,6 +3107,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     load_parser.add_argument("--id", required=True)
 
+    snapshot_parser = commands.add_parser("snapshot", help="inventory one reviewed case tree")
+    snapshot_parser.add_argument("--case-dir", required=True, type=Path)
+
     commands.add_parser("list", help="derive active cases and retired entries")
     retire_parser = commands.add_parser(
         "retire",
@@ -2913,6 +3133,8 @@ def build_parser() -> argparse.ArgumentParser:
         required=True,
         help="unpublished investigation.md SHA-256 from load public.sha256",
     )
+    publish_parser.add_argument("--expected-tree-sha256", required=True)
+    publish_parser.add_argument("--retain-local", action="append", default=[])
     publish_parser.add_argument("--source", required=True)
     publish_parser.add_argument("--timestamp")
 
@@ -2970,6 +3192,17 @@ def build_parser() -> argparse.ArgumentParser:
     save_parser.add_argument("--private-target", action="append", default=[])
     save_parser.add_argument("--timestamp")
 
+    resources_parser = commands.add_parser(
+        "save-resources", help="replace reviewed A-NNN resource units and case record together"
+    )
+    resources_parser.add_argument("--id", required=True)
+    resources_parser.add_argument("--candidate-dir", required=True, type=Path)
+    resources_parser.add_argument("--expected-tree-sha256", required=True)
+    resources_parser.add_argument("--expected-candidate-tree-sha256", required=True)
+    resources_parser.add_argument("--target", action="append", required=True)
+    resources_parser.add_argument("--source", required=True)
+    resources_parser.add_argument("--timestamp")
+
     commands.add_parser("validate", help="validate case-file mechanics")
     return parser
 
@@ -2978,13 +3211,15 @@ def main(argv: list[str] | None = None) -> int:
     try:
         args = build_parser().parse_args(argv)
         root = resolve_root(args.root, create=args.command == "open")
-        if args.command in {"open", "save", "consolidate", "transition", "close", "bind", "retire", "publish"}:
+        if args.command in {"open", "save", "save-resources", "consolidate", "transition", "close", "bind", "retire", "publish"}:
             args.identity = effective_git_identity(root.parent)
             args.note_locale = notes_locale(root.parent)
         if args.command == "open":
             return open_case(args, root)
         if args.command == "load":
             return load_case(args, root)
+        if args.command == "snapshot":
+            return snapshot_case(args)
         if args.command == "list":
             return list_cases(root)
         if args.command == "retire":
@@ -2999,6 +3234,8 @@ def main(argv: list[str] | None = None) -> int:
             return bind_case(args, root)
         if args.command == "save":
             return save_case(args, root)
+        if args.command == "save-resources":
+            return save_resources(args, root)
         if args.command == "consolidate":
             return consolidate_case(args, root)
         if args.command == "validate":

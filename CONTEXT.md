@@ -28,6 +28,18 @@ _Avoid_: public artifact, overlay note, gitignored case attachment
 The authoritative `investigation.md`, unpublished or published. Distinct from the private overlay and from local working material.
 _Avoid_: public case as a synonym of published investigation
 
+**Case artifact**:
+A source, method, result, or deliverable retained with an investigation because it supports understanding, review, or continuation. One `A-NNN` may identify a related group of files. Its inclusion in a published case establishes availability at that revision, not execution or reproducibility.
+_Avoid_: treating every executed script as an operational run or maintained tool
+
+**Operational run**:
+One bounded audit, observation, or external action with its own scope, authorization, steps, and outcome, recorded under `.operations/`. A run can provide evidence to an investigation without becoming its case file.
+_Avoid_: using the run as the sole durable source for a shared investigation claim
+
+**Artifact disposition**:
+The reviewed fate of a case artifact when knowledge is absorbed: a maintained destination, a durable note resource, a recoverable historical snapshot, no continuing use, or a pending dependency. Disposition does not create another investigation lifecycle state.
+_Avoid_: equating knowledge absorption with automatic code promotion or deletion
+
 **Publish**:
 The one-way, sanitized move of an unpublished investigation into `investigations/`. One ID keeps at most one `investigation.md`. There is no unpublish.
 _Avoid_: sync, copy both ways, promote-to-vault, learning-note write, ticket or story platform publication
