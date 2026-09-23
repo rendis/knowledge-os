@@ -1096,7 +1096,7 @@ def load_case_unlocked(args: argparse.Namespace, root: Path) -> int:
             emit({"status": "retired", **retirement_view(root, entry)})
             return 0
     legacy = locate_legacy_unpublished(root, args.id)
-    if legacy is not None:
+    if legacy is not None and not (root / args.id / "investigation.md").is_file():
         emit(
             {
                 "status": "legacy",
