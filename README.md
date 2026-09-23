@@ -48,13 +48,15 @@ The cell vault owns:
 - `10-Sistemas/` — one stub note per declared system
 - `10/`–`70/` — the cell's knowledge graph
 
-The distribution owns the thin `AGENTS.md` router, every generic file it ships under `90-Meta/`, kernel skills, selected adapter skills, `VERSION`, and the `CLAUDE.md` / `.claude/skills` symlink topology. `update` refreshes matching distribution files without deleting cell-only Meta files, skills, recipes, or overlays. The cell owns `instance.yaml`, `00-Home.md`, the root Bases, `90-Meta/Alcance.md`, and notes under `10/`–`70/`; those files are seeded or authored locally and never rewritten by `update`.
+The distribution owns the thin `AGENTS.md` router, every generic file it ships under `90-Meta/` (including `SOUL.md`), kernel skills, selected adapter skills, `VERSION`, and the `CLAUDE.md` / `.claude/skills` symlink topology. `update` refreshes matching distribution files without deleting cell-only Meta files, skills, recipes, or overlays. The cell owns `instance.yaml`, `00-Home.md`, the root Bases, `90-Meta/Alcance.md`, and notes under `10/`–`70/`; those files are seeded or authored locally and never rewritten by `update`.
 
 Related domain vaults may be recorded in the consumer-owned, versioned `90-Meta/vault-catalog.yaml`. It is created on first authorized registration and preserved by `init`, `adopt`, and `update`; absence is valid. `map-ecosystem` manages entries: discovered candidates require user confirmation, while a direct registration request already authorizes the named entry. The catalog stores portable repository identities and domain descriptions, never local paths, credentials or user access state. `doctor` validates existing catalogs; consultation still checks current access and destination instructions. See the [catalog procedure](kernel/.agents/skills/map-ecosystem/references/vault-catalog.md).
 
 Each checkout may also have a root `AGENTS.personal.md`. It is optional, local, and ignored by Git. The managed `AGENTS.md` has a dedicated personal-instructions section whose `@AGENTS.personal.md` reference imports it in compatible harnesses and whose explicit load instruction covers the others. Agents create or update it when the user establishes or changes a reusable rule for how future work should be done for them or in their local environment, even without explicitly asking to save it. One-time task instructions do not create persistent rules. Within kernel guardrails, current user direction has priority and the personal file specializes generic skills without changing their versioned content. Store credentials in a secret manager; the personal file records only how the local environment reaches them. `init`, `adopt`, and `update` preserve this file, while `doctor --strict` rejects a missing ignore rule or a tracked copy.
 
 Personal customizations belong exclusively in `AGENTS.personal.md`; never edit the vault's root `AGENTS.md` or versioned skills to persist them. Updating a personal rule preserves unrelated preferences.
+
+The managed router explicitly asks agents to read `@90-Meta/SOUL.md` once per session. The `@` reference supports harnesses that import it; the explicit instruction covers those that treat it as ordinary text. `SOUL.md` describes shared initiative and interaction, while the router and skills retain evidence, authorization and execution rules. Neither managed file is a place for cell or user customization.
 
 `update` refreshes only the consumer vault; it never traverses development worktrees. An existing worktree receives the current managed instruction block during its next authorized handoff mutation.
 
@@ -65,6 +67,8 @@ When adopting or upgrading a vault, a pre-existing file that becomes distributio
 A minimal sync starts at `00-Home.md` and `instance.yaml`. If bootstrap is incomplete, `map-ecosystem` takes its **orientation** branch instead of walking an empty graph.
 
 Synchronization stores its resumable local state under `.agents/state/map-ecosystem/sync/` in the cell; that state is ignored by Git and is never installed from this distribution. A sealed gate produces separate acknowledgement and documentation-group units. If a projection or application is recoverable, resume the emitted run rather than repeating its source analysis or review; the installed `map-ecosystem` references define the public commands and failure routing.
+
+`scheduled-vault-refresh` is the inherited guide for a manual or scheduled mapping cycle. Each team supplies its own cadence, source scope, any applicable procedure, and authorized review or publication path in its consumer vault or scheduler; installation alone creates no task or remote Git authority. The skill reuses `synchronize-ecosystem`, checks associated investigation claims against verified destinations, and consults applicable repository instructions and specific notes under `60-Operacion/Git/` before Git publication. Concurrent contributions require both Git reconciliation and review of the combined documented meaning.
 
 Local implementation plans live under `.plan/`. Init, adopt, and update keep that
 directory ignored by Git and merge it into Obsidian's excluded-file settings;

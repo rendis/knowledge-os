@@ -2706,8 +2706,13 @@ change:
             self.assertTrue((dest / "10-Sistemas" / "Payments.md").is_file())
             self.assertTrue((dest / "instance.yaml").is_file())
             self.assertTrue((dest / "AGENTS.md").is_file())
+            self.assertEqual(
+                (dest / "90-Meta/SOUL.md").read_bytes(),
+                (DIST / "kernel/90-Meta/SOUL.md").read_bytes(),
+            )
             self.assertFalse((dest / "AGENTS.personal.md").exists())
             self.assertTrue((dest / ".agents" / "skills" / "map-ecosystem" / "SKILL.md").is_file())
+            self.assertTrue((dest / ".agents" / "skills" / "scheduled-vault-refresh" / "SKILL.md").is_file())
             git_skill = dest / ".agents" / "skills" / "manage-git-workflow"
             self.assertTrue((git_skill / "SKILL.md").is_file())
             self.assertTrue((git_skill / "references" / "defaults.md").is_file())
@@ -2730,6 +2735,7 @@ change:
             self.assertIn('distribution_revision: "', lock)
             self.assertIn("distribution_dirty:", lock)
             self.assertIn('"AGENTS.md":', lock)
+            self.assertIn('"90-Meta/SOUL.md":', lock)
             self.assertIn('"90-Meta/audit-vault.py":', lock)
             self.assertNotIn('"Arquitectura.base":', lock)
             gitignore = (dest / ".gitignore").read_text(encoding="utf-8")
@@ -3247,6 +3253,10 @@ change:
                 (dest / "AGENTS.md").read_bytes(),
                 (DIST / "kernel" / "AGENTS.md").read_bytes(),
             )
+            self.assertEqual(
+                (dest / "90-Meta" / "SOUL.md").read_bytes(),
+                (DIST / "kernel" / "90-Meta" / "SOUL.md").read_bytes(),
+            )
             self.assertEqual((dest / "00-Home.md").read_text(encoding="utf-8"), home_text)
             self.assertEqual(knowledge_snapshot(dest), knowledge_before)
 
@@ -3373,6 +3383,7 @@ change:
         router = (DIST / "kernel" / "AGENTS.md").read_text(encoding="utf-8")
         self.assertIn("## Personal instructions", router)
         self.assertIn("@AGENTS.personal.md", router)
+        self.assertIn("read @90-Meta/SOUL.md", router)
         self.assertLess(
             router.index("## Personal instructions"),
             router.index("## Routing"),

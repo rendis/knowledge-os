@@ -75,6 +75,8 @@ learning-outcome: not-evaluated
 - `candidate-for-audit`: a fact may qualify under the cell evidence profile, but `map-ecosystem` has not independently applied that profile's evidence gate.
 - `documented`: `map-ecosystem` independently verified the fact at the cell's required evidence level and confirmed that the canonical vault already represented it correctly or updated and verified the affected notes. Record the canonical notes, lifecycle result, evidence boundary, and observed checks in Readiness and History.
 
+When a case has several selected claims, this field summarizes the case; it is not a per-claim absorption receipt. Keep their stable-ID dispositions in Readiness through [selective absorption](knowledge-and-retirement.md#selective-absorption), and verify the destination before reusing a prior `documented` result.
+
 For `purpose: mixed`, the field follows the current-state candidate when one exists; every future-state portion remains explicitly deferred and outside the vault regardless of that value. Purpose never proves eligibility for the vault.
 
 `learning-outcome` records the latest explicit assessment by `manage-investigation-derived-learning`; it is independent of `purpose`, investigation status, story export, and `vault-outcome`:
@@ -258,7 +260,7 @@ Before invoking a persistence command, review the candidate for documentary nece
 - Each material detail has one home. Questions own missing inputs and next steps; evidence owns findings and their limits; decisions own actual choices; Current state and Readiness refer to those IDs rather than repeat their contents.
 - A request to create the case is already represented by Request summary and the attributed creation event. It is not a domain decision. An unresolved scope choice belongs in Questions, not another decision saying it remains pending.
 - Preserve the causal explanation and decisive check together at the appropriate level. Do not expand one conclusion into separate entries for obvious arithmetic, a restated conclusion, and the same refuted suspicion. Separate entries only when they carry independently useful evidence or meaning.
-- Acceptance criteria say what will establish completion, using question/evidence IDs instead of duplicating their data collection instructions. Readiness adds only current readiness and the next relevant ID; frontmatter already carries outcomes and status.
+- Acceptance criteria say what will establish completion, using question/evidence IDs instead of duplicating their data collection instructions. Readiness adds current readiness and the next relevant ID; for selected claims, it also holds the compact ID/evidence identity/disposition/destination rows required by selective absorption. Frontmatter still carries the case-level outcomes and status. Do not duplicate the evidence narrative in those rows.
 - Do not enumerate every operation that was not requested or every safeguard followed. State material boundaries once; leave unchanged or inapplicable sections empty rather than filling them for appearance.
 
 This is an editing gate, not a new persisted schema or a word-count quota. Retain enough source and uncertainty to support the next action; removing duplication must never hide a contradiction or missing evidence.
