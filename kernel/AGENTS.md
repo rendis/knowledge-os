@@ -44,8 +44,8 @@ Personal executor preferences override these defaults; evidence, authorization, 
 - `manage-investigation-derived-learning` — assess and publish `70-Aprendizajes/` notes.
 - `manage-development-handoff` — persistent work-item worktrees and handoff files.
 - `reconcile-development-handoff` — pull one selected handoff's implementation evidence into its source case while preserving its worktree-local lifecycle state.
-- `manage-git-workflow` — own analysis and publication of the cell's specific Git/GitHub policy notes and their area-index links, or apply those notes to source repositories; routine local versioning of this vault follows repository instructions.
-- `manage-operational-workflow` — requested audits of a known flow or entity for a period through read-only evidence; draft or execute operational procedures; resume runs in `.operations/`. Uses inspection adapters for access and queries; business actions and publication require matching authorization.
+- `manage-git-workflow` — own analysis and publication of the cell's specific Git/GitHub policy notes and their area-index links, or apply those notes to source repositories and standalone Git/GitHub operations; routine local versioning of this vault follows repository instructions.
+- `manage-operational-workflow` — requested audits of a known flow or entity for a period through read-only evidence; draft or execute operational procedures, including applicable release procedures with Git/GitHub steps; resume runs in `.operations/`. Uses inspection adapters for access and queries; business actions and publication require matching authorization.
 - `inspect-database` — engine-neutral database evidence through the target’s configured runbook.
 - `explain-visually` — auxiliary static or interactive explanations when requested or materially useful; temporary aids or source-linked retained artifacts.
 - `obsidian-cli`, `obsidian-markdown`, `obsidian-bases` — user-invoked Obsidian helpers.

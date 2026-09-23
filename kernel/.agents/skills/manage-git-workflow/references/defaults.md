@@ -1,6 +1,6 @@
 # Git and GitHub defaults
 
-Use these conventions only where the target repository instructions and applicable specific notes linked from `60-Operacion/Git/Git.md` are silent. The area index itself is navigation, not policy. These are fallback decisions, not a replacement for live repository rules.
+Use these conventions only where the target repository instructions and applicable specific notes discovered under `60-Operacion/Git/` are silent. A missing link from `Git.md` does not exclude a specific note. The area index itself is navigation, not policy; if a decision depends on a rule found only there, resolve that conflict before applying a default. These are fallback decisions, not a replacement for live repository rules.
 
 ## Tool and identity
 
