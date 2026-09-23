@@ -43,7 +43,7 @@ For a bounded question about an already identified source, read it directly when
 - **Dependencies**: distinguish HTTP from messaging; use backlinks for inverse relationships instead of rebuilding manual lists.
 - **Data**: identify the resource, read/write mode, transformation rules, and participants; retain low-level strings when no durable node exists.
 - **Infrastructure**: separate versioned deployment evidence from live provider metadata; record the exact target, environment, location, and observation time.
-- **Flow**: traverse the numbered steps and both diagrams; verify that every relevant edge appears in participant notes.
+- **Flow or process**: traverse the numbered steps and both diagrams. For each material step, branch and result, verify direction, precondition and effect against participant notes and the bound implementation when exact behavior matters. State whether the answer describes intended design, versioned implementation, configuration or observed execution; a note or graph edge alone does not establish a live outcome. Resolve contradictions with the smallest authorized source check, or identify the affected claim as unresolved. Apply [response quality](../../../../90-Meta/response-quality.md) to the final prose or visual, including new implications introduced by simplification.
 
 ## Output
 
