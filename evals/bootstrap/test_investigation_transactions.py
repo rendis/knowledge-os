@@ -804,7 +804,7 @@ class Transactions(unittest.TestCase):
         self.assertEqual(listed['cases'][0]['visibility'], 'published')
 
     def test_publish_rejects_unshareable_content_even_with_reviewed_name(self):
-        dump = self.case.parent / 'artifacts' / 'yaak-collection.json'
+        dump = self.case.parent / 'yaak-collection.json'
         dump.write_text('{"path": "/Users/example/local-only"}\n', encoding='utf-8')
         rejected = self.run_cli(
             'publish', '--id', self.case_id,
@@ -867,6 +867,69 @@ class Transactions(unittest.TestCase):
         self.assertFalse((self.root / self.case_id / 'artifacts' / 'scratch.txt').exists())
         retained = Path(self.tmp.name) / '.investigations-private' / self.case_id / 'local' / 'publish-retained' / reviewed / 'artifacts' / 'scratch.txt'
         self.assertEqual(retained.read_bytes(), b'local draft\n')
+
+    def test_publish_rejects_link_to_retained_resource(self):
+        method = self.case.parent / 'artifacts' / 'A-001-method'
+        method.mkdir()
+        readme = method / 'README.md'
+        readme.write_text('[input](../scratch.txt)\n')
+        scratch = self.case.parent / 'artifacts' / 'scratch.txt'
+        scratch.write_text('local\n')
+        digest = hashlib.sha256(readme.read_bytes()).hexdigest()
+        self.case.write_text(self.case.read_text().replace(
+            '## Evidence',
+            f'- A-001 — Method: `artifacts/A-001-method/README.md` SHA-256 `{digest}`.\n\n## Evidence',
+        ))
+        result = self.run_cli('publish', '--id', self.case_id,
+                              '--expected-public-sha256', hashlib.sha256(self.case.read_bytes()).hexdigest(),
+                              '--expected-tree-sha256', self.tree_sha(),
+                              '--retain-local', 'artifacts/scratch.txt',
+                              '--source', 'synthetic resource review', ok=False)
+        self.assertIn('retain_referenced_resource', result.stderr)
+        self.assertTrue(self.case.exists())
+
+    def test_validate_detects_tampered_artifact_hash_after_publish(self):
+        artifact = self.case.parent / 'artifacts' / 'A-001-method.txt'
+        artifact.write_text('method\n')
+        digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
+        self.case.write_text(self.case.read_text().replace(
+            '## Evidence',
+            f'- A-001 — Method: `artifacts/A-001-method.txt` SHA-256 `{digest}`.\n\n## Evidence',
+        ))
+        self.run_cli('publish', '--id', self.case_id,
+                     '--expected-public-sha256', hashlib.sha256(self.case.read_bytes()).hexdigest(),
+                     '--expected-tree-sha256', self.tree_sha(),
+                     '--source', 'synthetic resource review')
+        public = self.root / self.case_id / 'investigation.md'
+        candidate = Path(self.tmp.name) / 'tampered.md'
+        candidate.write_text(public.read_text().replace(digest, '0' * 64))
+        rejected = self.run_cli('save', '--id', self.case_id,
+                                '--public-candidate', str(candidate),
+                                '--expected-public-sha256', hashlib.sha256(public.read_bytes()).hexdigest(),
+                                '--private-root', str(Path(self.tmp.name) / '.investigations-private'),
+                                '--source', 'synthetic hash review', '--target', 'A-001', ok=False)
+        self.assertIn('must record path and SHA-256', rejected.stderr)
+        self.run_cli('validate')
+        candidate.write_text(public.read_text().replace('artifact-integrity: sha256-v1\n', ''))
+        downgrade = self.run_cli('save', '--id', self.case_id,
+                                 '--public-candidate', str(candidate),
+                                 '--expected-public-sha256', hashlib.sha256(public.read_bytes()).hexdigest(),
+                                 '--private-root', str(Path(self.tmp.name) / '.investigations-private'),
+                                 '--source', 'synthetic downgrade review', '--target', 'A-001', ok=False)
+        self.assertIn('Artifact integrity mode cannot change', downgrade.stderr)
+        candidate.write_text(public.read_text().replace(digest, '0' * 64))
+        public.write_text(candidate.read_text())
+        invalid = self.run_cli('validate', ok=False)
+        self.assertIn('must record path and SHA-256', invalid.stderr)
+
+    def test_publish_rejects_artifact_outside_registered_unit(self):
+        (self.case.parent / 'artifacts' / 'unregistered-report.csv').write_text('x\n')
+        result = self.run_cli('publish', '--id', self.case_id,
+                              '--expected-public-sha256', hashlib.sha256(self.case.read_bytes()).hexdigest(),
+                              '--expected-tree-sha256', self.tree_sha(),
+                              '--source', 'synthetic resource review', ok=False)
+        self.assertIn('artifact_integrity_invalid', result.stderr)
+        self.assertIn('outside an A-NNN unit', result.stderr)
 
     def test_save_resources_is_scoped_and_rolls_back_invalid_candidate(self):
         self.run_cli(

@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Iterator
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 
 
 ID_PATTERN = re.compile(r"^\d{8}-\d{6}-[a-z0-9]+(?:-[a-z0-9]+)*(?:-\d{2})?$")
@@ -1835,6 +1835,20 @@ def validate_root(
             f"{relative}: {message}"
             for message in public_content_errors(record.path.parent)
         )
+        if record.fields.get("artifact-integrity") not in (None, "sha256-v1"):
+            errors.append(f"{relative}: invalid artifact-integrity")
+        try:
+            entries = case_tree_snapshot(record.path.parent)[1]
+        except CaseError as error:
+            errors.append(f"{relative}: {error.message}")
+        else:
+            errors.extend(
+                f"{relative}: {message}"
+                for message in artifact_integrity_errors(
+                    entries, record.text,
+                    strict=record.fields.get("artifact-integrity") == "sha256-v1",
+                )
+            )
 
         for retired_id in record.consolidated_from:
             if retired_id in lineage:
@@ -1979,7 +1993,8 @@ def artifact_entry(text: str, register_id: str) -> str:
 
 
 def artifact_integrity_errors(entries: list[dict[str, Any]], text: str,
-                              targets: set[str] | None = None) -> list[str]:
+                              targets: set[str] | None = None,
+                              *, strict: bool = True) -> list[str]:
     """Check every selected case artifact against its register's file inventory."""
     errors: list[str] = []
     for item in entries:
@@ -1987,14 +2002,55 @@ def artifact_integrity_errors(entries: list[dict[str, Any]], text: str,
             continue
         relative = str(item["path"])
         unit = artifact_unit_id(relative)
-        if unit is None or (targets is not None and unit not in targets):
+        if not relative.startswith("artifacts/"):
+            continue
+        if unit is None:
+            if strict and targets is None:
+                errors.append(f"{relative}: artifact is outside an A-NNN unit")
+            continue
+        if targets is not None and unit not in targets:
             continue
         entry = artifact_entry(text, unit)
+        if not strict and not any(
+            re.search(re.escape(relative) + r".{0,24}SHA-256\s+`?[a-fA-F0-9]{64}", line)
+            for line in entry.splitlines()
+        ):
+            continue  # Historical units without a per-file inventory remain legacy debt.
         if not entry:
             errors.append(f"{relative}: missing {unit} register entry")
             continue
         if not any(relative in line and item["sha256"] in line for line in entry.splitlines()):
             errors.append(f"{relative}: {unit} must record path and SHA-256 on one line")
+    return errors
+
+
+def retained_link_errors(case_dir: Path, removed: set[str]) -> list[str]:
+    """Reject local links in published documents that point at retained files."""
+    errors: list[str] = []
+    markdown = re.compile(r"(?<!!)\[[^\]]*\]\(([^)]+)\)|!\[[^\]]*\]\(([^)]+)\)")
+    html = re.compile(r"\b(?:href|src)\s*=\s*['\"]([^'\"]+)['\"]", re.I)
+    for document in case_dir.rglob("*"):
+        if not document.is_file() or document.suffix.lower() not in {".md", ".html", ".htm"}:
+            continue
+        relative_document = document.relative_to(case_dir)
+        try:
+            content = document.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            continue
+        links = [next(group for group in match.groups() if group is not None)
+                 for match in markdown.finditer(content)]
+        links.extend(match.group(1) for match in html.finditer(content))
+        for raw in links:
+            target = unquote(urlparse(raw.split(maxsplit=1)[0].strip("<> ")).path)
+            if not target or target.startswith("/") or urlparse(raw).scheme:
+                continue
+            resolved = (document.parent / target).resolve()
+            try:
+                candidate = resolved.relative_to(case_dir.resolve()).as_posix()
+            except ValueError:
+                continue
+            if candidate in removed:
+                errors.append(f"{relative_document}: link to retained resource {candidate}")
     return errors
 
 
@@ -2141,6 +2197,8 @@ def save_case(args: argparse.Namespace, root: Path) -> int:
         candidate_fields = parse_frontmatter(public_text)
         if candidate_fields.get("id") != args.id:
             raise CaseError("candidate_invalid", "Public candidate id does not match the target")
+        if candidate_fields.get("artifact-integrity") != record.fields.get("artifact-integrity"):
+            raise CaseError("artifact_integrity_invalid", "Artifact integrity mode cannot change through save")
         lifecycle_fields = ("status", "blocked-on", "closure-outcome", "resume-to")
         changed_lifecycle = [
             field
@@ -2277,6 +2335,8 @@ def save_resources(args: argparse.Namespace, root: Path) -> int:
     with locked(root):
         located = locate_live_case(root, args.id)
         record = located.record
+        if candidate_fields.get("artifact-integrity") != record.fields.get("artifact-integrity"):
+            raise CaseError("artifact_integrity_invalid", "Artifact integrity mode cannot change through save-resources")
         source_dir = record.path.parent
         if candidate_dir.resolve() == source_dir.resolve() or source_dir.resolve() in candidate_dir.resolve().parents:
             raise CaseError("candidate_invalid", "Stage resource candidates outside the live case")
@@ -3046,6 +3106,15 @@ def publish_case(args: argparse.Namespace, root: Path) -> int:
                     if staged_path.read_bytes() != retained_path.read_bytes() or stat.S_IMODE(staged_path.stat().st_mode) != stat.S_IMODE(retained_path.stat().st_mode):
                         raise CaseError("retain_copy_failed", "Retained file differs from reviewed bytes", path=str(relative))
                     staged_path.unlink()
+            removed = {entry["path"] for entry in current_entries
+                       if entry.get("type") == "file" and
+                       any(Path(entry["path"]) == item or item in Path(entry["path"]).parents
+                           for item in retained)}
+            link_errors = retained_link_errors(staging, removed)
+            if link_errors:
+                raise CaseError("retain_referenced_resource",
+                                "Published resources link to locally retained files",
+                                errors=link_errors)
             integrity_errors = artifact_integrity_errors(case_tree_snapshot(staging)[1], record.text)
             if integrity_errors:
                 raise CaseError("artifact_integrity_invalid",
@@ -3069,6 +3138,9 @@ def publish_case(args: argparse.Namespace, root: Path) -> int:
                 published_path.read_text(encoding="utf-8"),
                 "updated-at",
                 timestamp,
+            )
+            published_text = upsert_frontmatter_scalar(
+                published_text, "artifact-integrity", "sha256-v1"
             )
             published_text = append_history_event(
                 published_text,
