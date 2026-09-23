@@ -1,6 +1,6 @@
 ---
 name: manage-git-workflow
-description: Analyze or maintain a vault's Git/GitHub policy, or operate source repositories governed by it. Use for policy evidence and source-repository branch, commit, synchronization, pull-request, merge, release, hotfix, or recovery work; use repository instructions for routine local versioning of the vault itself, and manage-development-handoff for persistent work-item handoff worktrees.
+description: Analyze or maintain a vault's Git/GitHub policy, or operate source repositories governed by it. Use for policy evidence and source-repository branch, commit, synchronization, pull-request, merge, standalone release, hotfix, or recovery work; execute Git steps of an applicable release procedure within manage-operational-workflow, use repository instructions for routine local versioning of the vault itself, and manage-development-handoff for persistent work-item handoff worktrees.
 ---
 
 # Manage Git workflows
@@ -18,6 +18,8 @@ Treat `60-Operacion/Git/Git.md` as the Git area index: it supplies a brief scope
    - **Repository operation** — the request asks to inspect or change a branch, commit, synchronization, pull request, merge, release, hotfix, or recovery state. Follow sections 3 and 4.
 
 Workflow selection is complete when one branch owns the request; use policy evidence when the request is solely about new rules, even if those rules describe future repository operations.
+
+When the request is to execute an applicable release procedure, route the complete run to `manage-operational-workflow`. Perform its Git/GitHub steps under that run's effect plan and return verified results to the run. A standalone Git/GitHub release operation stays here; the word "release" alone does not start an operational run.
 
 ## 2. Analyze and maintain vault policy
 
@@ -54,7 +56,7 @@ Context is resolved when the exact repository, applicable policy, current state,
 
 Choose the smallest operation that reaches the requested outcome. Use local `git` for repository state and history; use authenticated `gh` for GitHub resources. Bind every `gh` invocation to the resolved host and repository: use `--repo` or `GH_REPO` for repository commands, and an exact API route plus host for `gh api`. Never rely on the repository inferred from the current directory. Consult live command help or official documentation for other syntax that may vary instead of maintaining a command catalog here.
 
-Before a mutation, identify its exact repository, branch or ref, affected local state, remote destination, and verification. Treat the user's request as authority only for effects it explicitly includes. Obtain separate authorization for any additional commit, push, force update, merge, tag, release, branch deletion, destructive recovery, or GitHub write.
+Before a mutation, identify its exact repository, branch or ref, affected local state, remote destination, and verification. Treat the user's request as authority only for effects it explicitly includes. An operational run's existing authorization covers an exact Git/GitHub step in its approved effect plan. Obtain separate authorization for any additional commit, push, force update, merge, tag, release, branch deletion, destructive recovery, or GitHub write.
 
 Planning is complete when every intended effect is explicit, unrelated work is protected, and any missing policy, identity, permission, or target is reported as a blocker.
 
