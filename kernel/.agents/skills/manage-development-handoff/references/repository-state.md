@@ -63,9 +63,9 @@ A schema-v1 `ACTIVE.yaml` is accepted only as its original single active handoff
 
 ## Managed repository surfaces
 
-The workflow owns only these target paths:
+New plans own only these target paths:
 
-- the exact managed block in every physical root instruction file selected from `AGENTS.md` and `CLAUDE.md`;
+- the exact managed block in the physical root `AGENTS.md`;
 - the exact root rule `/.knowledge-os-handoffs/` in `.gitignore`;
 - `.knowledge-os-handoffs/`.
 
@@ -76,7 +76,7 @@ The managed block uses these markers:
 <!-- knowledge-os:managed:end id="development handoff" -->
 ```
 
-Select the physical instruction surfaces from the filesystem state observed on the target OS. When one root file is a symlink directly to the other physical root file, preserve the symlink and manage only its physical target. When both are physical files, manage both. When neither exists, create `AGENTS.md`. A broken, external, chained, or mutually recursive instruction symlink blocks the operation.
+Manage only the physical root `AGENTS.md`; create it when absent. Preserve existing `CLAUDE.md` files and links, including any earlier managed blocks, without reading, validating, or updating them as handoff policy. An `AGENTS.md` symlink or other non-regular entry blocks the operation rather than writing through it or replacing it. The repository owner controls agent configuration and instruction discovery. Recovery of a previously authorized interrupted transaction may restore its recorded `CLAUDE.md` preimage, or remove that file if the transaction created it. This exception requires the exact interrupted token and unchanged recorded content; subsequent user edits block recovery and remain preserved. It does not add `CLAUDE.md` to new plans.
 
 Zero marker pairs means insert the bundled block after root frontmatter and the first H1 when present. Keep this near the beginning rather than appending it: the handoff preflight remains inside the instruction budget, while the repository's own detailed guidance follows it and retains local authority. One complete current pair means replace only that pair. Any obsolete, duplicate, incomplete, mixed, or inverted marker set blocks the operation. In all cases, when repository content follows the end marker, leave at least one blank line before that content. A non-empty root `AGENTS.override.md` also blocks because it hides the root instruction contract.
 

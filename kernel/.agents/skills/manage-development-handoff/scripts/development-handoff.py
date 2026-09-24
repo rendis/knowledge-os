@@ -45,7 +45,7 @@ MANAGED_BEGIN = '<!-- knowledge-os:managed:start id="development handoff" -->'
 MANAGED_END = '<!-- knowledge-os:managed:end id="development handoff" -->'
 OBSOLETE_MANAGED_BEGIN = "<!-- BEGIN MANAGED: System A-System B DEVELOPMENT HANDOFF -->"
 OBSOLETE_MANAGED_END = "<!-- END MANAGED: System A-System B DEVELOPMENT HANDOFF -->"
-INSTRUCTION_FILES = ("AGENTS.md", "CLAUDE.md")
+INSTRUCTION_FILES = ("AGENTS.md",)
 IGNORE_RULE = "/.knowledge-os-handoffs/"
 STORE_NAME = ".knowledge-os-handoffs"
 ACTIVE_NAME = "ACTIVE.yaml"
@@ -1529,48 +1529,14 @@ def insert_managed_block(text: str, block: str) -> str:
 
 
 def root_instruction_files(target: Path) -> tuple[str, ...]:
-    physical: set[str] = set()
-    linked: set[str] = set()
-    for name in INSTRUCTION_FILES:
-        path = target / name
-        if path.is_symlink():
-            linked.add(name)
-        elif path.exists():
-            if not path.is_file():
-                raise HandoffError(
-                    "invalid_file_type",
-                    f"{name} must be a regular file or a symlink to its root counterpart",
-                    path=str(path),
-                )
-            physical.add(name)
-
-    for name in linked:
-        path = target / name
-        counterpart = "CLAUDE.md" if name == "AGENTS.md" else "AGENTS.md"
-        raw_target = os.readlink(path)
-        candidate = Path(raw_target)
-        if not candidate.is_absolute():
-            candidate = path.parent / candidate
-        candidate_key = os.path.normcase(os.path.abspath(os.path.normpath(candidate)))
-        counterpart_key = os.path.normcase(
-            os.path.abspath(os.path.normpath(target / counterpart))
+    path = target / "AGENTS.md"
+    if path.is_symlink() or (path.exists() and not path.is_file()):
+        raise HandoffError(
+            "invalid_file_type",
+            "AGENTS.md must be a physical regular file",
+            path=str(path),
         )
-        if candidate_key != counterpart_key or counterpart not in physical:
-            raise HandoffError(
-                "unsafe_instruction_symlink",
-                f"{name} must point directly to the physical root {counterpart}",
-                path=str(path),
-                target=raw_target,
-            )
-
-    if not physical:
-        if linked:
-            raise HandoffError(
-                "unsafe_instruction_symlink",
-                "The root instruction files do not resolve to one physical file",
-            )
-        return ("AGENTS.md",)
-    return tuple(name for name in INSTRUCTION_FILES if name in physical)
+    return INSTRUCTION_FILES
 
 
 def prepare_instruction_file(path: Path) -> tuple[bytes, str]:
@@ -4092,7 +4058,6 @@ def build_complete_handoff_plan(
         preserve_symlinks = checkout_uses_symlinks(worktree.source)
         for relative in (
             "AGENTS.md",
-            "CLAUDE.md",
             "AGENTS.override.md",
             ".gitignore",
         ):

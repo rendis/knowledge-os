@@ -235,3 +235,70 @@ func TestLegacyInterruptedCommittedCleanup(t *testing.T) {
 		t.Fatal(string(raw))
 	}
 }
+
+// Older handoff versions included CLAUDE.md in authorized transactions.
+func TestTransactionRecoveryPreviousClaudePolicy(t *testing.T) {
+	for _, scenario := range []string{"restore", "remove-created", "preserve-user-edit"} {
+		t.Run(scenario, func(t *testing.T) {
+			root := t.TempDir()
+			txn := filepath.Join(root, storeName, transactionName)
+			if err := os.MkdirAll(txn, 0700); err != nil {
+				t.Fatal(err)
+			}
+			before, desired := []byte("original repository instructions"), []byte("interrupted policy")
+			if scenario == "remove-created" {
+				before = nil
+			}
+			token := strings.Repeat("a", 64)
+			j := transactionJournal{Format: nativeJournalFormat, Token: token, Images: []transactionImage{{
+				Path: "CLAUDE.md", Before: before, Desired: desired,
+				BeforeHash: imageHash(before), DesiredHash: imageHash(desired), Mode: 0600,
+			}}}
+			raw, err := json.Marshal(j)
+			if err != nil {
+				t.Fatal(err)
+			}
+			policyWrite(t, txn, "transaction.json", raw)
+			current := desired
+			if scenario == "preserve-user-edit" {
+				current = []byte("subsequent user edit")
+			}
+			policyWrite(t, root, "CLAUDE.md", current)
+			if err = Recover(root, strings.Repeat("b", 64)); err == nil {
+				t.Fatal("wrong token accepted")
+			}
+			got, err := os.ReadFile(filepath.Join(root, "CLAUDE.md"))
+			if err != nil || string(got) != string(current) {
+				t.Fatal("wrong-token recovery changed instructions")
+			}
+			err = Recover(root, token)
+			if scenario == "preserve-user-edit" {
+				if err == nil || !strings.Contains(err.Error(), "recovery conflict") {
+					t.Fatalf("expected conflict, got %v", err)
+				}
+				got, err = os.ReadFile(filepath.Join(root, "CLAUDE.md"))
+				if err != nil || string(got) != string(current) {
+					t.Fatal("user edit overwritten")
+				}
+				if _, err = os.Stat(txn); err != nil {
+					t.Fatal("conflicted journal lost")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			got, err = os.ReadFile(filepath.Join(root, "CLAUDE.md"))
+			if scenario == "remove-created" {
+				if !errors.Is(err, os.ErrNotExist) {
+					t.Fatalf("created file not removed: %v", err)
+				}
+			} else if err != nil || string(got) != string(before) {
+				t.Fatalf("preimage not restored: %v", err)
+			}
+			if err = Recover(root, token); err != nil {
+				t.Fatalf("recovery not idempotent: %v", err)
+			}
+		})
+	}
+}

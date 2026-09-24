@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -62,64 +61,14 @@ func encodeManaged(text string, bom bool, newline string) []byte {
 	return b
 }
 func rootInstructionFiles(target string) ([]string, error) {
-	names := []string{"AGENTS.md", "CLAUDE.md"}
-	physical := map[string]bool{}
-	linked := map[string]bool{}
-	for _, name := range names {
-		info, e := os.Lstat(filepath.Join(target, name))
-		if errors.Is(e, os.ErrNotExist) {
-			continue
-		}
-		if e != nil {
-			return nil, e
-		}
-		if info.Mode()&os.ModeSymlink != 0 {
-			linked[name] = true
-		} else if info.Mode().IsRegular() {
-			physical[name] = true
-		} else {
-			return nil, fmt.Errorf("%s must be a regular instruction file", name)
-		}
+	info, err := os.Lstat(filepath.Join(target, "AGENTS.md"))
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return nil, err
 	}
-	for name := range linked {
-		other := "AGENTS.md"
-		if name == other {
-			other = "CLAUDE.md"
-		}
-		raw, e := os.Readlink(filepath.Join(target, name))
-		if e != nil {
-			return nil, e
-		}
-		candidate := raw
-		if !filepath.IsAbs(candidate) {
-			candidate = filepath.Join(target, candidate)
-		}
-		candidate, e = filepath.Abs(candidate)
-		if e != nil {
-			return nil, e
-		}
-		wanted, e := filepath.Abs(filepath.Join(target, other))
-		if e != nil {
-			return nil, e
-		}
-		if runtime.GOOS == "windows" {
-			candidate = strings.ToLower(candidate)
-			wanted = strings.ToLower(wanted)
-		}
-		if candidate != wanted || !physical[other] {
-			return nil, fmt.Errorf("unsafe instruction symlink: %s", name)
-		}
+	if err == nil && !info.Mode().IsRegular() {
+		return nil, errors.New("AGENTS.md must be a physical regular file")
 	}
-	result := []string{}
-	for _, name := range names {
-		if physical[name] {
-			result = append(result, name)
-		}
-	}
-	if len(result) == 0 {
-		result = append(result, "AGENTS.md")
-	}
-	return result, nil
+	return []string{"AGENTS.md"}, nil
 }
 func joinManaged(block, after string) string {
 	if strings.TrimSpace(after) == "" {

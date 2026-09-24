@@ -309,7 +309,7 @@ func SetState(vault, remote, path, id, state, closure, approved string) (map[str
 			}
 			writes[storeName+"/ACTIVE.yaml"] = raw
 		}
-		fingerprint, err := stateFingerprint(target, "AGENTS.md", "CLAUDE.md", "AGENTS.override.md", storeName)
+		fingerprint, err := stateFingerprint(target, "AGENTS.md", "AGENTS.override.md", storeName)
 		if err != nil {
 			return err
 		}

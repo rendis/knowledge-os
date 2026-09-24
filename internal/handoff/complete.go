@@ -93,7 +93,7 @@ func PlanComplete(o WorktreeOptions) (CompletePlan, error) {
 		return p, err
 	}
 	names := []string{}
-	for _, name := range []string{"AGENTS.md", "CLAUDE.md", "AGENTS.override.md", ".gitignore"} {
+	for _, name := range []string{"AGENTS.md", "AGENTS.override.md", ".gitignore"} {
 		entry, e := gitCall(projectionSource, "ls-tree", selected, "--", name)
 		if e != nil {
 			return p, e

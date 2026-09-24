@@ -612,7 +612,7 @@ func planFamilyResolved(o FamilyOptions, b bundle, target, displayTarget, remote
 		_, trackedErr := gitCall(target, "ls-files", "--error-unmatch", "--", rel)
 		effects = append(effects, map[string]any{"path": rel, "action": action, "tracked": trackedErr == nil})
 	}
-	fingerprint, err := stateFingerprint(target, "AGENTS.md", "CLAUDE.md", "AGENTS.override.md", ".gitignore", storeName)
+	fingerprint, err := stateFingerprint(target, "AGENTS.md", "AGENTS.override.md", ".gitignore", storeName)
 	if err != nil {
 		return p, err
 	}
