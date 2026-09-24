@@ -616,6 +616,21 @@ func (r *repeated) Set(v string) error { *r = append(*r, v); return nil }
 
 // Run executes native synchronization and content-bound review commands.
 func Run(args []string, out io.Writer) error {
+	if len(args) == 0 || one(args[0], "--help", "-h", "help") {
+		_, err := fmt.Fprintln(out, `Usage: vaultctl sync <command> [options]
+
+Discovery: scan
+Packages: build, build-new, init-analysis, close-package, gate-batch
+Analysis: analysis finalize-analysis|check
+Review: review freeze|check|verify-published, review-finalize
+Correction: correction prepare|check
+Lifecycle: begin, checkpoint-package, seal-gate, status, validate-unit,
+           review-unit, apply-unit, resume, close, tool-digest
+
+Follow synchronize-ecosystem and its command contracts for required arguments,
+review and mutation prerequisites. This help does not read or modify vault state.`)
+		return err
+	}
 	if len(args) > 0 {
 		switch args[0] {
 		case "scan":
@@ -646,7 +661,7 @@ func Run(args []string, out io.Writer) error {
 		return runPublished(args, out)
 	}
 	if cmd != "freeze" && cmd != "check" && cmd != "verify-published" {
-		return fmt.Errorf("sync operation %q is not yet migrated; no state changed", cmd)
+		return fmt.Errorf("unknown sync operation %q; use vaultctl sync --help; no state changed", cmd)
 	}
 	f := flag.NewFlagSet(cmd, flag.ContinueOnError)
 	f.SetOutput(io.Discard)

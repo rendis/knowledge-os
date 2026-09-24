@@ -31,7 +31,7 @@ Throughout kernel instructions, `<CLI>`, `<cli>`, `<VAULTCTL>` and `<vaultctl>` 
 
 Bind the returned `vault_root` on successful resolution and pass it explicitly as `--vault` on vault-scoped commands. Read [vault resolution](../../../90-Meta/vault-resolution.md) when resolution fails or the task requires a source checkout. Bootstrap instructions can be read before resolution; domain evidence requires the binding.
 
-Use `<CLI> --help` to discover command families. Read the owning workflow's command contract for its arguments and mutation prerequisites; this skill does not replace those procedures.
+Execute the commands documented in this reference or the owning workflow, substituting the resolved paths and required inputs. Consult CLI help only to resolve a specific syntax, option or version mismatch that the procedure does not answer. Help describes the interface; the owning workflow defines mutation prerequisites, review and recovery.
 
 ## Choose the operation
 
