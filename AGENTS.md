@@ -24,4 +24,4 @@ Consumer vaults are created with `./install.sh init --dest <vault>`. Work here i
 - Cell identity and knowledge live only in `--dest`, never in this tree.
 - English for agent docs and skills in this repo. Note locale of a cell is chosen at init.
 - Overlays in a cell (`.agents/overlays/`) authorize `update` when kernel files drifted; they do not merge. `update` still copies the distribution kernel on top, then the overlay files remain beside it.
-- `CLAUDE.md` in a cell is a symlink to that cell's `AGENTS.md`. Same rule at the root of this repo.
+- `AGENTS.md` is the instruction file for this repo and installed cells. The installer removes its former `CLAUDE.md -> AGENTS.md` link during update while preserving a cell-owned `CLAUDE.md`.

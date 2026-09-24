@@ -144,7 +144,7 @@ Después de crear o revisar materialmente una skill compleja, ejecutar además u
 
 CI instala las dependencias bloqueadas en [`requirements-ci.txt`](requirements-ci.txt) antes de ejecutar los gates. Localmente, la instalación con `<python> -m pip install -r 90-Meta/requirements-ci.txt` es un paso de preparación que modifica el entorno: ejecutarlo solo cuando el usuario pidió preparar o corregir el entorno, o lo autorizó explícitamente. Un preflight read-only comprueba las dependencias y ofrece esta remediación sin ejecutarla. Revisar además en Obsidian los diagramas/notas modificados. Si la app no está disponible, registrar la limitación y usar el fallback.
 
-La allowlist común de huérfanos esperados es `00-Home.md` y `README.md`: son entradas del vault, no fallas. Los routers de instrucciones `AGENTS.md` y `CLAUDE.md` quedan fuera del grafo documental. Scripts, plantillas y metadocumentos deben quedar enlazados desde este framework o desde otro índice.
+La allowlist común de huérfanos esperados es `00-Home.md` y `README.md`: son entradas del vault, no fallas. `AGENTS.md` y cualquier `CLAUDE.md` propio de la celda quedan fuera del grafo documental. Scripts, plantillas y metadocumentos deben quedar enlazados desde este framework o desde otro índice.
 
 Los expedientes `investigations/`, los no publicados `.investigations/`, sus overlays y `local/` en `.investigations-private/`, las ejecuciones `.operations/` y los handoffs `.knowledge-os-handoffs/` quedan fuera del grafo técnico y sus gates. El versionamiento del expediente no lo convierte en una fuente paralela de verdad técnica.
 
