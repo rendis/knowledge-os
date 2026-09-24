@@ -1,13 +1,14 @@
 # Engram patterns to evaluate in the retrieval PoC
 
-Status: retrieval research handoff. The user selected Engram's bounded
-session-context plus explicit-search interaction pattern for v1; its current
-contract is in [hybrid-retrieval-cli.md](hybrid-retrieval-cli.md). The ranking
-ideas below remain experiments, not adopted behavior or a new dependency.
+Status: **historical retrieval research**, reconciled 2026-09-24. The current
+CLI uses explicit FTS5 search; session storage and hooks discussed below were
+not adopted. See [the current runtime contract](../../README.md#native-cli).
+The original proposal and measurements remain in
+[the historical decision record](hybrid-retrieval-cli.md).
 
 ## Scope and boundary
 
-Use Engram as a design reference, not as a dependency or a component to install. The vault's Markdown remains the authority for documentation. The local SQLite index is a disposable projection of eligible Markdown. Selected local session context is a separate data set keyed by a stable conversation identity within its project. Neither search results nor agent memories establish a claim until the agent reads the cited source.
+Use Engram as a design reference, not as a dependency or a component to install. The vault's Markdown remains the authority for documentation. The local SQLite index is a disposable projection of eligible Markdown. The proposed local session store was not implemented. Neither search results nor agent memories establish a claim until the agent reads the cited source.
 
 Engram's own database has a different role: it is authoritative for curated agent observations, user prompts, and sessions. Its Obsidian export writes Engram observations into Markdown; it does not index an existing vault. These boundaries matter when adapting the design. [Engram schema](https://github.com/Gentleman-Programming/engram/blob/main/DOCS.md#database-schema), [memory core](https://github.com/Gentleman-Programming/engram/blob/main/docs/codebase/memory-core.md), [Obsidian export](https://github.com/Gentleman-Programming/engram/blob/main/docs/beta/obsidian-brain.md#how-it-works).
 

@@ -1,5 +1,11 @@
 # Kernel routing thinning — session closure
 
+Historical evaluation record. File paths and tool names below identify the
+version tested at the time. The current evidence contract lives in
+`kernel/AGENTS.md`; consumer operations use `use-vault-cli`. Retired Python
+commands and `response-quality.md` references below are not current setup
+or execution instructions.
+
 Recorded 2026-09-17. Distribution-only; not a cell instruction. Local commits only; no push.
 
 ## Accepted kernel state

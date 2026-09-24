@@ -25,9 +25,9 @@ Schema for a cell knowledge vault. Cell identity, systems, and source prefixes l
 
 `.agents/` holds skills and stays outside the Obsidian graph. Versioned `investigations/` is searchable in Obsidian but excluded from the kernel's technical graph traversal and audit gates; the graph helper can still look up investigations explicitly. It is collaborative provenance, not canonical technical truth. Local ignored stores (`.investigations/`, `.investigations-private/`, `.operations/`, `.knowledge-os-handoffs/`, `.knowledge-os-config.yaml`, `.plan/`) are not graph sources. Local plans must live in `.plan/`; never create a visible `plan/` directory in a cell vault.
 
-For the provider-independent Python lint and security gate, follow
-[[code-quality]]. It applies to maintained tooling code and complements the
-functional validators described in this document.
+For native kernel checks and the separate distribution development gates,
+follow [[code-quality]]. Installed vault checks use the CLI selected through
+`use-vault-cli`.
 
 ## Node selection
 
@@ -81,7 +81,7 @@ The graph navigates repo → topic → repo when topics are enabled. Never docum
 
 ## Repository note frontmatter
 
-Closed contract. Do not add properties without updating this file, affected Bases, and `90-Meta/audit-vault.py`.
+Closed contract. Do not add properties without updating this file, affected Bases, and the native `vaultctl audit` validator.
 
 ```yaml
 ---

@@ -1,6 +1,6 @@
 # Knowledge OS — router
 
-This vault is an evidence-backed map of one cell's systems. Load skills by name; do not restate them here.
+This vault is an evidence-backed map of one cell's systems.
 
 ## Evidence and completion
 
@@ -33,15 +33,21 @@ Complete and verify authorized work through its owner. Preserve valid progress a
 - When the user establishes or changes how future work should be done for them or in their local environment, create or update `AGENTS.personal.md` with that reusable rule, preserving unrelated preferences. Recurring directions imply persistence even without an explicit request to save; one-time task instructions do not.
 - Write personal customizations only in `AGENTS.personal.md`; never edit the vault's root `AGENTS.md` or versioned skills to persist them. Keep the personal file ignored and untracked, and record access references instead of credentials.
 
+## Kernel CLI
+
+Use the installed `vaultctl` for kernel configuration, indexed retrieval, structural checks and workflow state operations it supports. Before the first CLI operation, read [use-vault-cli](.agents/skills/use-vault-cli/SKILL.md); reuse it while its instructions remain in context. This is a required operational reference, independent of primary-skill selection.
+
+Before reading domain notes or source code, run `<CLI> config resolve --vault "<candidate-path>"` with the executable selected by `use-vault-cli` and bind its successful result. Load the router, personal instructions and relevant skill/access references as bootstrap context; domain-note reads start only after resolution. Reuse that binding until its inputs change.
+
+Use search when the starting source is unknown, links for relationship discovery, and direct reads for an identified source. Retrieval results locate evidence; verify the source under the evidence contract above. Empty results do not establish absence. Keep configuration and lifecycle mutations with their owning skills and existing authorization gates.
+
 ## Routing
 
 `tracker` means one external work-tracking instance declared in `instance.yaml`. A `work item` is one externally tracked unit identified by its exact tracker and provider-native reference.
 
-Before reading domain notes or source code, run `90-Meta/resolve-vault.py` (with `--path` when supplied) and bind its successful result. Load the router, personal instructions and relevant skill/access references as bootstrap context; domain-note reads start only after resolution. Reuse that binding until its inputs change.
-
 1. Classify the request and select one primary skill from the catalog below. Loading an auxiliary skill supplies a method, not a new owner: keep the selected workflow through evidence gathering and the answer.
    Reclassify each follow-up for newly requested methods or presentation. Keep the existing owner and applicable evidence; an explicit diagram or visual explanation invokes `explain-visually` as an auxiliary.
-2. For orientation or relationship discovery, start with `90-Meta/graph-query.py` (JSON stems and edges, no note bodies). Read an already identified source directly for a bounded question that needs no graph discovery; For repository identity and failed-binding recovery, load [vault resolution](90-Meta/vault-resolution.md) before locating or reading a checkout.
+2. For initial orientation, use `config status --vault "<root>"`. Follow `use-vault-cli` for retrieval and result handling. For repository identity and failed-binding recovery, load [vault resolution](90-Meta/vault-resolution.md) before locating or reading a checkout.
 3. After classification, load only the context required by these triggers:
    - Cell identity: `instance.yaml` and `00-Home.md`.
    - Cell-specific scope, allowlists, or exceptions: `90-Meta/Alcance.md`.
@@ -65,26 +71,28 @@ Personal executor preferences override these defaults; evidence, authorization, 
 
 ## Skills
 
-- `evidence-driven-analysis` — analysis, diagnosis or audit without a specialized workflow; with or without a case.
-- `map-ecosystem` — vault navigation, dependency questions, knowledge publication, related-vault catalog, and placement of facts. First step is **orientation** when bootstrap is incomplete.
-- `synchronize-ecosystem` — inventory, knowledge-map synchronization, resume of a recorded sync run, or a `SYNC_PACKAGE_WORKER_V1` card.
-- `scheduled-vault-refresh` — guide an authorized manual or scheduled mapping cycle that reconciles source and investigation deltas, then follows the team's review or Git publication path.
-- `configure-workspace` — sole writer of local `.knowledge-os-config.yaml`. Onboarding is demand-triggered when a skill cannot resolve repositories or the user asks whether the workspace is initialized or configured.
-- `manage-investigation` — unpublished cases under `.investigations/` by default, published cases under `investigations/`, optional private overlays and local working stores.
-- `manage-investigation-derived-learning` — assess and publish `70-Aprendizajes/` notes.
-- `manage-development-handoff` — persistent work-item worktrees and handoff files.
-- `reconcile-development-handoff` — pull one selected handoff's implementation evidence into its source case while preserving its worktree-local lifecycle state.
-- `manage-git-workflow` — own analysis and publication of the cell's specific Git/GitHub policy notes and their area-index links, or apply those notes to source repositories and standalone Git/GitHub operations; routine local versioning of this vault follows repository instructions.
-- `manage-operational-workflow` — requested audits of a known flow or entity for a period through read-only evidence; draft or execute operational procedures, including applicable release procedures with Git/GitHub steps; resume runs in `.operations/`. Uses inspection adapters for access and queries; business actions and publication require matching authorization.
-- `inspect-database` — engine-neutral database evidence through the target’s configured runbook.
-- `explain-visually` — auxiliary static or interactive explanations when requested or materially useful; temporary aids or source-linked retained artifacts.
-- `obsidian-cli`, `obsidian-markdown`, `obsidian-bases` — user-invoked Obsidian helpers.
+- [evidence-driven-analysis](.agents/skills/evidence-driven-analysis/SKILL.md) — analysis, diagnosis or audit without a specialized workflow; with or without a case.
+- [map-ecosystem](.agents/skills/map-ecosystem/SKILL.md) — vault navigation, dependency questions, knowledge publication, related-vault catalog, and placement of facts. First step is **orientation** when bootstrap is incomplete.
+- [synchronize-ecosystem](.agents/skills/synchronize-ecosystem/SKILL.md) — inventory, knowledge-map synchronization, resume of a recorded sync run, or a `SYNC_PACKAGE_WORKER_V1` card.
+- [scheduled-vault-refresh](.agents/skills/scheduled-vault-refresh/SKILL.md) — guide an authorized manual or scheduled mapping cycle that reconciles source and investigation deltas, then follows the team's review or Git publication path.
+- [configure-workspace](.agents/skills/configure-workspace/SKILL.md) — sole writer of local `.knowledge-os-config.yaml`. Onboarding is demand-triggered when a skill cannot resolve repositories or the user asks whether the workspace is initialized or configured.
+- [manage-investigation](.agents/skills/manage-investigation/SKILL.md) — unpublished cases under `.investigations/` by default, published cases under `investigations/`, optional private overlays and local working stores.
+- [manage-investigation-derived-learning](.agents/skills/manage-investigation-derived-learning/SKILL.md) — assess and publish `70-Aprendizajes/` notes.
+- [manage-development-handoff](.agents/skills/manage-development-handoff/SKILL.md) — persistent work-item worktrees and handoff files.
+- [reconcile-development-handoff](.agents/skills/reconcile-development-handoff/SKILL.md) — pull one selected handoff's implementation evidence into its source case while preserving its worktree-local lifecycle state.
+- [manage-git-workflow](.agents/skills/manage-git-workflow/SKILL.md) — own analysis and publication of the cell's specific Git/GitHub policy notes and their area-index links, or apply those notes to source repositories and standalone Git/GitHub operations; routine local versioning of this vault follows repository instructions.
+- [manage-operational-workflow](.agents/skills/manage-operational-workflow/SKILL.md) — requested audits of a known flow or entity for a period through read-only evidence; draft or execute operational procedures, including applicable release procedures with Git/GitHub steps; resume runs in `.operations/`. Uses inspection adapters for access and queries; business actions and publication require matching authorization.
+- [inspect-database](.agents/skills/inspect-database/SKILL.md) — engine-neutral database evidence through the target’s configured runbook.
+- [explain-visually](.agents/skills/explain-visually/SKILL.md) — auxiliary static or interactive explanations when requested or materially useful; temporary aids or source-linked retained artifacts.
+- [obsidian-markdown](.agents/skills/obsidian-markdown/SKILL.md) — author Obsidian-specific note syntax, including wikilinks, embeds, callouts and properties.
+- [obsidian-bases](.agents/skills/obsidian-bases/SKILL.md) — create or edit `.base` views, filters and formulas.
+- [obsidian-cli](.agents/skills/obsidian-cli/SKILL.md) — interact with the Obsidian application, query Base views or verify app-specific behavior; use `vaultctl` for ordinary kernel retrieval.
 
 For mapping closure or pending-work status, use `map-ecosystem`.
 
 Adapters (only if listed in `instance.yaml` `adapters`):
 
-- `generate-reports` for registered operational report recipes.
+- [generate-reports](.agents/skills/generate-reports/SKILL.md) for registered operational report recipes.
 
 Provider-specific skills are selected and installed by the developer in the destination vault. Resolve their access through configured procedures; the kernel does not install provider tooling.
 

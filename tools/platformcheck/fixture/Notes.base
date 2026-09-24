@@ -1,0 +1,4 @@
+views:
+  - type: table
+    name: Fixture notes
+    order: [file.name]

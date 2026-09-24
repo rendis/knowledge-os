@@ -1,5 +1,11 @@
 # Source-access correction closure — 2026-09-16
 
+Historical evaluation record. File paths and tool names below identify the
+version tested at the time. The current evidence contract lives in
+`kernel/AGENTS.md`; consumer operations use `use-vault-cli`. Retired Python
+commands and `response-quality.md` references below are not current setup
+or execution instructions.
+
 **Accepted: 8/8 scoped scenarios with observable evidence.** The final independent Sol/medium review found no unresolved failure in the tested criteria. Released as 0.10.2 and propagated to both consumer vaults on 2026-09-16 through local commits; no push was performed.
 
 ## Release and propagation

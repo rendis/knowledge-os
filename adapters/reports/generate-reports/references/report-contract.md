@@ -1,6 +1,6 @@
 # Report contract
 
-Resolve one canonical `clase: reporte` note with a unique `report-id` through `90-Meta/operational-catalog.py`. The [Report section of the operational contract](../../manage-operational-workflow/references/procedure-contract.md#report) is the normative definition of required inputs, execution and acceptance criteria. Apply that contract's execution eligibility rules to the report and linked procedure before execution; listing remains a read-only catalog operation.
+Resolve one canonical `clase: reporte` note with a unique `report-id` through `<VAULTCTL> config operation --vault "<VAULT_ROOT>" --report-id "<id>"`. The [Report section of the operational contract](../../manage-operational-workflow/references/procedure-contract.md#report) is the normative definition of required inputs, execution and acceptance criteria. Apply that contract's execution eligibility rules to the report and linked procedure before execution; listing remains a read-only catalog operation.
 
 Follow the destination-owned procedure or implementation linked from the report. Reuse installed tools and resolve the requirements for the selected mode through that contract.
 

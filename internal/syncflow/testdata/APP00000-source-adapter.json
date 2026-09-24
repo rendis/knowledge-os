@@ -1,0 +1,130 @@
+{
+  "version": 1,
+  "code": "package-closed",
+  "status": "complete",
+  "repository": "APP00000-source-adapter",
+  "new_oid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "manifest": {
+    "version": 1,
+    "old_oid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "new_oid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "paths": [],
+    "environment_configs": [],
+    "credential_suspects": []
+  },
+  "scaffold": {
+    "version": 2,
+    "repository": "APP00000-source-adapter",
+    "old_oid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "new_oid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "paths": [],
+    "checklist": {},
+    "claims": [],
+    "nodes": [],
+    "result": "no-change",
+    "blockers": []
+  },
+  "analysis": {
+    "version": 2,
+    "repository": "APP00000-source-adapter",
+    "old_oid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "new_oid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "paths": [],
+    "checklist": {},
+    "claims": [
+      {
+        "claim_id": "claim-source-001",
+        "statement": "generic finalized package claim",
+        "evidence": [
+          {
+            "path": "component.txt",
+            "anchor": "exact fixture evidence"
+          }
+        ]
+      }
+    ],
+    "nodes": [
+      {
+        "basename": "target-service",
+        "action": "update",
+        "reason": "generic finalized node",
+        "claim_ids": [
+          "claim-source-001"
+        ]
+      }
+    ],
+    "result": "documentation-change",
+    "blockers": []
+  },
+  "review": {
+    "version": 3,
+    "repository": "APP00000-source-adapter",
+    "manifest_digest": "0350bc6b5cad1b6a061aadba65a5538e5744f61c20bdd65b8b156273e63a798a",
+    "scaffold_digest": "d1c6e590d73b55a014be839a1cf6d0d18c0c8114d47051655663f9cd55dad255",
+    "analysis_digest": "abd02ad643e0fb8f9132579de67096bbb7ed6d1446cfe1a3b87b3fad7bf3a649",
+    "verdict": "accept",
+    "findings": []
+  },
+  "gate": {
+    "version": 2,
+    "code": "batch-gated",
+    "status": "all-ready",
+    "repositories": [
+      {
+        "repository": "APP00000-source-adapter",
+        "verdict": "accept",
+        "review_disposition": "accept",
+        "result": "documentation-change",
+        "new_oid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "is_new": false,
+        "declared_nodes": [
+          "source-adapter",
+          "target-service"
+        ],
+        "affected_nodes": [],
+        "write_nodes": [
+          "target-service"
+        ],
+        "accepted_claim_ids": [
+          "claim-source-001"
+        ],
+        "rejected_claim_ids": [],
+        "partial_accept": false,
+        "analysis_fallback": false,
+        "fallback_reason": "",
+        "cursor_decision": "",
+        "disposition": "write-ready"
+      }
+    ],
+    "write_groups": [
+      {
+        "group_id": "group-001",
+        "repositories": [
+          "APP00000-source-adapter"
+        ],
+        "nodes": [
+          "target-service"
+        ],
+        "grants": [
+          {
+            "repository": "APP00000-source-adapter",
+            "claim_id": "claim-source-001",
+            "nodes": [
+              "target-service"
+            ]
+          }
+        ]
+      }
+    ],
+    "acknowledgements": [],
+    "fallback_repositories": [],
+    "pending_repositories": []
+  },
+  "validation": {
+    "manifest_digest": "0350bc6b5cad1b6a061aadba65a5538e5744f61c20bdd65b8b156273e63a798a",
+    "scaffold_digest": "d1c6e590d73b55a014be839a1cf6d0d18c0c8114d47051655663f9cd55dad255",
+    "analysis_digest": "abd02ad643e0fb8f9132579de67096bbb7ed6d1446cfe1a3b87b3fad7bf3a649",
+    "review_digest": "6046011e25659e40771107a89c225aadbaec991d0887af15be50195bdc0533a2",
+    "gate_digest": "111b7f2b84954f303ad83b4999ecd11765c2c40d9d2f4793166ca0fc401d16c6"
+  }
+}

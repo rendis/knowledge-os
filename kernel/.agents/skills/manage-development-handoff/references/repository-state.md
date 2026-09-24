@@ -93,18 +93,16 @@ For a new worktree and initial handoff, `plan-handoff` projects this file plan f
 Run:
 
 ```text
-<python> -B <skill-dir>/scripts/development-handoff.py \
-  --vault-root <vault-root> plan --bundle <package-dir> \
+<vaultctl> handoff plan --vault-root <vault-root> --bundle <package-dir> \
   --worktree-path <absolute-worktree-path>
 ```
 
-`plan` is read-only. It resolves `repository.remote` through `90-Meta/workspace-config.py locate-repository`, verifies that the explicit path is a registered worktree under the configured root and attached to a branch, and requires the first handoff's collision-safe work-item token to match on every operation. Later handoffs preserve that anchor branch and must match the registry investigation; selecting one never authorizes a branch or worktree change. The plan validates current state and returns the target, branch, action, revision, changed documents, exact effects, tracked status, and a `plan_token`.
+`plan` is read-only. It resolves `repository.remote` through `vaultctl config locate --vault <vault-root> --remote <remote>`, verifies that the explicit path is a registered worktree under the configured root and attached to a branch, and requires the first handoff's collision-safe work-item token to match on every operation. Later handoffs preserve that anchor branch and must match the registry investigation; selecting one never authorizes a branch or worktree change. The plan validates current state and returns the target, branch, action, revision, changed documents, exact effects, tracked status, and a `plan_token`.
 
 For existing worktrees, `plan` may attach a new family only when `ACTIVE.yaml` names the package's investigation. It preserves the existing branch and every registered family. Present the exact registry and family effects, then apply each unchanged plan:
 
 ```text
-<python> -B <skill-dir>/scripts/development-handoff.py \
-  --vault-root <vault-root> apply --bundle <package-dir> \
+<vaultctl> handoff apply --vault-root <vault-root> --bundle <package-dir> \
   --worktree-path <absolute-worktree-path> --plan-token <approved-token>
 ```
 
@@ -117,8 +115,7 @@ Multi-repository preparation and application are sequential and have no broad ro
 Run:
 
 ```text
-<python> -B <skill-dir>/scripts/development-handoff.py \
-  --vault-root <vault-root> validate --repository-remote <git-remote> \
+<vaultctl> handoff validate --vault-root <vault-root> --repository-remote <git-remote> \
   --worktree-path <absolute-worktree-path>
 ```
 
@@ -129,8 +126,7 @@ Validation is read-only. It checks the managed policy, ignore behavior, anchor b
 Preview one state update without a token:
 
 ```text
-<python> -B <skill-dir>/scripts/development-handoff.py \
-  --vault-root <vault-root> set-state --repository-remote <git-remote> \
+<vaultctl> handoff set-state --vault-root <vault-root> --repository-remote <git-remote> \
   --worktree-path <absolute-worktree-path> \
   --handoff-id <handoff-id> \
   --state <active|ready-for-production|production> \

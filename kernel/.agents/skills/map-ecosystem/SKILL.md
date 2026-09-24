@@ -50,7 +50,7 @@ Choose the next action from the existing knowledge, not from the number of pendi
 
 ## Execution Steps
 
-1. Load `../../../90-Meta/vault-resolution.md` and run `../../../90-Meta/resolve-vault.py` relative to this skill directory. Bind the resolved vault and configured source roots; a failed resolution blocks root-dependent work.
+1. Load `../../../90-Meta/vault-resolution.md` and run `<cli> config resolve --vault "<candidate-root>"` using the installed binary; the candidate is the supplied path or the root three levels above this installed skill. Bind the resolved vault and configured source roots; a failed resolution blocks root-dependent work.
 2. Select one primary branch from the table. Load only its recipe and supporting references it explicitly requires.
 3. For documentation, load `references/evidence-extraction.md` for bounded main-flow scope, preservation and directed review. Before a source read or delegation, bind its checkout by configured remote identity. Before a technical write, load `../../../90-Meta/evidence-policy.md` and `../../../90-Meta/node-selection.md`.
 4. After local-map acceptance, reconcile only external connections required by the task. Exhaust versioned evidence before requesting a missing live capability, so the request names the exact provider/project, cluster context or database target and read-only question. A discovered connection grants no access: use the configured executor or adapter to prove bounded read-only access against that target with existing authentication. Use workspace configuration only to bind a missing procedure; after missing setup becomes available, rerun the same probe and resume the pending connection without remapping the repository. Load `references/deployment-evidence.md` when that reconciliation or an explicit deployment audit needs current platform evidence. Publish reconciliation results through the ordinary single-unit or multi-unit recipe and `references/final-note-review.md`.
@@ -68,3 +68,7 @@ Return the resolved scope, evidence used, decisions and written paths, limitatio
 - `references/final-note-review.md` — independently bind complete resulting note bytes to evidence before ordinary documentation writes.
 - `../../../90-Meta/vault-resolution.md` — vault and source binding.
 - `../../../90-Meta/node-selection.md` — canonical node and lifecycle choice.
+
+## Native runtime
+
+Bind `<cli>` through [use-vault-cli](../use-vault-cli/SKILL.md) before resolution; that shared reference defines platform selection and invocation. Use `--vault "<VAULT_ROOT>"` on vault operations and the explicit roots required by synchronization.

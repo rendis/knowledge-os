@@ -6,6 +6,7 @@ import hashlib
 import importlib.util
 import json
 import os
+import platform
 import re
 import shutil
 import subprocess
@@ -19,6 +20,17 @@ from unittest import mock
 
 DIST = Path(__file__).resolve().parents[2]
 INSTALL = DIST / "install.sh"
+NATIVE = (DIST / "NATIVE_RUNTIME.json").is_file()
+
+def native_cli(vault: Path) -> str:
+    arch = {"x86_64": "amd64", "aarch64": "arm64"}.get(platform.machine().lower(), platform.machine().lower())
+    return str(vault / ".agents/bin" / (f"vaultctl-{platform.system().lower()}-{arch}" + (".exe" if os.name == "nt" else "")))
+
+def resolve_command(vault: Path) -> list[str]:
+    if NATIVE:
+        return [native_cli(vault), "config", "resolve", "--vault", str(vault)]
+    return [sys.executable, "-B", str(vault / "90-Meta/resolve-vault.py"), "--path", str(vault)]
+
 FORBIDDEN = re.compile(
     r"iot|acme|APP90001|APP90002|cell-dbs|tagger|\bsateo\b|vendorx|"
     r"cell-monthly|proj-a|\bSOS\b",
@@ -108,10 +120,13 @@ class BootstrapEval(unittest.TestCase):
                     self.assertIn("## " + heading, home)
                     self.assertIn("## " + purpose, system)
                     self.assertNotIn("No discovery roots were given", home)
-                    self.assertIn("workspace-config.py --vault-root . status --format json", home)
+                    runtime_guidance = (
+                        "ejecutable de tu plataforma en `.agents/bin/`"
+                        if locale == "es" else "platform executable in `.agents/bin/`"
+                    )
+                    self.assertIn(runtime_guidance if NATIVE else "workspace-config.py --vault-root . status --format json", home)
                     self.assertNotIn("{{", home + system)
-                    resolved = run([sys.executable, "-B", str(dest / "90-Meta/resolve-vault.py"),
-                                    "--path", str(dest)])
+                    resolved = run(resolve_command(dest))
                     self.assertEqual(resolved.returncode, 0, resolved.stderr)
                     orientation = json.loads(resolved.stdout)["orientation"]
                     self.assertTrue(orientation["ready"])
@@ -293,20 +308,14 @@ class BootstrapEval(unittest.TestCase):
                 encoding="utf-8"
             )
             self.assertIn(
-                "`python3 -B 90-Meta/resolve-vault.py [--path <vault>]`",
+                '`<cli> config resolve --vault "<vault_root>"`',
                 framework,
             )
             resolver_cache = Path(tmp) / "resolver-pycache"
             resolver_env = os.environ.copy()
             resolver_env["PYTHONPYCACHEPREFIX"] = str(resolver_cache)
             resolved = run(
-                [
-                    sys.executable,
-                    "-B",
-                    str(resolver),
-                    "--path",
-                    str(dest),
-                ],
+                resolve_command(dest),
                 env=resolver_env,
             )
             self.assertEqual(resolved.returncode, 0, resolved.stdout + resolved.stderr)
@@ -319,11 +328,11 @@ class BootstrapEval(unittest.TestCase):
             scanner_env["PYTHONPYCACHEPREFIX"] = str(scanner_cache)
             scanner = dest / "90-Meta" / "static-evidence-scan.py"
             scanned = run(
-                [sys.executable, "-B", str(scanner)],
+                ([native_cli(dest), "sync", "scan", "--vault", str(dest)] if NATIVE else [sys.executable, "-B", str(scanner)]),
                 cwd=dest,
                 env=scanner_env,
             )
-            self.assertEqual(scanned.returncode, 2, scanned.stdout + scanned.stderr)
+            self.assertNotEqual(scanned.returncode, 0, scanned.stdout + scanned.stderr)
             self.assertEqual(list(scanner_cache.rglob("*.pyc")), [])
 
             instance_path = dest / "instance.yaml"
@@ -338,33 +347,19 @@ class BootstrapEval(unittest.TestCase):
                     encoding="utf-8",
                 )
                 invalid_identity = run(
-                    [
-                        sys.executable,
-                        "-B",
-                        str(resolver),
-                        "--path",
-                        str(dest),
-                    ]
+                    resolve_command(dest)
                 )
-                self.assertEqual(
-                    invalid_identity.returncode,
-                    2,
-                    invalid_identity.stdout + invalid_identity.stderr,
-                )
-                self.assertEqual(json.loads(invalid_identity.stdout)["status"], "invalid")
+                self.assertNotEqual(invalid_identity.returncode, 0, invalid_identity.stdout + invalid_identity.stderr)
+                if not NATIVE:
+                    self.assertEqual(json.loads(invalid_identity.stdout)["status"], "invalid")
 
             instance_path.write_text("", encoding="utf-8")
             invalid = run(
-                [
-                    sys.executable,
-                    "-B",
-                    str(resolver),
-                    "--path",
-                    str(dest),
-                ]
+                resolve_command(dest)
             )
-            self.assertEqual(invalid.returncode, 2, invalid.stdout + invalid.stderr)
-            self.assertEqual(json.loads(invalid.stdout)["status"], "invalid")
+            self.assertNotEqual(invalid.returncode, 0, invalid.stdout + invalid.stderr)
+            if not NATIVE:
+                self.assertEqual(json.loads(invalid.stdout)["status"], "invalid")
 
     def test_investigations_register_exact_development_handoffs(self) -> None:
         template = (
@@ -2052,6 +2047,15 @@ class BootstrapEval(unittest.TestCase):
                 ]
             )
             self.assertEqual(initialized.returncode, 0, initialized.stderr)
+            if NATIVE:
+                # This test exercises the retained Python API oracle directly.
+                # Keep its helper dependency in a separate oracle-only copy;
+                # never reintroduce Python into the initialized native consumer.
+                self.assertFalse((cell / "90-Meta/instance.py").exists())
+                oracle_cell = root / "oracle-cell"
+                shutil.copytree(cell, oracle_cell, ignore=shutil.ignore_patterns(".bin"))
+                shutil.copy2(DIST / "kernel/90-Meta/instance.py", oracle_cell / "90-Meta/instance.py")
+                cell = oracle_cell
             instance_path = cell / "instance.yaml"
             instance_path.write_text(
                 instance_path.read_text(encoding="utf-8").replace(
@@ -2060,10 +2064,8 @@ class BootstrapEval(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            helper = (
-                cell
-                / ".agents/skills/manage-development-handoff/scripts/development-handoff.py"
-            )
+            # Internal Python API regression oracle remains distribution-only.
+            helper = DIST / "kernel/.agents/skills/manage-development-handoff/scripts/development-handoff.py"
             module_name = "development_handoff_multi_provider_temp_eval"
             spec = importlib.util.spec_from_file_location(module_name, helper)
             self.assertIsNotNone(spec)
@@ -2716,7 +2718,7 @@ change:
             self.assertTrue((git_skill / "references" / "defaults.md").is_file())
             self.assertFalse((dest / ".agents" / "skills" / "inspect-gcp-runtime").exists())
             for shared in (
-                "resolve-vault.py",
+                *( () if NATIVE else ("resolve-vault.py",) ),
                 "vault-resolution.md",
                 "node-selection.md",
                 "work-item-evidence.md",
@@ -2729,12 +2731,12 @@ change:
                 ).exists()
             )
             lock = (dest / ".knowledge-os.lock.yaml").read_text(encoding="utf-8")
-            self.assertIn('version: "3"', lock)
+            self.assertIn('version: "4"' if NATIVE else 'version: "3"', lock)
             self.assertIn('distribution_revision: "', lock)
             self.assertIn("distribution_dirty:", lock)
             self.assertIn('"AGENTS.md":', lock)
             self.assertNotIn('"90-Meta/SOUL.md":', lock)
-            self.assertIn('"90-Meta/audit-vault.py":', lock)
+            (self.assertNotIn if NATIVE else self.assertIn)('"90-Meta/audit-vault.py":', lock)
             self.assertNotIn('"Arquitectura.base":', lock)
             gitignore = (dest / ".gitignore").read_text(encoding="utf-8")
             self.assertNotIn(".knowledge-os.lock.yaml", gitignore)
@@ -2898,17 +2900,23 @@ change:
             )
             self.assertEqual(initialized.returncode, 0, initialized.stderr)
             targets = sorted(installed_command_targets(dest))
-            self.assertTrue(targets)
-            missing = [target for target in targets if not (dest / target).is_file()]
-            self.assertEqual(missing, [], f"documented command targets missing: {missing}")
-            self.assertTrue((dest / "90-Meta/git-change-manifest.py").is_file())
-            self.assertTrue((dest / "90-Meta/sync-run.py").is_file())
-            self.assertTrue((dest / "90-Meta/static-evidence-scan.py").is_file())
-            for command in (
-                [sys.executable, "-B", "90-Meta/audit-vault.py"],
-                [sys.executable, "-B", "90-Meta/verify-links.py"],
-                [sys.executable, "-B", "90-Meta/validate-bases.py"],
-            ):
+            if NATIVE:
+                self.assertEqual(targets, [], "consumer docs still invoke retired Python runtime")
+                self.assertEqual(list(dest.rglob("*.py")), [])
+                self.assertTrue(Path(native_cli(dest)).is_file())
+                commands = [[native_cli(dest), "audit", "--vault", str(dest)],
+                            [native_cli(dest), "check", "links", "--vault", str(dest)],
+                            [native_cli(dest), "check", "bases", "--vault", str(dest)]]
+            else:
+                # During migration the docs may already use native commands;
+                # legacy scripts remain exercised as distribution regressions.
+                missing = [target for target in targets if not (dest / target).is_file()]
+                self.assertEqual(missing, [], f"documented command targets missing: {missing}")
+                for script in ("git-change-manifest.py", "sync-run.py", "static-evidence-scan.py"):
+                    self.assertTrue((dest / "90-Meta" / script).is_file())
+                commands = [[sys.executable, "-B", "90-Meta/" + script] for script in
+                            ("audit-vault.py", "verify-links.py", "validate-bases.py")]
+            for command in commands:
                 checked = run(command, cwd=dest)
                 self.assertEqual(
                     checked.returncode,
@@ -3207,10 +3215,10 @@ change:
             self.assertEqual((dest / "90-Meta" / "Alcance.md").read_text(encoding="utf-8"), "# Cell scope\nKeep extra.\n")
             self.assertEqual(
                 (dest / "90-Meta" / "audit-vault.py").read_bytes(),
-                (DIST / "kernel" / "90-Meta" / "audit-vault.py").read_bytes(),
+                b"# cell-audit-keep\n" if NATIVE else (DIST / "kernel" / "90-Meta" / "audit-vault.py").read_bytes(),
             )
             self.assertTrue((dest / ".agents" / "skills" / "cell-local-tool" / "SKILL.md").is_file())
-            self.assertTrue((dest / "90-Meta" / "graph-query.py").is_file())
+            self.assertEqual((dest / "90-Meta" / "graph-query.py").is_file(), not NATIVE)
             self.assertTrue((dest / ".knowledge-os.lock.yaml").is_file())
             gitignore = (dest / ".gitignore").read_text(encoding="utf-8")
             self.assertIn("/custom-ignore", gitignore)
@@ -3229,10 +3237,10 @@ change:
                 ["archive/", ".plan/", ".scratch/", ".investigations/", "AGENTS.personal.md"],
             )
             lock = (dest / ".knowledge-os.lock.yaml").read_text(encoding="utf-8")
-            self.assertIn('version: "3"', lock)
+            self.assertIn('version: "4"' if NATIVE else 'version: "3"', lock)
             self.assertIn('"AGENTS.md":', lock)
             self.assertNotIn("cell-local-tool", lock)
-            self.assertIn('"90-Meta/audit-vault.py":', lock)
+            (self.assertNotIn if NATIVE else self.assertIn)('"90-Meta/audit-vault.py":', lock)
             self.assertNotIn('"90-Meta/Alcance.md":', lock)
             self.assertEqual(knowledge_snapshot(dest), knowledge_before)
             doctor = run(["sh", str(INSTALL), "doctor", "--dest", str(dest)])
@@ -3265,7 +3273,7 @@ change:
             self.assertTrue((dest / "90-Meta" / "Alcance.md").is_file())
             self.assertEqual(
                 (dest / "90-Meta" / "audit-vault.py").read_bytes(),
-                (DIST / "kernel" / "90-Meta" / "audit-vault.py").read_bytes(),
+                b"# cell-audit-keep\n" if NATIVE else (DIST / "kernel" / "90-Meta" / "audit-vault.py").read_bytes(),
             )
             self.assertEqual(
                 (dest / "AGENTS.md").read_bytes(),
@@ -3387,7 +3395,7 @@ change:
             self.assertEqual((dest / "00-Home.md").read_bytes(), home)
             self.assertEqual(agents.read_bytes(), (DIST / "kernel" / "AGENTS.md").read_bytes())
             portable_lock = lock_path.read_text(encoding="utf-8")
-            self.assertIn('version: "3"', portable_lock)
+            self.assertIn('version: "4"' if NATIVE else 'version: "3"', portable_lock)
             self.assertIn('"AGENTS.md":', portable_lock)
             self.assertNotIn(
                 ".knowledge-os.lock.yaml",
@@ -3454,7 +3462,7 @@ change:
         router = (DIST / "kernel" / "AGENTS.md").read_text(encoding="utf-8")
         self.assertNotIn("vault-catalog.md", router)
         self.assertNotIn("cross-vault-consultation.md", router)
-        self.assertIn("`synchronize-ecosystem`", router)
+        self.assertIn("[synchronize-ecosystem](.agents/skills/synchronize-ecosystem/SKILL.md)", router)
         self.assertIn("only when dispatching or reconsidering a subagent", router)
         map_skill = (
             DIST / "kernel/.agents/skills/map-ecosystem/SKILL.md"

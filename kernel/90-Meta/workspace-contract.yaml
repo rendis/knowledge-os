@@ -1,6 +1,6 @@
-# Closed local workspace contract (version 1)
+# Local workspace contract (version 1)
 
-The writer is `configure-workspace`. Consumers call `90-Meta/workspace-config.py`.
+The writer is `configure-workspace`. Consumers select the executable through `use-vault-cli` and call `<CLI> config` with an explicit `--vault` root.
 
 ```yaml
 version: 1
@@ -18,4 +18,4 @@ skills:
 
 Secret-bearing keys are prohibited. Discovery roots are read-only unless a development-handoff plan is authorized.
 
-The semantic CLI reads the emitted block-map/list YAML subset, quoted scalars and empty `[]`/`{}` collections without a third-party dependency. Unsupported YAML forms, unknown keys, duplicate keys and malformed data return `status: invalid` and are never overwritten, including during initialization. Proxy ports must be integers from 1 through 65535. Updates preserve other configured environments.
+The native CLI reads one YAML mapping, bounded to 4 MiB. Duplicate keys, malformed known fields and invalid existing state fail without overwriting the file. Updates preserve comments, unknown consumer-owned fields and other configured environments. Proxy ports must be integers from 1 through 65535. Configuration writes are serialized and atomically replaced; `--expected-hash` can bind a mutation to the reviewed file contents. No command executes a configured procedure or grants new access authority.

@@ -1,0 +1,89 @@
+{
+  "version": 2,
+  "code": "batch-gated",
+  "status": "all-ready",
+  "repositories": [
+    {
+      "repository": "APP00000-source-adapter",
+      "verdict": "accept",
+      "review_disposition": "accept",
+      "result": "documentation-change",
+      "new_oid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "is_new": false,
+      "declared_nodes": [
+        "source-adapter",
+        "target-service"
+      ],
+      "affected_nodes": [],
+      "write_nodes": [
+        "target-service"
+      ],
+      "accepted_claim_ids": [
+        "claim-source-001"
+      ],
+      "rejected_claim_ids": [],
+      "partial_accept": false,
+      "analysis_fallback": false,
+      "fallback_reason": "",
+      "cursor_decision": "",
+      "disposition": "write-ready"
+    },
+    {
+      "repository": "APP00000-target-service",
+      "verdict": "revise",
+      "review_disposition": "revise",
+      "result": "documentation-change",
+      "new_oid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "is_new": false,
+      "declared_nodes": [
+        "target-service"
+      ],
+      "affected_nodes": [
+        "target-service"
+      ],
+      "write_nodes": [],
+      "accepted_claim_ids": [],
+      "rejected_claim_ids": [
+        "claim-target-001"
+      ],
+      "partial_accept": false,
+      "analysis_fallback": false,
+      "fallback_reason": "review-revise",
+      "cursor_decision": "review-rejected",
+      "disposition": "cursor-ready"
+    }
+  ],
+  "write_groups": [
+    {
+      "group_id": "group-001",
+      "repositories": [
+        "APP00000-source-adapter"
+      ],
+      "nodes": [
+        "target-service"
+      ],
+      "grants": [
+        {
+          "repository": "APP00000-source-adapter",
+          "claim_id": "claim-source-001",
+          "nodes": [
+            "target-service"
+          ]
+        }
+      ]
+    }
+  ],
+  "acknowledgements": [
+    {
+      "repository": "APP00000-target-service",
+      "new_oid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "decision": "review-rejected",
+      "branch": "main",
+      "analysis_date": "2026-08-22"
+    }
+  ],
+  "fallback_repositories": [
+    "APP00000-target-service"
+  ],
+  "pending_repositories": []
+}

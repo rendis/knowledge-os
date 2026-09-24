@@ -35,7 +35,7 @@ After publication and reconciliation, compare the current inventory and accepted
 
 ## Report and stop
 
-For repository campaigns with pending checklists, run `python3 -B 90-Meta/check-map-closure.py --vault <vault> --checkpoint <existing-checkpoint>` before closure or commit. In the existing checkpoint, keep current counts under `visible_coverage.remaining_verification_items` and `visible_coverage.notes_with_verifications`, and `paths` pointing to Home and its linked coverage note. Keep dated pass receipts historical; current fields describe the latest aggregate. Avoid duplicating current numbers in a free-text checkpoint scope.
+For repository campaigns with pending checklists, run `<cli> check map-closure --vault <vault> --checkpoint <existing-checkpoint>` before closure or commit. In the existing checkpoint, keep current counts under `visible_coverage.remaining_verification_items` and `visible_coverage.notes_with_verifications`, and `paths` pointing to Home and its linked coverage note. Keep dated pass receipts historical; current fields describe the latest aggregate. Avoid duplicating current numbers in a free-text checkpoint scope.
 
 Each visible summary states the current aggregate once as `Remaining: N verification items in M notes.` or `Permanecen N verificaciones en M notas.` (Markdown emphasis is allowed). The checker compares those counts and the checkpoint with unchecked repository-note items; missing or conflicting counts block closure. Correct only stale summaries; preserve technical notes and historical receipts. This count check does not establish semantic completion, deduplicate questions, or replace review of the summary's scope and claims.
 
