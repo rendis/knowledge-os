@@ -146,10 +146,11 @@ instructions. Its
 [session-start hook](https://github.com/Gentleman-Programming/engram/blob/33337716a842db167a2b66a7fb5d0f7ed2e6461f/plugin/codex/scripts/session-start.sh)
 provides bounded project context. It does not search all memory and inject
 matching records on every user message. After the failed model trials above,
-the user selected this pattern for v1: offer a small project orientation at
-session start, include bounded recent project/session state when available,
-and make explicit CLI search available to the agent. A prompt hook records
-local session state but does not search or inject document cards.
+the user selected this pattern for v1: offer minimal orientation on a new
+session, include a bounded checkpoint from the **same session** only on
+resume/compaction, and make explicit CLI search available to the agent. A
+prompt hook records local session state but does not search or inject document
+cards. It does not automatically inject other sessions' recent prompts.
 The agent can still search when a dependent follow-up requires evidence.
 Automatic document suggestions are deferred research, not a v1 release gate.
 

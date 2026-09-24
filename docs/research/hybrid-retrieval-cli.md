@@ -85,14 +85,15 @@ they need not disappear to make the consumer Python-free.
 | Command | Purpose | Output |
 | --- | --- | --- |
 | `vaultctl search --vault PATH --query TEXT` | Refresh the derived index and retrieve evidence when the agent asks directly | Bounded JSON cards, source paths, rank and timings |
-| `vaultctl context --vault PATH --session ID` | Prepare bounded context for a future session-start adapter | Project identity, navigation pointers, limited recent session state and search guidance; no topical result cards |
+| `vaultctl context --vault PATH --session ID` | Prepare bounded context for a future session-start or resume adapter | Minimal project/CLI orientation, plus a summary of this same session only when resuming; empty output is valid |
 | `vaultctl session record --vault PATH --session ID` | Accept a prompt from a future message adapter via JSON stdin | Local acknowledgement; no document search or injected cards |
+| `vaultctl session checkpoint --vault PATH --session ID` | Persist an agent- or harness-supplied task checkpoint via JSON stdin when available | Objective, accepted decisions, pending work and source pointers; no generated factual claims |
 | `vaultctl index status|refresh --vault PATH` | Inspect or refresh corpus and per-file hashes | Counts of unchanged/inserted/updated/deleted files; index schema version |
 | `vaultctl vault init|adopt|update|doctor ...` | Replace `install.sh` / `knowledge_os.py` behavior | Existing exit/output contract, after parity tests |
 | `vaultctl check ...`, `vaultctl graph ...`, `vaultctl investigation ...` | Replace kernel and skill script families | Existing schemas and failure semantics, after parity tests |
 
-Command names are provisional. `context` is bounded orientation and recent
-conversation state, not a query against every document; `search` is invoked
+Command names are provisional. `context` is bounded orientation and, on
+resume, same-session state; it is not a query against every document. `search` is invoked
 for a concrete information need. The prompt record and the returned context
 must remain local to the cell and distinguish conversational state from
 documentary evidence. A skill documents the stable CLI contract, when to
@@ -102,15 +103,23 @@ stable within one conversation and distinct across conversations.
 
 ### Selected interaction sequence
 
-1. A project opts into its harness adapter. At session start, `context`
-   returns a size-limited orientation and a small recap of recent state from
-   **that project** when available. It labels session records as conversation
-   history, not as source evidence; it does not paste whole notes or a full
-   transcript.
-2. On each user message, the adapter records the prompt locally under the
+1. A project opts into its harness adapter. On a **new** session, `context`
+   returns only a short project/CLI pointer if the harness has not already
+   loaded that information from `AGENTS.md` and the CLI skill; otherwise it
+   may return nothing. The first user topic is not known yet, so this step
+   supplies no topical documents.
+2. On a **resume or compaction** of the same session, `context` may also
+   include one persisted checkpoint: objective, accepted decisions, pending
+   work and paths to sources already opened. The agent or a supported harness
+   supplies this checkpoint through `session checkpoint`; SQLite does not
+   infer decisions from raw prompts. If no checkpoint exists, omit it. This
+   is labeled conversation history, not evidence. It does not paste notes, a
+   full transcript, recent prompts from other sessions or a project-wide
+   memory dump.
+3. On each user message, the adapter records the prompt locally under the
    project and session IDs. This operation returns no search results to the
    agent. A failed capture must not block the user's request.
-3. When the task needs documentary evidence, the agent invokes `search` with
+4. When the task needs documentary evidence, the agent invokes `search` with
    an explicit query, receives a few source pointers with provenance, then
    opens the chosen Markdown. Zero search matches are valid and do not prove
    that the answer is unavailable elsewhere.
@@ -119,6 +128,27 @@ The SQLite conversation state and the FTS5 projection are local derived data;
 the Markdown remains the documentary authority. Compaction and session-end
 events, if supported by a harness, will be mapped after the CLI contract is
 tested. They do not change the no-search-on-every-message decision.
+
+Example of a **resume** payload (illustrative, not a finalized schema):
+
+```text
+Project: Cell A
+Session state (not source evidence):
+- Objective: finish the stock-realtime investigation.
+- Accepted decision: compare persisted updates with the event log.
+- Pending: verify the Chile sample and update the investigation record.
+- Sources already opened: investigations/.../investigation.md
+For new factual claims, run vaultctl search with a concrete query and read the
+original Markdown before citing it.
+```
+
+The initial budget to test is at most 2 KiB of injected text; it is a cap,
+not a target. A fresh session may receive zero bytes. Store prompts for local
+continuity, but render the persisted checkpoint instead of replaying
+the last N messages. A missing checkpoint is not filled with a fabricated
+summary; the agent can explicitly inspect session history if the task needs it.
+Another project's or session's records require an explicit lookup by the
+agent; they are never silently injected at startup.
 
 ## Retrieval implementation to test
 
