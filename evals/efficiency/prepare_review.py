@@ -23,8 +23,15 @@ def main():
                            for p in sorted(fixture.rglob('*.md')))
     frozen = Path(json.loads((args.campaign / "campaign.json").read_text())["distribution"]) / "kernel"
     evidence += "\n\nCOMMON SCOPE: No real network/application access or reads outside the fixture are authorized. No repository roots are configured. Obsidian is disconnected through a fixture stub. These policies are installed unchanged in every fixture.\n"
-    for name in ("90-Meta/Auditoria - Framework.md", "90-Meta/vault-resolution.md", "90-Meta/response-quality.md", ".agents/skills/manage-investigation/references/readiness-and-lifecycle.md"):
+    for name in ("90-Meta/Auditoria - Framework.md", "90-Meta/vault-resolution.md", ".agents/skills/manage-investigation/references/readiness-and-lifecycle.md"):
         evidence += "\nFILE: " + name + "\n" + (frozen / name).read_text()
+    previous_contract = frozen / "90-Meta/response-quality.md"
+    if previous_contract.is_file():
+        evidence += "\nFILE: 90-Meta/response-quality.md\n" + previous_contract.read_text()
+    else:
+        router = (frozen / "AGENTS.md").read_text()
+        contract = router.split("## Evidence and completion\n", 1)[1].split("## Personal instructions", 1)[0]
+        evidence += "\nFILE: AGENTS.md — Evidence and completion\n" + contract
     rows, mapping = [], {}
     for run in results:
         key = f"{run['case']}/r{run['repetition']:02d}-{run['variant']}"

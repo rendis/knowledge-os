@@ -4,7 +4,7 @@
 
 Accept a question, proposed change, or starting node. Resolve aliases only to find a note; navigate and report using canonical basenames. Keep this branch entirely read-only.
 
-When evidence needs to be obtained or evaluated, read [evidence-driven-analysis](../../evidence-driven-analysis/SKILL.md) in full before that analysis unless it is already loaded in the current context. Reuse the active method and valid checks; navigation alone does not require another analysis pass. This reference owns navigation and source identity; the shared method does not restart routing. If called as an auxiliary by another workflow, return observations, sources and limits to that owner.
+Apply the vault's `AGENTS.md` evidence and review contract directly. Load the diagnosis or audit method in `evidence-driven-analysis` only when the question needs that specialized inquiry; ordinary navigation and supported lookups do not require loading the whole skill. This branch owns navigation and source identity. When called as an auxiliary, return observations, sources and limits to the existing owner without restarting routing.
 
 When the question requires another domain vault discovered through authorized repository exploration or supplied by the user, follow [cross-vault-consultation.md](cross-vault-consultation.md) before reading its domain content. Return its evidence and limits to this workflow.
 
@@ -43,7 +43,7 @@ For a bounded question about an already identified source, read it directly when
 - **Dependencies**: distinguish HTTP from messaging; use backlinks for inverse relationships instead of rebuilding manual lists.
 - **Data**: identify the resource, read/write mode, transformation rules, and participants; retain low-level strings when no durable node exists.
 - **Infrastructure**: separate versioned deployment evidence from live provider metadata; record the exact target, environment, location, and observation time.
-- **Flow or process**: traverse the numbered steps and both diagrams. For each material step, branch and result, verify direction, precondition and effect against participant notes and the bound implementation when exact behavior matters. State whether the answer describes intended design, versioned implementation, configuration or observed execution; a note or graph edge alone does not establish a live outcome. Resolve contradictions with the smallest authorized source check, or identify the affected claim as unresolved. Apply [response quality](../../../../90-Meta/response-quality.md) to the final prose or visual, including new implications introduced by simplification.
+- **Flow or process**: traverse the numbered steps and both diagrams. For each material step, branch and result, verify direction, precondition and effect against participant notes and the bound implementation when exact behavior matters. State whether the answer describes intended design, versioned implementation, configuration or observed execution; a note or graph edge alone does not establish a live outcome. Resolve contradictions with the smallest authorized source check, or identify the affected claim as unresolved. Apply [evidence and completion](../../../../AGENTS.md#evidence-and-completion) to the final prose or visual, including new implications introduced by simplification.
 
 ## Output
 

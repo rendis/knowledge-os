@@ -175,7 +175,7 @@ def run_pair_member(base, materializer, case, repetition, variant, workers):
     phases.append(phase(root, vault, evidence / "parent", prompt))
     draft = answer_text(evidence, "parent")
     reviewer_prompt = (prefix + "Eres el revisor independiente de esta respuesta. Sigue la rubrica "
-                       "response-quality del vault. Lee la evidencia decisiva del fixture y revisa "
+                       "el contrato de evidencia de AGENTS.md del vault. Lee la evidencia decisiva del fixture y revisa "
                        "correccion, cobertura de la pregunta, citas, limites y afirmaciones operativas. "
                        "Tu rol es exclusivamente revisar el borrador de otro trabajador; no eres "
                        "su autor y no sometas tu dictamen a otro ciclo autor-revisor. No delegues. "

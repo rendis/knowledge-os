@@ -48,7 +48,7 @@ The cell vault owns:
 - `10-Sistemas/` — one stub note per declared system
 - `10/`–`70/` — the cell's knowledge graph
 
-The distribution owns the thin `AGENTS.md` router, every generic file it ships under `90-Meta/` (including `SOUL.md`), kernel skills, selected adapter skills, `VERSION`, and the `.claude/skills` symlink. Claude Code 2.1.277+ reads `AGENTS.md` when the project has no `CLAUDE.md` on supported backends; `update` removes only the former distribution link `CLAUDE.md -> AGENTS.md` and preserves any cell-owned `CLAUDE.md`. `update` refreshes matching distribution files without deleting cell-only Meta files, skills, recipes, or overlays. The cell owns `instance.yaml`, `00-Home.md`, the root Bases, `90-Meta/Alcance.md`, and notes under `10/`–`70/`; those files are seeded or authored locally and never rewritten by `update`.
+The distribution owns the thin `AGENTS.md` router, every generic file it ships under `90-Meta/`, kernel skills, selected adapter skills, `VERSION`, and the `.claude/skills` symlink. Claude Code 2.1.277+ reads `AGENTS.md` when the project has no `CLAUDE.md` on supported backends; `update` removes only the former distribution link `CLAUDE.md -> AGENTS.md` and preserves any cell-owned `CLAUDE.md`. `update` refreshes matching distribution files without deleting cell-only Meta files, skills, recipes, or overlays. The cell owns `instance.yaml`, `00-Home.md`, the root Bases, `90-Meta/Alcance.md`, and notes under `10/`–`70/`; those files are seeded or authored locally and never rewritten by `update`.
 
 Related domain vaults may be recorded in the consumer-owned, versioned `90-Meta/vault-catalog.yaml`. It is created on first authorized registration and preserved by `init`, `adopt`, and `update`; absence is valid. `map-ecosystem` manages entries: discovered candidates require user confirmation, while a direct registration request already authorizes the named entry. The catalog stores portable repository identities and domain descriptions, never local paths, credentials or user access state. `doctor` validates existing catalogs; consultation still checks current access and destination instructions. See the [catalog procedure](kernel/.agents/skills/map-ecosystem/references/vault-catalog.md).
 
@@ -56,7 +56,7 @@ Each checkout may also have a root `AGENTS.personal.md`. It is optional, local, 
 
 Personal customizations belong exclusively in `AGENTS.personal.md`; never edit the vault's root `AGENTS.md` or versioned skills to persist them. Updating a personal rule preserves unrelated preferences.
 
-The managed router explicitly asks agents to read `@90-Meta/SOUL.md` once per session. The `@` reference supports harnesses that import it; the explicit instruction covers those that treat it as ordinary text. `SOUL.md` describes shared initiative and interaction, while the router and skills retain evidence, authorization and execution rules. Neither managed file is a place for cell or user customization.
+The managed router includes the evidence, review and initiative contract directly. Specialized investigation and publication procedures remain in skills. Project-local evidence investigator and reviewer definitions are installed for Codex, Claude Code and Cursor; their discovery and permission differences are documented in `90-Meta/specialists.md`. No hooks are installed.
 
 `update` refreshes only the consumer vault; it never traverses development worktrees. An existing worktree receives the current managed instruction block during its next authorized handoff mutation.
 

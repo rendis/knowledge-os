@@ -13,13 +13,13 @@ Keep one primary workflow. When another skill consults this method, return concl
 
 For a standalone question, answer without creating an investigation, operation, or auxiliary document. Recommend a case when preserving evidence, decisions, or pending work would make continuation or collaboration materially easier. Continue conversing if the recommendation is declined or unanswered. Only an explicit request or acceptance hands persistence to `manage-investigation`; analysis alone does not grant permission to instrument, change code, process data operationally, deploy, or publish.
 
-## Method
+## Inquiry selection
 
-1. Identify the question and the claim to establish: intended behavior, inspected implementation, observed execution, or a decision. Bound the relevant component, environment, revision/time, and permissions when they matter. Resolve accessible facts before asking the user.
-2. Locate the smallest relevant sources using the contracts below. Prior knowledge is a lead, not proof. Inspect the source behind the claim; a title, search snippet, case narrative, or tool's successful exit alone is insufficient. Expand only for a concrete gap, contradiction, or untested dependency.
-3. Relate observations by identity, revision, environment, and time. Separate facts from interpretations, proposals, and reported claims. Check callers, consumers, or downstream outcomes when the conclusion depends on them. Do not silently reconcile contradictory sources or extrapolate from samples, truncated results, or missing access.
-4. Check what would disprove the leading explanation. For failures use [diagnosis](references/diagnosis.md); for assurance use [audit](references/audit.md); after confirming a pattern use [variants](references/variants.md). Before declaring evidence insufficient, separate the question into claims answerable from available sources and claims requiring unavailable observations. Resolve the former with the smallest relevant implementation read or permitted deterministic check; report only the remaining gap. Documentation can orient that read, but does not replace available implementation when the question turns on exact behavior. Stop when further inspection cannot change the scoped answer.
-5. Before delivering the candidate answer, apply [response quality](../../../90-Meta/response-quality.md): review new conclusions against their evidence, or check the conditions for reusing a prior review. Keep this workflow as owner. State the boundary of negative findings and resolve authorized missing checks before asking the user.
+The vault's `AGENTS.md` owns the always-active evidence, completion and review contract. Use this skill for specialized inquiry, not as a prerequisite for an ordinary source-backed answer.
+
+1. For a failure, load [diagnosis](references/diagnosis.md) and choose checks that distinguish plausible explanations. For assurance, load [audit](references/audit.md). Once a pattern is confirmed, use [variants](references/variants.md) only when its broader scope matters to the question.
+2. Select only the source contracts below needed by that inquiry. Use navigation as an auxiliary without transferring ownership or activating mapping/publication.
+3. Return the supported conclusion, decisive sources, checked alternatives and remaining evidence gaps. Apply the router's review requirements before delivery, reusing valid acceptance rather than repeating the investigation.
 
 ## Source contracts (load only those needed)
 

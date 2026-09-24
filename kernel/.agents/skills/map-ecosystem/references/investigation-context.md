@@ -2,6 +2,10 @@
 
 Use while mapping or refreshing a repository/change with associated investigations, or absorbing selected case knowledge. This supplies evidence to the existing documentation workflow, not another writer or a full-remap requirement.
 
+Check source changes alone, changes clarified by a case, and relevant case evidence without a source change. At investigation closure, verified production deployment or a durable documentation gap, assess only the bounded knowledge delta through the responsible workflow. Automatic case absorption requires verified production applicability; source-only corrections retain their own evidence-policy route. Compare claim/evidence identity, revision or observation, current canonical destination and recorded disposition. Return verified destinations and limits to the case owner; no write or scheduling authority follows from discovering a gap.
+
+When repeated drift or missed follow-up is likely, offer `scheduled-vault-refresh`; the user chooses cadence and authorized effects. A suggestion creates no schedule.
+
 Decide contribution per claim, not from the case's overall status:
 
 | Finding | Map/sync disposition |

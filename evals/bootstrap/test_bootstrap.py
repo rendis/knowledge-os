@@ -24,7 +24,7 @@ FORBIDDEN = re.compile(
     r"cell-monthly|proj-a|\bSOS\b",
     re.I,
 )
-SCAN_SUFFIXES = {".md", ".py", ".yaml", ".yml", ".sh", ".txt", ".json", ".sql", ".tmpl"}
+SCAN_SUFFIXES = {".md", ".py", ".yaml", ".yml", ".sh", ".txt", ".json", ".sql", ".tmpl", ".toml"}
 
 
 def run(
@@ -2706,10 +2706,8 @@ change:
             self.assertTrue((dest / "10-Sistemas" / "Payments.md").is_file())
             self.assertTrue((dest / "instance.yaml").is_file())
             self.assertTrue((dest / "AGENTS.md").is_file())
-            self.assertEqual(
-                (dest / "90-Meta/SOUL.md").read_bytes(),
-                (DIST / "kernel/90-Meta/SOUL.md").read_bytes(),
-            )
+            self.assertFalse((dest / "90-Meta/SOUL.md").exists())
+            self.assertFalse((dest / "90-Meta/response-quality.md").exists())
             self.assertFalse((dest / "AGENTS.personal.md").exists())
             self.assertTrue((dest / ".agents" / "skills" / "map-ecosystem" / "SKILL.md").is_file())
             self.assertTrue((dest / ".agents" / "skills" / "scheduled-vault-refresh" / "SKILL.md").is_file())
@@ -2735,7 +2733,7 @@ change:
             self.assertIn('distribution_revision: "', lock)
             self.assertIn("distribution_dirty:", lock)
             self.assertIn('"AGENTS.md":', lock)
-            self.assertIn('"90-Meta/SOUL.md":', lock)
+            self.assertNotIn('"90-Meta/SOUL.md":', lock)
             self.assertIn('"90-Meta/audit-vault.py":', lock)
             self.assertNotIn('"Arquitectura.base":', lock)
             gitignore = (dest / ".gitignore").read_text(encoding="utf-8")
@@ -2754,7 +2752,7 @@ change:
             obsidian_app = json.loads(
                 (dest / ".obsidian" / "app.json").read_text(encoding="utf-8")
             )
-            self.assertEqual(obsidian_app["userIgnoreFilters"], [".plan/", ".scratch/", "investigations/", "AGENTS.personal.md"])
+            self.assertEqual(obsidian_app["userIgnoreFilters"], [".plan/", ".scratch/", ".investigations/", "AGENTS.personal.md"])
             self.assertNotIn(".agents/state/map-ecosystem/sync", lock)
             doctor = run(["sh", str(INSTALL), "doctor", "--dest", str(dest)])
             self.assertEqual(doctor.returncode, 0, doctor.stderr)
@@ -2953,12 +2951,32 @@ change:
                 continue
             if any(part in skip for part in path.parts):
                 continue
+            # Research reports are evaluation evidence, not installed cell policy.
+            # Keep public runtime, installer, agent definitions and ordinary docs checked.
+            if path.relative_to(DIST).parts[:2] == ("docs", "research"):
+                continue
             if path.suffix not in SCAN_SUFFIXES:
                 continue
             text = path.read_text(encoding="utf-8", errors="ignore")
             if FORBIDDEN.search(text):
                 leaks.append(str(path.relative_to(DIST)))
         self.assertEqual(leaks, [], f"product leaks: {leaks}")
+
+    def test_product_scan_keeps_runtime_protected_but_allows_research(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            report = root / "docs/research/example.md"
+            report.parent.mkdir(parents=True)
+            report.write_text("IoT evaluation evidence", encoding="utf-8")
+            with mock.patch.dict(globals(), {"DIST": root}):
+                self.test_kernel_has_no_product_leak()
+                for relative in ("kernel/AGENTS.md", "kernel/.codex/agents/example.toml", "adapters/example/SKILL.md", "README.md"):
+                    target = root / relative
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    target.write_text("IoT consumer-specific policy", encoding="utf-8")
+                    with self.assertRaises(AssertionError):
+                        self.test_kernel_has_no_product_leak()
+                    target.unlink()
 
     def test_update_does_not_overwrite_home(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -3135,7 +3153,7 @@ change:
             )
             (dest / ".obsidian").mkdir()
             (dest / ".obsidian" / "app.json").write_text(
-                '{"livePreview": true, "userIgnoreFilters": ["archive/", "plan/"]}\n',
+                '{"livePreview": true, "userIgnoreFilters": ["archive/", "plan/", "investigations/"]}\n',
                 encoding="utf-8",
             )
             refused = run(
@@ -3208,7 +3226,7 @@ change:
             self.assertTrue(obsidian_app["livePreview"])
             self.assertEqual(
                 obsidian_app["userIgnoreFilters"],
-                ["archive/", ".plan/", ".scratch/", "investigations/", "AGENTS.personal.md"],
+                ["archive/", ".plan/", ".scratch/", ".investigations/", "AGENTS.personal.md"],
             )
             lock = (dest / ".knowledge-os.lock.yaml").read_text(encoding="utf-8")
             self.assertIn('version: "3"', lock)
@@ -3253,10 +3271,7 @@ change:
                 (dest / "AGENTS.md").read_bytes(),
                 (DIST / "kernel" / "AGENTS.md").read_bytes(),
             )
-            self.assertEqual(
-                (dest / "90-Meta" / "SOUL.md").read_bytes(),
-                (DIST / "kernel" / "90-Meta" / "SOUL.md").read_bytes(),
-            )
+            self.assertFalse((dest / "90-Meta/SOUL.md").exists())
             self.assertEqual((dest / "00-Home.md").read_text(encoding="utf-8"), home_text)
             self.assertEqual(knowledge_snapshot(dest), knowledge_before)
 
@@ -3383,7 +3398,7 @@ change:
         router = (DIST / "kernel" / "AGENTS.md").read_text(encoding="utf-8")
         self.assertIn("## Personal instructions", router)
         self.assertIn("@AGENTS.personal.md", router)
-        self.assertIn("read @90-Meta/SOUL.md", router)
+        self.assertIn("## Evidence and completion", router)
         self.assertLess(
             router.index("## Personal instructions"),
             router.index("## Routing"),

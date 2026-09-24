@@ -353,13 +353,17 @@ def ensure_obsidian_ignore_filters(dest: Path) -> None:
         isinstance(item, str) for item in raw_filters
     ):
         raise ValueError(f"{path} userIgnoreFilters must be a list of strings")
-    filters = [item for item in raw_filters if item not in {"plan/", "/plan/"}]
+    filters = [
+        item
+        for item in raw_filters
+        if item not in {"plan/", "/plan/", "investigations/", "/investigations/"}
+    ]
     if ".plan/" not in filters:
         filters.append(".plan/")
     if ".scratch/" not in filters:
         filters.append(".scratch/")
-    if "investigations/" not in filters:
-        filters.append("investigations/")
+    if ".investigations/" not in filters:
+        filters.append(".investigations/")
     if PERSONAL_AGENTS not in filters:
         filters.append(PERSONAL_AGENTS)
     payload["userIgnoreFilters"] = filters
