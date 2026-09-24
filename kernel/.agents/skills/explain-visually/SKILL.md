@@ -39,7 +39,7 @@ External design skills are optional references, never required installations. Re
 ## Generate and verify
 
 Keep facts, proposals, hypotheses and synthetic fixtures visibly distinct. Every meaningful relationship and quantity must trace to the supplied sources or an explicit assumption. A chart is a derived view, not new runtime evidence. Preserve the data and calculation needed to check quantitative claims.
-Before delivering a diagram derived from a vault answer, apply [response quality](../../../90-Meta/response-quality.md) to the diagram's meaning. In particular, check new arrows, branch labels and end states against the source and preserve conditions and evidence limits from the owning workflow.
+Before delivering a diagram derived from a vault answer, apply [evidence and completion](../../../AGENTS.md#evidence-and-completion) to the diagram's meaning. In particular, check new arrows, branch labels and end states against the source and preserve conditions and evidence limits from the owning workflow.
 
 Use essential inline CSS/JavaScript and local or system fonts for HTML; default to offline output. Read [verification.md](references/verification.md), select its widget-specific acceptance criteria before generation, and run the applicable checker plus rendered/manual checks before delivery. A failing criterion requires repair or an explicit unverified/failed result; do not equate a structural pass with visual approval. Inspect the actual artifacts and available render evidence before reporting completion. Repair concrete defects and rerun the affected checks; if access or rendering is unavailable, report that boundary without claiming a pass.
 

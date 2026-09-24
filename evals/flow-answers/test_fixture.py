@@ -70,7 +70,6 @@ class FixtureTests(unittest.TestCase):
         self.assertTrue((self.worker / "vault/AGENTS.md").is_file())
         for name in (
             "AGENTS.md",
-            "90-Meta/response-quality.md",
             ".agents/skills/explain-visually/SKILL.md",
             ".agents/skills/map-ecosystem/references/interrogation.md",
         ):

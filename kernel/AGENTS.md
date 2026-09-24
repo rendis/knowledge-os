@@ -2,7 +2,29 @@
 
 This vault is an evidence-backed map of one cell's systems. Load skills by name; do not restate them here.
 
-At the start of each session, read @90-Meta/SOUL.md from the vault root and apply its shared initiative guidance. Read it once unless it changes. For a map, sync or verified production deployment, check relevant investigation contributions and existing canonical destinations; pursue only eligible, unabsorbed knowledge through the responsible skill.
+## Evidence and completion
+
+Apply this contract to every material answer, diagram and retained conclusion; loading a skill is not a prerequisite.
+
+1. Establish the user's question, intended outcome and authorized scope. Bind the actual vault, repository, entity, environment and revision/time before relying on their evidence; a matching folder name is not identity.
+2. Inspect sources that support the exact claim. Search results, titles, case narratives and prior knowledge locate evidence; they do not replace it. Distinguish documented intent, implementation, configuration, deployment, execution and persisted or business outcomes. Tests or a successful tool exit alone do not prove production behavior.
+3. Resolve accessible, authorized checks that can change the answer. Trace relevant callers, conditions, consumers and outcomes; investigate contradictions and evidence against the leading explanation. Establish a hypothesis's connection to this case before using it as a cause. Resolve locally answerable parts before reporting unavailable external evidence. A missing source blocks only dependent claims.
+4. Check support, correspondence, sufficiency and completeness. Each material assertion needs inspected evidence at the claimed level. A flag's value does not establish its operational effect without consumer use. Samples, truncated results and missing search hits are bounded observations; a type inventory requires an exhaustive query using declared types. Include known material branches in process explanations and diagrams; show unknown segments or label the view partial. Do not connect verified steps across an unverified gap.
+5. Preserve established facts and valid checks; retract conclusions contradicted by new evidence. Separate observations, grounded inferences, proposals and unresolved questions. Complete the scoped work when the sources support the answer and remaining limitations are explicit; continue necessary checks within authority, and stop expansion when another read cannot change the scoped answer.
+6. Lead with the answer in clear, concise language. Include decisive references and limits, even for a one-sentence conclusion. Explain unfamiliar terms and preserve conditions when simplifying into prose, tables or diagrams. Deliver the result, not investigation narration.
+
+### Review before delivery
+
+- For a new bounded, low-impact conclusion, perform a distinct author verification pass against the contract above. A short or read-only answer is not automatically low impact.
+- Obtain independent acceptance **before delivery** for new operational status, eligibility, enablement or cause classifications; recommendations that could justify intervention or closure; conflicting sources; and uncertain cross-component relationships material to correctness. Operational-flow explanations or diagrams that could guide a procedure also qualify. The author, including a delegated author, requests review and waits; the reviewer does not delegate another review.
+- Give the reviewer the question, candidate answer, scope and actual source references, not only the author's summary. It must inspect decisive evidence and check both unsupported assertions and omitted conclusions the evidence can establish. Correct specific defects and recheck affected claims and dependent conclusions.
+- Reuse prior acceptance only when its review evidence, claims, entity, environment, revision/period and intended use still match, without a new inference or contradiction. User agreement or a previous answer alone is not review. Recheck the resulting meaning after transformations; additions need review. Preserve enough review context in the existing workflow for reuse; no new case or file is required.
+- If independent review is unavailable or prohibited, perform an author check, briefly disclose the missing review and deliver supported observations and precise limits. Withhold the classification or recommendation requiring independent acceptance. Stricter publication and executor gates remain mandatory.
+- Apply the bounded repair policy in execution profiles to delegated review. For author-only review, stop the affected conclusion if the same defect survives one focused correction; report supported findings and the remaining limitation. Review acceptance is not a guarantee of truth.
+
+### Initiative within authority
+
+Complete and verify authorized work through its owner. Preserve valid progress across follow-ups and compaction. When a concrete gap remains, explain its consequence and smallest useful next action; do not turn unchanged work into recurring suggestions. Analysis alone authorizes no mutation, schedule, deployment or publication. When an investigation closes, a production deployment is verified, a durable documentation gap appears, or map/sync begins, check relevant knowledge deltas through [associated investigation evidence](.agents/skills/map-ecosystem/references/investigation-context.md); follow the responsible workflow and its write authority.
 
 ## Personal instructions
 
@@ -36,6 +58,8 @@ Before using an existing case as context, use the read-only case load in `manage
 ## Delegation and execution
 
 Stay with the current agent unless a subtask is bounded, independently checkable, and cheaper than coordinating another executor. For that subtask, use the cheapest capable executor the harness exposes. Run deterministic checks as tools. Keep operational status, eligibility, enablement, and failure-cause classification with the coordinating agent.
+
+Project specialists are `evidence-investigator` for bounded independent evidence questions and `evidence-reviewer` for the independent acceptance required above. Give them the question, resolved scope, available sources, restrictions and expected result; give the reviewer the candidate answer too. Use the investigator only when delegation earns its coordination cost, not on every query. A specialist's response is evidence for the coordinator, not permission to publish or operate. If a native role is unavailable, use an allowed generic executor with the same role instructions from `90-Meta/specialists/`, or report required review unavailable. See [specialist availability](90-Meta/specialists.md) when configuring or diagnosing discovery.
 
 Personal executor preferences override these defaults; evidence, authorization, and workflow ownership still apply. Load [execution profiles](90-Meta/execution-profiles.md) only when dispatching or reconsidering a subagent. Preserve the primary workflow, its evidence gates, authorized scope, and exclusive ownership of shared-state writes across delegation.
 
@@ -73,7 +97,6 @@ Instance files (`instance.yaml`, `00-Home.md`, notes under `10/`–`70/`) are ne
 ## Guardrails
 
 - Apply `90-Meta/evidence-policy.md` when assessing a technical write. Cell identity and capability bindings come from onboarding, never inferred company conventions.
-- Before material conclusions, inspect evidence supporting the exact claim and apply [response quality](90-Meta/response-quality.md), including its review and reuse conditions. This applies to conversational answers as well as retained documents. New operational status, eligibility and cause classifications require independent review before delivery, even for read-only questions; reuse prior independent acceptance only under the linked reuse conditions.
 - Execute only after required deterministic checks pass for the exact operation. Correct a rejected input and recheck, or report the blocker; a tool failure never grants permission to bypass its contract.
 - Never persist secrets.
 - Canonical wikilinks target the note basename.
@@ -89,7 +112,7 @@ Treat the distributed kernel and skills as managed dependencies. When a vault ta
 
 ## Investigation and local stores
 
-`investigations/` is versionable but excluded from the knowledge graph. Local ignored stores are `.investigations/` · `.investigations-private/` · `.operations/` · `.knowledge-os-handoffs/` · `.plan/` · `.scratch/` · `.knowledge-os-config.yaml`.
+`investigations/` is versionable and searchable in Obsidian, but excluded from the kernel's technical graph traversal and audit gates; the graph helper can still look up investigations explicitly. Local ignored stores are `.investigations/` · `.investigations-private/` · `.operations/` · `.knowledge-os-handoffs/` · `.plan/` · `.scratch/` · `.knowledge-os-config.yaml`.
 
 Local implementation plans belong only in `.plan/`. Never create a visible
 `plan/` directory inside a cell vault: Obsidian indexes it as graph content.

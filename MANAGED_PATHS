@@ -7,3 +7,6 @@ AGENTS.md
 VERSION
 90-Meta/
 .agents/skills/
+.codex/agents/
+.claude/agents/
+.cursor/agents/

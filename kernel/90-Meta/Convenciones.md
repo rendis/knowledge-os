@@ -23,7 +23,7 @@ Schema for a cell knowledge vault. Cell identity, systems, and source prefixes l
 | `70-Aprendizajes/` | Evidence-bounded engineering learnings |
 | `90-Meta/` | Schema, evidence framework, validators |
 
-`.agents/` holds skills and stays outside the Obsidian graph. Versioned `investigations/` is also excluded from the graph: it is collaborative provenance, not canonical technical truth. Local ignored stores (`.investigations/`, `.investigations-private/`, `.operations/`, `.knowledge-os-handoffs/`, `.knowledge-os-config.yaml`, `.plan/`) are not graph sources. Local plans must live in `.plan/`; never create a visible `plan/` directory in a cell vault.
+`.agents/` holds skills and stays outside the Obsidian graph. Versioned `investigations/` is searchable in Obsidian but excluded from the kernel's technical graph traversal and audit gates; the graph helper can still look up investigations explicitly. It is collaborative provenance, not canonical technical truth. Local ignored stores (`.investigations/`, `.investigations-private/`, `.operations/`, `.knowledge-os-handoffs/`, `.knowledge-os-config.yaml`, `.plan/`) are not graph sources. Local plans must live in `.plan/`; never create a visible `plan/` directory in a cell vault.
 
 For the provider-independent Python lint and security gate, follow
 [[code-quality]]. It applies to maintained tooling code and complements the
@@ -237,8 +237,8 @@ Persist one durable direction. Inverse lists are backlinks.
 
 ## Agent execution
 
-The shared initiative and interaction policy lives in [[SOUL]]. Personal preferences belong in the root `AGENTS.personal.md`.
+The shared evidence, initiative and interaction contract lives in [AGENTS.md](../AGENTS.md#evidence-and-completion). Personal preferences belong in the root `AGENTS.personal.md`.
 
-For delegation and executor selection, consult [[execution-profiles]]. Personal execution preferences take precedence over its defaults.
+For project evidence roles, consult [[specialists]]. For delegation and executor selection, consult [[execution-profiles]]. Personal execution preferences take precedence over its defaults.
 
-For evidence-backed conversational and retained answers, apply [[response-quality]] before delivery. It defines review, reuse and clear-language criteria; publication gates still apply.
+For evidence-backed conversational and retained answers, apply [evidence and completion](../AGENTS.md#evidence-and-completion) before delivery. It defines review, reuse and clear-language criteria; publication gates still apply.
