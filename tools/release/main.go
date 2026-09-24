@@ -180,7 +180,7 @@ func notices(output string, targets []string) error {
 			return fmt.Errorf("missing redistribution notice for %s", mod.Path)
 		}
 	}
-	return os.WriteFile(filepath.Join(output, "THIRD_PARTY_NOTICES.txt"), []byte(out.String()), 0644)
+	return os.WriteFile(filepath.Join(output, "THIRD_PARTY_NOTICES.txt"), []byte(strings.TrimRight(out.String(), "\r\n")+"\n"), 0644)
 }
 
 func sourceFingerprint(root string) (string, error) {
