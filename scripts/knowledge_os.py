@@ -231,7 +231,7 @@ def load_lock(path: Path) -> dict[str, Any]:
 
 def preflight_kernel(dest: Path, adapters: list[str], extra_paths: list[str] | None = None) -> None:
     sources = managed_sources(adapters)
-    extra = ["CLAUDE.md", ".claude/skills", "Arquitectura.base", "Auditoria.base",
+    extra = [".claude/skills", "Arquitectura.base", "Auditoria.base",
              "Operacion.base", "Repos.base", ".gitignore", ".obsidian/app.json", LOCK_NAME]
     for rel in [*sources, *extra, *(extra_paths or [])]:
         relative = Path(rel)
@@ -245,7 +245,7 @@ def preflight_kernel(dest: Path, adapters: list[str], extra_paths: list[str] | N
         target = dest / relative
         if target.exists() and not target.is_symlink() and not target.is_file():
             raise RuntimeError(f"managed target collision; move it explicitly before retrying: {rel}")
-        if target.is_symlink() and rel not in sources and rel not in {"CLAUDE.md", ".claude/skills"}:
+        if target.is_symlink() and rel not in sources and rel != ".claude/skills":
             raise RuntimeError(f"local write target is a symlink: {rel}")
         if rel in sources:
             source = sources[rel]
@@ -267,10 +267,9 @@ def copy_kernel(dest: Path, adapters: list[str]) -> None:
         elif target.exists() and not target.is_file():
             raise RuntimeError(f"managed target is not a file: {rel}")
         shutil.copy2(source, target)
-    target_claude = dest / "CLAUDE.md"
-    if target_claude.exists() or target_claude.is_symlink():
-        target_claude.unlink()
-    os.symlink("AGENTS.md", target_claude)
+    legacy_claude = dest / "CLAUDE.md"
+    if legacy_claude.is_symlink() and os.readlink(legacy_claude) == "AGENTS.md":
+        legacy_claude.unlink()
     for name in ("Arquitectura.base", "Auditoria.base", "Operacion.base", "Repos.base"):
         target = dest / name
         if not target.is_file():
@@ -944,7 +943,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         payload["managed_matches_dist"] = not payload["distribution_drift"]
         payload["topology_drift"] = [
             relative for relative, expected_target in (
-                ("CLAUDE.md", "AGENTS.md"), (".claude/skills", "../.agents/skills")
+                (".claude/skills", "../.agents/skills"),
             )
             if not (dest / relative).is_symlink()
             or os.readlink(dest / relative) != expected_target

@@ -126,17 +126,34 @@ class IntegrityTests(unittest.TestCase):
             args = SimpleNamespace(dest=tmp, strict=True)
             with patch.object(installer, 'distribution_provenance', return_value=('a' * 40, False)), contextlib.redirect_stdout(io.StringIO()):
                 self.assertEqual(installer.cmd_doctor(args), 0)
+                self.assertFalse((dest / 'CLAUDE.md').exists())
                 agents = dest / 'AGENTS.md'
                 original = agents.read_text()
                 agents.write_text('changed')
                 self.assertEqual(installer.cmd_doctor(args), 2)
                 agents.write_text(original)
-                (dest / 'CLAUDE.md').unlink()
+                (dest / '.claude/skills').unlink()
                 self.assertEqual(installer.cmd_doctor(args), 2)
-                (dest / 'CLAUDE.md').symlink_to('AGENTS.md')
+                (dest / '.claude/skills').symlink_to('../.agents/skills')
                 lock['distribution_dirty'] = True
                 (dest / installer.LOCK_NAME).write_text(installer.dump_lock(lock))
                 self.assertEqual(installer.cmd_doctor(args), 2)
+
+    def test_update_removes_only_legacy_claude_link(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            dest = Path(tmp)
+            command = ['python3', '-B', str(ROOT / 'scripts/knowledge_os.py')]
+            subprocess.run(command + ['init', '--dest', tmp, '--cell-name', 'Test',
+                           '--purpose', 'Test', '--system', 'test:Test', '--yes'],
+                           check=True, capture_output=True)
+            claude = dest / 'CLAUDE.md'
+            self.assertFalse(claude.exists())
+            claude.symlink_to('AGENTS.md')
+            subprocess.run(command + ['update', '--dest', tmp], check=True, capture_output=True)
+            self.assertFalse(claude.exists() or claude.is_symlink())
+            claude.write_text('cell instructions')
+            subprocess.run(command + ['update', '--dest', tmp], check=True, capture_output=True)
+            self.assertEqual(claude.read_text(), 'cell instructions')
 
     def test_ignored_shipped_file_marks_distribution_dirty(self):
         with tempfile.TemporaryDirectory() as tmp:
