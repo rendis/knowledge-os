@@ -35,18 +35,55 @@ func TestPolicyInstructionPreservesBOMNewlinesAndPlacement(t *testing.T) {
 		t.Fatalf("not idempotent: %v", e)
 	}
 }
-func TestPolicyInstructionsCounterpartAndOverride(t *testing.T) {
+func TestPolicyInstructionsOnlyAgents(t *testing.T) {
+	for _, existingAgents := range []bool{false, true} {
+		root := t.TempDir()
+		// Even malformed former managed content belongs to the repository now.
+		original := []byte("# Local\n" + managedBegin)
+		policyWrite(t, root, "CLAUDE.md", original)
+		if existingAgents {
+			policyWrite(t, root, "AGENTS.md", []byte("# Project\n"))
+		}
+		desired, err := prepareInstructions(root)
+		if err != nil || len(desired) != 1 || desired["AGENTS.md"] == nil {
+			t.Fatalf("AGENTS-only policy: %v", err)
+		}
+		for name, data := range desired {
+			policyWrite(t, root, name, data)
+		}
+		actual, err := os.ReadFile(filepath.Join(root, "CLAUDE.md"))
+		if err != nil || !bytes.Equal(actual, original) {
+			t.Fatal("repository CLAUDE.md changed")
+		}
+	}
+}
+func TestPolicyInstructionsPreserveClaudeSymlink(t *testing.T) {
+	root := t.TempDir()
+	if err := os.Symlink("missing", filepath.Join(root, "CLAUDE.md")); err != nil {
+		t.Skip(err)
+	}
+	desired, err := prepareInstructions(root)
+	if err != nil || len(desired) != 1 || desired["AGENTS.md"] == nil {
+		t.Fatalf("unrelated CLAUDE symlink affected policy: %v", err)
+	}
+	if target, err := os.Readlink(filepath.Join(root, "CLAUDE.md")); err != nil || target != "missing" {
+		t.Fatal("CLAUDE symlink changed")
+	}
+}
+func TestPolicyInstructionsRejectAgentsSymlinkAndOverride(t *testing.T) {
 	root := t.TempDir()
 	policyWrite(t, root, "CLAUDE.md", []byte("# Local\n"))
-	if e := os.Symlink("CLAUDE.md", filepath.Join(root, "AGENTS.md")); e != nil {
-		t.Skip(e)
+	if err := os.Symlink("CLAUDE.md", filepath.Join(root, "AGENTS.md")); err != nil {
+		t.Skip(err)
 	}
-	desired, e := prepareInstructions(root)
-	if e != nil || len(desired) != 1 || desired["CLAUDE.md"] == nil {
-		t.Fatalf("counterpart failed: %v", e)
+	if _, err := prepareInstructions(root); err == nil {
+		t.Fatal("AGENTS symlink accepted")
+	}
+	if err := os.Remove(filepath.Join(root, "AGENTS.md")); err != nil {
+		t.Fatal(err)
 	}
 	policyWrite(t, root, "AGENTS.override.md", []byte("override"))
-	if _, e = prepareInstructions(root); e == nil {
+	if _, err := prepareInstructions(root); err == nil {
 		t.Fatal("override accepted")
 	}
 }

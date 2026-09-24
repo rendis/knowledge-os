@@ -83,3 +83,35 @@ func TestCompletePreparationWithCRLF(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestCompletePreparationPreservesRepositoryClaude(t *testing.T) {
+	o := worktreeFixture(t)
+	w, err := PlanWorktree(o)
+	if err != nil {
+		t.Fatal(err)
+	}
+	source := w.Source["path"]
+	original := []byte("# Repository Claude\n" + managedBegin)
+	write(t, filepath.Join(source, "CLAUDE.md"), original)
+	testGit(t, source, "add", "CLAUDE.md")
+	testGit(t, source, "commit", "-m", "repository instructions")
+	p, err := PlanComplete(o)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = PrepareComplete(o, p.Token); err != nil {
+		t.Fatal(err)
+	}
+	target := p.Worktree["path"]
+	actual, err := os.ReadFile(filepath.Join(target, "CLAUDE.md"))
+	if err != nil || string(actual) != string(original) {
+		t.Fatalf("repository instructions changed: %v", err)
+	}
+	if diff := testGit(t, target, "diff", "--", "CLAUDE.md"); diff != "" {
+		t.Fatal(diff)
+	}
+	agents, err := os.ReadFile(filepath.Join(target, "AGENTS.md"))
+	if err != nil || !strings.Contains(string(agents), managedBegin) {
+		t.Fatalf("missing AGENTS handoff: %v", err)
+	}
+}
