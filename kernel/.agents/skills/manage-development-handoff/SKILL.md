@@ -11,11 +11,13 @@ For a disputed repository-state claim, apply [evidence-driven-analysis](../evide
 
 ## Preflight
 
-1. Load `../../../90-Meta/vault-resolution.md` and run `../../../90-Meta/resolve-vault.py` relative to this skill directory. Bind `VAULT_ROOT` and source context only from one canonical `resolved` result.
+Bind `<vaultctl>` through [use-vault-cli](../use-vault-cli/SKILL.md) before the preflight.
+
+1. Load `../../../90-Meta/vault-resolution.md` and run `<vaultctl> config resolve --vault <vault-root>`. Bind `VAULT_ROOT` and source context only from one canonical `resolved` result.
 2. For every route that materializes or activates content, load [the input-bundle contract](references/input-bundle.md) and complete its intake protocol until every target is `exact-package`. Resolve `producer-required` through `manage-investigation` and continue this workflow with the exact directories it produced; stop `invalid-package` at the producer with its exact failure. Never inspect or change the source investigation or tracker. Validation and state updates use an exact repository remote and worktree path and do not require a package.
 3. Treat the producer's sufficiency result as scoped to the selected story and repository package. Never infer it from the investigation's `investigating`, `blocked`, or `closed` state, and never change or close the investigation because of a worktree lifecycle event.
-4. Resolve the development worktree root through the configuration API. If it is missing or unavailable, invoke `configure-workspace`; resume only after `development-worktree-root --format json` succeeds.
-5. Resolve `scripts/development-handoff.py` and bundled assets relative to this skill. Use the helper for every worktree and handoff operation.
+4. Resolve the development worktree root through the configuration API. If it is missing or unavailable, invoke `configure-workspace`; resume only after `<vaultctl> config worktree-root --vault <vault-root>` returns an existing configured directory.
+5. Resolve the installed native `vaultctl` executable once. Use `<vaultctl> handoff <operation> --vault-root <vault-root>` for every worktree and handoff operation; the executable embeds its managed policy and templates. All commands return JSON.
 
 Complete preflight only when the vault, every input required by the selected route, source repositories, and worktree root resolve semantically and no target or Git write has occurred.
 
@@ -64,7 +66,7 @@ Complete planning only when every target has a valid read-only plan and the user
 1. Apply each authorized package with its exact `--worktree-path` and approved `plan_token`; never substitute a path, token, or package.
 2. After each apply, run `validate` with the same remote and worktree path and select the exact handoff ID from the returned list; record its family, revision, state, and `implementation-updates.md` entry count.
 3. Invoke **Bind development handoff** in `manage-investigation` with the package source identity, exact normalized validation observation, and producer-reviewed case/story snapshots. The case owner alone reads and mutates the case. If it fails, stop at `materialized-unbound` and leave the active repository state intact. Retry from fresh repository validation and follow the input-bundle protocol for producer re-review of stale or missing snapshots.
-4. On any earlier failure, stop the batch. A handled apply failure restores its prior family and registry bytes. If validation reports `handoff_recovery_required`, retry the exact previously authorized apply token so it restores the interrupted attempt before revalidation; do not plan another handoff in that worktree first. Report applied, failed, and untouched targets; retain successful handoffs and re-plan only the remaining work.
+4. On any earlier failure, stop the batch. A handled apply failure restores its prior family and registry bytes. If validation reports a pending handoff transaction, retry the exact previously authorized apply token so it restores the interrupted attempt before revalidation; do not plan another handoff in that worktree first. Report applied, failed, and untouched targets; retain successful handoffs and re-plan only the remaining work.
 5. Hand the user each bound worktree path, branch, and revision so development can begin in a fresh session rooted there.
 
 No materialization or activation is complete until its exact `DH-NNN` binding passes case validation. Complete apply only when every authorized target validates at its planned revision and is bound, or a partial result identifies the exact resume boundary without claiming rollback.

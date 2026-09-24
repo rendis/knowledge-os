@@ -2,7 +2,7 @@
 
 Use this contract after a synchronization interruption, validation failure, or source/destination change. The coordinator reads `status` or `resume`; it does not infer state from logs or rerun semantic work speculatively.
 
-Active-run responses retain `next_command` and add `next_action`: the same `command`, an `argv` array beginning with that subcommand and its known CLI arguments, the selected `repository`/`oid` or `unit_id` when applicable, and `missing_inputs` listing required CLI flags whose values are not known. Supply those inputs before invoking `90-Meta/sync-run.py` with the arguments; an empty list only means CLI inputs are complete, not that validation or authorization has passed. Hints do not execute anything or reuse potentially stale projection, gate, or review artifacts. Closed receipts retain their existing format.
+Active-run responses retain `next_command` and add `next_action`: the same `command`, an `argv` array beginning with that subcommand and its known CLI arguments, the selected `repository`/`oid` or `unit_id` when applicable, and `missing_inputs` listing required CLI flags whose values are not known. Supply those inputs before invoking `<cli> sync` with the arguments; an empty list only means CLI inputs are complete, not that validation or authorization has passed. Hints do not execute anything or reuse potentially stale projection, gate, or review artifacts. Closed receipts retain their existing format.
 
 ## Durable records
 
@@ -25,7 +25,7 @@ The run progresses monotonically through `packages`, `gated`, `projecting`, and 
 
 | Command | Required public arguments | Result |
 | --- | --- | --- |
-| `tool-digest` | None | Computes the installed Python tool bundle identity. |
+| `tool-digest` | None | Computes the SHA-256 of the running CLI executable. |
 | `begin` | `--state-root --inventory-digest --package REPOSITORY OID` | Computes tool identity and creates or reuses the integrity-checked run for the fingerprint. |
 | `checkpoint-package` | `--state-root --run-id --repository --artifact` | Persists one exact `package-closed` artifact; rejects digest-only or unverifiable receipts. |
 | `seal-gate` | `--state-root --run-id --gate` | Persists gate v2 and independent units. |
@@ -48,7 +48,7 @@ Every command emits stable JSON. Exit `0` is success, `2` is a contract/blocking
 | Vault baseline changed for a pending unit | `stale` | Packages and gate | `resume --destination-digest PATH SHA256`; reproject only that unit. |
 | Deterministic semantic fallback | `packages` or `gated` | Finalized package and its closed fallback receipt | Continue to `checkpoint-package` or `seal-gate`; no new extractor or reviewer. |
 | Unresolved checkout/identity, unreadable exact evidence, invalid binding/integrity, or unsafe persistence | blocked | Only records proven valid by `status` | Stop and report the exact code; do not apply. |
-| Tool or schema mismatch | terminal (`run-version-mismatch`) | Existing immutable artifacts | Restore the original compatible tool bundle before continuing an active run. Mutations compare actual installed bytes, including when `--tool-digest` is omitted. Status and completed-receipt replay remain available; existing identities are never rewritten. |
+| Tool or schema mismatch | terminal (`run-version-mismatch`) | Existing immutable artifacts | Restore the original CLI executable before continuing an active run. Mutations compare the running executable bytes, including when `--tool-digest` is omitted. Status and completed-receipt replay remain available; existing identities are never rewritten. |
 | Missing active run | terminal (`run-state-missing`) | Closed receipt, if present | Inspect the receipt; otherwise report the missing state. |
 
 `source-stale` reopens only connected packages/groups. Applied affected bytes are
@@ -61,7 +61,7 @@ ordinals change. `vault-baseline-stale` preserves semantic authority and
 reprojects only the destination unit. Neither permits another semantic
 pass on a checkpointed package. The optional single correction occurs only before checkpointing, under the coordinator recipe.
 
-A finding-directed correction is local package preparation, not a new run state. `sync-correction.py` preserves its first artifacts and enforces one reserved correction before the final package checkpoint. The durable run continues to own one selected finalized package per repository.
+A finding-directed correction is local package preparation, not a new run state. `<cli> sync correction` preserves its first artifacts and enforces one reserved correction before the final package checkpoint. The durable run continues to own one selected finalized package per repository.
 
 ## Invariants
 

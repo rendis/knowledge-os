@@ -15,7 +15,7 @@ Load this branch when the user asks for a minimal sync, where to start, or wheth
 2. First hop — do not walk the graph:
 
 ```text
-<python> "<VAULT_ROOT>/90-Meta/graph-query.py" --root "<VAULT_ROOT>" orientation
+<cli> config status --vault "<VAULT_ROOT>"
 ```
 
    Equivalent: `instance.orientation_status`. The JSON includes `ready`, `systems`, `enabled_types`, and `pending_inventory` (true only when Home has heading `## Pending inventory` or `## Inventario pendiente` **and** listed remotes).

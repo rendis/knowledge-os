@@ -1,5 +1,11 @@
 # Framework review — decisions and remaining work
 
+Historical evaluation record. File paths and tool names below identify the
+version tested at the time. The current evidence contract lives in
+`kernel/AGENTS.md`; consumer operations use `use-vault-cli`. Retired Python
+commands and `response-quality.md` references below are not current setup
+or execution instructions.
+
 Recorded 2026-09-16 after the user accepted retaining 0.10.2. This is a distribution-only session closure, not a new consumer instruction or a release.
 
 ## Accepted decision

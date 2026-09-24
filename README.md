@@ -39,6 +39,59 @@ curl -fsSL <raw-tag>/install.sh | bash -s -- init --dest /path/to/cell-vault
 
 The current distribution channel is local-only. The script is written so that one-liner can clone a tag into cache and re-enter the same verbs.
 
+## Native CLI
+
+Build release artifacts before native installation:
+
+```bash
+make release
+```
+
+The build produces macOS, Linux and Windows binaries for ARM64 and AMD64,
+checksums, a portable runtime manifest and third-party notices under `dist/`.
+Init/update copies **all six binaries** plus the manifest and notices into the
+consumer's versioned `.agents/bin/`. Commit that directory with the kernel update;
+a clone or pull then receives every supported platform without this template,
+a compiler, Python, an extra download or a session hook. The generic executable
+reads the selected vault's own identity/configuration; there is no central registry.
+
+Select the filename for the execution host using
+[use-vault-cli](kernel/.agents/skills/use-vault-cli/SKILL.md#bind-the-executable-and-vault).
+For example, on macOS ARM64, from an installed vault:
+
+```bash
+.agents/bin/vaultctl-darwin-arm64 config resolve --vault .
+.agents/bin/vaultctl-darwin-arm64 search --vault . --query "repository retry policy" --limit 5
+.agents/bin/vaultctl-darwin-arm64 links --vault . --node "Canonical note basename"
+.agents/bin/vaultctl-darwin-arm64 audit --vault .
+.agents/bin/vaultctl-darwin-arm64 check links --vault .
+```
+
+Linux uses `vaultctl-linux-arm64` or `vaultctl-linux-amd64`; Windows uses
+`vaultctl-windows-arm64.exe` or `vaultctl-windows-amd64.exe` under the same directory.
+Prefix a quoted executable path with `&` in PowerShell. Preserve executable file
+modes for macOS/Linux when committing the bundle. Skills specify lifecycle and
+synchronization commands with explicit targets and existing review/authorization
+requirements. Existing ignored `.bin/` files from older installations are obsolete;
+new instructions use only `.agents/bin/`.
+
+The release adds the size of six builds to each consumer repository. Git transfers
+binary updates with the kernel; this deliberately trades repository size for
+self-contained clones while no public artifact download channel exists.
+
+Search hashes eligible Markdown on each explicit retrieval call and updates
+only changed files in one SQLite transaction. The index is local, disposable,
+and outside the vault; Markdown remains authoritative. `index --rebuild`
+recreates it. Private investigation context is included locally and labeled;
+`search --visibility public` omits it. Results contain bounded excerpts, source
+paths, headings, origin and lexical rank. Rank is not a probability or proof:
+open and verify the source before answering. No hooks, model services or
+automatic per-message injection are installed.
+
+Browser-specific skill resources remain with their skills. Legacy Python
+implementations retained in this distribution serve compatibility evals; the
+native retirement policy prevents installing them in consumer vaults.
+
 ## After init: where to start
 
 The cell vault owns:
@@ -48,7 +101,7 @@ The cell vault owns:
 - `10-Sistemas/` — one stub note per declared system
 - `10/`–`70/` — the cell's knowledge graph
 
-The distribution owns the thin `AGENTS.md` router, every generic file it ships under `90-Meta/`, kernel skills, selected adapter skills, `VERSION`, and the `.claude/skills` symlink. Claude Code 2.1.277+ reads `AGENTS.md` when the project has no `CLAUDE.md` on supported backends; `update` removes only the former distribution link `CLAUDE.md -> AGENTS.md` and preserves any cell-owned `CLAUDE.md`. `update` refreshes matching distribution files without deleting cell-only Meta files, skills, recipes, or overlays. The cell owns `instance.yaml`, `00-Home.md`, the root Bases, `90-Meta/Alcance.md`, and notes under `10/`–`70/`; those files are seeded or authored locally and never rewritten by `update`.
+The distribution owns the thin `AGENTS.md` router, every generic file it ships under `90-Meta/`, kernel skills, selected adapter skills, the six-platform `.agents/bin/` bundle, `VERSION`, and the `.claude/skills` symlink. Claude Code 2.1.277+ reads `AGENTS.md` when the project has no `CLAUDE.md` on supported backends; `update` removes only the former distribution link `CLAUDE.md -> AGENTS.md` and preserves any cell-owned `CLAUDE.md`. `update` refreshes matching distribution files without deleting cell-only Meta files, skills, recipes, or overlays. The cell owns `instance.yaml`, `00-Home.md`, the root Bases, `90-Meta/Alcance.md`, and notes under `10/`–`70/`; those files are seeded or authored locally and never rewritten by `update`.
 
 Related domain vaults may be recorded in the consumer-owned, versioned `90-Meta/vault-catalog.yaml`. It is created on first authorized registration and preserved by `init`, `adopt`, and `update`; absence is valid. `map-ecosystem` manages entries: discovered candidates require user confirmation, while a direct registration request already authorizes the named entry. The catalog stores portable repository identities and domain descriptions, never local paths, credentials or user access state. `doctor` validates existing catalogs; consultation still checks current access and destination instructions. See the [catalog procedure](kernel/.agents/skills/map-ecosystem/references/vault-catalog.md).
 
@@ -97,17 +150,17 @@ Apache License 2.0.
 
 ## Minimal workflow
 
-Requires Python 3.9+ and Git. Obsidian is optional for filesystem queries. Each optional adapter declares its own tool dependencies.
+Consumers obtain their vault with `git clone`; Git is a workspace prerequisite. The distribution installer and retained compatibility evals use Python 3.9+ and Git. Installed vault operations use their matching native executable under `.agents/bin/`, without Python or Go. Git, GitHub CLI and Obsidian remain external tools for the operations that need them. Each optional adapter declares its own tool dependencies.
 
 For a provider-independent local Python gate, create `.venv`, install the
 fully locked `kernel/90-Meta/requirements-ci.txt`, and run
 `python -B kernel/90-Meta/check-code-quality.py --root .` with that interpreter.
 Ruff and Bandit load their standard configuration files from `90-Meta`.
-Installed cells receive the same command and configuration; see
-`90-Meta/code-quality.md` for setup and scope.
+These are distribution-only developer checks. Installed cells use the native
+checks described in `90-Meta/code-quality.md`; Python tooling is not shipped.
 
 1. Initialize identity, systems, trackers, evidence profile and note locale with `init`.
-2. Use `configure-workspace` only when a task needs local source roots or an optional capability. Bind team procedures through `90-Meta/cell-config.py`; `instance.yaml` owns portable bindings, local config owns machine paths.
+2. Use `configure-workspace` only when a task needs local source roots or an optional capability. Bind team procedures through `<CLI> config bind`; `instance.yaml` owns portable bindings, local config owns machine paths.
 3. Ask a bounded question through `map-ecosystem`; it returns sources and limitations without creating a case.
 4. Open an investigation when the work needs continuity. Close it with a reason and limitations even when no story is exported.
 5. Export a self-sufficient development package only when implementation is requested. Its source anchor permits targeted read-only context lookup; implementation deltas remain in the worktree for later vault-owned reconciliation.
@@ -128,7 +181,7 @@ Map and sync share a bounded contract: repository purpose and stack, main entryp
 
 These rules ship through `init` and `update` as kernel behavior. They do not import, replace or rewrite another cell's `10/`–`70/` knowledge. A new cell starts with the mapping method and an empty domain graph; an existing cell keeps its own notes and uses them as the preservation baseline on later maps and syncs.
 
-A valid initial `revise` review may receive one targeted correction through `90-Meta/sync-correction.py` before checkpointing. Original artifacts remain available; publication/recovery continues with one final package. Rejected or limited outcomes stay explicit. Repeated publication attempts never trigger fresh semantic work.
+A valid initial `revise` review may receive one targeted correction through `<CLI> sync correction prepare` and `<CLI> sync correction check` before checkpointing. Original artifacts remain available; publication/recovery continues with one final package. Rejected or limited outcomes stay explicit. Repeated publication attempts never trigger fresh semantic work.
 
 `evals/extraction-quality/` prepares frozen synthetic repositories and vault context for blind production-artifact extraction. The separate semantic rubric checks recovered rules, dependent impact, justified removal, preservation and evidence precision; it is never provided to the extractor. One scenario is a regression, not a general quality or efficiency guarantee.
 

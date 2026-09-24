@@ -13,6 +13,8 @@ from pathlib import Path
 from typing import Any
 
 DIST = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(DIST / "scripts"))
+import native_runtime  # noqa: E402
 sys.path.insert(0, str(DIST / "kernel" / "90-Meta"))
 from instance import (  # noqa: E402
     DEFAULT_TYPES,
@@ -151,6 +153,10 @@ def managed_sources(adapters: list[str]) -> dict[str, Path]:
                         )
     # Consumer catalogs are never distribution payload, even if accidentally added.
     sources.pop(CATALOG_PATH.as_posix(), None)
+    runtime_policy = native_runtime.policy(DIST)
+    if runtime_policy is not None:
+        for retired_path in runtime_policy["retired_paths"]:
+            sources.pop(retired_path, None)
     return dict(sorted(sources.items()))
 
 
@@ -181,6 +187,8 @@ def dump_lock(data: dict[str, Any]) -> str:
             lines.append(f"  - {item}")
     else:
         lines.append("  []")
+    if data.get("runtime_release") is not None:
+        lines.append("runtime_release: " + json.dumps(data["runtime_release"], sort_keys=True, separators=(",", ":")))
     lines.append("managed_hashes:")
     for rel, digest in sorted((data.get("managed_hashes") or {}).items()):
         lines.append(f'  "{rel}": {digest} {MANAGED_HASH_COMMENT}')
@@ -195,6 +203,7 @@ def load_lock(path: Path) -> dict[str, Any]:
     distribution_dirty = True
     adapters: list[str] = []
     hashes: dict[str, str] = {}
+    runtime_release = None
     section = ""
     for raw in path.read_text(encoding="utf-8").splitlines():
         line = raw.strip()
@@ -206,6 +215,9 @@ def load_lock(path: Path) -> dict[str, Any]:
             distribution_revision = line.split(":", 1)[1].strip().strip('"')
         elif line.startswith("distribution_dirty:"):
             distribution_dirty = line.split(":", 1)[1].strip().casefold() == "true"
+        elif line.startswith("runtime_release:"):
+            runtime_release = native_runtime.descriptor(json.loads(line.split(":", 1)[1].strip()))
+            section = ""
         elif line.startswith("adapters:"):
             section = "adapters"
         elif line.startswith("managed_hashes:"):
@@ -226,10 +238,12 @@ def load_lock(path: Path) -> dict[str, Any]:
         "distribution_dirty": distribution_dirty,
         "adapters": adapters,
         "managed_hashes": hashes,
+        "runtime_release": runtime_release,
     }
 
 
 def preflight_kernel(dest: Path, adapters: list[str], extra_paths: list[str] | None = None) -> None:
+    native_runtime.preflight(dest, native_runtime.release(DIST))
     sources = managed_sources(adapters)
     extra = [".claude/skills", "Arquitectura.base", "Auditoria.base",
              "Operacion.base", "Repos.base", ".gitignore", ".obsidian/app.json", LOCK_NAME]
@@ -267,6 +281,7 @@ def copy_kernel(dest: Path, adapters: list[str]) -> None:
         elif target.exists() and not target.is_file():
             raise RuntimeError(f"managed target is not a file: {rel}")
         shutil.copy2(source, target)
+    native_runtime.install(DIST, dest, native_runtime.release(DIST))
     legacy_claude = dest / "CLAUDE.md"
     if legacy_claude.is_symlink() and os.readlink(legacy_claude) == "AGENTS.md":
         legacy_claude.unlink()
@@ -320,6 +335,12 @@ def ensure_gitignore_lines(dest: Path) -> None:
         if item not in lines:
             lines.append(item)
             changed = True
+    if native_runtime.policy(DIST) is not None:
+        portable = ["!/.agents/bin/"] + ["!/" + name for name in sorted(native_runtime.bundle_hashes(native_runtime.release(DIST)))]
+        # Place exceptions last so pre-existing *.exe or bin rules cannot hide the bundle.
+        updated = [line for line in lines if line not in portable] + portable
+        changed = changed or updated != lines
+        lines = updated
     if changed:
         path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
 
@@ -404,7 +425,15 @@ def pending_inventory(instance: dict[str, Any]) -> str:
     guidance = (
         "Consulta la configuración local vigente desde la raíz del vault con "
         if spanish else "Check the current local configuration from the vault root with "
-    ) + "`python3 -B 90-Meta/workspace-config.py --vault-root . status --format json`.\n"
+    )
+    if native_runtime.policy(DIST) is not None:
+        guidance += (
+            "el ejecutable de tu plataforma en `.agents/bin/` y `config status --vault .`; consulta `.agents/skills/use-vault-cli/SKILL.md`.\n"
+            if spanish else
+            "the platform executable in `.agents/bin/` with `config status --vault .`; see `.agents/skills/use-vault-cli/SKILL.md`.\n"
+        )
+    else:
+        guidance += "`python3 -B 90-Meta/workspace-config.py --vault-root . status --format json`.\n"
     if not roots:
         return guidance
     found: list[str] = []
@@ -504,13 +533,17 @@ def write_bootstrap(dest: Path, instance: dict[str, Any]) -> None:
 
 def write_lock(dest: Path, adapters: list[str]) -> None:
     revision, dirty = distribution_provenance()
+    runtime_release = native_runtime.release(DIST)
+    if runtime_release is not None:
+        dirty = dirty or runtime_release["source_dirty"] or runtime_release["source_revision"] != revision
     payload = {
-        "version": "3",
+        "version": "4" if runtime_release else "3",
         "kernel_version": dist_version(),
         "distribution_revision": revision,
         "distribution_dirty": dirty,
         "adapters": adapters,
         "managed_hashes": tree_hashes(dest, adapters),
+        "runtime_release": runtime_release,
     }
     path = dest / LOCK_NAME
     path.write_text(dump_lock(payload), encoding="utf-8")
@@ -644,6 +677,10 @@ def cmd_init(args: argparse.Namespace) -> int:
     bootstrap_paths.extend(f"{child.name}/.gitkeep" for child in (DIST / "kernel").iterdir() if child.is_dir() and child.name[:2].isdigit())
     for item in instance["systems"]:
         bootstrap_paths.extend([f"10-Sistemas/{item['name']}.md", f"20-Repos/{item['id']}/.gitkeep"])
+    runtime_conflicts = native_runtime.conflicts(dest, native_runtime.release(DIST), None)
+    if runtime_conflicts and not args.force:
+        print(json.dumps({"status": "ownership-conflict", "files": runtime_conflicts}))
+        return 3
     preflight_kernel(dest, instance["adapters"], bootstrap_paths)
     dest.mkdir(parents=True, exist_ok=True)
     seed_skeleton(dest, instance["graph"]["enabled_types"])
@@ -685,6 +722,7 @@ def cmd_adopt(args: argparse.Namespace) -> int:
         print(str(error), file=sys.stderr)
         return 2
     conflicts = ownership_conflicts(dest, instance["adapters"], set())
+    conflicts.extend(native_runtime.conflicts(dest, native_runtime.release(DIST), None))
     overlays = dest / ".agents" / "overlays"
     uncovered = [rel for rel in conflicts if not overlay_covers(overlays, dest, rel)]
     if uncovered and not args.force:
@@ -839,6 +877,7 @@ def cmd_update(args: argparse.Namespace) -> int:
             )
         )
         return 3
+    drifted.extend(native_runtime.conflicts(dest, native_runtime.release(DIST), lock.get("runtime_release")))
     drifted = sorted(set(drifted))
     overlays = dest / ".agents" / "overlays"
     if drifted and not args.force:
@@ -926,7 +965,8 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         payload["kernel_version_installed"] = lock.get("kernel_version")
         payload["kernel_version_dist"] = dist_version()
         payload["lock_version"] = lock.get("version")
-        payload["portable_lock"] = lock.get("version") in {"2", "3"}
+        payload["portable_lock"] = lock.get("version") in {"2", "3", "4"}
+        payload["native_runtime"] = native_runtime.status(dest, native_runtime.release(DIST), lock.get("runtime_release"))
         revision, dirty = distribution_provenance()
         payload["distribution_revision_installed"] = lock.get("distribution_revision")
         payload["distribution_dirty_installed"] = lock.get("distribution_dirty")
@@ -969,6 +1009,8 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         or payload.get("drift") or payload.get("topology_drift")
         or payload.get("adapter_configuration_drift")
         or not payload.get("managed_matches_dist")
+        or payload.get("native_runtime", {}).get("status") not in {"legacy", "ready"}
+        or (payload.get("native_runtime", {}).get("status") == "ready" and not payload["native_runtime"].get("release_matches_dist"))
         or not payload["personal_instructions"]["ignored"]
         or payload["personal_instructions"]["tracked"]
     ):

@@ -7,11 +7,10 @@ Load this reference when preparing a new handoff worktree or selecting an existi
 Resolve the destination only through:
 
 ```text
-<python> -B <vault-root>/90-Meta/workspace-config.py \
-  --vault-root <vault-root> development-worktree-root --format json
+<vaultctl> config worktree-root --vault <vault-root>
 ```
 
-If the view returns `worktree_root_not_configured` or `worktree_root_unavailable`, invoke `configure-workspace`, let it own the repair, and resume only after the semantic view succeeds. Never parse `.knowledge-os-config.yaml`.
+If `worktree_root` is null or its directory is unavailable, invoke `configure-workspace`, let it own the repair, and resume only after the semantic view succeeds. Never parse `.knowledge-os-config.yaml`.
 
 The helper derives:
 
@@ -31,8 +30,7 @@ Inspect local branches read-only. Suggest `main` when it exists and `master` onl
 Run a provisional complete remote plan to compare the exact local and remote commits and project the initial handoff files:
 
 ```text
-<python> -B <skill-dir>/scripts/development-handoff.py \
-  --vault-root <vault-root> plan-handoff --bundle <package-dir> \
+<vaultctl> handoff plan-handoff --vault-root <vault-root> --bundle <package-dir> \
   --base-branch <branch> --base-source remote --description <short-description> \
   [--branch-prefix <prefix>]
 ```
@@ -52,8 +50,7 @@ Re-run `plan-handoff` with the selected `--base-source`. Plan every repository b
 Prepare each unchanged approved plan with:
 
 ```text
-<python> -B <skill-dir>/scripts/development-handoff.py \
-  --vault-root <vault-root> prepare-handoff --bundle <package-dir> \
+<vaultctl> handoff prepare-handoff --vault-root <vault-root> --bundle <package-dir> \
   --base-branch <branch> --base-source <local|remote> \
   --description <short-description> [--branch-prefix <prefix>] \
   --plan-token <approved-token>
@@ -61,13 +58,14 @@ Prepare each unchanged approved plan with:
 
 The helper revalidates the complete token before any persistent write. It then performs the Git phase, rebuilds the file plan from the created worktree, requires its token to equal the authorized projection, applies the handoff, and validates it. A mismatch stops before file writes. A materialization failure preserves the created worktree and reports `worktree-created`; a later validation failure preserves the materialized handoff and reports `handoff-applied`. Both are exact resume boundaries and neither broadens authority into destructive rollback.
 
+Planning projects built-in checkout conversions, including CRLF. If a root policy file uses an external Git filter, the complete plan stops before persistent creation. Present the split Git and materialization phases for that target and obtain authorization for uncovered effects before proceeding; the post-checkout file plan must be reviewed against the actual bytes.
+
 ## Worktree-only creation
 
 Use this narrower route only when the user explicitly requests a persistent worktree without its handoff package. Create each unchanged approved plan with:
 
 ```text
-<python> -B <skill-dir>/scripts/development-handoff.py \
-  --vault-root <vault-root> create-worktree --bundle <package-dir> \
+<vaultctl> handoff create-worktree --vault-root <vault-root> --bundle <package-dir> \
   --base-branch <branch> --base-source <local|remote> \
   --description <short-description> [--branch-prefix <prefix>] \
   --plan-token <approved-token>

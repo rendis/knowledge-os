@@ -2,8 +2,9 @@
 
 Status: **research closed for the selected v1; candidate models rejected**,
 2026-09-24. This experiment evaluated `suggest` on the **current user
-message**; the user subsequently chose an Engram-style session orientation
-with explicit `search` instead. A positive test label meant the message had a
+message**; the user subsequently chose explicit `search` instead. Session
+hooks and message capture were not adopted; the current contract is in
+[README — Native CLI](../../README.md#native-cli). A positive test label meant the message had a
 recoverable subject and a present request for information. It does not prove
 that the vault contains an answer. Retrieval must still be able to return
 `cards: []`. The agent may use conversation context for its broader task, but

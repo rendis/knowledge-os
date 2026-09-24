@@ -11,8 +11,10 @@ The report note owns meaning; its linked execution procedure owns the source, pa
 
 Resolve `VAULT_ROOT` through `../../../90-Meta/vault-resolution.md`. Keep the calling workflow as owner when invoked as an auxiliary.
 
-- **List:** run `python3 90-Meta/operational-catalog.py list-reports` from the resolved vault and return the catalog. No period, executor or live access is required.
-- **Generate:** resolve one exact `report-id` through `90-Meta/operational-catalog.py resolve --report-id <id>`, read its note and [report contract](references/report-contract.md).
+Bind `<VAULTCTL>` through the installed `use-vault-cli` skill.
+
+- **List:** run `<VAULTCTL> config reports --vault "<VAULT_ROOT>"` from the resolved vault and return the catalog. No period, executor or live access is required.
+- **Generate:** resolve one exact `report-id` through `<VAULTCTL> config operation --vault "<VAULT_ROOT>" --report-id "<id>"`, read its note and [report contract](references/report-contract.md).
 - **Validate:** resolve the report contract and exact existing artifacts; require only the validation inputs named by its procedure.
 
 Complete when the selected mode and report are unambiguous, or the requested catalog has been returned.

@@ -13,7 +13,7 @@ For an external-only update, keep the repository's source commit and analysis da
 Freeze the candidate and evidence with the installed helper:
 
 ```text
-python3 -B 90-Meta/review-note-candidate.py freeze --vault <vault> --candidate <candidate-dir> --evidence-root <evidence-dir> --evidence <relative-record> --output <manifest.json>
+<cli> sync review freeze --vault <vault> --candidate <candidate-dir> --evidence-root <evidence-dir> --evidence <relative-record> --output <manifest.json>
 ```
 
 Repeat `--evidence` for required evidence files. Declare a removed note with repeatable `--delete <vault-relative.md>`; do not also stage an image for that path. For a sync documentation unit also pass `--projection <projection.json>` to bind the candidate to the existing projection. Keep the manifest and review outside the graph. Durable notes must carry authoritative source references and observation dates; a temporary evidence record alone is not a durable citation.
@@ -41,18 +41,18 @@ The reviewer writes:
 
 Use `revise` with specific findings (`{"reason": "<evidence-backed defect>"}` per finding) for incorrect prose, lost knowledge or unsupported closure. Correct actionable findings within the existing candidate and evidence scope, preserving each rejected attempt. Before each correction, identify the exact defect and its available authoritative evidence; after any candidate/evidence change, freeze a new manifest and obtain an independent review bound to it. Verify cited revisions and paths before review; changing a citation also requires checking that its content supports the claim.
 
-Continue targeted corrections while distinct findings can be resolved from available evidence without expanding the task. Stop the affected publication when the same defect survives a correction, the scope must expand, or required evidence is unavailable; report the precise remaining defect and retain reusable work. An unavailable source leaves the dependent pending item open. A second review finding alone does not require a new cycle, extraction or user approval. This final-note repair policy does not change the separate source-package correction limit enforced by `sync-correction.py`.
+Continue targeted corrections while distinct findings can be resolved from available evidence without expanding the task. Stop the affected publication when the same defect survives a correction, the scope must expand, or required evidence is unavailable; report the precise remaining defect and retain reusable work. An unavailable source leaves the dependent pending item open. A second review finding alone does not require a new cycle, extraction or user approval. This final-note repair policy does not change the separate source-package correction limit enforced by `<cli> sync correction`.
 
 ## Check and publish
 
 ```text
-python3 -B 90-Meta/review-note-candidate.py check --vault <vault> --candidate <candidate-dir> --evidence-root <evidence-dir> --manifest <manifest.json> --review <review.json>
+<cli> sync review check --vault <vault> --candidate <candidate-dir> --evidence-root <evidence-dir> --manifest <manifest.json> --review <review.json>
 ```
 
 For sync, validate the projection first, then register the accepted review against the stored projection:
 
 ```text
-python3 -B 90-Meta/sync-run.py review-unit --state-root <root> --run-id <run_id> --unit-id <group-NNN> --vault <vault> --candidate <candidate-dir> --evidence-root <evidence-dir> --manifest <manifest.json> --review <review.json>
+<cli> sync review-unit --state-root <root> --run-id <run_id> --unit-id <group-NNN> --vault <vault> --candidate <candidate-dir> --evidence-root <evidence-dir> --manifest <manifest.json> --review <review.json>
 ```
 
 The command invokes the checker against the checkpointed projection, compares reviewed file presence and deletions with the patch-derived path kinds, and persists its bound receipt. An empty file cannot stand in for an absent file. Only then use `apply-unit`; acknowledgement units are exempt. For external-only documentation, after a passing check copy only the reviewed full images to their corresponding authorized note paths and verify destination hashes against the manifest. Explicitly declared deletions follow the ordinary authorized retirement procedure; the manifest represents their result with the empty-content digest, and publication must verify absence. Run the ordinary vault/link gates and inspect the final diff. Recheck immediately before writing; destination drift requires a new candidate and review, never overwriting changed user bytes.
@@ -60,7 +60,7 @@ The command invokes the checker against the checkpointed projection, compares re
 Before declaring completion or committing the scoped notes, verify the current bytes:
 
 ```text
-python3 -B 90-Meta/review-note-candidate.py verify-published --vault <vault> --reviewed <manifest.json> <review.json>
+<cli> sync review verify-published --vault <vault> --reviewed <manifest.json> <review.json>
 ```
 
 For successive accepted updates, repeat `--reviewed` in publication order; the latest accepted full image governs each overlapping path. Include all in-scope published notes. A mismatch blocks closure for that path: preserve the current bytes, inspect the delta, and reuse a later valid review if one exists. Otherwise freeze the affected complete note and obtain independent review focused on the addition and preservation of the accepted content. Reuse unaffected reviews and source evidence; then verify again. Administrative summaries remain subject to their inventory/configuration checks.

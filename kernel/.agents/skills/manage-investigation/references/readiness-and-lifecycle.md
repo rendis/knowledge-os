@@ -34,12 +34,12 @@ Use `blocked` only when the named dependency prevents useful progress on the glo
 Do not store `resume-to`; unblocking always returns to `investigating`. Use the helper with the exact snapshot returned by `load`:
 
 ```text
-investigation-case.py --root "$VAULT_ROOT/investigations" transition \
+"$VAULTCTL" investigation --root "$VAULT_ROOT/investigations" transition \
   --id <id> --to blocked --blocked-on "<dependency>" \
   --reason "<formalized reason>" --source "<portable source>" \
   --expected-public-sha256 <sha256>
 
-investigation-case.py --root "$VAULT_ROOT/investigations" transition \
+"$VAULTCTL" investigation --root "$VAULT_ROOT/investigations" transition \
   --id <id> --to investigating \
   --reason "<why progress can resume>" --source "<portable source>" \
   --expected-public-sha256 <sha256>
@@ -66,7 +66,7 @@ Implementation, export, publication, merge, or deployment evidence is required o
 Invoke:
 
 ```text
-investigation-case.py --root "$VAULT_ROOT/investigations" close \
+"$VAULTCTL" investigation --root "$VAULT_ROOT/investigations" close \
   --id <id> --decision complete --reason "<formalized reason>" \
   --limitations "<formalized limitations or none>" \
   --source "<portable closure source>" \
@@ -83,7 +83,7 @@ Use `closure-outcome: abandoned` when the requester explicitly ends the work wit
 Reopen only for an explicit request or new material evidence that requires active investigation. Transition from `closed` to `investigating`, remove active `closure-outcome`, and preserve the earlier closure event in History:
 
 ```text
-investigation-case.py --root "$VAULT_ROOT/investigations" transition \
+"$VAULTCTL" investigation --root "$VAULT_ROOT/investigations" transition \
   --id <id> --to investigating \
   --reason "<reopen reason>" --source "<portable source>" \
   --expected-public-sha256 <sha256>

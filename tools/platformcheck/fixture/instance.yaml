@@ -1,0 +1,12 @@
+version: 1
+cell:
+  name: Platform Smoke Fixture
+  purpose: Disposable native CLI smoke verification
+systems:
+  - id: fixture
+    name: Fixture
+    aliases: []
+evidence:
+  profile: documented-source
+locale:
+  notes: en

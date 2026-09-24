@@ -1,12 +1,17 @@
 # Local retrieval CLI: product decision record and acceptance plan
 
-Status: **v1 search architecture and Engram-style interaction selected; product implementation pending**,
-2026-09-24. No hook is installed and no model is selected for distribution. A
-single-process Go `search` command was tested on macOS ARM in an isolated PoC.
-The user later discarded and deleted that PoC, including its handoff, so the
-measurements recorded below are historical experimental results rather than
-a runnable benchmark. Reproduce them against the selected CLI before release.
-Jev routing was discarded by the user. Harness events will be selected later.
+Status: **historical research and superseded proposal**, reconciled 2026-09-24.
+The native CLI is now implemented. Its current distribution and invocation
+contract is in [README — Native CLI](../../README.md#native-cli) and
+[use-vault-cli](../../kernel/.agents/skills/use-vault-cli/SKILL.md).
+
+The sections below preserve the experiment and original plan; they are not
+release instructions or a current backlog. In particular, the proposed
+`context` and `session` commands and message/session hooks were not adopted.
+Current behavior is explicit agent-invoked FTS5 search, automatic per-file
+fingerprint refresh, and six versioned binaries per vault. No embedding,
+reranker, Jev service, message capture or hook is distributed. Old source-file
+counts and PoC timings below describe the experiment, not today's runtime.
 
 ## Decision after the passage experiment
 

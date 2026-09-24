@@ -13,9 +13,9 @@ Own documentary persistence and traceability, not the general inquiry method. An
 
 Always:
 
-1. Load `../../../90-Meta/vault-resolution.md` and run `../../../90-Meta/resolve-vault.py` relative to this skill directory. Bind one canonical `VAULT_ROOT`; use `VAULT_ROOT/investigations/` as the published root. The helper also resolves `.investigations/` and `.investigations-private/` beside it.
+1. Load `../../../90-Meta/vault-resolution.md` and bind `<VAULTCTL>` through [use-vault-cli](../use-vault-cli/SKILL.md), then run `<VAULTCTL> config resolve --vault "<candidate-root>"`. Bind one canonical `VAULT_ROOT`; use `VAULT_ROOT/investigations/` as the published root. The helper also resolves `.investigations/` and `.investigations-private/` beside it.
 2. Require `investigations/` to be eligible for tracking. Require both `.investigations-private/` and `.investigations/` to be ignored and absent from `git ls-files` when they exist.
-3. Resolve `scripts/investigation-case.py` relative to this skill. Use it for Open, Load, List, Snapshot, Save, Save resources, Publish, Transition, Consolidate, Bind, Close, Retire, and validation; do not reproduce its discovery, locking, attribution, or rollback logic manually. `--root` is always `$VAULT_ROOT/investigations` even when the live case is unpublished.
+3. Use the selected `<VAULTCTL> investigation` for Open, Load, List, Snapshot, Save, Save resources, Publish, Transition, Consolidate, Bind, Close, Retire, and validation; do not reproduce its discovery, locking, attribution, or recovery logic manually. `--root` is always `$VAULT_ROOT/investigations` even when the live case is unpublished.
 
 Read-only lookup is complete when the published root is trackable and ignored investigation roots stay untracked. It does not require Git author identity or the record contract.
 
@@ -46,7 +46,7 @@ Before a mutating route, additionally:
 | **Learn** / **Promote** | [learn-and-promote.md](references/learn-and-promote.md) |
 | **Absorb / Retire** | [knowledge-and-retirement.md](references/knowledge-and-retirement.md) |
 
-Use no parallel active index. The helper's `list` derives the overview from current cases and the minimal retirement register; `retired` describes storage disposition, not a fourth lifecycle state. Interrogation may call `90-Meta/graph-query.py investigations --node <stem>` for the on-demand public-case/node join. That query is not a second store and does not replace exact-ID retirement lookup.
+Use no parallel active index. The helper's `list` derives the overview from current cases and the minimal retirement register; `retired` describes storage disposition, not a fourth lifecycle state. Interrogation may call `<VAULTCTL> links --vault "<VAULT_ROOT>" --node "<stem>"` for the on-demand public-case/node join. That query is not a second store and does not replace exact-ID retirement lookup.
 
 ## Open
 

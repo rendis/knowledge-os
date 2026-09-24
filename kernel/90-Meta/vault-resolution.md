@@ -24,47 +24,25 @@ Never identify the vault by directory basename alone. The local folder and Obsid
 
 ## Resolution
 
-Locate this shared resolver relative to the active installed skill directory. Use `python3` on macOS/Linux, `py -3` or `python` on native Windows, and quote paths on every platform:
+Select `<VAULTCTL>` through `use-vault-cli` (the executable-selection section in `.agents/skills/use-vault-cli/SKILL.md`) before resolution; it defines platform selection and shell invocation. For a skill installed at `<vault>/.agents/skills/<skill>`, its `../../..` directory supplies a candidate root; validate it before binding identity. A source checkout is not automatically the documentation vault.
 
 ```text
-<python> -B "<installed-skill-dir>/../../../90-Meta/resolve-vault.py"
+<VAULTCTL> config resolve --vault "<EXPLICIT_PATH>"
 ```
 
-If the user supplied a path, pass it explicitly:
+Supply a user-selected vault path, or the root derived from the active installed skill. The resolver checks that path and its ancestors for `instance.yaml`, validates required markers and the declared Git origin, and returns one `resolved` object. It does not search sibling repositories or select a vault from recency. If the explicit path cannot resolve, request the exact local vault path or authorization and destination to clone its canonical remote; continue independent work that needs no vault binding.
 
-```text
-<python> -B "<installed-skill-dir>/../../../90-Meta/resolve-vault.py" --path "<path>"
-```
+Bind `VAULT_ROOT` only from the returned `vault_root`. Its `source_context` contains ordered configured `roots`, `clone_root`, `clone_origin`, `clone_authorized` and warnings. An unavailable source context does not block vault-only work.
 
-The resolver is read-only and applies this order:
+The resolver makes a bounded optional `obsidian vaults verbose` query. `obsidian_vault` is set only for a unique registration matching the canonical filesystem path; `interaction_mode` is then `obsidian-cli`. Missing CLI, unavailable application or ambiguous registration leaves filesystem mode available. This probe does not launch Obsidian or select another vault.
 
-1. Explicit path or one of its ancestors.
-2. Current directory or one of its ancestors.
-3. Paths returned by `obsidian vaults verbose`.
-4. Canonical remote and marker validation for every candidate.
-
-Interpret the JSON status:
-
-- `resolved`: bind `vault_root`, `source_context`, and optional `obsidian_vault`; continue. `source_context.status=unavailable` does not block a vault-only question.
-- `invalid`: the explicit path is not the canonical vault; stop and report it.
-- `ambiguous`: present the verified candidates and request a choice; never choose by recency or basename.
-- `not_found`: request an explicit local path or authorization and destination to clone the canonical remote. Do not invent a persistent clone location.
-
-Treat the returned paths as task-local bindings:
-
-- `VAULT_ROOT` = `vault_root`, the documentation repository.
-- `SOURCE_CONTEXT` = `source_context`, with `status`, ordered `roots`, optional `clone_root`, `clone_origin` (`config` or `null`), `clone_authorized`, and `warnings`.
-- `SOURCE_ROOTS` = the ordered `source_context.roots`; each item declares `path`, `origin`, and whether it is `managed`.
-- `CLONE_ROOT` = `source_context.clone_root`, only when an existing managed directory was explicitly configured.
-- `OBSIDIAN_VAULT` = `obsidian_vault`, only when that exact path is registered in Obsidian.
-
-Resolve again after a new user-supplied vault path, configuration change, clone, or Obsidian registration change. Do not carry a path from another machine or session as fact.
+Bind `SOURCE_ROOTS` to `source_context.roots`, `CLONE_ROOT` to the configured clone root and `OBSIDIAN_VAULT` only to the verified registration name. Resolve again after a new user-supplied path, configuration change, clone or registration change. Re-establish machine-local bindings in a new session.
 
 ## Source configuration and selection
 
-`VAULT_ROOT/.knowledge-os-config.yaml` is the single local source of reusable repository roots and clone authority. The resolver does not interpret or repair it; it calls the versioned semantic API and forwards its `source_context`. Environment variables, conventional sibling discovery, and resolver-level source-root overrides are not valid configuration sources.
+`VAULT_ROOT/.knowledge-os-config.yaml` is the single local source of reusable repository roots and clone authority. The resolver does not interpret or repair it; it uses the native configuration API and forwards its `source_context`. Environment variables, conventional sibling discovery, and resolver-level source-root overrides are not valid configuration sources.
 
-`SOURCE_ROOTS` are discovery inputs; a successful semantic response is the only checkout binding. Before reading a source repository or assigning it to a worker, obtain its expected Git remote and run `python3 -B 90-Meta/workspace-config.py --vault-root "<VAULT_ROOT>" locate-repository "<GIT_REMOTE>" --format json`. Use only the `path` returned by that command, and repeat the resolution for every required repository. A configured discovery root represents itself when it is a Git repository; otherwise only its immediate child directories are candidates. The semantic API normalizes SSH and HTTPS remotes, performs no recursive scan, and rejects zero or multiple matches without writing configuration.
+`SOURCE_ROOTS` are discovery inputs; a successful semantic response is the only checkout binding. Before reading a source repository or assigning it to a worker, obtain its expected Git remote and run `<VAULTCTL> config locate --vault "<VAULT_ROOT>" --remote "<GIT_REMOTE>"`. Use only the `path` returned by that command, and repeat the resolution for every required repository. A configured discovery root represents itself when it is a Git repository; otherwise only its immediate child directories are candidates. The semantic API normalizes SSH and HTTPS remotes, performs no recursive scan, and rejects zero or multiple matches without writing configuration.
 
 A failed checkout binding keeps source reads blocked; a vault-only task may continue with that limitation. Recover through these supported paths:
 
@@ -90,7 +68,7 @@ If `clone_authorized=false`, never clone. Ask for explicit approval and an exact
 When `OBSIDIAN_VAULT` is available, verify the normalized filesystem binding before the first query. Run the versioned helper from `VAULT_ROOT`; do not trust the Obsidian exit code alone because a missing vault can still return `0`:
 
 ```text
-<python> -B 90-Meta/check-obsidian-binding.py --vault-root "<vault_root>" --vault-name "<obsidian_vault>"
+<VAULTCTL> check obsidian-binding --vault "<VAULT_ROOT>" --vault-name "<OBSIDIAN_VAULT>"
 ```
 
 Then always target the vault explicitly:
@@ -103,7 +81,7 @@ obsidian "vault=<obsidian_vault>" unresolved
 obsidian "vault=<obsidian_vault>" orphans
 ```
 
-Use Obsidian CLI for search, canonical resolution, backlinks, unresolved links, and orphan checks. Use the host's safe filesystem editing mechanism for versioned Markdown and skill files so Git can review the exact diff. Run repository scripts from `VAULT_ROOT`.
+Use the native CLI for bounded indexed retrieval: `<VAULTCTL> search --vault "<VAULT_ROOT>" --query "<terms>"`. Read the returned source before using it as evidence. Obsidian CLI can additionally inspect canonical resolution, backlinks, unresolved links and orphans. Use the host's safe filesystem editing mechanism for versioned Markdown and skill files so Git can review the exact diff. Pass the resolved `VAULT_ROOT` explicitly to CLI operations.
 
 Never issue an Obsidian command without the explicit `"vault=<obsidian_vault>"` argument; the implicit target is the most recently focused vault and is not safe evidence.
 
@@ -111,8 +89,8 @@ Never issue an Obsidian command without the explicit `"vault=<obsidian_vault>"` 
 
 If the resolver finds the vault but no matching Obsidian registration or CLI is available:
 
-1. Use targeted filesystem reads and `rg` for discovery.
-2. Use `<python> -B 90-Meta/verify-links.py` from `VAULT_ROOT` for filesystem link and orphan checks.
+1. Use native CLI search and targeted filesystem reads; `rg` remains a direct text-search fallback.
+2. Use `<VAULTCTL> check links --vault "<VAULT_ROOT>"` for filesystem link checks.
 3. Run all other Framework gates that are available.
 4. Report that Obsidian-native resolution, backlinks, or rendering were not verified.
 

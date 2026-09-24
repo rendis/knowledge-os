@@ -11,7 +11,7 @@ metadata:
 
 Use this skill for vault inventory, lifecycle synchronization, resuming a recorded sync run, or a complete `SYNC_PACKAGE_WORKER_V1` card. Read-only questions, catalog maintenance, and ordinary note publication belong to `map-ecosystem`. Workspace configuration belongs to `configure-workspace`.
 
-Shared mapping recipes live under `../map-ecosystem/references/`. Durable sync state remains `.agents/state/map-ecosystem/sync/`.
+Shared mapping recipes live under `../map-ecosystem/references/`. Durable sync state remains `.agents/state/map-ecosystem/sync/`. Bind `<cli>` through [use-vault-cli](../use-vault-cli/SKILL.md).
 
 ## Hard Rules
 
@@ -32,7 +32,7 @@ Shared mapping recipes live under `../map-ecosystem/references/`. Durable sync s
 
 ## Execution Steps
 
-1. Load `../../../90-Meta/vault-resolution.md` and run `../../../90-Meta/resolve-vault.py` relative to this skill directory. Bind the resolved vault and configured source roots; a failed resolution blocks root-dependent work.
+1. Load `../../../90-Meta/vault-resolution.md` and run `<cli> config resolve --vault "<candidate-root>"`; the supplied path or the root three levels above this installed skill is the candidate. Bind the resolved vault and configured source roots; a failed resolution blocks root-dependent work.
 2. Select one primary branch from the table. Load only its recipe and supporting references it explicitly requires.
 3. For coordinator synchronization, follow the vault-synchronization recipe: sealed gate grants, per-unit state, and `status` or `resume` rather than inferring a next step. Load `../map-ecosystem/references/evidence-extraction.md` before freezing inventory. Before a source read or delegation, bind its checkout by configured remote identity. Before a technical write, load `../../../90-Meta/evidence-policy.md` and `../../../90-Meta/node-selection.md`.
 4. After local-package acceptance, reconcile only external connections required by the task through `../map-ecosystem/references/connection-reconciliation.md`, published with `map-ecosystem`'s single-unit or multi-unit recipe and `../map-ecosystem/references/final-note-review.md`, outside the immutable closed Git package.

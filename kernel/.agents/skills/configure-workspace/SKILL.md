@@ -33,20 +33,19 @@ Group related missing choices into concise questions. Stop only the actions that
 
 On a missing vault, first initialize it through the distribution installer once portable identity/profile/locale and optional selections or deferrals are resolved; then use the resolver and local configuration steps below. Keep local paths in workspace configuration. Cloning, source inspection and sync wait for their source scope and access choices. External vault publication and live-environment access remain separate capabilities, required only when requested.
 
-Before reading or changing configuration, load `../../../90-Meta/vault-resolution.md` and run `../../../90-Meta/resolve-vault.py` relative to this skill directory. Pass any user-supplied path through that resolver. Bind `VAULT_ROOT` only from a single `resolved` result; an `invalid`, `ambiguous`, or `not_found` result blocks configuration.
+Before reading or changing configuration, load `../../../90-Meta/vault-resolution.md`. Resolve an explicit vault-root directory with `<VAULTCTL> config resolve --vault "<CANDIDATE_ROOT>"`. Bind `VAULT_ROOT` only from a successful `resolved` result. Bind `<VAULTCTL>` through [use-vault-cli](../use-vault-cli/SKILL.md) before resolution. A resolution error blocks configuration. The native resolver checks the explicit path and its ancestors; an optional Obsidian registration probe never selects another vault.
 
 ## 1. Inspect
 
 ```text
-<python> -B "<VAULT_ROOT>/90-Meta/workspace-config.py" --vault-root "<VAULT_ROOT>" status --format json
-<python> -B "<VAULT_ROOT>/90-Meta/workspace-config.py" --vault-root "<VAULT_ROOT>" locate-repository "<GIT_REMOTE>"
-<python> -B "<VAULT_ROOT>/90-Meta/workspace-config.py" --vault-root "<VAULT_ROOT>" repository
-<python> -B "<VAULT_ROOT>/90-Meta/workspace-config.py" --vault-root "<VAULT_ROOT>" development-worktree-root --format json
-<python> -B "<VAULT_ROOT>/90-Meta/workspace-config.py" --vault-root "<VAULT_ROOT>" development-worktree-root --format value
-<python> -B "<VAULT_ROOT>/90-Meta/workspace-config.py" --vault-root "<VAULT_ROOT>" database-proxy-port "<ENVIRONMENT>" --format value
+<VAULTCTL> config --vault "<VAULT_ROOT>" workspace
+<VAULTCTL> config --vault "<VAULT_ROOT>" locate --remote "<GIT_REMOTE>"
+<VAULTCTL> config --vault "<VAULT_ROOT>" schema-repository
+<VAULTCTL> config --vault "<VAULT_ROOT>" worktree-root
+<VAULTCTL> config --vault "<VAULT_ROOT>" proxy-port --environment "<ENVIRONMENT>"
 ```
 
-An `initialized` status with roots means discovery is ready. A missing worktree root or proxy port is a capability gap, not a failed discovery.
+All commands return JSON. Read `worktree_root` or `port` from their named fields; an absent value remains unconfigured. An `initialized` workspace status with roots means discovery configuration is available; repository access still requires an `ok` identity lookup. A missing worktree root or proxy port is a capability gap, not a failed discovery.
 
 Completion criterion: current status is observed; the run either stops or enters repair with one gap.
 
@@ -55,13 +54,13 @@ Completion criterion: current status is observed; the run either stops or enters
 Collect exact discovery roots. Each root is one Git repository or a directory whose immediate children are Git repositories. During a full initialization, also ask where persistent development worktrees should live; that path may be deferred if only discovery is required. Use already supplied exact values and authorization; ask only for a missing consequential choice:
 
 ```text
-<python> -B "<VAULT_ROOT>/90-Meta/workspace-config.py" --vault-root "<VAULT_ROOT>" initialize --repository-root "<ROOT>" [--managed-clone-root "<ROOT>"] [--development-worktree-root "<WORKTREE_ROOT>"]
+<VAULTCTL> config --vault "<VAULT_ROOT>" workspace-init --repository-root "<ROOT>" [--managed-clone-root "<ROOT>"] [--development-worktree-root "<WORKTREE_ROOT>"]
 ```
 
-Refresh without wiping ports. Present only the candidate for the selected environment when a live consumer needs a proxy port:
+Use `workspace-update` to preserve unspecified configuration. Both commands preserve existing proxy entries unless explicitly changed; updates retain comments and consumer-owned fields. `--expected-hash <SHA256>` optionally rejects a mutation if the file has changed since review. Refresh without wiping ports. Present only the candidate for the selected environment when a live consumer needs a proxy port:
 
 ```text
-<python> -B "<VAULT_ROOT>/90-Meta/workspace-config.py" --vault-root "<VAULT_ROOT>" update [--repository-root "<ROOT>"] [--managed-clone-root "<ROOT>" | --disable-managed-clone] [--development-worktree-root "<WORKTREE_ROOT>" | --disable-development-worktree-root] [--proxy-port "ENVIRONMENT=PORT"]
+<VAULTCTL> config --vault "<VAULT_ROOT>" workspace-update [--repository-root "<ROOT>"] [--managed-clone-root "<ROOT>" | --disable-managed-clone] [--development-worktree-root "<WORKTREE_ROOT>" | --disable-development-worktree-root] [--proxy-port "ENVIRONMENT=PORT"]
 ```
 
 Completion criterion: the configured values match the resolved user choices or reused existing configuration, `status` is `initialized`, and no consumer wrote the YAML by hand. Report deferred capabilities separately; do not report full onboarding or sync completion from this status alone.
@@ -72,23 +71,23 @@ Resume the exact task that exposed the gap with the semantic value it needs.
 
 ## Cell capabilities
 
-For database access, `instance.yaml` may declare `database_targets`: each has a unique `id`, declared `system`, `environment`, `instance`, `database`, `schemas`, canonical access `procedure`, optional local `port_key`, and zero or more credential-free HTTPS `repositories`. Repositories provide optional evidence; the procedure selects the executor. Inspect through `cell-config.py database-targets` and `database-target --target <ID>`. Add or update cell-owned declarations only within user-authorized configuration work, validate with the semantic read, and preserve existing fields. Resolve procedure basenames before marking a target configured. Keep credentials out of declarations.
+For database access, `instance.yaml` may declare `database_targets`: each has a unique `id`, declared `system`, `environment`, `instance`, `database`, `schemas`, canonical access `procedure`, optional local `port_key`, and zero or more credential-free HTTPS `repositories`. Repositories provide optional evidence; the procedure selects the executor. Inspect through `<VAULTCTL> config database-targets --vault "<VAULT_ROOT>"` and `<VAULTCTL> config database-target --vault "<VAULT_ROOT>" --target <ID>`. Add or update cell-owned declarations only within user-authorized configuration work, validate with the semantic read, and preserve existing fields. Resolve procedure basenames before marking a target configured. Keep credentials out of declarations.
 
-When the runbook requires a local proxy port, use the target's `port_key` with the existing `--proxy-port KEY=PORT` update and `database-proxy-port KEY` view. Preserve legacy environment keys and `sources.schema_repository` for existing consumers. An empty repository list never inherits that legacy source. Port configuration does not create an executor or establish live access.
+When the runbook requires a local proxy port, use the target's `port_key` with the existing `--proxy-port KEY=PORT` update and `config proxy-port --vault "<VAULT_ROOT>" --environment KEY` view. Preserve legacy environment keys and `sources.schema_repository` for existing consumers. An empty repository list never inherits that legacy source. Port configuration does not create an executor or establish live access.
 
 During initial onboarding, use the installer's identity/system/tracker/profile/locale options. Collect the team's optional tools, environment names, procedures and executors only when needed. The kernel has no default company, environment list, credential mechanism or procedure basename.
 
 Existing capabilities are read-only with:
 
 ```text
-<python> -B "<VAULT_ROOT>/90-Meta/cell-config.py" --vault-root "<VAULT_ROOT>" status
-<python> -B "<VAULT_ROOT>/90-Meta/cell-config.py" --vault-root "<VAULT_ROOT>" resolve --capability <id>
+<VAULTCTL> config --vault "<VAULT_ROOT>" status
+<VAULTCTL> config --vault "<VAULT_ROOT>" capability --capability <id>
 ```
 
 Bind an existing operational note (or first prepare the requested team procedure using the operational note contract) with:
 
 ```text
-<python> -B "<VAULT_ROOT>/90-Meta/cell-config.py" --vault-root "<VAULT_ROOT>" bind --capability <id> --procedure "<canonical basename>"
+<VAULTCTL> config --vault "<VAULT_ROOT>" bind --capability <id> --procedure "<canonical basename>"
 ```
 
 Repeat `--procedure` for required companion catalogs. Use `runtime-inspection` for runtime policy/catalogs and `database-inspection` for the database executor contract. Procedures own permitted environments, target selection, authentication mechanism, repository/skill entrypoint and any runner flags. Record mechanisms and references, never secrets. Binding configures guidance and does not authorize live execution. Report separately: identity configured, repositories discoverable, and each requested capability configured or its exact gap; resume the initiating task.

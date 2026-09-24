@@ -12,17 +12,17 @@ When the question requires another domain vault discovered through authorized re
 
 For a bounded question about an already identified source, read it directly when no relationship discovery is needed. Preserve vault/repository identity, private-case loading and access checks. Use the graph steps below when locating context or relationships; a direct read does not prove graph completeness.
 
-1. If orientation may be incomplete, run `graph-query.py orientation` (or the equivalent `instance.orientation_status`). If `ready` is false, load [orientation.md](orientation.md) and stop. Do not read Home, Convenciones, or Framework as a prelude to classifying a dependency question.
+1. If orientation may be incomplete, run `<cli> config status --vault "<VAULT_ROOT>"` and inspect `orientation`. If `ready` is false, load [orientation.md](orientation.md) and stop. Do not read Home, Convenciones, or Framework as a prelude to classifying a dependency question.
 2. First hop — portable graph query (Obsidian app not required; do not use `obsidian-cli` for this):
 
 ```text
-<python> "<VAULT_ROOT>/90-Meta/graph-query.py" --root "<VAULT_ROOT>" neighbors --node "<stem>"
-<python> "<VAULT_ROOT>/90-Meta/graph-query.py" --root "<VAULT_ROOT>" hygiene
-<python> "<VAULT_ROOT>/90-Meta/graph-query.py" --root "<VAULT_ROOT>" investigations --node "<stem>"
+<cli> links --vault "<VAULT_ROOT>" --node "<stem>"
+<cli> check links --vault "<VAULT_ROOT>"
+<cli> search --vault "<VAULT_ROOT>" --query "<subject>" --limit 5
 ```
 
-   Use `neighbors` for dependency, topic, flow, and impact. Use `hygiene` for unresolved links and orphans. Use `investigations` for vault ↔ published `investigations/` join (on-demand published-case scan; not a second index). When consulting a case, use the read-only loading mechanism in `manage-investigation` to discover unpublished or published path, overlay and local working store by ID; preserve private provenance and disclosure restrictions. `manage-investigation` remains owner of the store.
-3. Open the stems/paths named in the JSON. If a node or needed relationship is absent, search the named subject in the relevant notes or configured source before concluding that it does not exist. The graph is a navigation index, not proof of completeness. For change impact, query `neighbors` of the changed unit, then `neighbors` of its `publica-en` / `gatillado-por` / `participa-en` targets. Skip types disabled in `instance.yaml` `graph.enabled_types` (do not expand asynchronous messaging when `topic` is disabled). If the question asks where a fact belongs, load [node-selection.md](../../../../90-Meta/node-selection.md) and open the candidate note, not the full Convenciones file.
+   Use `links` for dependency, topic, flow, impact and published investigation pointers. Use `check links` for unresolved links and orphans. Use `search` for bounded source candidates when the starting note is unknown; open the actual source before treating its fragment as evidence. Ranking is lexical relevance, not truth or answer confidence. Empty results are valid. Private cases remain local and explicitly labeled; use `--visibility public` when restricted context is unnecessary. When consulting a case, use the read-only loading mechanism in `manage-investigation` to discover unpublished or published path, overlay and local working store by ID; preserve private provenance and disclosure restrictions. `manage-investigation` remains owner of the store.
+3. Open the stems/paths named in the JSON. If a node or needed relationship is absent, search the named subject in the relevant notes or configured source before concluding that it does not exist. The graph is a navigation index, not proof of completeness. For change impact, query `links` of the changed unit, then `links` of its `publica-en` / `gatillado-por` / `participa-en` targets. Skip types disabled in `instance.yaml` `graph.enabled_types` (do not expand asynchronous messaging when `topic` is disabled). If the question asks where a fact belongs, load [node-selection.md](../../../../90-Meta/node-selection.md) and open the candidate note, not the full Convenciones file.
 4. Expand a second named note only when the JSON edge is required by the question:
    - asynchronous messaging: producer → topic → consumer (only when `topic` is enabled).
    - HTTP: caller → consumed repository or integration.

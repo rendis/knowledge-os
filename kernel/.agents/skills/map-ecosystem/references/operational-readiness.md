@@ -2,7 +2,7 @@
 
 Load this branch to check prerequisites for a specific vault query, source analysis, authoring, closure, synchronization or external reconciliation. Questions about stored configuration, initialization choices or source roots belong to `configure-workspace`; reuse its result here only when the requested operation needs it. It defines a capability-scoped preflight; it does not establish whether cell runtimes are healthy.
 
-The readiness check itself is read-only and non-publishing: do not change versioned content, source working trees, external systems, Git authentication, or user configuration. When it exposes a workspace-configuration gap, hand off to `configure-workspace`; that skill may write local configuration only after its confirmation gate, then control returns here for a fresh preflight. Python checks use `-B` to avoid bytecode caches, Git checks use `--no-optional-locks`, and tooling tests may create and remove disposable fixtures under the host temporary directory.
+The readiness check itself is read-only and non-publishing: do not change versioned content, source working trees, external systems, Git authentication, or user configuration. When it exposes a workspace-configuration gap, hand off to `configure-workspace`; that skill may write local configuration only after its confirmation gate, then control returns here for a fresh preflight. Git checks use `--no-optional-locks`; native validation reads the selected vault and reports bounded diagnostics.
 
 ## When to run
 
@@ -34,8 +34,7 @@ Apply each dimension only where marked required (`R`), conditional on the concre
 |---|:---:|:---:|:---:|:---:|:---:|:---:|---|
 | Vault resolution | R | R | R | R | R | R | Resolver status is `resolved`; canonical remote and markers match |
 | Source access | — | R | C | — | C | C | Required when versioned evidence may answer the selected question |
-| Python 3 | R | R | R | R | R | R | The selected interpreter executes the resolver and applicable tooling |
-| Pinned gate dependencies | — | — | — | R | C | C | Required when the resulting documentation will pass closing gates |
+| Installed CLI | R | R | R | R | R | R | The platform binary executes the resolver and applicable tooling |
 | Framework gates | — | — | — | R | C | C | Required when the resulting documentation will be applied and closed |
 | Local `main` baseline | — | — | R | R | C | C | Required when reconciliation will author and close vault changes |
 | Obsidian binding | O | O | O | O | O | O | Exact normalized vault path matches; otherwise use the documented filesystem fallback |
@@ -44,45 +43,38 @@ Apply each dimension only where marked required (`R`), conditional on the concre
 | Procedure binding | — | — | — | — | — | R | The semantic workspace view resolves the configured executor or adapter for the exact procedure and target |
 | Read-only target access | — | — | — | — | — | R | That executor or adapter proves a bounded read-only operation against the exact authority and target using existing authentication |
 
-A failure in a closing dimension does not retroactively block authoring. Report combinations explicitly, for example: `Ready for vault authoring; Blocked for vault closure: ruamel.yaml missing`.
+A failure in a closing dimension does not retroactively block authoring. Report combinations explicitly, for example: `Ready for vault authoring; Blocked for vault closure: required review missing`.
 
 ## How to check
 
-First run the resolver from `SKILL_DIR`, the installed `map-ecosystem` skill directory, not from a presumed vault copy. Use the interpreter available on the host:
+Bind `<cli>` through [use-vault-cli](../../use-vault-cli/SKILL.md). The candidate is the user-supplied path or the root containing this installed skill. Resolve before reading domain content:
 
 ```text
-macOS/Linux (bash, zsh, fish): python3 -B "<installed-skill-dir>/../../../90-Meta/resolve-vault.py"
-Windows PowerShell:            py -3 -B "<installed-skill-dir>\..\..\..\90-Meta\resolve-vault.py"
-Windows Python:                python -B "<installed-skill-dir>\..\..\..\90-Meta\resolve-vault.py"
+<cli> config resolve --vault "<candidate-root>"
 ```
 
-Only after a `resolved` result, change to `VAULT_ROOT` and run the applicable commands below. In these examples, `<python>` means the same selected interpreter command (`python3`, `py -3`, or `python`). Quoted placeholders must be replaced with the exact resolver values.
+After a `resolved` result, use its canonical `VAULT_ROOT` and run only applicable checks:
 
 ```text
-# Interpreter and pinned dependency (read-only checks).
-<python> --version
-<python> -B -c "import ruamel.yaml; print(ruamel.yaml.__version__)"
+<cli> version
+<cli> config workspace --vault "<vault_root>"
+<cli> audit --vault "<vault_root>"
+<cli> check links --vault "<vault_root>"
+<cli> check bases --vault "<vault_root>"
 
-# Framework gates, only for vault closure or update-mode synchronization.
-<python> -B 90-Meta/test_workspace_config.py
-<python> -B 90-Meta/audit-vault.py
-<python> -B 90-Meta/verify-links.py
-<python> -B 90-Meta/validate-bases.py
-
-# Exact Obsidian binding must pass before native checks.
-<python> -B 90-Meta/check-obsidian-binding.py --vault-root "<vault_root>" --vault-name "<obsidian_vault>"
+# Check exact Obsidian identity before native application queries.
+<cli> check obsidian-binding --vault "<vault_root>" --vault-name "<obsidian_vault>"
 obsidian "vault=<obsidian_vault>" unresolved
 obsidian "vault=<obsidian_vault>" orphans
 
-# Local baseline and informational working-tree state.
 git --no-optional-locks -C "<vault_root>" show-ref --verify --quiet refs/heads/main
 git --no-optional-locks -C "<vault_root>" status --porcelain
 
-# GitHub identity, only when required by the capability.
-<python> -B 90-Meta/vault-inventory.py --format markdown
+# Only when remote repository inventory is required.
+<cli> inventory --vault "<vault_root>" --format markdown
 ```
 
-The argument-vector form above is shell-neutral; do not copy the literal angle-bracket placeholders. CI uses the `python` executable installed by `actions/setup-python`. Local Windows hosts may use `py -3` or `python`; macOS/Linux commonly use `python3`.
+The installed CLI requires neither Python nor Go. Git, GitHub CLI, Obsidian and procedure-specific tools are external dependencies only for operations that use them.
 
 Read `source_context` as defined in [vault-resolution.md](../../../../90-Meta/vault-resolution.md). An arbitrary directory is not proof that the target repository is usable. Report source configuration independently from readiness; mixed postures are valid:
 
@@ -116,7 +108,7 @@ Offer the smallest fix for the failing dimension. Never edit user-level environm
 Run the read-only status view from `VAULT_ROOT`:
 
 ```text
-<python> -B 90-Meta/workspace-config.py --vault-root "<vault_root>" status --format json
+<cli> config workspace --vault "<vault_root>"
 ```
 
 If it is not `initialized`, load `configure-workspace`. The observed gap opens demand-triggered onboarding: the owner skill may perform read-only discovery and present the required roots and proxy-port map, but the readiness question does not authorize a write. That skill owns confirmation, ambiguity resolution, initialization, repair, and every write to `.knowledge-os-config.yaml`. Readiness consumers must not parse or patch the file themselves. After a confirmed change, rerun status and the vault resolver; no process restart is required.
@@ -127,11 +119,11 @@ If it is not `initialized`, load `configure-workspace`. The observed gap opens d
 
 **Vault resolution not `resolved`.** Follow [vault-resolution.md](../../../../90-Meta/vault-resolution.md): `invalid` means report the wrong path; `ambiguous` means present verified candidates and request a choice; `not_found` means request an explicit local path or separate authorization and destination to clone the vault.
 
-**Pinned dependencies or gates unavailable.** Report the missing/mismatched dependency and affected closing gates. CI installs `90-Meta/requirements-ci.txt` in an isolated runner. Locally, run `<python> -m pip install --no-deps -r 90-Meta/requirements-ci.txt` only when the user asked to prepare/fix the environment or explicitly authorized installation, then re-run the failed gates.
+**CLI or gates unavailable.** Report the missing executable or exact failing gate. Restore the matching platform release through the distribution installer; rerun the affected checks. Do not replace a failed semantic review with a structural check.
 
 **Git baseline.** This vault uses local `main` as its only baseline. A missing `refs/heads/main` blocks authoring, closure, and synchronization. A dirty working tree does not affect readiness: report changed/untracked paths as delivery context and preserve unrelated work.
 
-**Obsidian binding.** Run `check-obsidian-binding.py` before `unresolved` or `orphans`; Obsidian may print `Vault not found` with exit `0`. If no exact normalized registration matches, use `verify-links.py` and report that native backlinks/rendering were not verified.
+**Obsidian binding.** Run `<cli> check obsidian-binding` before `unresolved` or `orphans`; Obsidian may print `Vault not found` with exit `0`. If no exact normalized registration matches, use `<cli> check links` and report that native backlinks/rendering were not verified.
 
 **GitHub identity.** Suggest `--github-user <login>` for a stored account, a non-interactive `GH_TOKEN`/`GITHUB_TOKEN`, or authenticating `gh` and checking SSO authorization. Never persist or print tokens.
 
