@@ -7,6 +7,7 @@ Load this reference as bootstrap context, then resolve the vault before reading 
 - [Canonical identity](#canonical-identity)
 - [Resolution](#resolution)
 - [Source configuration and selection](#source-configuration-and-selection)
+- [Development destinations](#development-destinations)
 - [Managed clone authorization](#managed-clone-authorization)
 - [Interaction protocol](#interaction-protocol)
 - [Filesystem interaction](#filesystem-interaction)
@@ -40,6 +41,8 @@ Bind `SOURCE_ROOTS` to `source_context.roots`, `CLONE_ROOT` to the configured cl
 
 ## Source configuration and selection
 
+This section binds repositories consulted as evidence sources. For an explicitly selected implementation checkout, use Development destinations below instead; it does not require discovery configuration.
+
 `VAULT_ROOT/.knowledge-os-config.yaml` is the single local source of reusable repository roots and clone authority. The resolver does not interpret or repair it; it uses the native configuration API and forwards its `source_context`. Environment variables, conventional sibling discovery, and resolver-level source-root overrides are not valid configuration sources.
 
 `SOURCE_ROOTS` are discovery inputs; a successful semantic response is the only checkout binding. Before reading a source repository or assigning it to a worker, obtain its expected Git remote and run `<VAULTCTL> config locate --vault "<VAULT_ROOT>" --remote "<GIT_REMOTE>"`. Use only the `path` returned by that command, and repeat the resolution for every required repository. A configured discovery root represents itself when it is a Git repository; otherwise only its immediate child directories are candidates. The semantic API normalizes SSH and HTTPS remotes, performs no recursive scan, and rejects zero or multiple matches without writing configuration.
@@ -53,7 +56,15 @@ The recovery question requests configuration or a matching checkout, never permi
 
 The order of `SOURCE_ROOTS` is the configured order and every record has `origin: config`. A root whose exact resolved path is also `CLONE_ROOT` is marked `managed: true`; parent/child overlap does not transfer authority. Duplicate or inconsistent candidates require the configuration workflow and an explicit user choice; consumers must not invent a preference.
 
-Repositories under non-managed roots are read-only: do not fetch, checkout, reset, merge, or write in them. A root with `managed: true` may clone or fetch according to the managed-clone protocol below, but its existing working trees remain read-only. Database schema repositories follow the same selection rules as application repositories.
+In the evidence-source role, repositories under non-managed roots are read-only: do not fetch, checkout, reset, merge, or write in them. A root with `managed: true` may clone or fetch according to the managed-clone protocol below, but its existing working trees remain read-only. Database schema repositories follow the same selection rules as application repositories.
+
+## Development destinations
+
+A checkout selected for an explicitly requested implementation is a separate task role from an evidence source. Bind an exact user-supplied path or an already established task destination with Git: verify its root, expected remote when supplied or registered, current branch and working changes. A repository with no remote may be used when explicitly selected as local-only. A registered handoff also requires its exact branch and handoff identity. This path need not be added to discovery configuration.
+
+A successful source lookup alone grants no edit authority. If the request identifies a repository but leaves multiple possible implementation checkouts, resolve that choice before writing. An explicit instruction to edit the exact existing source checkout authorizes that scoped implementation without changing reusable clone authority or allowing unrelated source writes. Keep other repositories in their evidence-source role.
+
+Use work-in-repository for repository context and implementation, manage-git-workflow for Git effects, and manage-development-handoff for persistent work-item worktrees and handoff state. Existing task authority carries forward; configuration changes, acquisition and publication retain their own scopes.
 
 ## Managed clone authorization
 

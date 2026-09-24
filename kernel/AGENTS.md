@@ -46,7 +46,9 @@ Use search when the starting source is unknown, links for relationship discovery
 `tracker` means one external work-tracking instance declared in `instance.yaml`. A `work item` is one externally tracked unit identified by its exact tracker and provider-native reference.
 
 1. Classify the request and select one primary skill from the catalog below. Loading an auxiliary skill supplies a method, not a new owner: keep the selected workflow through evidence gathering and the answer.
+   When the user requests repository implementation, select work-in-repository for that scope; auxiliary context loading alone retains the current owner.
    Reclassify each follow-up for newly requested methods or presentation. Keep the existing owner and applicable evidence; an explicit diagram or visual explanation invokes `explain-visually` as an auxiliary.
+   Before working in a source repository, use work-in-repository to load its applicable instructions and relevant skills; reuse the binding while its target and inputs remain current.
 2. For initial orientation, use `config status --vault "<root>"`. Follow `use-vault-cli` for retrieval and result handling. For repository identity and failed-binding recovery, load [vault resolution](90-Meta/vault-resolution.md) before locating or reading a checkout.
 3. After classification, load only the context required by these triggers:
    - Cell identity: `instance.yaml` and `00-Home.md`.
@@ -78,6 +80,7 @@ Personal executor preferences override these defaults; evidence, authorization, 
 - [configure-workspace](.agents/skills/configure-workspace/SKILL.md) — sole writer of local `.knowledge-os-config.yaml`. Onboarding is demand-triggered when a skill cannot resolve repositories or the user asks whether the workspace is initialized or configured.
 - [manage-investigation](.agents/skills/manage-investigation/SKILL.md) — unpublished cases under `.investigations/` by default, published cases under `investigations/`, optional private overlays and local working stores.
 - [manage-investigation-derived-learning](.agents/skills/manage-investigation-derived-learning/SKILL.md) — assess and publish `70-Aprendizajes/` notes.
+- [work-in-repository](.agents/skills/work-in-repository/SKILL.md) — repository implementation from this session, or auxiliary loading of repository instructions and skills.
 - [manage-development-handoff](.agents/skills/manage-development-handoff/SKILL.md) — persistent work-item worktrees and handoff files.
 - [reconcile-development-handoff](.agents/skills/reconcile-development-handoff/SKILL.md) — pull one selected handoff's implementation evidence into its source case while preserving its worktree-local lifecycle state.
 - [manage-git-workflow](.agents/skills/manage-git-workflow/SKILL.md) — own analysis and publication of the cell's specific Git/GitHub policy notes and their area-index links, or apply those notes to source repositories and standalone Git/GitHub operations; routine local versioning of this vault follows repository instructions.
