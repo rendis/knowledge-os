@@ -343,3 +343,24 @@ func TestVaultOnlyResolutionSurvivesInvalidWorkspace(t *testing.T) {
 		t.Fatal("dependent workspace operation accepted invalid config")
 	}
 }
+
+func TestReferenceBranchOrder(t *testing.T) {
+	base := func(order any) Object {
+		return Object{"version": 1, "cell": map[string]any{"name": "C", "purpose": "p"}, "systems": []any{map[string]any{"id": "s", "name": "S"}},
+			"sources": map[string]any{"reference_branch_order": order}}
+	}
+	if got := ReferenceBranchOrder(Object{}); len(got) != 2 || got[0] != "main" || got[1] != "master" {
+		t.Fatalf("default order is main, master: %v", got)
+	}
+	if got := ReferenceBranchOrder(base([]any{"develop", "main"})); got[0] != "develop" {
+		t.Fatalf("the cell's order is kept: %v", got)
+	}
+	for _, bad := range []any{[]any{}, []any{"main", "main"}, []any{"refs/heads/main"}, "main"} {
+		if ValidateInstance(base(bad)) == nil {
+			t.Fatalf("invalid order accepted: %v", bad)
+		}
+	}
+	if e := ValidateInstance(base([]any{"develop", "main", "master"})); e != nil {
+		t.Fatal(e)
+	}
+}

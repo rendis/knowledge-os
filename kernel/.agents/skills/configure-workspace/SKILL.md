@@ -21,6 +21,7 @@ For a new vault or a request for full onboarding, collect missing decisions befo
 | Evidence profile and note language | Ask for missing choices, briefly explaining the proposed defaults; pass the selected values explicitly. |
 | Trackers and adapters | During full onboarding, offer selection or explicit deferral. Deferred means unconfigured, not a confirmed absence or operational readiness. |
 | Source identity and scope | Obtain the organization/remotes and exact repository scope needed for discovery; a missing inventory is not an empty successful sync. |
+| Reference branches | Ask which branch holds each repository's reference code, in order of preference: teams and older projects differ (`main`, `master`, `develop`), and one cell often mixes them. Pass the order with `--reference-branch` (repeat, default `main` then `master`); record exceptions per repository in `sources.reference_branches` ([reference-branches](../../../90-Meta/reference-branches.md)). |
 | Local source roots | Obtain exact paths. Suggest an existing directory if useful, then wait for the user's selection before recording it. |
 | Source acquisition mode | Distinguish read-only existing checkouts from permission to clone/fetch in an exact managed root. Confirmation of a location alone does not enable acquisition. |
 | Development worktrees | Ask for an exact root or explicit deferral during full onboarding. Discovery-only work may defer this capability. |

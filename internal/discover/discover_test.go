@@ -391,18 +391,25 @@ func TestReferenceRefFollowsPolicy(t *testing.T) {
 	g(clone, "checkout", "-q", "main")
 	g(clone, "fetch", "-q", "origin")
 	g(clone, "remote", "set-head", "origin", "--delete")
-	if ref, note, e := referenceRef(clone, ""); e != nil || note != "" || ref != "refs/remotes/origin/main" {
+	if ref, note, e := referenceRef(clone, "", nil); e != nil || note != "" || ref != "refs/remotes/origin/main" {
 		t.Fatalf("unlisted repo must use origin/main over a lagging local branch: %q %q %v", ref, note, e)
 	}
-	if ref, _, e := referenceRef(clone, "trunk"); e != nil || ref != "refs/remotes/origin/trunk" {
+	if ref, _, e := referenceRef(clone, "trunk", nil); e != nil || ref != "refs/remotes/origin/trunk" {
 		t.Fatalf("configured branch must be exact: %q %v", ref, e)
 	}
-	if _, _, e := referenceRef(clone, "release/x"); e == nil {
+	if _, _, e := referenceRef(clone, "release/x", nil); e == nil {
 		t.Fatal("a missing configured branch must block, not fall back")
+	}
+	g(clone, "branch", "-q", "develop")
+	if ref, _, e := referenceRef(clone, "", []string{"develop", "main"}); e != nil || ref != "refs/heads/develop" {
+		t.Fatalf("the cell's branch order is tried first to last: %q %v", ref, e)
+	}
+	if ref, _, e := referenceRef(clone, "", []string{"release", "master", "main"}); e != nil || ref != "refs/remotes/origin/main" {
+		t.Fatalf("absent branches of the order are skipped: %q %v", ref, e)
 	}
 	other := gitRepo(t, filepath.Join(t.TempDir(), "other"), map[string]string{"a.txt": "1\n"})
 	g(other, "branch", "-m", "main", "develop")
-	if ref, note, e := referenceRef(other, ""); e != nil || ref != "HEAD" || note == "" {
+	if ref, note, e := referenceRef(other, "", nil); e != nil || ref != "HEAD" || note == "" {
 		t.Fatalf("no main/master must scan HEAD and report the fallback: %q %q %v", ref, note, e)
 	}
 }

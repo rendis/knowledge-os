@@ -418,8 +418,9 @@ def load_org(org: str, github: GitHubContext) -> list[dict[str, Any]]:
             continue
         candidates = reference_branches(INSTANCE, repo["name"])
         references = {branch: repo.get(branch) for branch in candidates}
-        if repo["name"] in INSTANCE["sources"]["reference_branches"]:
-            branch = candidates[0]
+        for branch in candidates:
+            if branch in ("main", "master"):
+                continue  # already in the organization query
             result = run(
                 ["gh", "api", "graphql", "-f", "query=query($org:String!,$repo:String!,$ref:String!){repository(owner:$org,name:$repo){ref(qualifiedName:$ref){name target{oid}}}}",
                  "-f", f"org={org}", "-f", f"repo={repo['name']}", "-f", f"ref=refs/heads/{branch}"],

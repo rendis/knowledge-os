@@ -624,6 +624,13 @@ def build_instance_from_args(args: argparse.Namespace) -> dict[str, Any]:
         args.yes,
     )
     locale = args.locale or prompt("Note locale (es|en)", "es", args.yes)
+    branch_order = args.reference_branch or [
+        part.strip() for part in prompt(
+            "Reference branches, in order: the first that exists in each repository is read as its reference (main, master, develop…)",
+            "main,master",
+            args.yes,
+        ).split(",") if part.strip()
+    ]
     adapters = list(args.adapter or [])
     if not args.yes and not adapters:
         raw = prompt("Adapters (reports — empty for none)", "", False)
@@ -641,6 +648,7 @@ def build_instance_from_args(args: argparse.Namespace) -> dict[str, Any]:
             "github_org": args.github_org or "",
             "repo_prefixes": args.repo_prefix or [],
             "discovery_roots": args.discovery_root or [],
+            "reference_branch_order": branch_order,
             "schema_repository": {"remote": "", "note": ""},
         },
         "graph": {"enabled_types": types},
@@ -1031,6 +1039,7 @@ def main() -> int:
     parser.add_argument("--github-org", default="")
     parser.add_argument("--repo-prefix", action="append", default=[])
     parser.add_argument("--discovery-root", action="append", default=[])
+    parser.add_argument("--reference-branch", action="append", default=[], help="reference branch in preference order; repeat (default: main, then master)")
     parser.add_argument("--disable-topics", action="store_true")
     parser.add_argument("--yes", action="store_true")
     parser.add_argument("--force", action="store_true")

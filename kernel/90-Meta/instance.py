@@ -265,6 +265,8 @@ def dump_instance(data: dict[str, Any]) -> str:
             lines.append(f"    - {_quote(root)}")
     else:
         lines.append("  discovery_roots: []")
+    order = sources.get("reference_branch_order") or ["main", "master"]
+    lines.append(f"  reference_branch_order: [{', '.join(_quote(b) for b in order)}]")
     branches = sources.get("reference_branches") or {}
     if branches:
         lines.append("  reference_branches:")
@@ -432,6 +434,7 @@ def validate_instance(data: dict[str, Any]) -> dict[str, Any]:
             "repo_prefixes": list(((data.get("sources") or {}).get("repo_prefixes") or [])),
             "discovery_roots": list(((data.get("sources") or {}).get("discovery_roots") or [])),
             "schema_repository": (data.get("sources") or {}).get("schema_repository") or {},
+            "reference_branch_order": validate_branch_order((data.get("sources") or {}).get("reference_branch_order", ["main", "master"])),
             "reference_branches": validate_reference_branches((data.get("sources") or {}).get("reference_branches", {})),
         },
         "graph": {"enabled_types": list(types)},
@@ -464,10 +467,19 @@ def validate_reference_branches(value: Any) -> dict[str, str]:
     return dict(value)
 
 
+def validate_branch_order(value: Any) -> list[str]:
+    if isinstance(value, str):
+        value = [part.strip() for part in value.split(",") if part.strip()]
+    if not isinstance(value, list) or not value or not all(valid_branch_name(b) for b in value) or len(set(value)) != len(value):
+        raise InstanceError("sources.reference_branch_order must list distinct valid Git branch names, e.g. [main, master]")
+    return list(value)
+
+
 def reference_branches(instance: dict[str, Any], repository: str) -> tuple[str, ...]:
-    """Explicit repository policy; absent entries retain the legacy ordered fallback."""
-    branch = instance.get("sources", {}).get("reference_branches", {}).get(repository)
-    return (branch,) if branch else ("main", "master")
+    """Explicit repository policy; other repositories try the cell's branch order."""
+    sources = instance.get("sources", {})
+    branch = sources.get("reference_branches", {}).get(repository)
+    return (branch,) if branch else tuple(sources.get("reference_branch_order") or ("main", "master"))
 
 
 def validate_database_targets(targets: Any, systems: set[str]) -> list[dict[str, Any]]:
