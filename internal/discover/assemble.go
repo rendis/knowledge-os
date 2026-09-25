@@ -410,6 +410,11 @@ func (a *assembly) entryType(e entry) (string, float64) {
 	if t := canonicalKind(e.Value); t != "" {
 		return t, 1
 	}
+	if resourceShaped(e.Value) {
+		if t := objectType(a.platform.objectsNamed(e.Value)); t != "" {
+			return t, 1 // a database, table, collection or bucket the platform lists by this name
+		}
+	}
 	if j, ok := a.st.ConfigValues[entryID(e)]; ok && resourceTypes[j.Choice] && j.Confidence >= 0.5 {
 		return j.Choice, j.Confidence
 	}
@@ -682,6 +687,22 @@ func (a *assembly) facts() []repoFacts {
 			}
 		}
 	}
+	// Code literals naming a data service the platform lists (a Firestore collection, a table, a bucket),
+	// in a repository whose dependencies use that kind of service.
+	for _, s := range a.scans {
+		uses := a.categories(s)
+		for lit, files := range s.code.Literals {
+			objs := []objectRef{}
+			for _, o := range a.platform.objectsNamed(lit) {
+				if uses[o.res.Kind] {
+					objs = append(objs, o)
+				}
+			}
+			if t := objectType(objs); t != "" {
+				add(s, t, lit, evidence{Kind: "code", Repo: s.in.Name, Commit: s.in.Commit, File: files[0], Value: lit})
+			}
+		}
+	}
 	events := a.platformEvents()
 	out := []repoFacts{}
 	for _, s := range a.scans {
@@ -765,6 +786,11 @@ func isMessaging(t string) bool { return t == "message_topic" || t == "message_s
 
 // wire completes a messaging resource with platform facts: subscription or queue -> topic and filters.
 func (a *assembly) wire(r *resource) {
+	if r.Type == "database_object" || r.Type == "storage_bucket" {
+		for _, o := range a.platform.objectsNamed(r.Name) {
+			r.Evidence = append(r.Evidence, evidence{Kind: "platform", Scope: o.scope, Value: o.res.Type + " " + o.res.Name})
+		}
+	}
 	for _, ob := range a.platform.observed[normalizeResource(r.Name)] {
 		r.Evidence = append(r.Evidence, evidence{Kind: "platform-observed", Scope: ob.scope, Value: ob.service + " " + ob.name})
 	}
@@ -944,6 +970,40 @@ func (a *assembly) pendingFor(f repoFacts) []pending {
 	for _, d := range f.Dependencies {
 		if d.Category == "unclassified" {
 			out = append(out, pending{Kind: "classification", Subject: d.ID, Detail: "dependency category not yet judged", Confirm: "vaultctl discover questions --vault <VAULT>"})
+		}
+	}
+	return out
+}
+
+// objectType is the resource type of the data services a name matches.
+func objectType(objs []objectRef) string {
+	t := ""
+	for _, o := range objs {
+		switch o.res.Kind {
+		case "object_storage":
+			t = "storage_bucket"
+		default:
+			return "database_object"
+		}
+	}
+	return t
+}
+
+// categories returns the dependency categories a repository uses.
+func (a *assembly) categories(s *repoScan) map[string]bool {
+	out := map[string]bool{}
+	for id, d := range s.deps {
+		c := d.Category
+		if j, ok := a.st.Dependencies[id]; ok && c == "" {
+			c = j.Choice
+		}
+		out[c] = true
+	}
+	for _, m := range s.code.Manifest.declared {
+		if j, ok := a.st.Dependencies["manifest:"+m]; ok {
+			out[j.Choice] = true
+		} else if j, ok := a.st.Dependencies[m]; ok {
+			out[j.Choice] = true
 		}
 	}
 	return out

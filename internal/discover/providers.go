@@ -7,7 +7,8 @@ import (
 	"strings"
 )
 
-// Each provider reads its cloud's messaging platform with the cloud's own CLI, read-only.
+// Each provider reads its cloud's platform with the cloud's own CLI, read-only: names and relations of
+// messaging, databases, storage and (Google Cloud) the warehouse, never their data.
 
 // --- Google Cloud: Pub/Sub topics and subscriptions of one project (scope = project id).
 
@@ -47,23 +48,34 @@ func (p gcpProvider) isScope(v string) bool {
 
 func (gcpProvider) validScope(s string) bool { return gcpProjectID.MatchString(s) }
 
-func (gcpProvider) kinds() []string { return []string{"messaging"} }
+func (gcpProvider) kinds() []string {
+	return []string{"messaging", "document_db", "sql_db", "object_storage", "warehouse"}
+}
 
 func (gcpProvider) confirm(project string) string {
-	return fmt.Sprintf("gcloud pubsub topics list --project %s && gcloud pubsub subscriptions list --project %s", project, project)
+	return fmt.Sprintf("gcloud pubsub topics list --project %[1]s; gcloud firestore databases list --project %[1]s; gcloud sql instances list --project %[1]s; gcloud storage buckets list --project %[1]s; bq ls --project_id=%[1]s", project)
 }
 
 func (gcpProvider) commands() string {
-	return "gcloud pubsub topics list / subscriptions list --format=json (read-only)"
+	return "gcloud pubsub topics/subscriptions list; firestore databases/indexes list; sql instances/databases list; storage buckets list; bq ls (read-only, names only)"
 }
 
-func (gcpProvider) capture(project string) platformSnapshot {
-	snap := newSnapshot("gcp", project)
+func (p gcpProvider) capture(project string) platformSnapshot {
+	return captureKinds(newSnapshot("gcp", project), map[string]kindCapture{
+		"messaging":      func(s *platformSnapshot) (string, error) { return gcpMessaging(s, project) },
+		"document_db":    func(s *platformSnapshot) (string, error) { return gcpFirestore(s, project) },
+		"sql_db":         func(s *platformSnapshot) (string, error) { return gcpCloudSQL(s, project) },
+		"object_storage": func(s *platformSnapshot) (string, error) { return gcpStorage(s, project) },
+		"warehouse":      func(s *platformSnapshot) (string, error) { return gcpBigQuery(s, project) },
+	}, p.kinds())
+}
+
+func gcpMessaging(snap *platformSnapshot, project string) (string, error) {
 	var topics []struct {
 		Name string `json:"name"`
 	}
 	if msg, e := jsonCLI(&topics, "gcloud", "pubsub", "topics", "list", "--project", project, "--format=json"); e != nil {
-		return snap.failed(msg)
+		return msg, e
 	}
 	for _, t := range topics {
 		snap.Topics = append(snap.Topics, t.Name)
@@ -86,7 +98,7 @@ func (gcpProvider) capture(project string) platformSnapshot {
 		} `json:"deadLetterPolicy"`
 	}
 	if msg, e := jsonCLI(&subs, "gcloud", "pubsub", "subscriptions", "list", "--project", project, "--format=json"); e != nil {
-		return snap.failed(msg)
+		return msg, e
 	}
 	for _, s := range subs {
 		sink := ""
@@ -99,7 +111,7 @@ func (gcpProvider) capture(project string) platformSnapshot {
 		snap.Subscriptions = append(snap.Subscriptions, platformSubscription{Name: s.Name, Topic: s.Topic, Filter: s.Filter,
 			Attributes: filterAttributes(s.Filter), Push: s.PushConfig.PushEndpoint, Sink: sink, DeadLetter: s.DeadLetterPolicy.DeadLetterTopic})
 	}
-	return snap.sorted()
+	return "", nil
 }
 
 // --- AWS: SNS topics, SQS queues and SNS subscriptions of one account and region
@@ -145,18 +157,20 @@ func (awsProvider) isScope(string) bool { return false } // an account id alone 
 
 func (awsProvider) validScope(s string) bool { return awsScope.MatchString(s) }
 
-func (awsProvider) kinds() []string { return []string{"messaging"} }
+func (awsProvider) kinds() []string {
+	return []string{"messaging", "document_db", "sql_db", "object_storage"}
+}
 
 func (awsProvider) confirm(scope string) string {
 	account, region, _ := strings.Cut(scope, "/")
-	return fmt.Sprintf("aws sns list-topics --region %s && aws sqs list-queues --region %s && aws sns list-subscriptions --region %s (credentials of account %s)", region, region, region, account)
+	return fmt.Sprintf("aws sns list-topics / sqs list-queues / dynamodb list-tables / rds describe-db-instances --region %s; aws s3api list-buckets (credentials of account %s)", region, account)
 }
 
 func (awsProvider) commands() string {
-	return "aws sts get-caller-identity; aws sns list-topics / list-subscriptions / get-subscription-attributes; aws sqs list-queues / get-queue-attributes (read-only)"
+	return "aws sts get-caller-identity; sns list-topics/list-subscriptions/get-subscription-attributes; sqs list-queues/get-queue-attributes; dynamodb list-tables; rds describe-db-instances/clusters; s3api list-buckets (read-only, names only)"
 }
 
-func (awsProvider) capture(scope string) platformSnapshot {
+func (p awsProvider) capture(scope string) platformSnapshot {
 	snap := newSnapshot("aws", scope)
 	account, region, _ := strings.Cut(scope, "/")
 	var id struct{ Account string }
@@ -167,23 +181,32 @@ func (awsProvider) capture(scope string) platformSnapshot {
 		return snap.failed(fmt.Sprintf("the active AWS credentials belong to account %s, not %s: select a profile of %s (AWS_PROFILE)", id.Account, account, account))
 	}
 	r := []string{"--region", region, "--output", "json"}
+	return captureKinds(snap, map[string]kindCapture{
+		"messaging":      func(s *platformSnapshot) (string, error) { return awsMessaging(s, r) },
+		"document_db":    func(s *platformSnapshot) (string, error) { return awsDynamoDB(s, r) },
+		"sql_db":         func(s *platformSnapshot) (string, error) { return awsRDS(s, r) },
+		"object_storage": func(s *platformSnapshot) (string, error) { return awsS3(s) },
+	}, p.kinds())
+}
+
+func awsMessaging(snap *platformSnapshot, r []string) (string, error) {
 	var topics struct{ Topics []struct{ TopicArn string } }
 	if msg, e := jsonCLI(&topics, "aws", append([]string{"sns", "list-topics"}, r...)...); e != nil {
-		return snap.failed(msg)
+		return msg, e
 	}
 	for _, t := range topics.Topics {
 		snap.Topics = append(snap.Topics, t.TopicArn)
 	}
 	var queues struct{ QueueUrls []string }
 	if msg, e := jsonCLI(&queues, "aws", append([]string{"sqs", "list-queues"}, r...)...); e != nil {
-		return snap.failed(msg)
+		return msg, e
 	}
 	queueDLQ, subscribed := map[string]string{}, map[string]bool{}
 	queueARNs := []string{}
 	for _, u := range queues.QueueUrls {
 		var attrs struct{ Attributes map[string]string }
 		if msg, e := jsonCLI(&attrs, "aws", append([]string{"sqs", "get-queue-attributes", "--queue-url", u, "--attribute-names", "QueueArn", "RedrivePolicy"}, r...)...); e != nil {
-			return snap.failed(msg)
+			return msg, e
 		}
 		arn := attrs.Attributes["QueueArn"]
 		var redrive struct {
@@ -197,7 +220,7 @@ func (awsProvider) capture(scope string) platformSnapshot {
 		Subscriptions []struct{ SubscriptionArn, Protocol, Endpoint, TopicArn string }
 	}
 	if msg, e := jsonCLI(&subs, "aws", append([]string{"sns", "list-subscriptions"}, r...)...); e != nil {
-		return snap.failed(msg)
+		return msg, e
 	}
 	for _, s := range subs.Subscriptions {
 		if !strings.HasPrefix(s.SubscriptionArn, "arn:") {
@@ -205,7 +228,7 @@ func (awsProvider) capture(scope string) platformSnapshot {
 		}
 		var attrs struct{ Attributes map[string]string }
 		if msg, e := jsonCLI(&attrs, "aws", append([]string{"sns", "get-subscription-attributes", "--subscription-arn", s.SubscriptionArn}, r...)...); e != nil {
-			return snap.failed(msg)
+			return msg, e
 		}
 		policy := attrs.Attributes["FilterPolicy"]
 		ps := platformSubscription{Topic: s.TopicArn, Filter: policy, Attributes: policyAttributes(policy)}
@@ -225,7 +248,7 @@ func (awsProvider) capture(scope string) platformSnapshot {
 			snap.Subscriptions = append(snap.Subscriptions, platformSubscription{Name: q, DeadLetter: queueDLQ[q]})
 		}
 	}
-	return snap.sorted()
+	return "", nil
 }
 
 // --- Azure: Service Bus topics, subscriptions (with their rules) and queues of every namespace in one
@@ -265,27 +288,37 @@ func (azureProvider) isScope(string) bool { return false } // a bare GUID may be
 
 func (azureProvider) validScope(s string) bool { return azureGUID.MatchString(s) }
 
-func (azureProvider) kinds() []string { return []string{"messaging"} }
+func (azureProvider) kinds() []string {
+	return []string{"messaging", "document_db", "sql_db", "object_storage"}
+}
 
 func (azureProvider) confirm(sub string) string {
-	return fmt.Sprintf("az servicebus namespace list --subscription %s, then az servicebus topic list / topic subscription list / queue list per namespace", sub)
+	return fmt.Sprintf("az servicebus namespace list / cosmosdb list / sql server list / postgres flexible-server list / storage account list --subscription %s", sub)
 }
 
 func (azureProvider) commands() string {
-	return "az servicebus namespace list; topic list; topic subscription list; topic subscription rule list; queue list (read-only)"
+	return "az servicebus namespace/topic/subscription/rule/queue list; cosmosdb list and sql database/container list; sql server/db list; postgres flexible-server/db list; storage account list (read-only, names only)"
 }
 
-func (azureProvider) capture(sub string) platformSnapshot {
-	snap := newSnapshot("azure", sub)
+func (p azureProvider) capture(sub string) platformSnapshot {
+	return captureKinds(newSnapshot("azure", sub), map[string]kindCapture{
+		"messaging":      func(s *platformSnapshot) (string, error) { return azureMessaging(s, sub) },
+		"document_db":    func(s *platformSnapshot) (string, error) { return azureCosmos(s, sub) },
+		"sql_db":         func(s *platformSnapshot) (string, error) { return azureSQL(s, sub) },
+		"object_storage": func(s *platformSnapshot) (string, error) { return azureStorage(s, sub) },
+	}, p.kinds())
+}
+
+func azureMessaging(snap *platformSnapshot, sub string) (string, error) {
 	var namespaces []struct{ Name, ResourceGroup string }
 	if msg, e := jsonCLI(&namespaces, "az", "servicebus", "namespace", "list", "--subscription", sub, "--output", "json"); e != nil {
-		return snap.failed(msg)
+		return msg, e
 	}
 	for _, ns := range namespaces {
 		at := []string{"--subscription", sub, "--resource-group", ns.ResourceGroup, "--namespace-name", ns.Name, "--output", "json"}
 		var topics []struct{ ID, Name string }
 		if msg, e := jsonCLI(&topics, "az", append([]string{"servicebus", "topic", "list"}, at...)...); e != nil {
-			return snap.failed(msg)
+			return msg, e
 		}
 		for _, t := range topics {
 			snap.Topics = append(snap.Topics, t.ID)
@@ -293,7 +326,7 @@ func (azureProvider) capture(sub string) platformSnapshot {
 				ID, Name, ForwardTo, ForwardDeadLetteredMessagesTo string
 			}
 			if msg, e := jsonCLI(&subs, "az", append([]string{"servicebus", "topic", "subscription", "list", "--topic-name", t.Name}, at...)...); e != nil {
-				return snap.failed(msg)
+				return msg, e
 			}
 			for _, s := range subs {
 				var rules []struct {
@@ -305,7 +338,7 @@ func (azureProvider) capture(sub string) platformSnapshot {
 					} `json:"correlationFilter"`
 				}
 				if msg, e := jsonCLI(&rules, "az", append([]string{"servicebus", "topic", "subscription", "rule", "list", "--topic-name", t.Name, "--subscription-name", s.Name}, at...)...); e != nil {
-					return snap.failed(msg)
+					return msg, e
 				}
 				filters, attrs := []string{}, [][2]string{}
 				for _, rl := range rules {
@@ -333,7 +366,7 @@ func (azureProvider) capture(sub string) platformSnapshot {
 		}
 		var queues []struct{ ID, ForwardTo, ForwardDeadLetteredMessagesTo string }
 		if msg, e := jsonCLI(&queues, "az", append([]string{"servicebus", "queue", "list"}, at...)...); e != nil {
-			return snap.failed(msg)
+			return msg, e
 		}
 		for _, q := range queues {
 			ps := platformSubscription{Name: q.ID, DeadLetter: q.ForwardDeadLetteredMessagesTo}
@@ -343,5 +376,5 @@ func (azureProvider) capture(sub string) platformSnapshot {
 			snap.Subscriptions = append(snap.Subscriptions, ps)
 		}
 	}
-	return snap.sorted()
+	return "", nil
 }

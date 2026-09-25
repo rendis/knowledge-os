@@ -16,8 +16,9 @@ first existing branch of `sources.reference_branch_order`. Never the remote's de
 endpoint, database, library), with its file and line.
 
 **Platform provider** — one cloud `discover platform` can read (`gcp`, `aws`, `azure`), each with its own
-CLI and the developer's login. A cell lists its clouds in `platform.providers`; the core only knows topics,
-subscriptions and queues.
+CLI and the developer's login: messaging, databases, storage and warehouse. A cell lists its clouds in
+`platform.providers`. The providers are a floor: other services are inspected directly and recorded as
+**observations** (`90-Meta/discovery/platform/observed/`).
 
 **Scope** — the unit a provider captures: a Google Cloud project, an AWS `<account>/<region>`, an Azure
 subscription. Facts and pending items name it as `<provider>:<scope>`.
