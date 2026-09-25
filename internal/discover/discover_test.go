@@ -435,7 +435,9 @@ func TestStaleNeighboursAfterSync(t *testing.T) {
 	vault := t.TempDir()
 	write(t, vault, "instance.yaml", "version: 1\ncell:\n  name: \"C\"\n  purpose: \"p\"\nsystems:\n  - id: \"s\"\n    name: \"S\"\nsources:\n  repo_prefixes: [\"SVC\"]\n")
 	write(t, vault, ".knowledge-os-config.yaml", "version: 1\nworkspace:\n  repository_roots:\n    - \""+repos+"\"\n")
-	link := func(sha, file string) string { return "https://github.com/acme/SVC-orders/blob/" + sha + "/" + file + "#L2" }
+	link := func(sha, file string) string {
+		return "https://github.com/acme/SVC-orders/blob/" + sha + "/" + file + "#L2"
+	}
 	write(t, vault, "20-Repos/orders.md", "---\naliases: [\"SVC-orders\"]\ncommit-analizado: \""+head[:12]+"\"\n---\n# orders\n")
 	write(t, vault, "25-Topics/orders-out.md", "# orders-out\n\nGuarda y notifica. [^e1]\nOtro. [^e2]\n\n[^e1]: [svc/save.go]("+link(old, "svc/save.go")+")\n[^e2]: [svc/other.go]("+link(old, "svc/other.go")+")\n")
 	write(t, vault, "30-Flujos/flow.md", "# flow\n\nYa actualizado. [^e1]\n\n[^e1]: [svc/save.go]("+link(head, "svc/save.go")+")\n")
