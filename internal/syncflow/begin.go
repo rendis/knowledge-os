@@ -75,6 +75,11 @@ func beginRun(root, inventory, tool string, packages []string) (map[string]any, 
 		} else if !os.IsNotExist(e) {
 			return nil, e
 		}
+		if _, found, e := archivedAbandonment(root, candidate); e != nil {
+			return nil, e
+		} else if found {
+			continue
+		}
 		p, e := statePath(root, "active", candidate, "run.json")
 		if e != nil {
 			return nil, e

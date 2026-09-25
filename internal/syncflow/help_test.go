@@ -12,7 +12,7 @@ func TestSyncHelpWithoutVault(t *testing.T) {
 		if err := Run(args, &out); err != nil {
 			t.Fatalf("%v: %v", args, err)
 		}
-		for _, command := range []string{"scan", "build-new", "checkpoint-package", "tool-digest", "verify-published"} {
+		for _, command := range []string{"scan", "build-new", "checkpoint-package", "abandon-empty", "tool-digest", "verify-published"} {
 			if !strings.Contains(out.String(), command) {
 				t.Fatalf("%v: missing %s", args, command)
 			}
