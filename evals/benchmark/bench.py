@@ -118,6 +118,44 @@ def qa(a):
         subprocess.run([sys.executable, "-B", str(HERE.parent / "regression" / "judge.py"), "--questions", str(suite["_dir"] / suite["questions"]), "--answers", str(out)], check=True)
 
 
+REPAIR_PROMPT = """En este vault, la rama `{branch}` recibió una revisión independiente con veredicto revise y estos hallazgos:
+{findings}
+Estado de los gates: {gates}
+Corrige solo las afirmaciones señaladas y los gates que fallan, contra la evidencia y sin reabrir el análisis. Commitea en la misma rama, corre `discover check` en las notas de repositorio tocadas y `sync verify`. No registres review, no ejecutes `sync finish`, no hagas push. Los repositorios fuente son de solo lectura (git fetch permitido, nada más). Termina con los commits y el resultado de los gates."""
+
+
+def evaluate(dst, base, out_prefix, timeout):
+    """Deterministic gates plus the fixed reviewer's verdict for the branch currently checked out."""
+    ev = {"branch": sh(["git", "-C", str(dst), "branch", "--show-current"], check=False)}
+    on_branch = ev["branch"].startswith("sync/")
+    ev["changed"] = sh(["git", "-c", "core.quotePath=false", "-C", str(dst), "diff", "--name-only", f"{base}...HEAD"], check=False).splitlines() if on_branch else []
+    ev["uncommitted"] = bool(sh(["git", "-C", str(dst), "status", "--porcelain", "--", ".", ":!.agents/state"], check=False))
+    ev["note_gates"], ev["stale_neighbours"], ev["structural_issues_introduced"] = [], [], []
+    if on_branch:
+        v = subprocess.run([cli(dst), "sync", "verify", "--vault", str(dst)], capture_output=True, text=True).stdout
+        try:
+            vj = json.loads(v[v.index("{", 1):] if v.startswith('{"error') else v)
+            ev["note_gates"], ev["stale_neighbours"] = vj.get("note_gates", []), vj.get("stale_neighbours", [])
+            ev["structural_issues_introduced"] = vj.get("new_structural_issues", [])
+        except ValueError:
+            ev["structural_issues_introduced"] = ["unparsed sync verify output"]
+    ev["gates_ok"] = bool(ev["changed"]) and not ev["uncommitted"] and all(g.get("ok") for g in ev["note_gates"]) and not ev["stale_neighbours"] and not ev["structural_issues_introduced"]
+    ev["review"] = {"verdict": "none", "findings": []}
+    if ev["changed"]:
+        gates = {"note_gates": ev["note_gates"], "stale_neighbours": ev["stale_neighbours"], "structural_issues_introduced": ev["structural_issues_introduced"]}
+        prompt = REVIEW_PROMPT.format(branch=ev["branch"], base=base, cli=cli(dst), gates=json.dumps(gates, ensure_ascii=False))
+        rv = runner.execute(REVIEWER["harness"], prompt, dst, REVIEWER["model"], REVIEWER["effort"], f"{out_prefix}.review.txt", timeout=timeout)
+        m = re.search(r"\{.*\}", rv.get("answer", ""), re.S)
+        try:
+            verdict = json.loads(m.group(0)) if m else {}
+        except ValueError:
+            verdict = {}
+        ev["review"] = {"verdict": verdict.get("verdict", "error"), "findings": verdict.get("findings", []), "seconds": rv["seconds"], "usage": rv.get("usage")}
+    ev["material"] = len([x for x in ev["review"]["findings"] if x.get("severity") == "material"])
+    ev["accepted"] = ev["gates_ok"] and ev["review"]["verdict"] == "accept" and ev["material"] == 0
+    return ev
+
+
 def flow(a):
     suite, work = load_suite(a.suite), pathlib.Path(a.work)
     setting = parse_setting(a.setting)
@@ -132,48 +170,33 @@ def flow(a):
             shutil.copytree(work / "vaults" / f["vault"], dst, symlinks=True)
             base = suite["vaults"][f["vault"]]["branch"]
             before = source_state(dst)
-            rec = {"flow": f["id"], "run": i, "setting": setting}
-            rec["author"] = runner.execute(setting[0], f["prompt"], dst, setting[1], setting[2], dst.parent / f"run{i}.author.txt", write=True, timeout=a.timeout)
-            branch = sh(["git", "-C", str(dst), "branch", "--show-current"], check=False)
-            rec["branch"] = branch
-            dirty = sh(["git", "-C", str(dst), "status", "--porcelain", "--", ".", ":!.agents/state"], check=False)
-            changed = sh(["git", "-c", "core.quotePath=false", "-C", str(dst), "diff", "--name-only", f"{base}...HEAD"], check=False).splitlines() if branch.startswith("sync/") else []
-            rec["changed"], rec["uncommitted"] = changed, bool(dirty)
-            gates = {}
-            for note in [c for c in changed if c.startswith("20-Repos/") and c.endswith(".md")]:
-                r = subprocess.run([cli(dst), "discover", "check", "--vault", str(dst), "--note", note], capture_output=True, text=True)
-                try:
-                    j = json.loads(r.stdout)
-                    j = j["notes"][0] if "notes" in j else j
-                    gates[note] = {"ok": j.get("ok"), "errors": [x for x in j.get("issues", []) if x["severity"] == "error"], "anchors": j.get("anchors"), "coverage": j.get("coverage")}
-                except (ValueError, KeyError, IndexError):
-                    gates[note] = {"ok": False, "errors": [r.stdout[-500:] + r.stderr[-500:]]}
-            if branch.startswith("sync/"):
-                v = subprocess.run([cli(dst), "sync", "verify", "--vault", str(dst)], capture_output=True, text=True).stdout
-                try:
-                    vj = json.loads(v[v.index("{", 1) if v.startswith('{"error"') else 0:])
-                    rec["structural_issues_introduced"] = vj.get("new_structural_issues", [])
-                    rec["stale_neighbours"] = vj.get("stale_neighbours", [])
-                except ValueError:
-                    rec["structural_issues_introduced"] = ["unparsed sync verify output"]
-            rec["gates"] = gates
-            rec["gates_ok"] = bool(changed) and all(g.get("ok") for g in gates.values()) and not rec.get("structural_issues_introduced") and not rec.get("stale_neighbours")
-            if changed:
-                prompt = REVIEW_PROMPT.format(branch=branch, base=base, cli=cli(dst), gates=json.dumps({k: {"ok": g.get("ok"), "errors": len(g.get("errors", []))} for k, g in gates.items()}))
-                rv = runner.execute(REVIEWER["harness"], prompt, dst, REVIEWER["model"], REVIEWER["effort"], dst.parent / f"run{i}.review.txt", timeout=a.timeout)
-                m = re.search(r"\{.*\}", rv.get("answer", ""), re.S)
-                try:
-                    verdict = json.loads(m.group(0)) if m else {}
-                except ValueError:
-                    verdict = {}
-                rec["review"] = {"verdict": verdict.get("verdict", "error"), "findings": verdict.get("findings", []), "seconds": rv["seconds"], "usage": rv.get("usage")}
+            prefix = dst.parent / f"run{i}"
+            rec = {"flow": f["id"], "run": i, "setting": setting, "rounds": []}
+            author = runner.execute(setting[0], f["prompt"], dst, setting[1], setting[2], f"{prefix}.author0.txt", write=True, timeout=a.timeout)
+            ev = evaluate(dst, base, f"{prefix}.r0", a.timeout)
+            rec["rounds"].append({"author": author, **ev})
+            # Protocol: a revise verdict or failing gate gets a focused repair and a new review, bounded.
+            for n in range(1, a.repairs + 1):
+                if ev["accepted"] or not ev["changed"]:
+                    break
+                prompt = REPAIR_PROMPT.format(branch=ev["branch"], findings=json.dumps(ev["review"]["findings"], ensure_ascii=False, indent=1),
+                                              gates=json.dumps({"gates_ok": ev["gates_ok"], "note_gates": ev["note_gates"], "stale_neighbours": ev["stale_neighbours"]}, ensure_ascii=False))
+                author = runner.execute(setting[0], prompt, dst, setting[1], setting[2], f"{prefix}.author{n}.txt", write=True, timeout=a.timeout)
+                ev = evaluate(dst, base, f"{prefix}.r{n}", a.timeout)
+                rec["rounds"].append({"author": author, **ev})
+            first, last = rec["rounds"][0], rec["rounds"][-1]
             after = source_state(dst)
-            rec["sources_unchanged"] = before == after
-            rec["sources_changed"] = sorted(k for k in set(before) | set(after) if before.get(k) != after.get(k))
+            rec.update({"changed": last["changed"], "first_pass_accepted": first["accepted"], "accepted": last["accepted"], "repairs": len(rec["rounds"]) - 1,
+                        "first_pass_material": first["material"], "final_material": last["material"], "gates_ok": last["gates_ok"],
+                        "stale_neighbours": last["stale_neighbours"], "sources_unchanged": before == after,
+                        "sources_changed": sorted(k for k in set(before) | set(after) if before.get(k) != after.get(k)),
+                        "author_seconds": sum(r["author"]["seconds"] for r in rec["rounds"]),
+                        "author_cost_usd": sum(r["author"].get("cost_usd") or 0 for r in rec["rounds"]) or None,
+                        "author_input_tokens": sum((r["author"].get("usage") or {}).get("input_total", 0) for r in rec["rounds"]),
+                        "author_output_tokens": sum((r["author"].get("usage") or {}).get("output", 0) for r in rec["rounds"])})
             (dst.parent / f"run{i}.json").write_text(json.dumps(rec, ensure_ascii=False, indent=1))
-            material = [x for x in rec.get("review", {}).get("findings", []) if x.get("severity") == "material"]
-            print(f["id"], tag(setting), f"run{i}", "branch=" + branch, "changed=%d" % len(changed), "gates_ok=%s" % rec["gates_ok"],
-                  "review=" + rec.get("review", {}).get("verdict", "none"), "material=%d" % len(material), "sources_unchanged=%s" % rec["sources_unchanged"], flush=True)
+            print(f["id"], tag(setting), f"run{i}", "first_pass_accepted=%s" % rec["first_pass_accepted"], "accepted=%s" % rec["accepted"], "repairs=%d" % rec["repairs"],
+                  "material=%d->%d" % (rec["first_pass_material"], rec["final_material"]), "sources_unchanged=%s" % rec["sources_unchanged"], flush=True)
 
 
 def mean(xs):
@@ -200,15 +223,15 @@ def report(a):
                          "score_max": max(r["score"] for r in runs), "violations_per_run": mean([r["violations"] for r in runs]), "answers_per_run": runs[0]["n"],
                          "seconds": mean([r["seconds"] for r in runs]), "input_tokens": mean([r["input"] for r in runs]), "output_tokens": mean([r["output"] for r in runs]), "cost_usd": mean([r["cost"] for r in runs])})
     for d in sorted((work / "flows").glob("*")) if (work / "flows").exists() else []:
-        recs = [json.loads(f.read_text()) for f in d.glob("*/run*.json")]
+        recs = [json.loads(f.read_text()) for f in d.glob("*/run*.json") if not f.name.endswith((".review.txt", ".txt"))]
+        recs = [r for r in recs if "rounds" in r]
         if not recs:
             continue
-        au = [r["author"] for r in recs]
-        frows.append({"setting": d.name, "runs": len(recs), "completed": sum(bool(r["changed"]) for r in recs), "gates_ok": sum(r["gates_ok"] for r in recs),
-                      "accepted": sum(r.get("review", {}).get("verdict") == "accept" for r in recs),
-                      "material_findings": mean([len([x for x in r.get("review", {}).get("findings", []) if x.get("severity") == "material"]) for r in recs]),
-                      "stale_neighbours": mean([len(r.get("stale_neighbours", [])) for r in recs]), "sources_unchanged": all(r["sources_unchanged"] for r in recs), "seconds": mean([x["seconds"] for x in au]),
-                      "input_tokens": mean([(x.get("usage") or {}).get("input_total") for x in au]), "output_tokens": mean([(x.get("usage") or {}).get("output") for x in au]), "cost_usd": mean([x.get("cost_usd") for x in au])})
+        frows.append({"setting": d.name, "runs": len(recs), "first_pass_accepted": sum(r["first_pass_accepted"] for r in recs), "accepted": sum(r["accepted"] for r in recs),
+                      "repairs": mean([r["repairs"] for r in recs]), "first_pass_material": mean([r["first_pass_material"] for r in recs]),
+                      "stale_neighbours_first_pass": mean([len(r["rounds"][0]["stale_neighbours"]) for r in recs]),
+                      "sources_unchanged": all(r["sources_unchanged"] for r in recs), "seconds": mean([r["author_seconds"] for r in recs]),
+                      "input_tokens": mean([r["author_input_tokens"] for r in recs]), "output_tokens": mean([r["author_output_tokens"] for r in recs]), "cost_usd": mean([r["author_cost_usd"] for r in recs])})
     out = {"fingerprint": fp, "qa": rows, "flows": frows}
     (work / "report.json").write_text(json.dumps(out, indent=1))
     f = lambda x, p=2: "—" if x is None else (f"{x:.{p}f}" if isinstance(x, float) else str(x))
@@ -217,8 +240,8 @@ def report(a):
         md += ["## Questions", "", "| Setting | Runs | Score mean (min–max) | Violations / run | Time / run (s) | Input tokens / run | Output tokens / run | USD / run |", "|---|---|---|---|---|---|---|---|"]
         md += [f"| {r['setting']} | {r['runs']} | {f(r['score_mean'], 3)} ({f(r['score_min'], 3)}–{f(r['score_max'], 3)}) | {f(r['violations_per_run'], 1)} of {r['answers_per_run']} | {f(r['seconds'], 0)} | {f(r['input_tokens'], 0)} | {f(r['output_tokens'], 0)} | {f(r['cost_usd'])} |" for r in rows]
     if frows:
-        md += ["", "## Publication flows", "", "| Setting | Runs | Branch with changes | Gates ok | Stale neighbours / run | Reviewer accept | Material findings / run | Sources unchanged | Author time (s) | Author input tokens | Author USD |", "|---|---|---|---|---|---|---|---|---|---|---|"]
-        md += [f"| {r['setting']} | {r['runs']} | {r['completed']} | {r['gates_ok']} | {f(r['stale_neighbours'], 1)} | {r['accepted']} | {f(r['material_findings'], 1)} | {r['sources_unchanged']} | {f(r['seconds'], 0)} | {f(r['input_tokens'], 0)} | {f(r['cost_usd'])} |" for r in frows]
+        md += ["", "## Publication flows (author until accepted, bounded repairs)", "", "| Setting | Runs | Accepted first pass | Accepted after repairs | Repairs / run | Material findings first pass | Stale neighbours first pass | Sources unchanged | Author time (s) | Author input tokens | Author USD |", "|---|---|---|---|---|---|---|---|---|---|---|"]
+        md += [f"| {r['setting']} | {r['runs']} | {r['first_pass_accepted']} | {r['accepted']} | {f(r['repairs'], 1)} | {f(r['first_pass_material'], 1)} | {f(r['stale_neighbours_first_pass'], 1)} | {r['sources_unchanged']} | {f(r['seconds'], 0)} | {f(r['input_tokens'], 0)} | {f(r['cost_usd'])} |" for r in frows]
     (work / "report.md").write_text("\n".join(md) + "\n")
     print("\n".join(md))
 
@@ -236,6 +259,7 @@ def main():
             s.add_argument("--parallel", type=int, default=4)
             s.add_argument("--timeout", type=int, default=3600)
             s.add_argument("--flow", default="")
+            s.add_argument("--repairs", type=int, default=2)
     sub.add_parser("report").add_argument("--work", required=True)
     a = p.parse_args()
     {"prepare": prepare, "qa": qa, "flow": flow, "report": report}[a.cmd](a)

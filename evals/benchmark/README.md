@@ -65,9 +65,12 @@ between runs made under similar load.
 
 - Questions: judge score (share of expected facts stated), violations (forbidden claims asserted without
   reserve), time, tokens, cost.
-- Flows: whether a `sync/` branch with committed changes was produced, deterministic gates (`discover check`,
-  structural issues introduced, stale neighbour notes), reviewer verdict and material findings, source integrity, author time,
-  tokens and cost.
+- Flows: the author runs the scenario prompt; deterministic gates (`sync verify`: note gates, stale neighbour
+  notes, structural issues) and the fixed reviewer judge the branch. A `revise` verdict or a failing gate gets a
+  focused repair from the same setting and a new review, up to `--repairs` (default 2), as the sync protocol
+  prescribes. Reported: accepted on the first pass, accepted after repairs, repairs, material findings on the
+  first pass, stale neighbours left on the first pass, source integrity, and author time, tokens and cost
+  summed over every round.
 
 `report` writes `report.md` and `report.json` in the work directory. Publish only the anonymized table
 (settings and numbers) in `execution-profiles.md`; raw outputs contain cell material.
