@@ -5,48 +5,66 @@ python3 -B evals/regression/run.py --harness claude|codex|cursor --questions FIL
 
 Each question runs in a fresh headless session whose working directory is the vault, exactly as a
 developer would ask it. Answers, usage and duration are stored per question for judge.py.
+`execute` is shared with evals/benchmark so questions and flows are measured the same way.
 """
-import argparse, concurrent.futures as cf, json, os, pathlib, subprocess, time
+import argparse, concurrent.futures as cf, json, pathlib, subprocess, time
 
 HERE = pathlib.Path(__file__).parent
 SUFFIX = "\n\n(Consulta de solo lectura: no modifiques archivos ni ejecutes acciones con efectos.)"
-
-
 DEFAULTS = {"claude": ("opus", "medium"), "codex": ("gpt-5.5", "medium"), "cursor": ("", "")}
 
 
-def command(harness, prompt, out_file, model, effort):
+def command(harness, prompt, out_file, model, effort, write=False):
     if harness == "claude":
         return ["claude", "-p", prompt, "--model", model, "--effort", effort, "--output-format", "json", "--permission-mode", "bypassPermissions"]
     if harness == "codex":
-        return ["codex", "exec", "--skip-git-repo-check", "-m", model, "-c", f'model_reasoning_effort="{effort}"', "-s", "read-only", "--json", "--output-last-message", str(out_file), prompt]
+        sandbox = "danger-full-access" if write else "read-only"  # workspace-write keeps .git read-only
+        return ["codex", "exec", "--skip-git-repo-check", "-m", model, "-c", f'model_reasoning_effort="{effort}"', "-s", sandbox, "--json", "--output-last-message", str(out_file), prompt]
     if harness == "cursor":
         return ["cursor-agent", "-p", "--output-format", "json", "--force"] + (["--model", model] if model else []) + [prompt]
     raise SystemExit("unknown harness")
 
 
-def run_one(harness, q, vault, out_dir, model, effort):
-    out_dir.mkdir(parents=True, exist_ok=True)
-    last = out_dir / f"{q['id']}.last.txt"
+def normalize_usage(harness, j):
+    """Tokens as total input (cached included), cached input and output, comparable across harnesses."""
+    if harness == "claude":
+        mu = j.get("modelUsage") or {}
+        if mu:
+            cached = sum(v.get("cacheReadInputTokens", 0) for v in mu.values())
+            total = sum(v.get("inputTokens", 0) + v.get("cacheReadInputTokens", 0) + v.get("cacheCreationInputTokens", 0) for v in mu.values())
+            return {"input_total": total, "input_cached": cached, "output": sum(v.get("outputTokens", 0) for v in mu.values())}
+        u = j.get("usage") or {}
+        total = u.get("input_tokens", 0) + u.get("cache_read_input_tokens", 0) + u.get("cache_creation_input_tokens", 0)
+        return {"input_total": total, "input_cached": u.get("cache_read_input_tokens", 0), "output": u.get("output_tokens", 0)}
+    if harness == "cursor":
+        u = j.get("usage") or {}
+        total = u.get("inputTokens", 0) + u.get("cacheReadTokens", 0) + u.get("cacheWriteTokens", 0)
+        return {"input_total": total, "input_cached": u.get("cacheReadTokens", 0), "output": u.get("outputTokens", 0)}
+    return {"input_total": j.get("input_tokens", 0), "input_cached": j.get("cached_input_tokens", 0), "output": j.get("output_tokens", 0)}
+
+
+def execute(harness, prompt, cwd, model, effort, out_file, write=False, timeout=1500):
+    """Run one fresh headless session and return its answer, normalized usage, cost and duration."""
+    out_file = pathlib.Path(out_file)
     start = time.time()
     try:
-        r = subprocess.run(command(harness, q["question"] + SUFFIX, last, model, effort), cwd=vault, capture_output=True, text=True, timeout=1500)
+        r = subprocess.run(command(harness, prompt, out_file, model, effort, write), cwd=cwd, capture_output=True, text=True, timeout=timeout)
         stdout, rc = r.stdout, r.returncode
     except subprocess.TimeoutExpired as e:
         stdout, rc = (e.stdout or b"").decode() if isinstance(e.stdout, bytes) else (e.stdout or ""), "timeout"
-    rec = {"id": q["id"], "harness": harness, "model": model, "effort": effort, "vault": vault, "seconds": round(time.time() - start, 1), "returncode": rc}
+    rec = {"harness": harness, "model": model, "effort": effort, "seconds": round(time.time() - start, 1), "returncode": rc}
     if harness in ("claude", "cursor"):
         try:
             j = json.loads(stdout)
             rec["answer"] = j.get("result", "")
-            rec["usage"] = j.get("usage", {})
+            rec["usage"] = normalize_usage(harness, j)
             rec["cost_usd"] = j.get("total_cost_usd")
             rec["turns"] = j.get("num_turns")
         except Exception:
             rec["answer"] = stdout[-8000:]
     else:
-        rec["answer"] = last.read_text() if last.exists() else stdout[-8000:]
-        usage = {"input_tokens": 0, "cached_input_tokens": 0, "output_tokens": 0}
+        rec["answer"] = out_file.read_text() if out_file.exists() else stdout[-8000:]
+        raw = {"input_tokens": 0, "cached_input_tokens": 0, "output_tokens": 0}
         commands = 0
         for line in stdout.splitlines():
             try:
@@ -54,11 +72,18 @@ def run_one(harness, q, vault, out_dir, model, effort):
             except ValueError:
                 continue
             if ev.get("type") == "turn.completed":
-                for k in usage:
-                    usage[k] += ev.get("usage", {}).get(k, 0)
+                for k in raw:
+                    raw[k] += ev.get("usage", {}).get(k, 0)
             if ev.get("type") == "item.completed" and ev.get("item", {}).get("type") == "command_execution":
                 commands += 1
-        rec["usage"], rec["commands"] = usage, commands
+        rec["usage"], rec["commands"] = normalize_usage("codex", raw), commands
+    return rec
+
+
+def run_one(harness, q, vault, out_dir, model, effort):
+    out_dir.mkdir(parents=True, exist_ok=True)
+    rec = {"id": q["id"], "vault": vault}
+    rec.update(execute(harness, q["question"] + SUFFIX, vault, model, effort, out_dir / f"{q['id']}.last.txt"))
     (out_dir / f"{q['id']}.json").write_text(json.dumps(rec, ensure_ascii=False, indent=1))
     return rec
 
@@ -69,7 +94,7 @@ def main():
     p.add_argument("--questions", required=True, help="cell-owned question set (kept outside this repository)")
     p.add_argument("--out", required=True)
     p.add_argument("--vault", action="append", required=True)
-    p.add_argument("--model", default="", help="model id; Cursor effort goes in bracket overrides, e.g. 'm[effort=medium]'")
+    p.add_argument("--model", default="", help="model id; Cursor effort is part of its model id")
     p.add_argument("--effort", default="")
     p.add_argument("--ids", default="")
     p.add_argument("--parallel", type=int, default=4)
