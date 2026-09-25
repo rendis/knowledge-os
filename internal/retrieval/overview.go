@@ -1,6 +1,7 @@
 package retrieval
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -83,9 +84,46 @@ func overviewLine(stem string, raw []byte) string {
 	return line
 }
 
+// discoveryFlags reads the last `discover run` comparison (local state) and returns, per note path,
+// the relations the repository evidence does not support, so readers verify them before use.
+func discoveryFlags(root string) map[string]string {
+	var cmp []struct {
+		Note          string `json:"note"`
+		Discrepancies []struct {
+			Field  string   `json:"field"`
+			Target string   `json:"target"`
+			Found  []string `json:"discovered"`
+		} `json:"discrepancies"`
+	}
+	b, e := readFileBounded(filepath.Join(root, ".agents", "state", "discovery", "comparison.json"), 16_000_000)
+	if e != nil || json.Unmarshal(b, &cmp) != nil {
+		return nil
+	}
+	flags := map[string]string{}
+	for _, c := range cmp {
+		parts := []string{}
+		for _, d := range c.Discrepancies {
+			p := d.Field + ": " + d.Target
+			if len(d.Found) > 0 {
+				found := d.Found
+				if len(found) > 4 {
+					found = found[:4]
+				}
+				p += " (repository evidence names " + strings.Join(found, ", ") + ")"
+			}
+			parts = append(parts, p)
+		}
+		if len(parts) > 0 {
+			flags[filepath.ToSlash(c.Note)] = " ⚠ unsupported by the last discover run, verify before use: " + strings.Join(parts, "; ")
+		}
+	}
+	return flags
+}
+
 // WriteOverview prints the vault overview as compact Markdown.
 func WriteOverview(root, folder string, out io.Writer) error {
 	notes := []ovNote{}
+	flags := discoveryFlags(root)
 	e := filepath.WalkDir(root, func(p string, d os.DirEntry, e error) error {
 		if e != nil {
 			return nil
@@ -107,7 +145,7 @@ func WriteOverview(root, folder string, out io.Writer) error {
 			return nil
 		}
 		stem := strings.TrimSuffix(filepath.Base(p), ".md")
-		notes = append(notes, ovNote{folder: top, stem: stem, line: overviewLine(stem, raw)})
+		notes = append(notes, ovNote{folder: top, stem: stem, line: overviewLine(stem, raw) + flags[rel]})
 		return nil
 	})
 	if e != nil {
