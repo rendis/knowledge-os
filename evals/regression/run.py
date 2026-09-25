@@ -7,16 +7,32 @@ Each question runs in a fresh headless session whose working directory is the va
 developer would ask it. Answers, usage and duration are stored per question for judge.py.
 `execute` is shared with evals/benchmark so questions and flows are measured the same way.
 """
-import argparse, concurrent.futures as cf, json, pathlib, subprocess, time
+import argparse, concurrent.futures as cf, json, os, pathlib, subprocess, tempfile, time
 
 HERE = pathlib.Path(__file__).parent
 SUFFIX = "\n\n(Consulta de solo lectura: no modifiques archivos ni ejecutes acciones con efectos.)"
 DEFAULTS = {"claude": ("opus", "medium"), "codex": ("gpt-5.5", "medium"), "cursor": ("", "")}
 
 
+def isolated_env(harness):
+    """Environment with the vault's instructions only: no personal memories, global instructions, hooks or
+    plugins of the person running the benchmark. Codex gets a private home that links only its auth file;
+    Claude skips user settings via --setting-sources. Cursor exposes no equivalent (a recorded limit)."""
+    env = dict(os.environ)
+    if harness == "codex":
+        real = pathlib.Path(os.environ.get("CODEX_HOME", pathlib.Path.home() / ".codex"))
+        home = pathlib.Path(os.environ.get("BENCH_CODEX_HOME", pathlib.Path(tempfile.gettempdir()) / "vault-bench-codex-home"))
+        home.mkdir(parents=True, exist_ok=True)
+        link = home / "auth.json"
+        if not link.exists() and (real / "auth.json").exists():
+            link.symlink_to(real / "auth.json")
+        env["CODEX_HOME"] = str(home)
+    return env
+
+
 def command(harness, prompt, out_file, model, effort, write=False):
     if harness == "claude":
-        return ["claude", "-p", prompt, "--model", model, "--effort", effort, "--output-format", "json", "--permission-mode", "bypassPermissions"]
+        return ["claude", "-p", prompt, "--model", model, "--effort", effort, "--output-format", "json", "--permission-mode", "bypassPermissions", "--setting-sources", "project,local"]
     if harness == "codex":
         sandbox = "danger-full-access" if write else "read-only"  # workspace-write keeps .git read-only
         return ["codex", "exec", "--skip-git-repo-check", "-m", model, "-c", f'model_reasoning_effort="{effort}"', "-s", sandbox, "--json", "--output-last-message", str(out_file), prompt]
@@ -48,7 +64,7 @@ def execute(harness, prompt, cwd, model, effort, out_file, write=False, timeout=
     out_file = pathlib.Path(out_file)
     start = time.time()
     try:
-        r = subprocess.run(command(harness, prompt, out_file, model, effort, write), cwd=cwd, capture_output=True, text=True, timeout=timeout)
+        r = subprocess.run(command(harness, prompt, out_file, model, effort, write), cwd=cwd, capture_output=True, text=True, timeout=timeout, env=isolated_env(harness))
         stdout, rc = r.stdout, r.returncode
     except subprocess.TimeoutExpired as e:
         stdout, rc = (e.stdout or b"").decode() if isinstance(e.stdout, bytes) else (e.stdout or ""), "timeout"
