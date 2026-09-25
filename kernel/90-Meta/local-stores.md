@@ -14,8 +14,8 @@ local to one checkout and ignored by Git.
 | `.scratch/<task>/` | Helper scripts or code with no selected investigation or workflow location | any workflow |
 | `.knowledge-os-config.yaml` | Machine paths and local capability settings | `configure-workspace` |
 
-`investigations/` is versioned and searchable but outside the technical graph traversal and audit
-gates; `links` still returns investigation pointers.
+`investigations/` is versioned and searchable but outside the technical graph traversal and note audit;
+`links` still returns investigation pointers, and `sync verify` gates changed cases with `investigation check`.
 
 When temporary work in `.scratch/<task>/` later belongs to an investigation, move it through
 `manage-investigation`: working material into the case's private `local/` store, reviewed methods or

@@ -30,10 +30,10 @@ Allowed synchronization statuses are `current` and `stale`. Copy the investigati
 After a material case-file change, inspect every local draft that references the affected material:
 
 - For `publication-status: draft`, update its content and `updated-at`, copy the current case timestamp into `source-updated-at`, and restore `current`. If reconciliation cannot finish in the same interaction, set `stale` and add a prominent reason; do not leave an unlabeled mismatch.
-- Treat a `published` draft as an immutable publication snapshot. Do not silently rewrite or republish it. Create a new draft with a new `S` identifier for changed work and record the relationship in History.
+- Treat a `published` draft as an immutable publication snapshot. Do not silently rewrite or republish it. Create a new draft with a new `S` identifier for changed work and name the draft it replaces in its header.
 - Never hand off a stale draft for publication or use it to satisfy an output-sufficiency gate.
 
-Append one case History event naming every reconciled, marked-stale, or replacement draft.
+Name every reconciled, marked-stale or replacement draft in the case's Current state; Git keeps the history.
 
 ## Audience and purpose
 
