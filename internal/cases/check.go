@@ -34,18 +34,21 @@ type Result struct {
 }
 
 var (
-	comment    = regexp.MustCompile(`(?s)<!--.*?-->`)
-	fence      = regexp.MustCompile("(?ms)^```.*?^```")
-	heading2   = regexp.MustCompile(`(?m)^##\s+(.+?)\s*$`)
-	recordDef  = regexp.MustCompile("^\\s*(?:[-*+]\\s+|\\|\\s*|#{2,4}\\s+)?[*_`]*((?:AC|DH|CH|[EDQRSAF])-\\d{3,})\\b")
-	recordRef  = regexp.MustCompile(`\b((?:AC|DH|CH|[EDQRSAF])-\d{3,})\b`)
-	sourceRef  = regexp.MustCompile("\\]\\(|\\[\\[|https?://|`[^`\\s]*[/.][^`\\s]*`|@[0-9a-f]{7,}|\\b[0-9a-f]{7,40}\\b|#L\\d+|\\b(?:A|E|F)-\\d{3,}\\b|\\b[A-Z][A-Z0-9]{1,9}-\\d{2,}\\b|(?i)snapshot|(?i)\\bquery\\b|(?i)\\bconsulta\\b|(?i)\\b(?:solicitante|requester|usuario|user|reuni[oó]n|meeting)\\b[^\\n]*\\d{4}-\\d{2}-\\d{2}")
-	wikilink   = regexp.MustCompile(`\[\[([^\]|#]+)`)
-	secret     = regexp.MustCompile(`(?i)PRIVATE KEY-----|\b(?:password|passwd|pwd|secret|token|api[-_]?key)\s*[:=]\s*\S+|\b(?:gh[pousr]_|github_pat_|sk-(?:proj-|svcacct-)?|xox[baprs]-)\S+`)
-	localPath  = regexp.MustCompile("(?:^|[^A-Za-z0-9])(?:/(?:Users|home|tmp|var/tmp|private/tmp)/[^\\s`)]+|[A-Za-z]:\\\\[^\\s`]+)")
-	wordToken  = regexp.MustCompile(`[\p{L}\p{N}]+`)
-	noteFolder = regexp.MustCompile(`^[1-7]\d-`)
-	outcomes   = regexp.MustCompile(`^(completed|abandoned|superseded-by:\d{8}-\d{6}-[a-z0-9-]+)$`)
+	comment        = regexp.MustCompile(`(?s)<!--.*?-->`)
+	fence          = regexp.MustCompile("(?ms)^```.*?^```")
+	heading2       = regexp.MustCompile(`(?m)^##\s+(.+?)\s*$`)
+	recordDef      = regexp.MustCompile("^\\s*(?:[-*+]\\s+|\\|\\s*|#{2,4}\\s+)?[*_`]*((?:AC|DH|CH|[EDQRSAF])-\\d{3,})\\b")
+	recordRef      = regexp.MustCompile(`\b((?:AC|DH|CH|[EDQRSAF])-\d{3,})\b`)
+	sourceRef      = regexp.MustCompile("\\]\\(|\\[\\[|https?://|`[^`\\s]*[/.][^`\\s]*`|@[0-9a-f]{7,}|\\b[0-9a-f]{7,40}\\b|#L\\d+|\\b(?:A|E|F)-\\d{3,}\\b|\\b[A-Z][A-Z0-9]{1,9}-\\d{2,}\\b|(?i)snapshot|(?i)\\bquery\\b|(?i)\\bconsulta\\b|(?i)\\b(?:solicitante|requester|usuario|user|reuni[oó]n|meeting)\\b[^\\n]*\\d{4}-\\d{2}-\\d{2}")
+	wikilink       = regexp.MustCompile(`\[\[([^\]|#]+)`)
+	secret         = regexp.MustCompile(`(?i)PRIVATE KEY-----|\b(?:password|passwd|pwd|secret|token|api[-_]?key)\s*[:=]\s*\S+|\b(?:gh[pousr]_|github_pat_|sk-(?:proj-|svcacct-)?|xox[baprs]-)\S+`)
+	localPath      = regexp.MustCompile("(?:^|[^A-Za-z0-9])(?:/(?:Users|home|tmp|var/tmp|private/tmp)/[^\\s`)]+|[A-Za-z]:\\\\[^\\s`]+)")
+	wordToken      = regexp.MustCompile(`[\p{L}\p{N}]+`)
+	noteFolder     = regexp.MustCompile(`^[1-7]\d-`)
+	componentToken = regexp.MustCompile(`[A-Za-z0-9][A-Za-z0-9._-]{6,}`)
+	wikilinkSpan   = regexp.MustCompile(`\[\[[^\]]*\]\]`)
+	appPrefix      = regexp.MustCompile(`^(?i)app\d+-`)
+	outcomes       = regexp.MustCompile(`^(completed|abandoned|superseded-by:\d{8}-\d{6}-[a-z0-9-]+)$`)
 )
 
 func sectionKey(title string) string {
@@ -62,8 +65,9 @@ func sectionKey(title string) string {
 
 // vaultIndex holds what check compares a case against: note basenames and 8-word shingles of notes.
 type vaultIndex struct {
-	notes    map[string]bool
-	shingles map[string]string
+	notes     map[string]bool
+	knowledge map[string]string // lowercased basename → basename, for notes under 10-…70-
+	shingles  map[string]string
 }
 
 const shingleSize = 8
@@ -78,7 +82,7 @@ func shingles(text string) []string {
 }
 
 func indexVault(vault string) vaultIndex {
-	ix := vaultIndex{notes: map[string]bool{}, shingles: map[string]string{}}
+	ix := vaultIndex{notes: map[string]bool{}, knowledge: map[string]string{}, shingles: map[string]string{}}
 	_ = filepath.WalkDir(vault, func(p string, d os.DirEntry, err error) error {
 		if err != nil {
 			return nil
@@ -97,6 +101,7 @@ func indexVault(vault string) vaultIndex {
 		stem := strings.TrimSuffix(d.Name(), ".md")
 		ix.notes[strings.ToLower(stem)] = true
 		if noteFolder.MatchString(strings.SplitN(rel, "/", 2)[0]) {
+			ix.knowledge[strings.ToLower(stem)] = stem
 			if b, e := os.ReadFile(p); e == nil {
 				for _, s := range shingles(string(b)) {
 					if _, ok := ix.shingles[s]; !ok {
@@ -279,6 +284,21 @@ func checkContent(vault, full, raw string, ix vaultIndex) Result {
 		}
 	}
 
+	// A component the vault documents is referenced, not restated: name it with its note.
+	linked := map[string]bool{}
+	for _, m := range wikilink.FindAllStringSubmatch(body, -1) {
+		linked[strings.ToLower(strings.TrimSpace(m[1]))] = true
+	}
+	named := map[string]bool{}
+	for _, tok := range componentToken.FindAllString(wikilinkSpan.ReplaceAllString(body, ""), -1) {
+		tok = strings.Trim(tok, ".-_")
+		key := strings.ToLower(appPrefix.ReplaceAllString(tok, ""))
+		if stem, ok := ix.knowledge[key]; ok && len(key) >= 8 && strings.ContainsAny(key, "-_") && !linked[key] && !named[key] {
+			named[key] = true
+			add("review", "[["+stem+"]]", "the case names "+tok+", which the vault documents: reference [["+stem+"]] where a record relies on it (after discover check shows it fresh) instead of restating it")
+		}
+	}
+
 	// Relations discovery contradicts go to review.
 	for _, f := range discover.ContradictedRelations(vault, body) {
 		add("review", f[0], f[1])
@@ -344,12 +364,12 @@ func CheckIntroduced(vault, path string, base []byte) (bool, []string, int, erro
 		s := string(base)
 		prev = &s
 	}
-	ok, introduced, pre := introducedErrors(vault, full, prev, string(b), indexVault(vault))
+	ok, introduced, pre, _ := introducedErrors(vault, full, prev, string(b), indexVault(vault))
 	return ok, introduced, pre, nil
 }
 
 // introducedErrors compares the gate on the next content with the gate on the previous content.
-func introducedErrors(vault, full string, prev *string, next string, ix vaultIndex) (bool, []string, int) {
+func introducedErrors(vault, full string, prev *string, next string, ix vaultIndex) (bool, []string, int, Result) {
 	keys := func(res Result, severities ...string) map[string]bool {
 		out := map[string]bool{}
 		for _, i := range res.Issues {
@@ -363,11 +383,11 @@ func introducedErrors(vault, full string, prev *string, next string, ix vaultInd
 	}
 	r := checkContent(vault, full, next, ix)
 	if r.OK {
-		return true, nil, 0
+		return true, nil, 0, r
 	}
 	now := keys(r, "error")
 	if prev == nil {
-		return false, sortedKeys(now), 0
+		return false, sortedKeys(now), 0, r
 	}
 	// A finding the previous version already had is not introduced, whatever its severity there: the
 	// earlier format reports its debt as warnings, and migrating it does not create that debt.
@@ -379,7 +399,7 @@ func introducedErrors(vault, full string, prev *string, next string, ix vaultInd
 		}
 	}
 	sort.Strings(introduced)
-	return len(introduced) == 0, introduced, len(now) - len(introduced)
+	return len(introduced) == 0, introduced, len(now) - len(introduced), r
 }
 
 func filepathJoin(vault, path string) string {

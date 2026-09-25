@@ -270,3 +270,18 @@ func TestEarlierCasesAreReadOnly(t *testing.T) {
 }
 
 func toJSON(v any) string { b, _ := json.Marshal(v); return string(b) }
+
+func TestDocumentedComponentsAreReferenced(t *testing.T) {
+	v := vault(t)
+	write(t, v, "20-Repos/svc-orders-api.md", "---\ntipo: api\n---\n# svc-orders-api\n\nExpone órdenes.\n")
+	res, _ := run(t, "new", "--vault", v, "--title", "Órdenes", "--type", "understanding", "--objective", "Entender la API de órdenes.")
+	id := res["id"].(string)
+	m, e := run(t, "add", "--vault", v, "--id", id, "--kind", "evidence", "--text", "APP01234-svc-orders-api responde 404 sin clave", "--source", "`src/api.go@abc1234` L5", "--level", "demonstrated")
+	if e != nil || !strings.Contains(toJSON(m["gate_review"]), "[[svc-orders-api]]") {
+		t.Fatalf("a write that names a documented component points to its note: %v %v", e, m)
+	}
+	m, _ = run(t, "add", "--vault", v, "--id", id, "--kind", "finding", "--text", "La API [[svc-orders-api]] exige la clave", "--level", "demonstrated", "--from", "E-001")
+	if strings.Contains(toJSON(m["gate_review"]), "svc-orders-api") {
+		t.Fatalf("once the case links the note the reminder goes: %v", m)
+	}
+}

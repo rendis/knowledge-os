@@ -307,13 +307,22 @@ func mutate(o options, out io.Writer, change func(c Case, text, locale string) (
 	if len(logParts) > 0 {
 		next = appendToSection(next, "log", locale, "- "+today(o)+" — "+strings.Join(logParts, "; "))
 	}
-	ok, introduced, _ := introducedErrors(o.vault, full, &prev, next, indexVault(o.vault))
+	ok, introduced, _, gate := introducedErrors(o.vault, full, &prev, next, indexVault(o.vault))
 	if !ok {
 		_ = emit(out, map[string]any{"ok": false, "id": c.ID, "introduced": introduced})
 		return errors.New("the change would introduce gate errors; nothing was written")
 	}
 	if res == nil {
 		res = map[string]any{}
+	}
+	review := []Issue{}
+	for _, i := range gate.Issues {
+		if i.Severity == "review" {
+			review = append(review, i)
+		}
+	}
+	if len(review) > 0 {
+		res["gate_review"] = review // not blocking: shown on every write until addressed
 	}
 	if o.dryRun {
 		res["ok"], res["applied"], res["id"], res["path"] = true, false, c.ID, c.Path
