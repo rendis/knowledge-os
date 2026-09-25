@@ -323,17 +323,6 @@ class BootstrapEval(unittest.TestCase):
             self.assertFalse(canonical_config.exists())
             self.assertEqual(list(resolver_cache.rglob("*.pyc")), [])
 
-            scanner_cache = Path(tmp) / "scanner-pycache"
-            scanner_env = os.environ.copy()
-            scanner_env["PYTHONPYCACHEPREFIX"] = str(scanner_cache)
-            scanner = dest / "90-Meta" / "static-evidence-scan.py"
-            scanned = run(
-                ([native_cli(dest), "sync", "scan", "--vault", str(dest)] if NATIVE else [sys.executable, "-B", str(scanner)]),
-                cwd=dest,
-                env=scanner_env,
-            )
-            self.assertNotEqual(scanned.returncode, 0, scanned.stdout + scanned.stderr)
-            self.assertEqual(list(scanner_cache.rglob("*.pyc")), [])
 
             instance_path = dest / "instance.yaml"
             valid_instance = instance_path.read_text(encoding="utf-8")
@@ -2712,7 +2701,8 @@ change:
             self.assertFalse((dest / "90-Meta/response-quality.md").exists())
             self.assertFalse((dest / "AGENTS.personal.md").exists())
             self.assertTrue((dest / ".agents" / "skills" / "map-ecosystem" / "SKILL.md").is_file())
-            self.assertTrue((dest / ".agents" / "skills" / "scheduled-vault-refresh" / "SKILL.md").is_file())
+            self.assertFalse((dest / ".agents" / "skills" / "scheduled-vault-refresh").exists())
+            self.assertFalse((dest / ".agents" / "skills" / "obsidian-cli").exists())
             git_skill = dest / ".agents" / "skills" / "manage-git-workflow"
             self.assertTrue((git_skill / "SKILL.md").is_file())
             self.assertTrue((git_skill / "references" / "defaults.md").is_file())
@@ -2912,8 +2902,6 @@ change:
                 # legacy scripts remain exercised as distribution regressions.
                 missing = [target for target in targets if not (dest / target).is_file()]
                 self.assertEqual(missing, [], f"documented command targets missing: {missing}")
-                for script in ("git-change-manifest.py", "sync-run.py", "static-evidence-scan.py"):
-                    self.assertTrue((dest / "90-Meta" / script).is_file())
                 commands = [[sys.executable, "-B", "90-Meta/" + script] for script in
                             ("audit-vault.py", "verify-links.py", "validate-bases.py")]
             for command in commands:

@@ -105,7 +105,7 @@ If the resolver finds the vault but no matching Obsidian registration or CLI is 
 3. Run all other Framework gates that are available.
 4. Report that Obsidian-native resolution, backlinks, or rendering were not verified.
 
-The companion `obsidian-cli`, `obsidian-markdown`, and `obsidian-bases` skills improve tool-specific operation when installed, but vault identity, routing, and evidence boundaries remain valid in either interaction mode.
+The companion `obsidian-markdown` and `obsidian-bases` skills improve Obsidian-specific authoring, but vault identity, routing, and evidence boundaries remain valid in either interaction mode.
 
 ## Completion criterion
 

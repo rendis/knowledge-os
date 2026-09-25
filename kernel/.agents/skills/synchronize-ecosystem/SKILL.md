@@ -1,50 +1,44 @@
 ---
 name: synchronize-ecosystem
-description: "Trigger: inventory, synchronize or resume a knowledge-map run. Queries and ordinary documentation belong to map-ecosystem."
+description: "Trigger: inventory, synchronize repository maps, or run a manual or scheduled vault refresh. Queries and single-note documentation belong to map-ecosystem."
 license: Apache-2.0
 metadata:
   author: documentation-vault maintainers
-  version: "1.0"
+  version: "2.0"
 ---
 
-## Activation Contract
+# Synchronize the vault
 
-Use this skill for vault inventory, lifecycle synchronization, or resuming a recorded sync run. Read-only questions, catalog maintenance, and ordinary note publication belong to `map-ecosystem`. Workspace configuration belongs to `configure-workspace`.
+A sync brings repository notes to the current production commit of their sources. The run is a local Git branch; commits are its checkpoints; the review is a commit that binds the accepted content; publication is a fast-forward merge plus the team's Git policy. Nobody is assumed to review by hand, so the gates and the independent agent review are mandatory.
 
-Shared mapping recipes live under `../map-ecosystem/references/`. Durable sync state remains `.agents/state/map-ecosystem/sync/`. Bind `<cli>` through [use-vault-cli](../use-vault-cli/SKILL.md).
+## Hard rules
 
-## Hard Rules
+- Sources, platforms and databases are read-only evidence. Write to the vault only with vault-update authority; publish to the remote only through the repository's Git policy (`manage-git-workflow`).
+- Every technical claim follows `90-Meta/evidence-policy.md` and the evidence format in `../map-ecosystem/references/repository-map.md`.
+- One author writes the resulting notes; one fresh reviewer judges them (`../map-ecosystem/references/final-note-review.md`). The author never records its own review.
+- A changed byte after an accepted review needs review of that change; a failed gate is fixed in the note, never by re-running source analysis.
 
-- Resolve the vault before reading relative vault paths; keep remote sources read-only.
-- Write only with explicit vault-update authority and the cell evidence profile for every technical claim.
-- For each repository delta, one author prepares the complete resulting note images and one fresh reviewer checks their changed meaning against the baseline and frozen evidence.
-- Correct a semantic finding only in the affected candidate text and re-review the materially changed meaning. Deterministic formatting, reference, pattern, integrity, or redaction repairs return to CLI checks without source extraction.
-- Publish only exact reviewed images below canonical knowledge roots. Resume publication failure from its recorded state without repeating analysis or review.
-- External reconciliation uses the same complete-candidate review and publication path while preserving source-analysis metadata when the source was not re-analyzed.
+## Recipe
 
-## Decision Gates
+1. **Bind.** Bind the vault through [use-vault-cli](../use-vault-cli/SKILL.md#bind-the-executable-and-vault). Start from a clean knowledge tree up to date with its upstream (fetch/pull per repository policy; preserve unrelated local work).
+2. **Select.** `<cli> inventory --vault "<vault>" --format markdown` lists `new` and `changed` repositories. `<cli> discover run --vault "<vault>"` computes facts at each repository's production head; add `discover platform --referenced` when the user authorizes cloud reads. Pick small independent groups; a slow repository never holds the others.
+3. **Branch.** `<cli> sync start --vault "<vault>" --name <slug>`.
+4. **Author.** For each repository: read the current note, the delta since `commit-analizado` (`git diff`), the facts and `discover check`'s stale cited files. Write the complete resulting note following repository-map.md; update `commit-analizado`, `fecha-analisis` and `rama-analizada`. Create or update topic/event/integration notes the facts require. A repository whose delta changes nothing durable gets `sync acknowledge --decision no-documentation-change`; a new repository without a durable role gets `no-durable-node`. Commit.
+5. **Gate.** `<cli> discover check --vault "<vault>" --note <each changed repository note>` passes with no `error`; pending items appear in the note's `Verificaciones pendientes`.
+6. **Review.** Dispatch a fresh reviewer (`evidence-reviewer`, or another agent session) with final-note-review.md, the branch diff (`git diff <base>...HEAD`), the facts and the check output. On `revise`, correct only the cited text, commit, re-check, and re-review the change. On `accept`, record it: `<cli> sync review --vault "<vault>" --verdict accept --reviewer "<reviewer>" --summary "<one line>"`.
+7. **Verify and publish.** `<cli> sync verify --vault "<vault>"` must return `ok` (note gates, no structural issue introduced versus the base, review covering the final content). `<cli> sync finish --vault "<vault>"` fast-forwards the base. Push or open a PR as the repository policy says, and verify the remote ref.
 
-| Request or condition | Load / action |
-| --- | --- |
-| Inventory, lifecycle, synchronization, or resume | Load `../map-ecosystem/references/vault-synchronization.md`, then `../map-ecosystem/references/synchronization-state-machine.md` for a transition or failure. |
-| Query, catalog, or ordinary documentation | Use `map-ecosystem`. |
+## Concurrency and recovery
 
-## Execution Steps
+- Base moved (another developer published): rebase the branch, resolve note conflicts by re-applying this run's facts onto the new note, re-run the gates and get the merged meaning reviewed. Never force-push.
+- Source moved during the run: re-run `discover run --repo <name>` and redo only that repository's delta.
+- Interrupted run: the branch and its commits are the state; continue from `sync status`.
+- Branches made by the legacy run state machine (`.agents/state/map-ecosystem/sync/`) are not resumable with this kernel; their completed receipts remain history.
 
-1. Bind the vault through [use-vault-cli](../use-vault-cli/SKILL.md#bind-the-executable-and-vault), reusing the session's binding. Bind the resolved vault and configured source roots; a failed resolution blocks root-dependent work.
-2. Select one primary branch from the table. Load only its recipe and supporting references it explicitly requires.
-3. For coordinator synchronization, follow the vault-synchronization recipe: one complete candidate, one independent semantic review, deterministic checks and resumable exact publication. Load `../map-ecosystem/references/evidence-extraction.md` before freezing inventory. Before a source read or delegation, bind its checkout by configured remote identity. Before a technical write, load `../../../90-Meta/evidence-policy.md` and `../../../90-Meta/node-selection.md`.
-4. After the source-backed candidate is accepted and published, reconcile only external connections required by the task through `../map-ecosystem/references/connection-reconciliation.md`. Publish that separately observed evidence with `map-ecosystem`'s single-unit or multi-unit recipe and the same final-note review, while preserving the repository analysis metadata.
-5. Before declaring a sync campaign complete, follow `../map-ecosystem/references/mapping-completion.md`.
-6. Report inspected evidence, changes, limitations, and observed checks. Stop when the selected recipe's completion criterion is met.
+## Manual or scheduled refresh
 
-## Output Contract
+The team chooses cadence, source scope, publication path (direct push, PR or review-only) and notification preference; store them in the scheduler's task or the vault, never in this skill, and read them back to confirm. Scheduling grants no push, merge or deployment authority. Each run: steps 1–7 for the selected sources, plus investigation knowledge ready to absorb (`manage-investigation` **Promote**/**Absorb**, see `../map-ecosystem/references/investigation-context.md`). Missing authority produces a read-only report. A run with nothing actionable stays quiet unless the saved preference asks for a status.
 
-Return the resolved scope, evidence used, decisions and written paths, limitations, and checks actually observed.
+## Completion
 
-## References
-
-- `../map-ecosystem/references/vault-synchronization.md` — coordinator recipe.
-- `../map-ecosystem/references/synchronization-state-machine.md` — durable run, unit, and recovery contract.
-- `../map-ecosystem/references/synchronization-package-worker.md` — legacy package-worker contract, loaded only to resume a recorded old run that names it.
-- `../../../90-Meta/vault-resolution.md` — vault and source binding.
+Every selected repository has a published note update or an acknowledgement, `sync verify` passed on the published content, the remote publication (or review-only result) is verified, and no source was modified. Otherwise report the exact unresolved repository, its branch and the gate or review finding. Before declaring a campaign complete, apply `../map-ecosystem/references/mapping-completion.md`.
