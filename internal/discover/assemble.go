@@ -139,7 +139,8 @@ func discoverRepositories(vault string, only map[string]bool) ([]repoInput, erro
 		return nil, e
 	}
 	vaultID, _ := config.RemoteIdentity(gitRemoteOf(vault))
-	seen := map[string]bool{}
+	vaultPath, _ := filepath.EvalSymlinks(vault)
+	seen := map[string]bool{vaultPath: true} // the vault is never one of its own sources
 	out := []repoInput{}
 	sc, _ := w["source_context"].(config.Object)
 	for _, r := range asList(sc["roots"]) {
