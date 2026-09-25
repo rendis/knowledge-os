@@ -103,7 +103,7 @@ func Run(args []string, out io.Writer) error {
 	}
 	o.vault, _ = r["vault_root"].(string)
 	if o.base == "" {
-		o.base = defaultBase(o.vault)
+		o.base = defaultBase(o.vault, cmd == "start")
 	}
 	switch cmd {
 	case "start":
@@ -138,7 +138,17 @@ func Run(args []string, out io.Writer) error {
 	return fmt.Errorf("unknown sync command %q; see sync --help", cmd)
 }
 
-func defaultBase(vault string) string {
+// defaultBase is the branch a sync starts from and publishes to: the one recorded when the sync branch
+// was started, else the branch checked out when starting, else the remote's default branch, else main.
+// The local origin/HEAD is only a cache of the remote's default and can be stale.
+func defaultBase(vault string, starting bool) string {
+	cur := current(vault)
+	if b, e := git(vault, "config", "--get", "branch."+cur+".vault-base"); e == nil && b != "" {
+		return b
+	}
+	if starting && cur != "" && cur != "HEAD" && !strings.HasPrefix(cur, "sync/") {
+		return cur
+	}
 	if r, e := git(vault, "symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD"); e == nil && r != "" {
 		return strings.TrimPrefix(r, "origin/")
 	}
@@ -173,6 +183,9 @@ func start(o opts, out io.Writer) error {
 	}
 	branch := "sync/" + o.name
 	if _, e := git(o.vault, "switch", "-c", branch, o.base); e != nil {
+		return e
+	}
+	if _, e := git(o.vault, "config", "branch."+branch+".vault-base", o.base); e != nil {
 		return e
 	}
 	return emit(out, map[string]any{"branch": branch, "base": o.base, "next": "write the notes, commit, run `discover check`, record the review with `sync review`, then `sync verify` and `sync finish`"})

@@ -220,3 +220,17 @@ func TestPublishingACaseRunsTheCaseGate(t *testing.T) {
 		t.Fatalf("a sourced, reviewed case publishes: %v %v", e, res)
 	}
 }
+
+func TestSyncKeepsTheBranchItStartedFrom(t *testing.T) {
+	v := vault(t)
+	run(t, v, "switch", "-qc", "develop")
+	// A stale origin/HEAD (the remote's default changed since the clone) must not decide the base.
+	run(t, v, "update-ref", "refs/remotes/origin/main", "HEAD")
+	run(t, v, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main")
+	if res, e := call(t, "start", "--vault", v, "--name", "refresh"); e != nil || res["base"] != "develop" {
+		t.Fatalf("start from the checked-out branch: %v %v", e, res)
+	}
+	if res, e := call(t, "status", "--vault", v); e != nil || res["base"] != "develop" {
+		t.Fatalf("the sync branch remembers its base: %v %v", e, res)
+	}
+}
