@@ -163,7 +163,7 @@ func CheckPackage(path string) (Package, []Issue, error) {
 	for _, m := range wikilink.FindAllStringSubmatch(clean, 5) {
 		add("error", "[["+m[1]+"]] points into the vault, which the implementing agent does not have: write the needed fact here or cite a permalink")
 	}
-	for _, m := range secret.FindAllString(clean, 3) {
+	for _, m := range credentials(clean, 3) {
 		add("error", "credential value in the package ("+string([]rune(m)[:min(20, len([]rune(m)))])+"…): remove it")
 	}
 	for _, m := range localPath.FindAllString(clean, 3) {
@@ -221,4 +221,22 @@ func relOrAbs(base, p string) string {
 		return filepath.ToSlash(r)
 	}
 	return p
+}
+
+// envReference matches a value that names where a secret comes from instead of holding it.
+var envReference = regexp.MustCompile(`(?i)[:=]\s*["'` + "`" + `]?(?:process\.env|os\.(?:environ|getenv)|\$\{|\$[A-Z_]|<|env\(|secret(?:s)?\.|vault:|\*{3,})`)
+
+// credentials returns up to n credential values in text, skipping references to where a secret lives.
+func credentials(text string, n int) []string {
+	out := []string{}
+	for _, m := range secret.FindAllString(text, -1) {
+		if envReference.MatchString(m) {
+			continue
+		}
+		out = append(out, m)
+		if len(out) == n {
+			break
+		}
+	}
+	return out
 }

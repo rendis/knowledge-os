@@ -138,7 +138,7 @@ func checkContent(vault, full, raw string, ix vaultIndex) Result {
 	add := func(sev, where, detail string) { r.Issues = append(r.Issues, Issue{sev, where, detail}) }
 
 	// Leaks are errors in every schema: the case is shareable content.
-	for _, m := range secret.FindAllString(raw, 3) {
+	for _, m := range credentials(raw, 3) {
 		add("error", "credential", "remove the credential value ("+firstRunes(m, 24)+"…); keep secrets out of the case; name only where they live")
 	}
 	for _, m := range localPath.FindAllString(raw, 3) {
@@ -438,4 +438,22 @@ func runCheck(o options, out io.Writer) error {
 		return fmt.Errorf("case gate failed")
 	}
 	return nil
+}
+
+// envReference matches a value that names where a secret comes from instead of holding it.
+var envReference = regexp.MustCompile(`(?i)[:=]\s*["'` + "`" + `]?(?:process\.env|os\.(?:environ|getenv)|\$\{|\$[A-Z_]|<|env\(|secret(?:s)?\.|vault:|\*{3,})`)
+
+// credentials returns up to n credential values in text, skipping references to where a secret lives.
+func credentials(text string, n int) []string {
+	out := []string{}
+	for _, m := range secret.FindAllString(text, -1) {
+		if envReference.MatchString(m) {
+			continue
+		}
+		out = append(out, m)
+		if len(out) == n {
+			break
+		}
+	}
+	return out
 }

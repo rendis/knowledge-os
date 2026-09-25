@@ -259,3 +259,16 @@ func TestDocumentedComponentsAreReferenced(t *testing.T) {
 		t.Fatalf("once the case links the note the reminder goes: %v", m)
 	}
 }
+
+func TestCredentialReferencesAreNotCredentials(t *testing.T) {
+	for _, ref := range []string{"password: process.env.DB_PASSWORD", "token: ${GITHUB_TOKEN}", "api_key = os.getenv('KEY')", "password: <from vault>", "secret: $DB_SECRET"} {
+		if len(credentials(ref, 1)) != 0 {
+			t.Errorf("a reference to where a secret lives is not a credential: %s", ref)
+		}
+	}
+	for _, value := range []string{"password: hunter2", "token: abc123", "api_key=sk-live-123"} {
+		if len(credentials(value, 1)) == 0 {
+			t.Errorf("a credential value must be caught: %s", value)
+		}
+	}
+}
