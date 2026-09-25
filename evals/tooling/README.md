@@ -6,7 +6,6 @@ Run the full distribution eval directories with `unittest discover` using the lo
 
 ```sh
 python -B -m unittest discover -s evals/tooling
-python -B -m unittest discover -s evals/helper-integrity
 python -B kernel/90-Meta/test_instance.py
 python -B -m unittest discover -s evals/sync -p 'test_next_action.py'
 ```
