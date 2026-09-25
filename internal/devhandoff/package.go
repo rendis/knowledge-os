@@ -24,6 +24,7 @@ type Package struct {
 	Base       string            `json:"base"`
 	Branch     string            `json:"branch"`
 	Title      string            `json:"title"`
+	DependsOn  []string          `json:"depends_on,omitempty"`
 	SHA256     string            `json:"sha256"`
 	Fields     map[string]string `json:"-"`
 	Text       string            `json:"-"`
@@ -116,6 +117,9 @@ func ReadPackage(path string) (Package, error) {
 	if m := heading1.FindStringSubmatch(body); m != nil {
 		p.Title = m[1]
 	}
+	for _, d := range strings.FieldsFunc(fm["depends-on"], func(r rune) bool { return r == ',' || r == ' ' || r == '[' || r == ']' }) {
+		p.DependsOn = append(p.DependsOn, d)
+	}
 	return p, nil
 }
 
@@ -139,6 +143,11 @@ func CheckPackage(path string) (Package, []Issue, error) {
 	}
 	if p.Branch != "" && (!branchName.MatchString(p.Branch) || strings.Contains(p.Branch, "..")) {
 		add("error", "branch is not a valid Git branch name")
+	}
+	for _, d := range p.DependsOn {
+		if !handoffID.MatchString(d) || d == p.Handoff {
+			add("error", "depends-on lists other handoffs of the case as DH-NNN: "+d)
+		}
 	}
 	if p.Title == "" {
 		add("error", "the package needs a title (# heading) that names the task")

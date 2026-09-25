@@ -18,9 +18,9 @@ A cell investigation may prepare this repository for a task. The task lives in `
 
 When ` + "`.handoff/`" + ` exists, before planning or changing code:
 
-1. Read each ` + "`.handoff/DH-*.md`" + `: the task, the changes it asks for (what and where), the acceptance criteria, the context it needs and what is out of scope. It is the whole definition; you need neither the investigation nor the vault.
+1. Read each ` + "`.handoff/DH-*.md`" + `: the task, the changes it asks for (what and where), the acceptance criteria, the context it needs and what is out of scope. It is the whole definition; you need neither the investigation nor the vault. Several files are tasks of one milestone on this branch: work them one at a time, in ` + "`depends-on`" + ` order, starting a task once the tasks it depends on are verified.
 2. Implement only those changes, following this repository's own instructions, which prevail (closer instruction files govern their subtree). Verify every acceptance criterion with the repository's usual tests or checks.
-3. Leave the task files unchanged. Record in ` + "`.handoff/deltas.md`" + `, as soon as it becomes known and before later work relies on it, anything that changes, adds to or contradicts the definition, plus material decisions, deviations, open questions and verification results (not routine progress). Number entries consecutively; supersede an earlier entry with a new one instead of editing it:
+3. Leave the task files unchanged. Record in ` + "`.handoff/deltas.md`" + `, as soon as it becomes known and before later work relies on it, anything that changes, adds to or contradicts the definition, plus material decisions, deviations, open questions and verification results (not routine progress). When every criterion of a task passes, record a ` + "`verification`" + ` delta listing each criterion and its result. Number entries consecutively; supersede an earlier entry with a new one instead of editing it:
 
    ` + "```" + `
    ## DELTA-NNN — <short title>
@@ -30,7 +30,7 @@ When ` + "`.handoff/`" + ` exists, before planning or changing code:
    - Evidence: <commit, test, pull request, file or dated agreement>
    ` + "```" + `
 
-4. Progress is the branch itself: commits, tests and the pull request, following this repository's workflow; commits, pushes and pull requests need the user's authorization.
+4. Progress is the branch itself: commits, tests and the pull request, following this repository's workflow; commits, pushes and pull requests need the user's authorization. End each commit message with a ` + "`Handoff: DH-NNN`" + ` trailer naming its task, unless this repository's conventions exclude trailers.
 5. When the task is ambiguous or a criterion cannot be met, ask the user and record the question as a delta.
 
 The cell later reads this branch and ` + "`deltas.md`" + ` to update its investigation; nothing here writes to the vault.`
