@@ -6,6 +6,9 @@ Writes <DIR>/grades.json and prints accuracy, violations, time and cost per run.
 import argparse, concurrent.futures as cf, json, pathlib, re, subprocess
 
 HERE = pathlib.Path(__file__).parent
+# Fixed judge for every graded run, so settings are compared under the same grader. The judge sees only
+# the question, the expected facts and the answer text: never the harness, model or effort that wrote it.
+JUDGE = {"harness": "codex", "model": "gpt-5.5", "effort": "medium"}
 PROMPT = """Eres un evaluador estricto. Compara la RESPUESTA con los HECHOS ESPERADOS y las AFIRMACIONES PROHIBIDAS.
 Pregunta: {question}
 Hechos esperados (cada uno vale 1 punto; 0.5 si está parcial o impreciso; 0 si falta o es incorrecto):
@@ -21,11 +24,10 @@ Responde SOLO un objeto JSON: {{"points": [<puntaje por hecho en orden>], "viola
 
 def grade(q, rec):
     prompt = PROMPT.format(question=q["question"], expected="\n".join(f"- {e}" for e in q["expected"]), must_not="\n".join(f"- {m}" for m in q["must_not"]) or "- (ninguna)", answer=rec.get("answer", "")[:12000])
-    # Independent judge from another model family than the Claude answers (Codex gpt-5.5).
     text = ""
     for _ in range(3):  # a hung judge session is retried, never allowed to abort the whole grading
         try:
-            text = subprocess.run(["codex", "exec", "--skip-git-repo-check", "-m", "gpt-5.5", "-c", 'model_reasoning_effort="medium"', "-s", "read-only", prompt], capture_output=True, text=True, timeout=300, cwd="/tmp").stdout
+            text = subprocess.run(["codex", "exec", "--skip-git-repo-check", "-m", JUDGE["model"], "-c", f'model_reasoning_effort="{JUDGE["effort"]}"', "-s", "read-only", prompt], capture_output=True, text=True, timeout=300, cwd="/tmp").stdout
         except subprocess.TimeoutExpired:
             continue
         if re.search(r"\{.*\}", text, re.S):
@@ -52,8 +54,8 @@ def main():
         viol = sum(len(g.get("violations", [])) for g in grades.values())
         uns = sum(len(g.get("unsupported_claims", [])) for g in grades.values())
         cost = sum((r.get("cost_usd") or 0) for r in recs)
-        tokens = sum((r.get("usage") or {}).get("input_tokens", 0) for r in recs)
-        out_tokens = sum((r.get("usage") or {}).get("output_tokens", 0) for r in recs)
+        tokens = sum((r.get("usage") or {}).get("input_total", (r.get("usage") or {}).get("input_tokens", 0)) for r in recs)
+        out_tokens = sum((r.get("usage") or {}).get("output", (r.get("usage") or {}).get("output_tokens", 0)) for r in recs)
         secs = sum(r["seconds"] for r in recs)
         print(f"{d.name}: n={n} mean_score={score:.3f} verdicts={[grades[r['id']]['verdict'] for r in recs]} violations={viol} unsupported={uns} seconds={secs:.0f} input_tokens={tokens} output_tokens={out_tokens} cost_usd={cost:.2f}")
 
