@@ -26,7 +26,7 @@ Select by explicit domain/environment/database or target ID, never by local port
 
 Each target has zero or more `repositories`. Resolve relevant remotes through `<VAULTCTL> config locate --vault "<VAULT_ROOT>" --remote "<REMOTE>"`, then read their applicable instructions. Repositories, documentation and live catalogs are distinct evidence sources. Missing repositories limit static claims; they do not prevent authorized live inspection with a valid executor. Do not substitute the schema repository for a target whose repository list is empty.
 
-For cells without a matching target, the `database-inspection` capability is the access contract. For a static-schema question, `<VAULTCTL> config schema-repository --vault "<VAULT_ROOT>"` resolves the optional `sources.schema_repository`. Its absence means static source unavailable, not database nonexistent. An unknown explicitly requested target cannot silently fall back to another destination. Hand configuration gaps to `configure-workspace`.
+For cells without a matching target, the `database-inspection` capability is the access contract. For a static-schema question, `<VAULTCTL> config schema-repository --vault "<VAULT_ROOT>"` resolves the optional `sources.schema_repository`. Its absence means static source unavailable, not database nonexistent. An unknown explicitly requested target cannot silently fall back to another destination. Hand configuration gaps to `onboard-developer`.
 
 Complete when the requested target or capability route is unambiguous, and available evidence sources and their limitations are identified.
 
@@ -40,6 +40,6 @@ Complete when each live operation has observed target/read-only checks and a bou
 
 ## 4. Return evidence
 
-Report static source revisions, live observation time and destination, results, inferences, and limitations separately. Preserve secrets; use the primary workflow's evidence store and retention policy. Configuration changes belong to `configure-workspace`; business mutations require their own authorized workflow.
+Report static source revisions, live observation time and destination, results, inferences, and limitations separately. Preserve secrets; use the primary workflow's evidence store and retention policy. Configuration changes belong to `onboard-developer`; business mutations require their own authorized workflow.
 
 Complete when the initiating question is answered or its remaining limitation is explicit and control returns to the primary branch.

@@ -1,6 +1,6 @@
 # Maintain the related-vault catalog
 
-`90-Meta/vault-catalog.yaml` belongs to the consumer vault and is versionable. It describes related domains, not a user's access list. The installer preserves it. Absence means an empty catalog; create it only for an authorized first registration. `map-ecosystem` owns maintenance; `configure-workspace` retains ownership of local checkout configuration.
+`90-Meta/vault-catalog.yaml` belongs to the consumer vault and is versionable. It describes related domains, not a user's access list. The installer preserves it. Absence means an empty catalog; create it only for an authorized first registration. `map-ecosystem` owns maintenance; `onboard-developer` retains ownership of local checkout configuration.
 
 ## Register or update
 

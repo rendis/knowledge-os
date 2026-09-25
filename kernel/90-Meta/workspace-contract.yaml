@@ -1,6 +1,6 @@
 # Local workspace contract (version 1)
 
-The writer is `configure-workspace`. Consumers select the executable through `use-vault-cli` and call `<CLI> config` with an explicit `--vault` root.
+The writer is `onboard-developer`. Consumers select the executable through `use-vault-cli` and call `<CLI> config` with an explicit `--vault` root.
 
 ```yaml
 version: 1

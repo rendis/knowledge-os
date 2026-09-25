@@ -49,10 +49,10 @@ This section binds repositories consulted as evidence sources. For an explicitly
 
 A failed checkout binding keeps source reads blocked; a vault-only task may continue with that limitation. Recover through these supported paths:
 
-- **Unavailable/invalid configuration or ambiguous matches:** load `configure-workspace`. Ask which repository root/checkout should be configured and for authorization to make the required configuration change. If configuration changes are forbidden, state that the source question cannot be completed under that constraint and ask whether the user wants to authorize that bounded configuration repair. Resume source reading only after the repaired configuration returns one successful checkout binding.
+- **Unavailable/invalid configuration or ambiguous matches:** load `onboard-developer`. Ask which repository root/checkout should be configured and for authorization to make the required configuration change. If configuration changes are forbidden, state that the source question cannot be completed under that constraint and ask whether the user wants to authorize that bounded configuration repair. Resume source reading only after the repaired configuration returns one successful checkout binding.
 - **`not_found` under valid roots:** request an existing matching checkout within those roots, or authorization to configure another root. Repeat checkout resolution before reading.
 
-The recovery question requests configuration or a matching checkout, never permission to skip identity resolution. Confirming an ambiguous path without resolving its configuration does not complete recovery. `configure-workspace` remains the sole configuration writer.
+The recovery question requests configuration or a matching checkout, never permission to skip identity resolution. Confirming an ambiguous path without resolving its configuration does not complete recovery. `onboard-developer` remains the sole configuration writer.
 
 The order of `SOURCE_ROOTS` is the configured order and every record has `origin: config`. A root whose exact resolved path is also `CLONE_ROOT` is marked `managed: true`; parent/child overlap does not transfer authority. Duplicate or inconsistent candidates require the configuration workflow and an explicit user choice; consumers must not invent a preference.
 
@@ -72,7 +72,7 @@ A valid configured `CLONE_ROOT` authorizes shallow clones and `git fetch` only i
 
 When a managed clone is missing, determine the production branch using the inventory rule, then create its shallow clone under `CLONE_ROOT`. When it exists and current remote evidence is required, fetch the required remote refs without changing any existing checkout. Materialize the selected remote commit in a detached temporary worktree created with the host's safe temporary-directory API (`mktemp -d` on POSIX or the platform equivalent), pass that exact worktree through `--source-repo`, and remove that exact worktree in guaranteed cleanup on success or failure. If interrupted cleanup leaves metadata, report the exact path and retry only `git worktree remove --force <exact-temporary-path>` against that managed clone. Never use broad `git worktree prune`: it may remove unrelated stale registrations.
 
-If `clone_authorized=false`, never clone. Ask for explicit approval and an exact existing root, then hand off to `configure-workspace` to record managed-clone authority before acquisition. If the user does not want persistent clone authority, require them to provide an already available checkout under a configured read-only root.
+If `clone_authorized=false`, never clone. Ask for explicit approval and an exact existing root, then hand off to `onboard-developer` to record managed-clone authority before acquisition. If the user does not want persistent clone authority, require them to provide an already available checkout under a configured read-only root.
 
 ## Interaction protocol
 

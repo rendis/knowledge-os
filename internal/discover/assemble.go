@@ -709,7 +709,7 @@ func (a *assembly) facts() []repoFacts {
 		f := repoFacts{Repo: s.in.Name, Remote: s.in.Remote, Path: s.in.Path, Commit: s.in.Commit, Ref: s.in.Ref, Note: s.in.Note,
 			Languages: s.code.Languages, ConfigFiles: s.cfgFiles, ConfigCount: len(s.entries), Pending: []pending{}}
 		if s.in.RefNote != "" {
-			f.Pending = append(f.Pending, pending{Kind: "reference-branch", Subject: s.in.Name, Detail: s.in.RefNote, Confirm: "configure-workspace: 90-Meta/reference-branches.md"})
+			f.Pending = append(f.Pending, pending{Kind: "reference-branch", Subject: s.in.Name, Detail: s.in.RefNote, Confirm: "onboard-cell: 90-Meta/reference-branches.md"})
 		}
 		f.ServiceIDs = firstN(ids[s], 50)
 		channels := map[string]bool{}

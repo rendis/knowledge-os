@@ -26,7 +26,7 @@ Load @AGENTS.personal.md from the vault root when present, before classifying re
 
 ## Navigate the vault
 
-Read [use-vault-cli](.agents/skills/use-vault-cli/SKILL.md) before the first CLI operation; it binds `<CLI>` and the vault root once per session.
+Read [use-vault-cli](.agents/skills/use-vault-cli/SKILL.md) before the first CLI operation; it binds `<CLI>` and the vault root once per session. When `<CLI> config status --vault "<root>"` reports `workspace: uninitialized`, this person has not been onboarded: offer [onboard-developer](.agents/skills/onboard-developer/SKILL.md) before work that needs sources; answers from the notes do not wait.
 
 1. `<CLI> overview --vault "<root>"` lists every knowledge note in one line (type, relations, first sentence). Choose the notes to open from it.
 2. Open identified notes directly. Use `search` for a term the overview does not reveal and `links` for a known note's relationships. Before an answer relies on a repository note, run `<CLI> discover check --vault "<root>" --note <path>`: it reports stale cited files and relations the repository's evidence does not support (G3); treat those as unverified until the source confirms them.
@@ -42,7 +42,8 @@ Select one primary skill; an auxiliary skill supplies a method and the primary k
 - [evidence-driven-analysis](.agents/skills/evidence-driven-analysis/SKILL.md) — the method when one decisive source cannot settle the answer: diagnosing a failure, auditing a claim or guarantee, tracing variants of a confirmed cause.
 - [map-ecosystem](.agents/skills/map-ecosystem/SKILL.md) — questions about the vault, knowledge publication, related-vault catalog, mapping completion; orientation when bootstrap is incomplete.
 - [synchronize-ecosystem](.agents/skills/synchronize-ecosystem/SKILL.md) — inventory, repository map synchronization and manual or scheduled refresh cycles; the publication path for every technical note.
-- [configure-workspace](.agents/skills/configure-workspace/SKILL.md) — sole writer of `.knowledge-os-config.yaml`; onboarding when repositories cannot be resolved.
+- [onboard-cell](.agents/skills/onboard-cell/SKILL.md) — create or adopt the vault, or change the cell's shared setup: identity, systems, sources, reference branches, clouds, trackers, database targets and procedures; first reading.
+- [onboard-developer](.agents/skills/onboard-developer/SKILL.md) — this person's machine: repository clones, worktrees, cloud logins, database ports; sole writer of `.knowledge-os-config.yaml`.
 - [manage-investigation](.agents/skills/manage-investigation/SKILL.md) — investigation cases through the CLI: open, record, resume, close, publish, absorb and retire.
 - [manage-investigation-derived-learning](.agents/skills/manage-investigation-derived-learning/SKILL.md) — assess and publish `70-Aprendizajes/` notes.
 - [work-in-repository](.agents/skills/work-in-repository/SKILL.md) — implementation in a source repository from this session.

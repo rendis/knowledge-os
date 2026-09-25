@@ -16,6 +16,9 @@ const Help = `config --vault PATH COMMAND [options]
   database-targets               List portable database identities
   database-target --target ID    Resolve target procedure
   workspace                      Local workspace and proxy configuration
+  detect                         Propose this developer's workspace from the machine (read-only):
+                                 clones of the cell's repositories, worktree root, cloud logins,
+                                 missing database proxy ports, and the command that records them
   workspace-update | workspace-init
     [--repository-root PATH ...] [--managed-clone-root PATH | --disable-managed-clone]
     [--development-worktree-root PATH | --disable-development-worktree-root]
@@ -80,7 +83,7 @@ func Run(args []string, out io.Writer) error {
 		return errors.New("config command is required; use config --help")
 	}
 	accepted := map[string]string{
-		"status": "", "resolve": "", "capability": "--capability", "bind": "--capability --procedure --expected-hash", "database-targets": "", "database-target": "--target", "workspace": "", "workspace-update": "--repository-root --managed-clone-root --disable-managed-clone --development-worktree-root --disable-development-worktree-root --proxy-port --expected-hash", "workspace-init": "--repository-root --managed-clone-root --disable-managed-clone --development-worktree-root --disable-development-worktree-root --proxy-port --expected-hash", "locate": "--remote", "schema-repository": "", "proxy-port": "--environment", "worktree-root": "", "catalog": "", "areas": "", "reports": "", "operation": "--basename --report-id",
+		"status": "", "detect": "", "resolve": "", "capability": "--capability", "bind": "--capability --procedure --expected-hash", "database-targets": "", "database-target": "--target", "workspace": "", "workspace-update": "--repository-root --managed-clone-root --disable-managed-clone --development-worktree-root --disable-development-worktree-root --proxy-port --expected-hash", "workspace-init": "--repository-root --managed-clone-root --disable-managed-clone --development-worktree-root --disable-development-worktree-root --proxy-port --expected-hash", "locate": "--remote", "schema-repository": "", "proxy-port": "--environment", "worktree-root": "", "catalog": "", "areas": "", "reports": "", "operation": "--basename --report-id",
 	}
 	allowedFlags, known := accepted[cmd]
 	if !known {
@@ -108,6 +111,8 @@ func Run(args []string, out io.Writer) error {
 		result, e = Resolve(root)
 	case "workspace":
 		result, e = Workspace(root)
+	case "detect":
+		result, e = Detect(root)
 	case "catalog":
 		result, e = Catalog(root)
 	case "locate":
@@ -220,6 +225,9 @@ func Run(args []string, out io.Writer) error {
 				caps = append(caps, c)
 			}
 			result = Object{"vault_root": root, "orientation": Orientation(root, m), "capabilities": caps, "discovery": DiscoveryAcceleration(), "platform_providers": PlatformProviders(m)}
+			if w, we := Workspace(root); we == nil {
+				result.(Object)["workspace"] = w["status"] // uninitialized: this developer's onboarding is pending
+			}
 		case "capability":
 			if one("--capability") == "" {
 				return errors.New("capability is required")

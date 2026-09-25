@@ -90,7 +90,7 @@ func portValue(v any) (string, error) {
 func Workspace(root string) (Object, error) {
 	_, m, _, e := readYAML(filepath.Join(root, WorkspaceFile))
 	if os.IsNotExist(e) {
-		return Object{"status": "uninitialized", "source_context": Object{"status": "unavailable", "roots": []any{}, "clone_root": nil, "clone_origin": nil, "clone_authorized": false, "warnings": []string{"workspace configuration is missing; configure workspace"}}}, nil
+		return Object{"status": "uninitialized", "source_context": Object{"status": "unavailable", "roots": []any{}, "clone_root": nil, "clone_origin": nil, "clone_authorized": false, "warnings": []string{"workspace configuration is missing: run onboard-developer (config detect proposes it)"}}}, nil
 	}
 	if e != nil {
 		return nil, e

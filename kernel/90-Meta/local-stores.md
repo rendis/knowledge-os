@@ -12,7 +12,7 @@ local to one checkout and ignored by Git.
 | `.agents/state/discovery/` | Facts, questions, comparison and gaps of the last `discover run` | `vaultctl discover` |
 | `.plan/` | Local implementation plans (a visible `plan/` directory would become graph content) | any workflow |
 | `.scratch/<task>/` | Helper scripts or code with no selected investigation or workflow location | any workflow |
-| `.knowledge-os-config.yaml` | Machine paths and local capability settings | `configure-workspace` |
+| `.knowledge-os-config.yaml` | Machine paths and local capability settings | `onboard-developer` |
 
 `investigations/` is versioned and searchable but outside the technical graph traversal and note audit;
 `links` still returns investigation pointers, and `sync verify` gates changed cases with `investigation check`.

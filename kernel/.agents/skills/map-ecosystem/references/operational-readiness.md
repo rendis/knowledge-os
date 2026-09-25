@@ -1,8 +1,8 @@
 # Ecosystem tooling readiness
 
-Load this branch to check prerequisites for a specific vault query, source analysis, authoring, closure, synchronization or external reconciliation. Questions about stored configuration, initialization choices or source roots belong to `configure-workspace`; reuse its result here only when the requested operation needs it. It defines a capability-scoped preflight; it does not establish whether cell runtimes are healthy.
+Load this branch to check prerequisites for a specific vault query, source analysis, authoring, closure, synchronization or external reconciliation. Questions about stored configuration, initialization choices or source roots belong to `onboard-developer`; reuse its result here only when the requested operation needs it. It defines a capability-scoped preflight; it does not establish whether cell runtimes are healthy.
 
-The readiness check itself is read-only and non-publishing: do not change versioned content, source working trees, external systems, Git authentication, or user configuration. When it exposes a workspace-configuration gap, hand off to `configure-workspace`; that skill may write local configuration only after its confirmation gate, then control returns here for a fresh preflight. Git checks use `--no-optional-locks`; native validation reads the selected vault and reports bounded diagnostics.
+The readiness check itself is read-only and non-publishing: do not change versioned content, source working trees, external systems, Git authentication, or user configuration. When it exposes a workspace-configuration gap, hand off to `onboard-developer`; that skill may write local configuration only after its confirmation gate, then control returns here for a fresh preflight. Git checks use `--no-optional-locks`; native validation reads the selected vault and reports bounded diagnostics.
 
 ## When to run
 
@@ -89,7 +89,7 @@ Read `source_context` as defined in [vault-resolution.md](../../../../90-Meta/va
 
 The workspace view binds a team procedure to an executor or adapter; it does not authorize or prove access to the discovered connection. Resolve the binding from the semantic workspace view, then use the procedure's own status or bounded read-only probe against the exact provider/project, cluster context or database target. Reuse the existing authenticated identity or session named by the procedure. A successful probe establishes only that bounded access at the observed target and time.
 
-If no procedure is bound, hand the exact capability, target and read-only question to `configure-workspace`. If the procedure is bound but access fails, report its exact missing executor, profile, role, session, network route or target-specific setup and retry the same probe after that setup is available. Discovery, a configured connection string or secret reference, and workspace initialization alone are never a passing access signal.
+If no procedure is bound, hand the exact capability, target and read-only question to `onboard-cell`. If the procedure is bound but access fails, report its exact missing executor, profile, role, session, network route or target-specific setup and retry the same probe after that setup is available. Discovery, a configured connection string or secret reference, and workspace initialization alone are never a passing access signal.
 
 ## Status classification
 
@@ -101,7 +101,7 @@ Never return a bare "Operational", "ready", or "not ready". Name the capability,
 
 ## How to suggest preparation
 
-Offer the smallest fix for the failing dimension. Never edit user-level environment variables or launch configuration without explicit authorization; `.knowledge-os-config.yaml` may be written only by `configure-workspace` after explicit confirmation within onboarding opened by an initialization/configuration request, an incomplete readiness result, or an operation that requires the missing view.
+Offer the smallest fix for the failing dimension. Never edit user-level environment variables or launch configuration without explicit authorization; `.knowledge-os-config.yaml` may be written only by `onboard-developer` after explicit confirmation within onboarding opened by an initialization/configuration request, an incomplete readiness result, or an operation that requires the missing view.
 
 ### Workspace configuration
 
@@ -111,11 +111,11 @@ Run the read-only status view from `VAULT_ROOT`:
 <cli> config workspace --vault "<vault_root>"
 ```
 
-If it is not `initialized`, load `configure-workspace`. The observed gap opens demand-triggered onboarding: the owner skill may perform read-only discovery and present the required roots and proxy-port map, but the readiness question does not authorize a write. That skill owns confirmation, ambiguity resolution, initialization, repair, and every write to `.knowledge-os-config.yaml`. Readiness consumers must not parse or patch the file themselves. After a confirmed change, rerun status and the vault resolver; no process restart is required.
+If it is not `initialized`, load `onboard-developer`. The observed gap opens demand-triggered onboarding: the owner skill may perform read-only discovery and present the required roots and proxy-port map, but the readiness question does not authorize a write. That skill owns confirmation, ambiguity resolution, initialization, repair, and every write to `.knowledge-os-config.yaml`. Readiness consumers must not parse or patch the file themselves. After a confirmed change, rerun status and the vault resolver; no process restart is required.
 
 ### Dimension-specific remediation
 
-**Source access unavailable or inconsistent.** Load `configure-workspace`, report the semantic status/error, and collect only the exact root or candidate choice it requires. If cloning is needed, obtain approval for an exact existing managed root and let the owner skill record it before acquisition. A vault-only query does not require source access.
+**Source access unavailable or inconsistent.** Load `onboard-developer`, report the semantic status/error, and collect only the exact root or candidate choice it requires. If cloning is needed, obtain approval for an exact existing managed root and let the owner skill record it before acquisition. A vault-only query does not require source access.
 
 **Vault resolution not `resolved`.** Follow [vault-resolution.md](../../../../90-Meta/vault-resolution.md): `invalid` means report the wrong path; `ambiguous` means present verified candidates and request a choice; `not_found` means request an explicit local path or separate authorization and destination to clone the vault.
 
