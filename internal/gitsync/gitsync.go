@@ -393,6 +393,18 @@ func verify(o opts) (map[string]any, error) {
 		}
 	}
 	res["note_gates"] = notes
+	repoNotes := []string{}
+	for _, n := range notes {
+		repoNotes = append(repoNotes, n.(map[string]any)["note"].(string))
+	}
+	stale, e := discover.StaleNeighbours(o.vault, repoNotes)
+	if e != nil {
+		return nil, e
+	}
+	res["stale_neighbours"] = stale
+	if len(stale) > 0 {
+		problems = append(problems, fmt.Sprintf("%d note(s) still cite changed files of the synced repository at an older commit; update or re-anchor them", len(stale)))
+	}
 	now, e := structural(o.vault)
 	if e != nil {
 		return nil, e

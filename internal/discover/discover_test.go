@@ -419,3 +419,35 @@ func TestLibraryContextResolvesSelectedRepository(t *testing.T) {
 		t.Fatalf("a library's own imported packages must be followed: %+v", s.deps)
 	}
 }
+
+func TestStaleNeighboursAfterSync(t *testing.T) {
+	dir := t.TempDir()
+	repos := filepath.Join(dir, "repos")
+	repo := gitRepo(t, filepath.Join(repos, "SVC-orders"), map[string]string{"svc/save.go": "package svc\n// save then notify\n", "svc/other.go": "package svc\n"})
+	old, _ := resolveCommit(repo, "HEAD")
+	write(t, repo, "svc/save.go", "package svc\n// exists, enrich, save, notify\n")
+	for _, args := range [][]string{{"add", "-A"}, {"-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "-m", "change"}} {
+		if b, e := exec.Command("git", append([]string{"-C", repo}, args...)...).CombinedOutput(); e != nil {
+			t.Fatal(string(b))
+		}
+	}
+	head, _ := resolveCommit(repo, "HEAD")
+	vault := t.TempDir()
+	write(t, vault, "instance.yaml", "version: 1\ncell:\n  name: \"C\"\n  purpose: \"p\"\nsystems:\n  - id: \"s\"\n    name: \"S\"\nsources:\n  repo_prefixes: [\"SVC\"]\n")
+	write(t, vault, ".knowledge-os-config.yaml", "version: 1\nworkspace:\n  repository_roots:\n    - \""+repos+"\"\n")
+	link := func(sha, file string) string { return "https://github.com/acme/SVC-orders/blob/" + sha + "/" + file + "#L2" }
+	write(t, vault, "20-Repos/orders.md", "---\naliases: [\"SVC-orders\"]\ncommit-analizado: \""+head[:12]+"\"\n---\n# orders\n")
+	write(t, vault, "25-Topics/orders-out.md", "# orders-out\n\nGuarda y notifica. [^e1]\nOtro. [^e2]\n\n[^e1]: [svc/save.go]("+link(old, "svc/save.go")+")\n[^e2]: [svc/other.go]("+link(old, "svc/other.go")+")\n")
+	write(t, vault, "30-Flujos/flow.md", "# flow\n\nYa actualizado. [^e1]\n\n[^e1]: [svc/save.go]("+link(head, "svc/save.go")+")\n")
+	if !overlaps([][2]int{{22, 21}}, 12, 30) || overlaps([][2]int{{22, 21}}, 1, 21) || !overlaps([][2]int{{5, 7}}, 7, 9) || overlaps([][2]int{{5, 7}}, 8, 9) {
+		t.Fatal("line overlap: an insertion counts only inside the cited block")
+	}
+	write(t, vault, "30-Flujos/package.md", "# package\n\nPaquete. [^e1]\n\n[^e1]: [svc/save.go]("+strings.Replace(link(old, "svc/save.go"), "#L2", "#L1", 1)+")\n")
+	stale, e := StaleNeighbours(vault, []string{"20-Repos/orders.md"})
+	if e != nil {
+		t.Fatal(e)
+	}
+	if len(stale) != 1 || !strings.HasPrefix(stale[0], "25-Topics/orders-out.md") || !strings.Contains(stale[0], "svc/save.go") || strings.Contains(stale[0], "other.go") {
+		t.Fatalf("only the neighbour citing a changed file at an older commit is stale: %v", stale)
+	}
+}

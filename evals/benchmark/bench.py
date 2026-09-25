@@ -153,10 +153,11 @@ def flow(a):
                 try:
                     vj = json.loads(v[v.index("{", 1) if v.startswith('{"error"') else 0:])
                     rec["structural_issues_introduced"] = vj.get("new_structural_issues", [])
+                    rec["stale_neighbours"] = vj.get("stale_neighbours", [])
                 except ValueError:
                     rec["structural_issues_introduced"] = ["unparsed sync verify output"]
             rec["gates"] = gates
-            rec["gates_ok"] = bool(changed) and all(g.get("ok") for g in gates.values()) and not rec.get("structural_issues_introduced")
+            rec["gates_ok"] = bool(changed) and all(g.get("ok") for g in gates.values()) and not rec.get("structural_issues_introduced") and not rec.get("stale_neighbours")
             if changed:
                 prompt = REVIEW_PROMPT.format(branch=branch, base=base, cli=cli(dst), gates=json.dumps({k: {"ok": g.get("ok"), "errors": len(g.get("errors", []))} for k, g in gates.items()}))
                 rv = runner.execute(REVIEWER["harness"], prompt, dst, REVIEWER["model"], REVIEWER["effort"], dst.parent / f"run{i}.review.txt", timeout=a.timeout)
@@ -206,7 +207,7 @@ def report(a):
         frows.append({"setting": d.name, "runs": len(recs), "completed": sum(bool(r["changed"]) for r in recs), "gates_ok": sum(r["gates_ok"] for r in recs),
                       "accepted": sum(r.get("review", {}).get("verdict") == "accept" for r in recs),
                       "material_findings": mean([len([x for x in r.get("review", {}).get("findings", []) if x.get("severity") == "material"]) for r in recs]),
-                      "sources_unchanged": all(r["sources_unchanged"] for r in recs), "seconds": mean([x["seconds"] for x in au]),
+                      "stale_neighbours": mean([len(r.get("stale_neighbours", [])) for r in recs]), "sources_unchanged": all(r["sources_unchanged"] for r in recs), "seconds": mean([x["seconds"] for x in au]),
                       "input_tokens": mean([(x.get("usage") or {}).get("input_total") for x in au]), "output_tokens": mean([(x.get("usage") or {}).get("output") for x in au]), "cost_usd": mean([x.get("cost_usd") for x in au])})
     out = {"fingerprint": fp, "qa": rows, "flows": frows}
     (work / "report.json").write_text(json.dumps(out, indent=1))
@@ -216,8 +217,8 @@ def report(a):
         md += ["## Questions", "", "| Setting | Runs | Score mean (min–max) | Violations / run | Time / run (s) | Input tokens / run | Output tokens / run | USD / run |", "|---|---|---|---|---|---|---|---|"]
         md += [f"| {r['setting']} | {r['runs']} | {f(r['score_mean'], 3)} ({f(r['score_min'], 3)}–{f(r['score_max'], 3)}) | {f(r['violations_per_run'], 1)} of {r['answers_per_run']} | {f(r['seconds'], 0)} | {f(r['input_tokens'], 0)} | {f(r['output_tokens'], 0)} | {f(r['cost_usd'])} |" for r in rows]
     if frows:
-        md += ["", "## Publication flows", "", "| Setting | Runs | Branch with changes | Gates ok | Reviewer accept | Material findings / run | Sources unchanged | Author time (s) | Author input tokens | Author USD |", "|---|---|---|---|---|---|---|---|---|---|"]
-        md += [f"| {r['setting']} | {r['runs']} | {r['completed']} | {r['gates_ok']} | {r['accepted']} | {f(r['material_findings'], 1)} | {r['sources_unchanged']} | {f(r['seconds'], 0)} | {f(r['input_tokens'], 0)} | {f(r['cost_usd'])} |" for r in frows]
+        md += ["", "## Publication flows", "", "| Setting | Runs | Branch with changes | Gates ok | Stale neighbours / run | Reviewer accept | Material findings / run | Sources unchanged | Author time (s) | Author input tokens | Author USD |", "|---|---|---|---|---|---|---|---|---|---|---|"]
+        md += [f"| {r['setting']} | {r['runs']} | {r['completed']} | {r['gates_ok']} | {f(r['stale_neighbours'], 1)} | {r['accepted']} | {f(r['material_findings'], 1)} | {r['sources_unchanged']} | {f(r['seconds'], 0)} | {f(r['input_tokens'], 0)} | {f(r['cost_usd'])} |" for r in frows]
     (work / "report.md").write_text("\n".join(md) + "\n")
     print("\n".join(md))
 
