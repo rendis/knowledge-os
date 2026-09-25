@@ -1,22 +1,11 @@
 # Bootstrap evals
 
-These checks are **not** installed into a cell vault.
+Installer checks; not installed into a cell. Run them with `make test-installer` after `make release`
+(native installation tests fail rather than skip when the release is stale).
 
-```bash
-python3 -B kernel/90-Meta/test_instance.py
-python3 -B evals/bootstrap/test_bootstrap.py
-python3 -B evals/bootstrap/test_interactive_onboarding.py
-python3 -B evals/bootstrap/test_cell_capabilities.py
-python3 -B evals/bootstrap/test_integrity.py
-```
+`criteria.md` states the bars the harness enforces. The behavior trials below need a fresh agent in a
+disposable installed vault; they are run when the corresponding behavior changes:
 
-
-When changing development-package content requirements, also run the bounded
-[handoff sufficiency behavioral regression](handoff-sufficiency.md). It checks
-source-derived questions and recipient understanding; the Python integrity
-tests do not establish semantic completeness.
-
-When changing personal-instruction routing, run the blind
-[personal instructions behavior trials](personal-instructions.md). The bootstrap
-suite checks installation and Git boundaries; it does not prove that an agent
-chooses correctly when the optional file is absent or present.
+- [onboarding decisions](onboarding-decisions.md) — what `configure-workspace` asks and records;
+- [personal instructions](personal-instructions.md) — routing with and without `AGENTS.personal.md`;
+- [distribution changes](distribution-changes.md) — how a vault session proposes a change to the kernel.

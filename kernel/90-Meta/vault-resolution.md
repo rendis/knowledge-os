@@ -76,7 +76,7 @@ If `clone_authorized=false`, never clone. Ask for explicit approval and an exact
 
 ## Interaction protocol
 
-When `OBSIDIAN_VAULT` is available, verify the normalized filesystem binding before the first query. Run the versioned helper from `VAULT_ROOT`; do not trust the Obsidian exit code alone because a missing vault can still return `0`:
+When `OBSIDIAN_VAULT` is available, verify the normalized filesystem binding before the first query. Run it from `VAULT_ROOT`; do not trust the Obsidian exit code alone because a missing vault can still return `0`:
 
 ```text
 <VAULTCTL> check obsidian-binding --vault "<VAULT_ROOT>" --vault-name "<OBSIDIAN_VAULT>"

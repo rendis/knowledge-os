@@ -15,7 +15,6 @@ from typing import Any
 DIST = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(DIST / "scripts"))
 import native_runtime  # noqa: E402
-sys.path.insert(0, str(DIST / "kernel" / "90-Meta"))
 from instance import (  # noqa: E402
     DEFAULT_TYPES,
     dump_instance,
@@ -427,14 +426,11 @@ def pending_inventory(instance: dict[str, Any]) -> str:
         "Consulta la configuración local vigente desde la raíz del vault con "
         if spanish else "Check the current local configuration from the vault root with "
     )
-    if native_runtime.policy(DIST) is not None:
-        guidance += (
-            "el ejecutable de tu plataforma en `.agents/bin/` y `config status --vault .`; consulta `.agents/skills/use-vault-cli/SKILL.md`.\n"
-            if spanish else
-            "the platform executable in `.agents/bin/` with `config status --vault .`; see `.agents/skills/use-vault-cli/SKILL.md`.\n"
-        )
-    else:
-        guidance += "`python3 -B 90-Meta/workspace-config.py --vault-root . status --format json`.\n"
+    guidance += (
+        "el ejecutable de tu plataforma en `.agents/bin/` y `config status --vault .`; consulta `.agents/skills/use-vault-cli/SKILL.md`.\n"
+        if spanish else
+        "the platform executable in `.agents/bin/` with `config status --vault .`; see `.agents/skills/use-vault-cli/SKILL.md`.\n"
+    )
     if not roots:
         return guidance
     found: list[str] = []

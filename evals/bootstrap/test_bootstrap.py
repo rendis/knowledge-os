@@ -20,16 +20,13 @@ from unittest import mock
 
 DIST = Path(__file__).resolve().parents[2]
 INSTALL = DIST / "install.sh"
-NATIVE = (DIST / "NATIVE_RUNTIME.json").is_file()
 
 def native_cli(vault: Path) -> str:
     arch = {"x86_64": "amd64", "aarch64": "arm64"}.get(platform.machine().lower(), platform.machine().lower())
     return str(vault / ".agents/bin" / (f"vaultctl-{platform.system().lower()}-{arch}" + (".exe" if os.name == "nt" else "")))
 
 def resolve_command(vault: Path) -> list[str]:
-    if NATIVE:
-        return [native_cli(vault), "config", "resolve", "--vault", str(vault)]
-    return [sys.executable, "-B", str(vault / "90-Meta/resolve-vault.py"), "--path", str(vault)]
+    return [native_cli(vault), "config", "resolve", "--vault", str(vault)]
 
 # Terms of the cells this distribution was developed with, kept as SHA-256 prefixes so the check itself
 # does not publish them. A word, or a run of up to three hyphen-joined parts, whose hash is listed is a leak.
@@ -152,7 +149,7 @@ class BootstrapEval(unittest.TestCase):
                         "ejecutable de tu plataforma en `.agents/bin/`"
                         if locale == "es" else "platform executable in `.agents/bin/`"
                     )
-                    self.assertIn(runtime_guidance if NATIVE else "workspace-config.py --vault-root . status --format json", home)
+                    self.assertIn(runtime_guidance, home)
                     self.assertNotIn("{{", home + system)
                     resolved = run(resolve_command(dest))
                     self.assertEqual(resolved.returncode, 0, resolved.stderr)
@@ -165,65 +162,12 @@ class BootstrapEval(unittest.TestCase):
                     self.assertEqual(updated.returncode, 0, updated.stdout + updated.stderr)
                     self.assertEqual(before, knowledge_snapshot(dest))
 
-    def test_operational_catalog_derives_cell_area_mocs(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            for area in ("Git", "Runtime"):
-                moc = root / "60-Operacion" / area / f"{area}.md"
-                moc.parent.mkdir(parents=True)
-                moc.write_text(
-                    "---\ntipo: indice\ntags: [moc, operacion]\n---\n",
-                    encoding="utf-8",
-                )
-
-            result = run(
-                [
-                    sys.executable,
-                    "-B",
-                    str(DIST / "kernel/90-Meta/operational-catalog.py"),
-                    "--root",
-                    str(root),
-                    "list-areas",
-                ]
-            )
-
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertEqual(
-                json.loads(result.stdout),
-                [
-                    {"area": "Git", "path": "60-Operacion/Git/Git.md"},
-                    {
-                        "area": "Runtime",
-                        "path": "60-Operacion/Runtime/Runtime.md",
-                    },
-                ],
-            )
-
-            broken = root / "60-Operacion" / "Broken"
-            broken.mkdir()
-            (broken / "Rule.md").write_text("# Missing area MOC\n", encoding="utf-8")
-            invalid = run(
-                [
-                    sys.executable,
-                    "-B",
-                    str(DIST / "kernel/90-Meta/operational-catalog.py"),
-                    "--root",
-                    str(root),
-                    "list-areas",
-                ]
-            )
-            self.assertEqual(invalid.returncode, 2, invalid.stdout + invalid.stderr)
-            invalid_payload = json.loads(invalid.stdout)
-            self.assertEqual(invalid_payload["error"], "contract-invalid")
-            self.assertIn("missing area MOC", invalid_payload["message"])
-
     def test_specialists_follow_the_router_contract(self) -> None:
         result = subprocess.run([sys.executable, "-B", str(DIST / "scripts/render_specialists.py"), "--check"], capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_shared_vault_interfaces_are_kernel_owned(self) -> None:
         for relative in (
-            "90-Meta/resolve-vault.py",
             "90-Meta/vault-resolution.md",
             "90-Meta/node-selection.md",
             "90-Meta/work-item-evidence.md",
@@ -305,16 +249,12 @@ class BootstrapEval(unittest.TestCase):
                     resolve_command(dest)
                 )
                 self.assertNotEqual(invalid_identity.returncode, 0, invalid_identity.stdout + invalid_identity.stderr)
-                if not NATIVE:
-                    self.assertEqual(json.loads(invalid_identity.stdout)["status"], "invalid")
 
             instance_path.write_text("", encoding="utf-8")
             invalid = run(
                 resolve_command(dest)
             )
             self.assertNotEqual(invalid.returncode, 0, invalid.stdout + invalid.stderr)
-            if not NATIVE:
-                self.assertEqual(json.loads(invalid.stdout)["status"], "invalid")
 
     def test_update_removes_retired_managed_files(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -534,7 +474,6 @@ class BootstrapEval(unittest.TestCase):
             self.assertTrue((git_skill / "references" / "defaults.md").is_file())
             self.assertFalse((dest / ".agents" / "skills" / "inspect-gcp-runtime").exists())
             for shared in (
-                *( () if NATIVE else ("resolve-vault.py",) ),
                 "vault-resolution.md",
                 "node-selection.md",
                 "work-item-evidence.md",
@@ -547,12 +486,12 @@ class BootstrapEval(unittest.TestCase):
                 ).exists()
             )
             lock = (dest / ".knowledge-os.lock.yaml").read_text(encoding="utf-8")
-            self.assertIn('version: "4"' if NATIVE else 'version: "3"', lock)
+            self.assertIn('version: "4"', lock)
             self.assertIn('distribution_revision: "', lock)
             self.assertIn("distribution_dirty:", lock)
             self.assertIn('"AGENTS.md":', lock)
             self.assertNotIn('"90-Meta/SOUL.md":', lock)
-            (self.assertNotIn if NATIVE else self.assertIn)('"90-Meta/audit-vault.py":', lock)
+            self.assertNotIn('"90-Meta/audit-vault.py":', lock)
             self.assertNotIn('"Arquitectura.base":', lock)
             gitignore = (dest / ".gitignore").read_text(encoding="utf-8")
             self.assertNotIn(".knowledge-os.lock.yaml", gitignore)
@@ -716,20 +655,12 @@ class BootstrapEval(unittest.TestCase):
             )
             self.assertEqual(initialized.returncode, 0, initialized.stderr)
             targets = sorted(installed_command_targets(dest))
-            if NATIVE:
-                self.assertEqual(targets, [], "consumer docs still invoke retired Python runtime")
-                self.assertEqual(list(dest.rglob("*.py")), [])
-                self.assertTrue(Path(native_cli(dest)).is_file())
-                commands = [[native_cli(dest), "audit", "--vault", str(dest)],
-                            [native_cli(dest), "check", "links", "--vault", str(dest)],
-                            [native_cli(dest), "check", "bases", "--vault", str(dest)]]
-            else:
-                # During migration the docs may already use native commands;
-                # legacy scripts remain exercised as distribution regressions.
-                missing = [target for target in targets if not (dest / target).is_file()]
-                self.assertEqual(missing, [], f"documented command targets missing: {missing}")
-                commands = [[sys.executable, "-B", "90-Meta/" + script] for script in
-                            ("audit-vault.py", "verify-links.py", "validate-bases.py")]
+            self.assertEqual(targets, [], "consumer docs must not invoke Python helpers")
+            self.assertEqual(list(dest.rglob("*.py")), [])
+            self.assertTrue(Path(native_cli(dest)).is_file())
+            commands = [[native_cli(dest), "audit", "--vault", str(dest)],
+                        [native_cli(dest), "check", "links", "--vault", str(dest)],
+                        [native_cli(dest), "check", "bases", "--vault", str(dest)]]
             for command in commands:
                 checked = run(command, cwd=dest)
                 self.assertEqual(
@@ -738,44 +669,15 @@ class BootstrapEval(unittest.TestCase):
                     checked.stdout + checked.stderr,
                 )
 
-    def test_quality_gate_normalizes_signal_return_codes(self) -> None:
-        helper = DIST / "kernel/90-Meta/check-code-quality.py"
-        spec = importlib.util.spec_from_file_location("code_quality", helper)
-        self.assertIsNotNone(spec)
-        self.assertIsNotNone(spec.loader)
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-
-        cases = (
-            ((0, 0, 0), 0),
-            ((1, 0, 0), 1),
-            ((2, 1, 0), 2),
-            ((-9, 0, 0), 137),
-            ((-2, 1, 0), 130),
-        )
-        for return_codes, expected in cases:
-            with (
-                self.subTest(return_codes=return_codes),
-                mock.patch.object(module.importlib.util, "find_spec", return_value=object()),
-                mock.patch.object(module, "run", return_value=return_codes[0]) as run_mock,
-                mock.patch.object(module, "run_bandit", side_effect=return_codes[1:]) as bandit_mock,
-                mock.patch.object(sys, "argv", [str(helper), "--root", str(DIST)]),
-            ):
-                self.assertEqual(module.main(), expected)
-                self.assertEqual(run_mock.call_count, 1)
-                self.assertEqual(bandit_mock.call_count, 2)
-
     def test_kernel_has_no_product_leak(self) -> None:
         leaks = []
-        skip = {".git", ".venv", "evals", "plan", "__pycache__"}
-        for path in DIST.rglob("*"):
-            if not path.is_file():
-                continue
-            if any(part in skip for part in path.parts):
-                continue
-            # Research reports are evaluation evidence, not installed cell policy.
-            # Keep public runtime, installer, agent definitions and ordinary docs checked.
-            if path.relative_to(DIST).parts[:2] == ("docs", "research"):
+        skip = {".git", ".venv", "dist", "plan", "__pycache__"}
+        tracked = subprocess.run(["git", "-C", str(DIST), "ls-files", "-z"], capture_output=True, text=True)
+        # The distribution is what Git tracks; outside a repository (the self-test) every file counts.
+        paths = ([DIST / name for name in tracked.stdout.split("\0") if name]
+                 if tracked.returncode == 0 and (DIST / ".git").exists() else DIST.rglob("*"))
+        for path in paths:
+            if not path.is_file() or any(part in skip for part in path.relative_to(DIST).parts):
                 continue
             if path.suffix not in SCAN_SUFFIXES:
                 continue
@@ -784,23 +686,26 @@ class BootstrapEval(unittest.TestCase):
                 leaks.append(str(path.relative_to(DIST)))
         self.assertEqual(leaks, [], f"product leaks: {leaks}")
 
-    def test_product_scan_keeps_runtime_protected_but_allows_research(self) -> None:
+    def test_product_scan_covers_the_whole_distribution(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            report = root / "docs/research/example.md"
-            report.parent.mkdir(parents=True)
             probe = "forbidden-probe"
-            report.write_text(f"{probe} evaluation evidence", encoding="utf-8")
             hashes = FORBIDDEN_HASHES | {hashlib.sha256(probe.encode()).hexdigest()[:16]}
+            (root / "README.md").write_text("A clean distribution.\n", encoding="utf-8")
             with mock.patch.dict(globals(), {"DIST": root, "FORBIDDEN_HASHES": hashes}):
                 self.test_kernel_has_no_product_leak()
-                for relative in ("kernel/AGENTS.md", "kernel/.codex/agents/example.toml", "adapters/example/SKILL.md", "README.md"):
+                for relative in ("kernel/AGENTS.md", "kernel/.codex/agents/example.toml", "adapters/example/SKILL.md",
+                                 "README.md", "docs/adr/0002-example.md", "evals/example/results.md"):
                     target = root / relative
                     target.parent.mkdir(parents=True, exist_ok=True)
+                    before = target.read_text(encoding="utf-8") if target.exists() else None
                     target.write_text(f"{probe} consumer-specific policy", encoding="utf-8")
                     with self.assertRaises(AssertionError):
                         self.test_kernel_has_no_product_leak()
-                    target.unlink()
+                    if before is None:
+                        target.unlink()
+                    else:
+                        target.write_text(before, encoding="utf-8")
 
     def test_update_does_not_overwrite_home(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -934,7 +839,7 @@ class BootstrapEval(unittest.TestCase):
                 self.assertFalse((dest / ".agents/skills" / name).exists())
 
     def test_adopt_preserves_knowledge_and_extras(self) -> None:
-        sys.path.insert(0, str(DIST / "kernel" / "90-Meta"))
+        sys.path.insert(0, str(DIST / "scripts"))
         from instance import dump_instance, validate_instance
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -1031,10 +936,10 @@ class BootstrapEval(unittest.TestCase):
             self.assertEqual((dest / "90-Meta" / "Alcance.md").read_text(encoding="utf-8"), "# Cell scope\nKeep extra.\n")
             self.assertEqual(
                 (dest / "90-Meta" / "audit-vault.py").read_bytes(),
-                b"# cell-audit-keep\n" if NATIVE else (DIST / "kernel" / "90-Meta" / "audit-vault.py").read_bytes(),
+                b"# cell-audit-keep\n",
             )
             self.assertTrue((dest / ".agents" / "skills" / "cell-local-tool" / "SKILL.md").is_file())
-            self.assertEqual((dest / "90-Meta" / "graph-query.py").is_file(), not NATIVE)
+            self.assertFalse((dest / "90-Meta" / "graph-query.py").is_file())
             self.assertTrue((dest / ".knowledge-os.lock.yaml").is_file())
             gitignore = (dest / ".gitignore").read_text(encoding="utf-8")
             self.assertIn("/custom-ignore", gitignore)
@@ -1053,10 +958,10 @@ class BootstrapEval(unittest.TestCase):
                 ["archive/", ".plan/", ".scratch/", ".investigations/", "AGENTS.personal.md"],
             )
             lock = (dest / ".knowledge-os.lock.yaml").read_text(encoding="utf-8")
-            self.assertIn('version: "4"' if NATIVE else 'version: "3"', lock)
+            self.assertIn('version: "4"', lock)
             self.assertIn('"AGENTS.md":', lock)
             self.assertNotIn("cell-local-tool", lock)
-            (self.assertNotIn if NATIVE else self.assertIn)('"90-Meta/audit-vault.py":', lock)
+            self.assertNotIn('"90-Meta/audit-vault.py":', lock)
             self.assertNotIn('"90-Meta/Alcance.md":', lock)
             self.assertEqual(knowledge_snapshot(dest), knowledge_before)
             doctor = run(["sh", str(INSTALL), "doctor", "--dest", str(dest)])
@@ -1089,7 +994,7 @@ class BootstrapEval(unittest.TestCase):
             self.assertTrue((dest / "90-Meta" / "Alcance.md").is_file())
             self.assertEqual(
                 (dest / "90-Meta" / "audit-vault.py").read_bytes(),
-                b"# cell-audit-keep\n" if NATIVE else (DIST / "kernel" / "90-Meta" / "audit-vault.py").read_bytes(),
+                b"# cell-audit-keep\n",
             )
             self.assertEqual(
                 (dest / "AGENTS.md").read_bytes(),
@@ -1211,7 +1116,7 @@ class BootstrapEval(unittest.TestCase):
             self.assertEqual((dest / "00-Home.md").read_bytes(), home)
             self.assertEqual(agents.read_bytes(), (DIST / "kernel" / "AGENTS.md").read_bytes())
             portable_lock = lock_path.read_text(encoding="utf-8")
-            self.assertIn('version: "4"' if NATIVE else 'version: "3"', portable_lock)
+            self.assertIn('version: "4"', portable_lock)
             self.assertIn('"AGENTS.md":', portable_lock)
             self.assertNotIn(
                 ".knowledge-os.lock.yaml",

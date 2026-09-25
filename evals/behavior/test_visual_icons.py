@@ -1,6 +1,5 @@
-"""Verify the pinned icon subset and portable symbol reference checks."""
+"""Verify the pinned icon subset; symbol reference checks are Go tests of `check visual`."""
 import hashlib
-import importlib.util
 import json
 from pathlib import Path
 import unittest
@@ -8,9 +7,6 @@ import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[2]
 SKILL = ROOT / 'kernel/.agents/skills/explain-visually'
-SPEC = importlib.util.spec_from_file_location('check_visual', SKILL / 'scripts/check_visual.py')
-CHECK = importlib.util.module_from_spec(SPEC)
-SPEC.loader.exec_module(CHECK)
 
 
 class IconChecks(unittest.TestCase):
@@ -30,15 +26,6 @@ class IconChecks(unittest.TestCase):
         self.assertIn('ISC License', notice)
         self.assertIn('The MIT License', notice)
         self.assertIn('Cole Bemis', notice)
-
-    def test_local_symbol_required(self):
-        svg = '<svg aria-label="Diagram"><defs><symbol id="db"/></defs><use href="#db"/></svg>'
-        self.assertTrue(CHECK.check(svg)['structural_pass'])
-        self.assertFalse(CHECK.check(svg.replace('#db', '#missing'))['structural_pass'])
-        self.assertFalse(CHECK.check(svg.replace('#db', 'https://example.org/db.svg'))['structural_pass'])
-        icon = svg.replace('<use ', '<use data-icon="database" aria-hidden="true" focusable="false" ')
-        self.assertTrue(CHECK.check(icon)['structural_pass'])
-        self.assertFalse(CHECK.check(icon.replace('aria-hidden="true"', 'aria-hidden="false"'))['structural_pass'])
 
 
 if __name__ == '__main__':

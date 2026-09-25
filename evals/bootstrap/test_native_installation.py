@@ -33,10 +33,8 @@ class NativeInstallationTests(unittest.TestCase):
             shutil.copy2(DIST / name, cls.dist / name)
         # All artifacts are checked by installer preflight, including non-host targets.
         shutil.copytree(DIST / "dist", cls.dist / "dist", ignore=shutil.ignore_patterns("tests", "vaultctl", "*.test"))
-        paths = sorted(p.relative_to(cls.dist / "kernel").as_posix() for p in (cls.dist / "kernel").rglob("*") if p.is_file() and p.suffix in {".py", ".sh"})
-        paths.extend(["90-Meta/.bandit", "90-Meta/requirements-ci.in", "90-Meta/requirements-ci.txt", "90-Meta/ruff.toml"])
-        cls.policy = {"schema": 1, "retired_paths": sorted(paths)}
-        (cls.dist / "NATIVE_RUNTIME.json").write_text(json.dumps(cls.policy))
+        shutil.copy2(DIST / "NATIVE_RUNTIME.json", cls.dist / "NATIVE_RUNTIME.json")
+        cls.policy = json.loads((cls.dist / "NATIVE_RUNTIME.json").read_text())
         native_runtime.release(cls.dist)  # Fail with actionable build error, never skip coverage.
 
     def setUp(self):
@@ -133,9 +131,9 @@ class NativeInstallationTests(unittest.TestCase):
         # Recreate a previous portable lock's tracked runtime entry.
         sys.path.insert(0, str(DIST / "scripts"))
         import knowledge_os
-        old = self.vault / "90-Meta/audit-vault.py"
-        source = self.dist / "kernel/90-Meta/audit-vault.py"
-        old.write_bytes(source.read_bytes())
+        old = self.vault / "90-Meta/audit-vault.py"  # a helper earlier versions installed
+        retired = b"# retired helper\n"
+        old.write_bytes(retired)
         lockpath = self.vault / ".knowledge-os.lock.yaml"
         lock = knowledge_os.load_lock(lockpath)
         lock["managed_hashes"]["90-Meta/audit-vault.py"] = native_runtime.sha256(old)
@@ -144,7 +142,7 @@ class NativeInstallationTests(unittest.TestCase):
         result = self.install("update", ok=False)
         self.assertEqual(result.returncode, 3, result.stdout + result.stderr)
         self.assertEqual(old.read_text(), "# local change\n")
-        old.write_bytes(source.read_bytes())
+        old.write_bytes(retired)
         local = self.vault / "90-Meta/cell-owned.py"
         local.write_text("# keep consumer tool\n")
         self.install("update")

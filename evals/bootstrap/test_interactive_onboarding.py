@@ -10,7 +10,7 @@ import tempfile
 import unittest
 
 DIST = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(DIST / 'kernel' / '90-Meta'))
+sys.path.insert(0, str(DIST / 'scripts'))
 from instance import load_instance
 
 PROMPTS = ['Systems as', 'Trackers as', 'Cell name', 'Cell purpose',
