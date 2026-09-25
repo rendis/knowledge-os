@@ -180,7 +180,7 @@ func discoverRepositories(vault string, only map[string]bool) ([]repoInput, erro
 				in := repoInput{Name: name, Remote: remote, Path: p, Note: notes[name]}
 				configured, _ := branches[name].(string)
 				var e error
-				if in.Ref, in.RefNote, e = referenceRef(p, configured); e != nil {
+				if in.Ref, in.RefNote, e = referenceRef(p, configured, config.ReferenceBranchOrder(inst)); e != nil {
 					in.RefErr = e.Error()
 				}
 				out = append(out, in)

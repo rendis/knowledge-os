@@ -126,6 +126,15 @@ class InstanceTests(unittest.TestCase):
             self.assertEqual(reference_branches(loaded, "payments-api"), ("release/stable",))
             self.assertEqual(reference_branches(loaded, "123"), ("trunk",))
             self.assertEqual(reference_branches(loaded, "unlisted"), ("main", "master"))
+        data["sources"]["reference_branch_order"] = ["develop", "main", "master"]
+        loaded = validate_instance(_parse_minimal_yaml(dump_instance(data)))
+        self.assertEqual(reference_branches(loaded, "unlisted"), ("develop", "main", "master"))
+        self.assertEqual(reference_branches(loaded, "payments-api"), ("release/stable",))
+        for bad in ([], ["main", "main"], ["refs/heads/main"]):
+            data["sources"]["reference_branch_order"] = bad
+            with self.assertRaises(InstanceError):
+                validate_instance(data)
+        data["sources"]["reference_branch_order"] = ["main", "master"]
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "instance.yaml"
             path.write_text(dump_instance(data))

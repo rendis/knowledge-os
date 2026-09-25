@@ -41,11 +41,14 @@ func resolveCommit(repo, ref string) (string, error) {
 }
 
 // referenceRef applies the vault's reference-branch policy (90-Meta/reference-branches.md): a
-// configured branch is exact; otherwise main, then master. The remote-tracking ref wins over the
-// local branch, which may lag behind it. A non-empty note explains a fallback the caller reports
-// as pending.
-func referenceRef(repo, configured string) (ref, note string, err error) {
-	candidates := []string{"main", "master"}
+// configured branch is exact; otherwise the cell's branch order (default main, then master). The
+// remote-tracking ref wins over the local branch, which may lag behind it. A non-empty note explains a
+// fallback the caller reports as pending.
+func referenceRef(repo, configured string, order []string) (ref, note string, err error) {
+	candidates := order
+	if len(candidates) == 0 {
+		candidates = []string{"main", "master"}
+	}
 	if configured != "" {
 		candidates = []string{configured}
 	}
@@ -63,7 +66,7 @@ func referenceRef(repo, configured string) (ref, note string, err error) {
 	if r, e := gitOutput(repo, "symbolic-ref", "--quiet", "refs/remotes/origin/HEAD"); e == nil && r != "" {
 		fallback = r
 	}
-	return fallback, "no main or master branch; scanned " + fallback + "; declare the production branch in sources.reference_branches", nil
+	return fallback, "none of " + strings.Join(candidates, ", ") + " exists; scanned " + fallback + "; declare the branch in sources.reference_branches or extend sources.reference_branch_order", nil
 }
 
 func openSnapshot(repo, ref string) (*snapshot, error) {

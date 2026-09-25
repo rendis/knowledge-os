@@ -45,10 +45,15 @@ fields:
   sources.discovery_roots:
     type: list
     optional: true
+  sources.reference_branch_order:
+    type: list
+    optional: true
+    default: [main, master]
+    description: Branches tried in order for every repository without an explicit entry; the first that exists is its reference branch. Asked during onboarding, since teams and older projects differ (main, master, develop).
   sources.reference_branches:
     type: object
     optional: true
-    description: Maps exact repository basenames to Git branch names. Unlisted repositories use main, falling back to master. An explicit branch never falls back.
+    description: Maps exact repository basenames to Git branch names. Unlisted repositories use reference_branch_order. An explicit branch never falls back.
   sources.schema_repository:
     type: object
     optional: true

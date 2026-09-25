@@ -187,6 +187,19 @@ func ValidateInstance(m Object) error {
 			}
 		}
 	}
+	if v, exists := obj(m["sources"])["reference_branch_order"]; exists && v != nil {
+		order, ok := v.([]any)
+		seen := map[string]bool{}
+		if !ok || len(order) == 0 {
+			return errors.New("reference_branch_order must list branch names")
+		}
+		for _, b := range order {
+			if !validBranch(str(b)) || seen[str(b)] {
+				return errors.New("invalid reference_branch_order")
+			}
+			seen[str(b)] = true
+		}
+	}
 	if t, exists := m["trackers"]; exists && t != nil {
 		a, ok := t.([]any)
 		if !ok {
@@ -597,4 +610,19 @@ func ResolvePath(path string) (Object, error) {
 		candidate = parent
 	}
 	return nil, errors.New("explicit path is not inside a vault with instance.yaml")
+}
+
+// ReferenceBranchOrder is the cell's ordered branch preference for repositories without an explicit
+// reference branch (default main, then master).
+func ReferenceBranchOrder(inst Object) []string {
+	out := []string{}
+	for _, b := range list(obj(inst["sources"])["reference_branch_order"]) {
+		if s := str(b); s != "" {
+			out = append(out, s)
+		}
+	}
+	if len(out) == 0 {
+		return []string{"main", "master"}
+	}
+	return out
 }

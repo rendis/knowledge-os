@@ -14,9 +14,9 @@ sys.path.insert(0, str(DIST / 'kernel' / '90-Meta'))
 from instance import load_instance
 
 PROMPTS = ['Systems as', 'Trackers as', 'Cell name', 'Cell purpose',
-           'Evidence profile', 'Note locale', 'Adapters (']
+           'Evidence profile', 'Note locale', 'Reference branches', 'Adapters (']
 ANSWERS = ['orders:Orders', 'work:github:https://example.org/issues',
-           'Commerce', 'Order fulfillment.', 'documented-source', 'en', 'reports']
+           'Commerce', 'Order fulfillment.', 'documented-source', 'en', 'develop,main', 'reports']
 
 
 def snapshot(root):
@@ -50,13 +50,14 @@ class InteractiveOnboardingTests(unittest.TestCase):
                 self.assertFalse(self.dest.exists())
 
     def test_enter_defaults_is_intentional(self):
-        result = self.run_init('\n' * 7)
+        result = self.run_init('\n' * len(PROMPTS))
         self.assertEqual(result.returncode, 0, result.stderr)
         instance = load_instance(self.dest / 'instance.yaml')
         self.assertEqual(instance['cell']['name'], 'Cell')
         self.assertEqual(instance['evidence']['profile'], 'production-gate')
         self.assertEqual(instance['locale']['notes'], 'es')
         self.assertEqual(instance['adapters'], [])
+        self.assertEqual(instance['sources']['reference_branch_order'], ['main', 'master'])
 
     def test_answers_persist_without_local_clone_authority(self):
         discovery = self.root / 'discovery'
@@ -73,6 +74,7 @@ class InteractiveOnboardingTests(unittest.TestCase):
         self.assertEqual(instance['trackers'], [{'id': 'work', 'provider': 'github', 'url': 'https://example.org/issues'}])
         self.assertEqual(instance['evidence']['profile'], 'documented-source')
         self.assertEqual(instance['locale']['notes'], 'en')
+        self.assertEqual(instance['sources']['reference_branch_order'], ['develop', 'main'])
         self.assertEqual(instance['adapters'], ['reports'])
         self.assertEqual(instance['sources']['discovery_roots'], [str(discovery)])
         self.assertEqual(snapshot(discovery), before)

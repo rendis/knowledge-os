@@ -382,16 +382,20 @@ func remoteRepos(ctx context.Context, s scope, org string, g github) ([]object, 
 			if !s.tracked(name) {
 				continue
 			}
-			branches := []string{"main", "master"}
+			branches := config.ReferenceBranchOrder(s.instance)
 			refs := map[string]any{"main": r["main"], "master": r["master"]}
-			configured := str(obj(obj(s.instance["sources"])["reference_branches"])[name])
-			if configured != "" {
+			if configured := str(obj(obj(s.instance["sources"])["reference_branches"])[name]); configured != "" {
 				branches = []string{configured}
-				data, e := api(ctx, g.token, `query($org:String!,$repo:String!,$ref:String!){repository(owner:$org,name:$repo){ref(qualifiedName:$ref){name target{oid}}}}`, "org="+org, "repo="+name, "ref=refs/heads/"+configured)
+			}
+			for _, b := range branches {
+				if _, known := refs[b]; known {
+					continue // main and master come with the organization query
+				}
+				data, e := api(ctx, g.token, `query($org:String!,$repo:String!,$ref:String!){repository(owner:$org,name:$repo){ref(qualifiedName:$ref){name target{oid}}}}`, "org="+org, "repo="+name, "ref=refs/heads/"+b)
 				if e != nil {
 					return nil, e
 				}
-				refs[configured] = obj(data["repository"])["ref"]
+				refs[b] = obj(data["repository"])["ref"]
 			}
 			r["branch"] = nil
 			r["sha"] = nil
