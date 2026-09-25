@@ -124,24 +124,6 @@ func TestCheckGatesEvidenceReferencesLinksAndLeaks(t *testing.T) {
 	}
 }
 
-func TestLegacyCasesLoadWithWarnings(t *testing.T) {
-	v := vault(t)
-	legacy := "---\nid: 20260701-120000-legacy-case\ntitle: Legacy\ndedupe-key: legacy\nstatus: investigating\npurpose: development\ncreated-at: 2026-07-01T12:00:00Z\n---\n\n# Legacy\n\n## Evidence\n\n### Facts\n\n- E-001 hecho sin fuente\n\n## History\n\n- 2026-07-01 — creado; registrado por alguien\n"
-	write(t, v, "investigations/20260701-120000-legacy-case/investigation.md", legacy)
-	cs, _ := List(v)
-	if len(cs) != 1 || !cs[0].Legacy || cs[0].Status != "open" || cs[0].Type != "development" || cs[0].Visibility != "published" {
-		t.Fatalf("legacy case must map onto the new states: %+v", cs)
-	}
-	r, _ := Check(v, cs[0].Path)
-	if !r.OK || !strings.Contains(issues(r, "warning"), "evidence without a source") {
-		t.Fatalf("legacy schema findings are warnings, not blockers: %+v", r)
-	}
-	ok, _, pre, _ := CheckIntroduced(v, cs[0].Path, []byte(legacy))
-	if !ok || pre != 0 {
-		t.Fatal("an unchanged legacy case passes")
-	}
-}
-
 func TestListFindsRetiredCasesInHistory(t *testing.T) {
 	v := vault(t)
 	write(t, v, "investigations/20260801-090000-old/investigation.md", caseText(""))
@@ -258,14 +240,6 @@ func TestPublishedCasesChangeOnlyOnSyncBranches(t *testing.T) {
 	git(t, v, "checkout", "-q", "-b", "sync/case-ordenes")
 	if _, e := run(t, "add", "--vault", v, "--id", "20260925-100000-ordenes", "--kind", "question", "--text", "¿Y en CO?", "--resolve-by", "snapshot"); e != nil {
 		t.Fatal(e)
-	}
-}
-
-func TestEarlierCasesAreReadOnly(t *testing.T) {
-	v := vault(t)
-	write(t, v, ".investigations/20260701-120000-legacy-case/investigation.md", "---\nid: 20260701-120000-legacy-case\ntitle: Legacy\nstatus: investigating\npurpose: knowledge\n---\n\n# Legacy\n")
-	if _, e := run(t, "add", "--vault", v, "--id", "20260701-120000-legacy-case", "--kind", "question", "--text", "x", "--resolve-by", "y"); e == nil || !strings.Contains(e.Error(), "open a new case") {
-		t.Fatalf("an earlier case is recreated in the current format, not edited: %v", e)
 	}
 }
 

@@ -772,7 +772,6 @@ func Run(args []string, out io.Writer) error {
 	fs := flag.NewFlagSet("audit", flag.ContinueOnError)
 	fs.SetOutput(out)
 	root := fs.String("vault", ".", "vault directory")
-	fs.StringVar(root, "root", ".", "vault directory (compatibility)")
 	if e := fs.Parse(args); e != nil {
 		return e
 	}

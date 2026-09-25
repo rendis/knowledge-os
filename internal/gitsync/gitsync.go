@@ -135,7 +135,7 @@ func Run(args []string, out io.Writer) error {
 	case "pull":
 		return pull(o, out)
 	}
-	return fmt.Errorf("unknown sync command %q; the legacy run commands were retired, see synchronize-ecosystem", cmd)
+	return fmt.Errorf("unknown sync command %q; see sync --help", cmd)
 }
 
 func defaultBase(vault string) string {

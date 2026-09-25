@@ -2,7 +2,6 @@
 """Execute the installed native runtime against disposable vaults.
 
 Requires `make release`; uses real release artifacts, never mocked executables.
-The native policy is activated in the temporary distribution only.
 """
 from __future__ import annotations
 
@@ -33,8 +32,6 @@ class NativeInstallationTests(unittest.TestCase):
             shutil.copy2(DIST / name, cls.dist / name)
         # All artifacts are checked by installer preflight, including non-host targets.
         shutil.copytree(DIST / "dist", cls.dist / "dist", ignore=shutil.ignore_patterns("tests", "vaultctl", "*.test"))
-        shutil.copy2(DIST / "NATIVE_RUNTIME.json", cls.dist / "NATIVE_RUNTIME.json")
-        cls.policy = json.loads((cls.dist / "NATIVE_RUNTIME.json").read_text())
         native_runtime.release(cls.dist)  # Fail with actionable build error, never skip coverage.
 
     def setUp(self):
@@ -69,17 +66,6 @@ class NativeInstallationTests(unittest.TestCase):
         self.assertEqual(doctor["lock_version"], "4")
         self.assertNotIn('".bin/', (self.vault / ".knowledge-os.lock.yaml").read_text())
 
-    def test_installed_own_skills_never_reference_retired_scripts(self):
-        retired = {Path(name).name for name in self.policy["retired_paths"] if name.endswith(".py")}
-        references = []
-        for note in (self.vault / ".agents/skills").rglob("*.md"):
-            # Upstream Obsidian skills are outside the owned documentation audit.
-            if note.relative_to(self.vault / ".agents/skills").parts[0].startswith("obsidian-"):
-                continue
-            content = note.read_text(encoding="utf-8")
-            references.extend(f"{note.relative_to(self.vault)}: {name}" for name in retired if name in content)
-        self.assertEqual(references, [], "Installed instructions reference absent retired scripts")
-
     def test_search_refresh_new_edit_rename_delete(self):
         note = self.vault / "50-Glosario" / "Lookup.md"
         note.write_text("# Lookup\n\n## Example\n\nUniqueindexexample alpha.\n")
@@ -110,33 +96,16 @@ class NativeInstallationTests(unittest.TestCase):
         self.install("update")
         self.cli("version")
 
-    def test_upgrade_host_only_runtime_to_portable_bundle(self):
-        legacy = self.vault / ".bin"
-        legacy.mkdir()
-        selected = self.vault / native_runtime.local_paths(native_runtime.target())[0]
-        old = legacy / ("vaultctl.exe" if os.name == "nt" else "vaultctl")
-        shutil.copy2(selected, old)
-        unrelated = legacy / "consumer-owned.txt"
-        unrelated.write_text("preserve local files")
-        shutil.rmtree(self.vault / ".agents/bin")
-        self.install("update")
-        self.assertTrue(old.is_file())
-        self.assertEqual(unrelated.read_text(), "preserve local files")
-        for target in native_runtime.TARGETS:
-            self.assertTrue((self.vault / ".agents/bin" / native_runtime.filename(target)).is_file())
-        self.assertEqual(json.loads(self.install("doctor").stdout)["native_runtime"]["status"], "ready")
-        self.cli("version")
-
     def test_retirement_preserves_local_changes_then_removes_unchanged(self):
         # Recreate a previous portable lock's tracked runtime entry.
         sys.path.insert(0, str(DIST / "scripts"))
         import knowledge_os
-        old = self.vault / "90-Meta/audit-vault.py"  # a helper earlier versions installed
-        retired = b"# retired helper\n"
+        old = self.vault / "90-Meta/removed-helper.py"  # a file an earlier release managed
+        retired = b"# helper no longer shipped\n"
         old.write_bytes(retired)
         lockpath = self.vault / ".knowledge-os.lock.yaml"
         lock = knowledge_os.load_lock(lockpath)
-        lock["managed_hashes"]["90-Meta/audit-vault.py"] = native_runtime.sha256(old)
+        lock["managed_hashes"]["90-Meta/removed-helper.py"] = native_runtime.sha256(old)
         lockpath.write_text(knowledge_os.dump_lock(lock))
         old.write_text("# local change\n")
         result = self.install("update", ok=False)

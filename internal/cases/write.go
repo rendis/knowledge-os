@@ -290,9 +290,6 @@ func mutate(o options, out io.Writer, change func(c Case, text, locale string) (
 	if e != nil {
 		return e
 	}
-	if c.Legacy {
-		return fmt.Errorf("case %s uses the earlier format: open a new case in the current format from it (read it, then new and add), and close this one as superseded", c.ID)
-	}
 	full := filepath.Join(o.vault, c.Path)
 	b, e := os.ReadFile(full)
 	if e != nil {

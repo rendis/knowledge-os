@@ -43,47 +43,6 @@ class IntegrityTests(unittest.TestCase):
             self.assertFalse((dest / '.agents/skills/generate-reports/SKILL.md').exists())
             self.assertEqual(doctor(), 0)
 
-    def test_retired_provider_pack_update_preserves_cell_files(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            dest = Path(tmp)
-            command = ['python3', '-B', str(ROOT / 'scripts/knowledge_os.py')]
-            subprocess.run(command + ['init', '--dest', tmp, '--cell-name', 'Test',
-                           '--purpose', 'Test', '--system', 'test:Test', '--yes'],
-                           check=True, capture_output=True)
-            retired = dest / '.agents/skills/gcloud/SKILL.md'
-            retired.parent.mkdir()
-            retired.write_text('old distributed helper')
-            custom = retired.parent / 'local.md'
-            custom.write_text('developer owned')
-            lock = installer.load_lock(dest / installer.LOCK_NAME)
-            lock['adapters'] = ['gcp', 'postgres']
-            lock['managed_hashes']['.agents/skills/gcloud/SKILL.md'] = installer.sha256_file(retired)
-            (dest / installer.LOCK_NAME).write_text(installer.dump_lock(lock))
-            # Configuration still naming removed packs fails without touching the vault.
-            instance = dest / 'instance.yaml'
-            original = instance.read_text()
-            instance.write_text(original.replace('adapters: []', 'adapters: [gcp, postgres]'))
-            refused = subprocess.run(command + ['update', '--dest', tmp], capture_output=True)
-            self.assertNotEqual(refused.returncode, 0)
-            self.assertTrue(retired.exists())
-            doctor = subprocess.run(command + ['doctor', '--dest', tmp, '--strict'],
-                                    capture_output=True, text=True)
-            self.assertNotEqual(doctor.returncode, 0)
-            self.assertNotIn('Traceback', doctor.stderr)
-            instance.write_text(original)
-            # Existing drift protection still applies to a retired managed file.
-            retired.write_text('locally modified helper')
-            refused = subprocess.run(command + ['update', '--dest', tmp], capture_output=True)
-            self.assertNotEqual(refused.returncode, 0)
-            self.assertEqual(retired.read_text(), 'locally modified helper')
-            retired.write_text('old distributed helper')
-            subprocess.run(command + ['update', '--dest', tmp], check=True, capture_output=True)
-            self.assertFalse(retired.exists())
-            self.assertEqual(custom.read_text(), 'developer owned')
-            self.assertTrue((dest / '.agents/skills/inspect-database/SKILL.md').is_file())
-            self.assertEqual(instance.read_text(), original)
-            self.assertEqual(installer.load_lock(dest / installer.LOCK_NAME)['adapters'], [])
-
     def test_real_claude_skills_preserved_before_any_copy(self):
         with tempfile.TemporaryDirectory() as tmp:
             dest = Path(tmp)
@@ -138,22 +97,6 @@ class IntegrityTests(unittest.TestCase):
                 lock['distribution_dirty'] = True
                 (dest / installer.LOCK_NAME).write_text(installer.dump_lock(lock))
                 self.assertEqual(installer.cmd_doctor(args), 2)
-
-    def test_update_removes_only_legacy_claude_link(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            dest = Path(tmp)
-            command = ['python3', '-B', str(ROOT / 'scripts/knowledge_os.py')]
-            subprocess.run(command + ['init', '--dest', tmp, '--cell-name', 'Test',
-                           '--purpose', 'Test', '--system', 'test:Test', '--yes'],
-                           check=True, capture_output=True)
-            claude = dest / 'CLAUDE.md'
-            self.assertFalse(claude.exists())
-            claude.symlink_to('AGENTS.md')
-            subprocess.run(command + ['update', '--dest', tmp], check=True, capture_output=True)
-            self.assertFalse(claude.exists() or claude.is_symlink())
-            claude.write_text('cell instructions')
-            subprocess.run(command + ['update', '--dest', tmp], check=True, capture_output=True)
-            self.assertEqual(claude.read_text(), 'cell instructions')
 
     def test_ignored_shipped_file_marks_distribution_dirty(self):
         with tempfile.TemporaryDirectory() as tmp:

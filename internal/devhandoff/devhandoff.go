@@ -39,7 +39,7 @@ type options struct {
 	apply                           bool
 }
 
-// Run executes a handoff command; legacy verbs are routed by the caller.
+// Run executes a handoff command; reconcile is routed to the case package by the caller.
 func Run(args []string, out io.Writer) error {
 	if len(args) == 0 || contains(args, "--help") || contains(args, "-h") {
 		_, e := io.WriteString(out, Help+"\n")

@@ -17,25 +17,6 @@ from pathlib import Path
 TARGETS = {f"{system}/{arch}" for system in ("darwin", "linux", "windows") for arch in ("arm64", "amd64")}
 
 
-def policy(dist: Path) -> dict | None:
-    path = dist / "NATIVE_RUNTIME.json"
-    if not path.exists():
-        return None
-    if path.is_symlink():
-        raise RuntimeError("native runtime policy must not be a symlink")
-    value = json.loads(path.read_text(encoding="utf-8"))
-    if (not isinstance(value, dict) or value.get("schema") != 1
-            or set(value) != {"schema", "retired_paths"}
-            or not isinstance(value["retired_paths"], list)):
-        raise RuntimeError("invalid NATIVE_RUNTIME.json policy")
-    for name in value["retired_paths"]:
-        if (not isinstance(name, str) or name.startswith("/") or "\\" in name
-                or any(p in {"", ".", ".."} for p in name.split("/"))
-                or not name.startswith(("90-Meta/", ".agents/skills/"))):
-            raise RuntimeError("unsafe native runtime retired path")
-    return value
-
-
 def target() -> str:
     system = platform.system().lower()
     machine = platform.machine().lower()
@@ -112,9 +93,7 @@ def descriptor(value: object) -> dict:
     return value
 
 
-def release(dist: Path) -> dict | None:
-    if policy(dist) is None:
-        return None
+def release(dist: Path) -> dict:
     path = dist / "dist/runtime-manifest.json"
     if not path.is_file() or path.is_symlink():
         raise RuntimeError("native runtime release missing: run make release before installation")
@@ -130,9 +109,7 @@ def release(dist: Path) -> dict | None:
     return value
 
 
-def preflight(dest: Path, current: dict | None) -> None:
-    if current is None:
-        return
+def preflight(dest: Path, current: dict) -> None:
     for relative in bundle_hashes(current):
         path = dest / relative
         parent = dest
@@ -144,9 +121,7 @@ def preflight(dest: Path, current: dict | None) -> None:
             raise RuntimeError(f"unsafe native runtime local path: {relative}")
 
 
-def conflicts(dest: Path, current: dict | None, previous: dict | None) -> list[str]:
-    if current is None:
-        return []
+def conflicts(dest: Path, current: dict, previous: dict | None) -> list[str]:
     preflight(dest, current)
     if previous is not None:
         previous = descriptor(previous)
@@ -154,9 +129,7 @@ def conflicts(dest: Path, current: dict | None, previous: dict | None) -> list[s
     return [relative for relative, digest in expected.items() if (dest / relative).exists() and sha256(dest / relative) != digest]
 
 
-def install(dist: Path, dest: Path, current: dict | None) -> None:
-    if current is None:
-        return
+def install(dist: Path, dest: Path, current: dict) -> None:
     preflight(dest, current)
     for relative in bundle_hashes(current):
         output = dest / relative
@@ -178,9 +151,7 @@ def install(dist: Path, dest: Path, current: dict | None) -> None:
                 os.unlink(name)
 
 
-def status(dest: Path, current: dict | None, installed: dict | None) -> dict:
-    if current is None and installed is None:
-        return {"status": "legacy"}
+def status(dest: Path, current: dict, installed: dict | None) -> dict:
     if installed is None:
         return {"status": "missing-release-lock"}
     try:

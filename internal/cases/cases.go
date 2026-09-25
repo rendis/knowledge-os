@@ -26,7 +26,7 @@ change that would introduce a gate error is refused. All output is JSON.
   new      --title TEXT --type understanding|development --objective TEXT [--source-ref REF]
            Open an unpublished case from the request (neutral, formalized) and report
            existing cases with a similar title.
-  list     [--id ID]   Unpublished, published and retired cases (earlier formats readable).
+  list     [--id ID]   Unpublished, published and retired cases.
   check    [--id ID]   The gate: sourced evidence, unique and resolving record IDs, resolving
            links, no credential or local path, no paragraph copied from a vault note, handoff
            packages complete and citing defined requirements.
@@ -64,7 +64,7 @@ type options struct {
 	apply, dryRun                                                      bool
 }
 
-// Run executes an investigation command. Legacy verbs are handled by the caller.
+// Run executes an investigation command.
 func Run(args []string, out io.Writer) error {
 	if len(args) == 0 || contains(args, "--help") || contains(args, "-h") {
 		_, e := io.WriteString(out, Help+"\n")
@@ -158,7 +158,6 @@ type Case struct {
 	Visibility string `json:"visibility"` // unpublished | published | retired
 	Path       string `json:"path,omitempty"`
 	Private    string `json:"private,omitempty"` // sensitive notes and scratch, never shared
-	Legacy     bool   `json:"legacy,omitempty"`
 	Updated    string `json:"updated,omitempty"`
 }
 
@@ -179,28 +178,13 @@ func frontmatter(text string) map[string]string {
 	return out
 }
 
-// normalize maps the current and legacy schemas onto type, status and outcome.
-func normalize(fm map[string]string) (kind, status, outcome string, legacy bool) {
-	kind, legacy = fm["type"], fm["type"] == ""
-	if legacy {
-		switch fm["purpose"] {
-		case "development", "mixed":
-			kind = "development"
-		default:
-			kind = "understanding"
-		}
-	}
-	switch fm["status"] {
-	case "closed":
+// normalize reads type, status and outcome; anything but closed is open.
+func normalize(fm map[string]string) (kind, status, outcome string) {
+	status = "open"
+	if fm["status"] == "closed" {
 		status = "closed"
-	default:
-		status = "open"
 	}
-	outcome = fm["outcome"]
-	if outcome == "" {
-		outcome = fm["closure-outcome"]
-	}
-	return kind, status, outcome, legacy
+	return fm["type"], status, fm["outcome"]
 }
 
 func readCase(vault, dir, visibility string) (Case, bool) {
@@ -214,7 +198,7 @@ func readCase(vault, dir, visibility string) (Case, bool) {
 	if c.ID == "" {
 		c.ID = filepath.Base(dir)
 	}
-	c.Type, c.Status, c.Outcome, c.Legacy = normalize(fm)
+	c.Type, c.Status, c.Outcome = normalize(fm)
 	c.Path, _ = filepath.Rel(vault, p)
 	if st, e := os.Stat(p); e == nil {
 		c.Updated = st.ModTime().UTC().Format(time.RFC3339)
@@ -227,7 +211,7 @@ func readCase(vault, dir, visibility string) (Case, bool) {
 }
 
 // List returns every case: unpublished, published, and retired ones recorded in Git history
-// (Retired-Case trailers) or in the legacy retirement register.
+// (Retired-Case trailers).
 func List(vault string) ([]Case, error) {
 	out := []Case{}
 	seen := map[string]bool{}
@@ -259,17 +243,6 @@ func retiredIDs(vault string) []string {
 	if b, e := cmd.Output(); e == nil {
 		for _, m := range retiredTag.FindAllStringSubmatch(string(b), -1) {
 			ids = append(ids, m[1])
-		}
-	}
-	// Legacy register: "- {json}" lines with an "id" field.
-	if b, e := os.ReadFile(filepath.Join(vault, "investigations", "retired.md")); e == nil {
-		for _, l := range strings.Split(string(b), "\n") {
-			var m map[string]any
-			if strings.HasPrefix(l, "- ") && json.Unmarshal([]byte(l[2:]), &m) == nil {
-				if id, _ := m["id"].(string); id != "" {
-					ids = append(ids, id)
-				}
-			}
 		}
 	}
 	return ids

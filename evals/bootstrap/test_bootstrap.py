@@ -173,12 +173,6 @@ class BootstrapEval(unittest.TestCase):
             "90-Meta/work-item-evidence.md",
         ):
             self.assertTrue((DIST / "kernel" / relative).is_file(), relative)
-        for relative in (
-            ".agents/skills/map-ecosystem/scripts/resolve-vault.py",
-            ".agents/skills/map-ecosystem/references/vault-resolution.md",
-            ".agents/skills/map-ecosystem/references/node-selection.md",
-        ):
-            self.assertFalse((DIST / "kernel" / relative).exists(), relative)
 
     def test_shared_vault_resolver_requires_a_valid_instance(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -408,16 +402,6 @@ class BootstrapEval(unittest.TestCase):
             self.assertEqual(json.loads(blocked.stdout)["status"], "invalid-lock")
             self.assertEqual(outside_file.read_bytes(), retired_bytes)
 
-    def test_changed_workflows_have_no_legacy_resolution_routes(self) -> None:
-        documents = [
-            DIST / "kernel/.agents/skills/manage-development-handoff/SKILL.md",
-            DIST / "kernel/.agents/skills/manage-operational-workflow/SKILL.md",
-        ]
-        combined = "\n".join(path.read_text(encoding="utf-8") for path in documents)
-        self.assertNotIn("Legacy maintenance", combined)
-        self.assertNotIn("path-less compatibility", combined)
-        self.assertNotIn("when that resolver is unavailable", combined)
-
     def test_development_handoff_is_an_atomic_task_package(self) -> None:
         skill = (DIST / "kernel/.agents/skills/manage-development-handoff/SKILL.md").read_text(encoding="utf-8")
         router = (DIST / "kernel/AGENTS.md").read_text(encoding="utf-8")
@@ -479,12 +463,6 @@ class BootstrapEval(unittest.TestCase):
                 "work-item-evidence.md",
             ):
                 self.assertTrue((dest / "90-Meta" / shared).is_file(), shared)
-            self.assertFalse(
-                (
-                    dest
-                    / ".agents/skills/map-ecosystem/scripts/resolve-vault.py"
-                ).exists()
-            )
             lock = (dest / ".knowledge-os.lock.yaml").read_text(encoding="utf-8")
             self.assertIn('version: "4"', lock)
             self.assertIn('distribution_revision: "', lock)
@@ -495,7 +473,6 @@ class BootstrapEval(unittest.TestCase):
             self.assertNotIn('"Arquitectura.base":', lock)
             gitignore = (dest / ".gitignore").read_text(encoding="utf-8")
             self.assertNotIn(".knowledge-os.lock.yaml", gitignore)
-            self.assertIn("/.agents/state/map-ecosystem/", gitignore)
             self.assertIn("/AGENTS.personal.md", gitignore)
             self.assertIn("/.plan/", gitignore)
             self.assertIn("/.scratch/", gitignore)
@@ -510,7 +487,6 @@ class BootstrapEval(unittest.TestCase):
                 (dest / ".obsidian" / "app.json").read_text(encoding="utf-8")
             )
             self.assertEqual(obsidian_app["userIgnoreFilters"], [".plan/", ".scratch/", ".investigations/", "AGENTS.personal.md"])
-            self.assertNotIn(".agents/state/map-ecosystem/sync", lock)
             doctor = run(["sh", str(INSTALL), "doctor", "--dest", str(dest)])
             self.assertEqual(doctor.returncode, 0, doctor.stderr)
             info = json.loads(doctor.stdout)
@@ -972,15 +948,15 @@ class BootstrapEval(unittest.TestCase):
             personal_text = "# Personal instructions\n\nUse the local mail profile.\n"
             personal.write_text(personal_text, encoding="utf-8")
             self.assertTrue(info["orientation"]["ready"])
-            sync_state = dest / ".agents" / "state" / "map-ecosystem" / "sync" / "active" / "run-eval" / "run.json"
-            sync_state.parent.mkdir(parents=True)
-            sync_state.write_text('{"local":"keep"}\n', encoding="utf-8")
+            discovery_state = dest / ".agents" / "state" / "discovery" / "report.json"
+            discovery_state.parent.mkdir(parents=True)
+            discovery_state.write_text('{"local":"keep"}\n', encoding="utf-8")
             updated = run(["sh", str(INSTALL), "update", "--dest", str(dest)])
             self.assertEqual(updated.returncode, 0, updated.stderr)
-            self.assertEqual(sync_state.read_text(encoding="utf-8"), '{"local":"keep"}\n')
+            self.assertEqual(discovery_state.read_text(encoding="utf-8"), '{"local":"keep"}\n')
             self.assertEqual(personal.read_text(encoding="utf-8"), personal_text)
             self.assertNotIn(
-                ".agents/state/map-ecosystem/sync",
+                ".agents/state/",
                 (dest / ".knowledge-os.lock.yaml").read_text(encoding="utf-8"),
             )
             self.assertTrue((dest / ".agents" / "skills" / "cell-local-tool" / "SKILL.md").is_file())
@@ -1059,69 +1035,6 @@ class BootstrapEval(unittest.TestCase):
             updated_info = json.loads(after_update.stdout)
             self.assertTrue(updated_info["portable_lock"])
             self.assertTrue(updated_info["managed_matches_dist"])
-
-    def test_update_migrates_version2_lock_without_silent_runtime_overwrite(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            dest = Path(tmp) / "cell"
-            initialized = run(
-                [
-                    "sh",
-                    str(INSTALL),
-                    "init",
-                    "--dest",
-                    str(dest),
-                    "--cell-name",
-                    "Payments",
-                    "--purpose",
-                    "Card-present checkout",
-                    "--system",
-                    "payments:Payments",
-                    "--yes",
-                ]
-            )
-            self.assertEqual(initialized.returncode, 0, initialized.stderr)
-            home = (dest / "00-Home.md").read_bytes()
-            agents = dest / "AGENTS.md"
-            agents.write_text("# Cell-owned router\n", encoding="utf-8")
-            lock_path = dest / ".knowledge-os.lock.yaml"
-            current_lock = lock_path.read_text(encoding="utf-8")
-            legacy_lock = current_lock.replace('version: "3"', 'version: "2"', 1)
-            legacy_lock = "\n".join(
-                line
-                for line in legacy_lock.splitlines()
-                if not line.startswith((
-                    "distribution_revision:",
-                    "distribution_dirty:",
-                    '  "AGENTS.md":',
-                ))
-            ) + "\n"
-            lock_path.write_text(legacy_lock, encoding="utf-8")
-            gitignore = dest / ".gitignore"
-            gitignore.write_text(
-                gitignore.read_text(encoding="utf-8") + ".knowledge-os.lock.yaml\n",
-                encoding="utf-8",
-            )
-            blocked = run(["sh", str(INSTALL), "update", "--dest", str(dest)])
-            self.assertEqual(blocked.returncode, 3, blocked.stdout + blocked.stderr)
-            self.assertIn("AGENTS.md", json.loads(blocked.stdout)["files"])
-            updated = run([
-                "sh",
-                str(INSTALL),
-                "update",
-                "--dest",
-                str(dest),
-                "--force",
-            ])
-            self.assertEqual(updated.returncode, 0, updated.stderr)
-            self.assertEqual((dest / "00-Home.md").read_bytes(), home)
-            self.assertEqual(agents.read_bytes(), (DIST / "kernel" / "AGENTS.md").read_bytes())
-            portable_lock = lock_path.read_text(encoding="utf-8")
-            self.assertIn('version: "4"', portable_lock)
-            self.assertIn('"AGENTS.md":', portable_lock)
-            self.assertNotIn(
-                ".knowledge-os.lock.yaml",
-                gitignore.read_text(encoding="utf-8"),
-            )
 
     def test_personal_agents_contract_and_doctor_rejects_tracked_copy(self) -> None:
         router = (DIST / "kernel" / "AGENTS.md").read_text(encoding="utf-8")
