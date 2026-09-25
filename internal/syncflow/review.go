@@ -682,7 +682,7 @@ Analysis: analysis finalize-analysis|check
 Review: review freeze|check|publish|verify-published, review-finalize
 Correction: correction prepare|check
 Lifecycle: begin, checkpoint-package, seal-gate, status, validate-unit,
-           review-unit, apply-unit, resume, close, tool-digest
+           review-unit, apply-unit, resume, close, abandon-empty, tool-digest
 
 Follow synchronize-ecosystem and its command contracts for required arguments,
 review and mutation prerequisites. This help does not read or modify vault state.`)
@@ -704,7 +704,7 @@ review and mutation prerequisites. This help does not read or modify vault state
 			return runCorrection(args[1:], out)
 		}
 	}
-	if len(args) > 0 && one(args[0], "begin", "status", "checkpoint-package", "seal-gate", "tool-digest", "validate-unit", "review-unit", "apply-unit", "resume", "close") {
+	if len(args) > 0 && one(args[0], "begin", "status", "checkpoint-package", "seal-gate", "tool-digest", "validate-unit", "review-unit", "apply-unit", "resume", "close", "abandon-empty") {
 		return runState(args, out)
 	}
 	if len(args) > 0 && args[0] == "review" {

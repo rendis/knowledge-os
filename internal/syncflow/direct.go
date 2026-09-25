@@ -110,7 +110,7 @@ func validateSourceBindings(value any) error {
 		branchName, validRef := productionBranch(str(binding["production_ref"]))
 		date := str(binding["analysis_date"])
 		parsed, dateErr := time.Parse("2006-01-02", date)
-		if !nameRE.MatchString(repository) || repository <= prev || !nonempty(identity) || localPath.MatchString(identity) || strings.Contains(identity, "@") || !oidRE.MatchString(str(binding["new_oid"])) || str(binding["old_oid"]) != "" && !oidRE.MatchString(str(binding["old_oid"])) || !validRef || branchName != binding["branch"] || dateErr != nil || parsed.Format("2006-01-02") != date || !one(binding["outcome"], "write", "no-documentation-change", "no-durable-node") {
+		if !nameRE.MatchString(repository) || repository <= prev || !nonempty(identity) || containsLocalAbsolutePath(identity) || strings.Contains(identity, "@") || !oidRE.MatchString(str(binding["new_oid"])) || str(binding["old_oid"]) != "" && !oidRE.MatchString(str(binding["old_oid"])) || !validRef || branchName != binding["branch"] || dateErr != nil || parsed.Format("2006-01-02") != date || !one(binding["outcome"], "write", "no-documentation-change", "no-durable-node") {
 			return fail("source-binding-invalid")
 		}
 		prev = repository

@@ -14,6 +14,8 @@ An older active run may contain immutable packages, a sealed gate, unit projecti
 
 Legacy runs progress through `packages`, `gated`, `projecting` and `closing`; units progress from `pending` to `validated` to `applied`. Their stored executable digest, inventory fingerprint, repository/OID pairs and artifact digests remain authoritative for that run. Restore the matching CLI when it reports `run-version-mismatch`.
 
+An explicitly superseded run may use `sync abandon-empty --state-root <root> --run-id <run_id>` only while it is still a pristine package-stage run: every package is pending with zero checkpoints, and no gate, unit, vault locator or other run artifact exists. The command archives the exact run with a durable abandonment receipt and permits a new run or direct reviewed publication. This narrow transition does not authorize reusing an unaccepted legacy package; freeze and review the exact direct-publication candidate against its preserved evidence.
+
 | Legacy failure | Reuse | Recovery |
 | --- | --- | --- |
 | Invalid grant, path, digest or projection | Packages and gate | Correct only projection metadata or patch and repeat the stored validation command. |
@@ -21,6 +23,7 @@ Legacy runs progress through `packages`, `gated`, `projecting` and `closing`; un
 | Source OID changed | Unaffected packages and groups | Use the stored source-drift resume action; retract affected applied bytes when required, then rebuild only connected work. |
 | Destination baseline changed | Packages and gate | Reproject only the affected unit against the observed destination. |
 | Tool/schema mismatch | Immutable artifacts | Restore the original CLI; never rewrite stored identities. |
+| Explicitly superseded pristine run | Exact archived run and abandonment receipt | Use `abandon-empty`, then start a new run or freeze and review the direct-publication candidate. |
 | Missing active run | Closed receipt when present | Inspect the receipt; otherwise report missing state. |
 
 The old [synchronization-package-worker.md](synchronization-package-worker.md) contract is loaded only when a legacy run's stored next action explicitly names `SYNC_PACKAGE_WORKER_V1`. New sessions never choose it from inventory alone.

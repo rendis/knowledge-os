@@ -430,6 +430,22 @@ var sensitiveToken = regexp.MustCompile(`(?:gh[pousr]_[A-Za-z0-9]{10,}|xox[baprs
 var assignment = regexp.MustCompile(`(?i)(?:password|passwd|secret|token|api[_-]?key|private[_-]?key)\s*[:=]\s*['"]?[^\s'"]+`)
 var localPath = regexp.MustCompile(`/(?:Users|home/[^/[:space:]]+|private/(?:tmp|var)|tmp|var/folders|Volumes)/`)
 
+func containsLocalAbsolutePath(value string) bool {
+	for _, match := range localPath.FindAllStringIndex(value, -1) {
+		if match[0] == 0 {
+			return true
+		}
+		previous := value[match[0]-1]
+		if !('a' <= previous && previous <= 'z') &&
+			!('A' <= previous && previous <= 'Z') &&
+			!('0' <= previous && previous <= '9') &&
+			!strings.ContainsRune("._-", rune(previous)) {
+			return true
+		}
+	}
+	return false
+}
+
 func sensitive(v any) bool {
 	switch x := v.(type) {
 	case map[string]any:
@@ -445,7 +461,7 @@ func sensitive(v any) bool {
 			}
 		}
 	case string:
-		return strings.Contains(x, "-----BEGIN ") || sensitiveToken.MatchString(x) || sensitiveAssignment(x) || localPath.MatchString(x)
+		return strings.Contains(x, "-----BEGIN ") || sensitiveToken.MatchString(x) || sensitiveAssignment(x) || containsLocalAbsolutePath(x)
 	}
 	return false
 }
@@ -573,12 +589,37 @@ func runState(args []string, out io.Writer) error {
 				return e
 			}
 		}
+		if cmd == "abandon-empty" {
+			receipt, found, lookupErr := archivedAbandonment(*root, *id)
+			if lookupErr != nil {
+				return lookupErr
+			}
+			if found {
+				active, pathErr := statePath(*root, "active", *id)
+				if pathErr != nil {
+					return pathErr
+				}
+				if _, pathErr = os.Lstat(active); pathErr == nil {
+					return fail("run-abandonment-conflict")
+				} else if !os.IsNotExist(pathErr) {
+					return pathErr
+				}
+				result = clone(receipt)
+				result["reused"] = true
+				return json.NewEncoder(out).Encode(result)
+			}
+		}
 		r, e := loadRun(*root, *id)
 		if e != nil {
 			return e
 		}
 		if cmd == "status" {
 			result = publicStatus(*root, r)
+		} else if cmd == "abandon-empty" {
+			result, e = abandonEmpty(*root, r)
+			if e != nil {
+				return e
+			}
 		} else {
 			d, e := executableDigest()
 			if e != nil {

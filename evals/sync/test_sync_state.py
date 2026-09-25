@@ -1078,6 +1078,7 @@ class SyncRunStateEval(unittest.TestCase):
         cases = [
             ("/status responde 200.", True),
             ("GET /home/document-summary devuelve un resumen.", True),
+            ("Mobile/Users/Session/UserSession.swift", True),
             ("Archivo /home/alice/private/config.yaml", False),
             ("Archivo /Users/alice/private/config.yaml", False),
             ("GitHub permissions `id-token: write`.", True),
