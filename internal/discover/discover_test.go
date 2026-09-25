@@ -316,6 +316,11 @@ func TestNoteGates(t *testing.T) {
 	if !r.OK || !flagged {
 		t.Fatalf("a relation the evidence does not support goes to review without failing the gate: %+v", r.Issues)
 	}
+	multi := strings.Replace(good, "[pub/pub.go]("+link+")", "[go.mod](https://github.com/acme/SVC-orders/blob/"+sha+"/go.mod), [pub/pub.go]("+link+")", 1)
+	write(t, vault, "20-Repos/orders.md", multi)
+	if r, _ = checkNote(vault, "20-Repos/orders.md", "", false); !r.OK {
+		t.Fatalf("an identifier in one of a footnote's cited files satisfies the footnote: %+v", r.Issues)
+	}
 	bad := strings.Replace(good, "`pubsub.NewClient`", "`kafka.NewWriter`", 1)
 	bad = strings.Replace(bad, "#L5-L8", "#L5-L40", 1)
 	bad = strings.Replace(bad, "Publica en el topic `orders-cl-outbound` usando `TOPIC_OUT`.", "Publica eventos.", 1)
@@ -330,6 +335,15 @@ func TestNoteGates(t *testing.T) {
 	}
 	if r.OK || gates["G1-anchor"] == 0 {
 		t.Fatalf("invented identifier or impossible range must fail G1: %+v", r.Issues)
+	}
+	if ok, _, pre, _ := CheckNoteIntroduced(vault, "20-Repos/orders.md", []byte(bad)); !ok || pre == 0 {
+		t.Fatal("a touched note keeping its pre-existing errors must not block")
+	}
+	if ok, introduced, _, _ := CheckNoteIntroduced(vault, "20-Repos/orders.md", []byte(good)); ok || len(introduced) == 0 {
+		t.Fatal("errors added to a touched note must block")
+	}
+	if ok, _, _, _ := CheckNoteIntroduced(vault, "20-Repos/orders.md", nil); ok {
+		t.Fatal("the synced note must pass every gate")
 	}
 	if claim := claimFor("Hace A. Luego publica B. [^e2] [^e3]\n", "e3"); claim != "Luego publica B." {
 		t.Fatalf("claim %q", claim)
@@ -445,6 +459,12 @@ func TestStaleNeighboursAfterSync(t *testing.T) {
 		t.Fatal("line overlap: an insertion counts only inside the cited block")
 	}
 	write(t, vault, "30-Flujos/package.md", "# package\n\nPaquete. [^e1]\n\n[^e1]: [svc/save.go]("+strings.Replace(link(old, "svc/save.go"), "#L2", "#L1", 1)+")\n")
+	// A neighbour citing a commit newer than the synced note (a pinned later version) is not stale.
+	write(t, vault, "20-Repos/orders-old.md", "---\naliases: [\"SVC-orders\"]\ncommit-analizado: \""+old[:12]+"\"\n---\n# orders\n")
+	if s, _ := StaleNeighbours(vault, []string{"20-Repos/orders-old.md"}); len(s) != 0 {
+		t.Fatalf("newer anchors are not stale: %v", s)
+	}
+	_ = os.Remove(filepath.Join(vault, "20-Repos/orders-old.md"))
 	stale, e := StaleNeighbours(vault, []string{"20-Repos/orders.md"})
 	if e != nil {
 		t.Fatal(e)
