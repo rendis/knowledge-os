@@ -153,6 +153,11 @@ func TestSegmentReachesClaudeWhenItDoesNotImportAgents(t *testing.T) {
 	if files := instructionFiles(dir); len(files) != 1 {
 		t.Fatal("a CLAUDE.md importing AGENTS.md needs no copy")
 	}
+	os.Remove(filepath.Join(dir, "CLAUDE.md"))
+	write(t, dir, "CLAUDE.local.md", "# personal\n")
+	if files := instructionFiles(dir); len(files) != 2 || !strings.HasSuffix(files[1], "CLAUDE.local.md") {
+		t.Fatal("a personal CLAUDE.local.md hides AGENTS.md from Claude Code, so it gets the segment")
+	}
 	write(t, dir, "AGENTS.md", "# Rules\n\n"+strings.Replace(Segment(), "Development handoff", "Old handoff policy", 1))
 	next, changed, _ := withSegment(filepath.Join(dir, "AGENTS.md"))
 	if !changed || strings.Count(string(next), segmentStart) != 1 || !strings.Contains(string(next), "# Rules") {

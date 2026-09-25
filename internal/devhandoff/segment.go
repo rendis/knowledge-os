@@ -58,14 +58,22 @@ func segmentStatus(path string) string {
 }
 
 // instructionFiles are the root files the segment must reach: AGENTS.md (Codex, Cursor and most
-// harnesses) and CLAUDE.md when the repository has one that does not already import AGENTS.md.
+// harnesses), plus the file Claude Code reads instead when one exists without importing AGENTS.md:
+// Claude Code loads AGENTS.md only when no CLAUDE.md or CLAUDE.local.md is present.
 func instructionFiles(worktree string) []string {
 	files := []string{filepath.Join(worktree, "AGENTS.md")}
-	claude := filepath.Join(worktree, "CLAUDE.md")
-	if fi, e := os.Lstat(claude); e == nil && fi.Mode()&os.ModeSymlink == 0 {
-		if b, e := os.ReadFile(claude); e == nil && !strings.Contains(string(b), "AGENTS.md") {
-			files = append(files, claude)
+	for _, name := range []string{"CLAUDE.md", "CLAUDE.local.md"} {
+		p := filepath.Join(worktree, name)
+		fi, e := os.Lstat(p)
+		if e != nil {
+			continue
 		}
+		if fi.Mode()&os.ModeSymlink == 0 {
+			if b, e := os.ReadFile(p); e == nil && !strings.Contains(string(b), "AGENTS.md") {
+				files = append(files, p)
+			}
+		}
+		break // the first Claude file present is the one Claude reads alongside
 	}
 	return files
 }

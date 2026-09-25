@@ -49,6 +49,9 @@ type resource struct {
 	Topic     string     `json:"topic,omitempty"`
 	Events    []string   `json:"events,omitempty"`
 	Evidence  []evidence `json:"evidence"`
+	// MissingIn lists captured projects where a configuration file that declares that project uses
+	// this short name but the platform has no such resource (e.g. present in prd, absent in uat).
+	MissingIn []string `json:"missing_in,omitempty"`
 }
 
 type pending struct {
@@ -631,10 +634,15 @@ func (a *assembly) facts() []repoFacts {
 		}
 	}
 	for _, s := range a.scans {
+		fileProject := a.fileProjects(s)
 		blocks := map[string][]entry{}
 		for _, e := range s.entries {
 			if t := a.typed(e); t != "" {
-				add(s, t, e.Value, evidence{Kind: "config", Repo: s.in.Name, Commit: s.in.Commit, File: e.File, Key: e.KeyPath})
+				ev := evidence{Kind: "config", Repo: s.in.Name, Commit: s.in.Commit, File: e.File, Key: e.KeyPath}
+				if !canonicalPubSub.MatchString(strings.ToLower(e.Value)) {
+					ev.Project = fileProject[e.File] // a short name belongs to the project its file declares
+				}
+				add(s, t, e.Value, ev)
 			}
 			if strings.HasPrefix(e.Context, "module") || strings.HasPrefix(e.Context, "resource") {
 				blocks[e.File+"\x00"+e.Context] = append(blocks[e.File+"\x00"+e.Context], e)
@@ -716,6 +724,9 @@ func (a *assembly) facts() []repoFacts {
 				channels["messaging"] = true
 			}
 			a.wire(r)
+			if r.Type == "pubsub_topic" || r.Type == "pubsub_subscription" {
+				r.MissingIn = a.scopedMisses(r)
+			}
 			f.Resources = append(f.Resources, *r)
 			for _, ev := range r.Events {
 				f.Events = append(f.Events, eventFact{Name: ev, Topic: r.Topic, Role: "consume", Evidence: []evidence{{Kind: "platform", Value: r.Name}}})
@@ -785,6 +796,84 @@ func (a *assembly) wire(r *resource) {
 	}
 }
 
+// fileProjects maps each configuration file to the captured platform project it declares (an entry
+// judged a cloud project whose value is a captured project); files naming several projects map to none.
+func (a *assembly) fileProjects(s *repoScan) map[string]string {
+	found := map[string]map[string]bool{}
+	for _, e := range s.entries {
+		if e.Secret || len(e.Placeholders) > 0 {
+			continue
+		}
+		v := strings.ToLower(strings.TrimSpace(e.Value))
+		if _, captured := a.platform.projects[v]; !captured {
+			continue
+		}
+		if k, ok := a.st.ConfigKeys[keySignature(e)]; ok && k.Choice == "cloud_project_or_region" {
+			if found[e.File] == nil {
+				found[e.File] = map[string]bool{}
+			}
+			found[e.File][v] = true
+		}
+	}
+	out := map[string]string{}
+	for f, ps := range found {
+		if len(ps) == 1 {
+			for p := range ps {
+				out[f] = p
+			}
+		}
+	}
+	return out
+}
+
+// scopedMisses returns the declared projects (with a readable snapshot) where the resource is absent.
+func (a *assembly) scopedMisses(r *resource) []string {
+	n := normalizeResource(r.Name)
+	in := map[string]bool{}
+	if r.Type == "pubsub_subscription" {
+		for _, s := range a.platform.subs[n] {
+			in[projectOf(s.Name)] = true
+		}
+	} else {
+		for _, t := range a.platform.topics[n] {
+			in[projectOf(t)] = true
+		}
+	}
+	for _, v := range a.platform.variants(n) {
+		in[projectOf(v)] = true
+	}
+	missing := []string{}
+	if len(in) == 0 {
+		return missing // absent everywhere: the generic pending already reports it
+	}
+	for _, ev := range r.Evidence {
+		if ev.Kind != "config" || ev.Project == "" || in[ev.Project] {
+			continue
+		}
+		if snap, ok := a.platform.projects[ev.Project]; !ok || snap.Status != "ok" {
+			continue
+		}
+		// A consumer may name a topic owned by another system's project; only an environment
+		// counterpart of the same project family (acme-x-prd / acme-x-uat) proves a missing resource.
+		sibling := r.Type == "pubsub_subscription"
+		for p := range in {
+			sibling = sibling || projectFamily(p) == projectFamily(ev.Project)
+		}
+		if sibling {
+			missing = appendUnique(missing, ev.Project)
+		}
+	}
+	return missing
+}
+
+// projectFamily drops the trailing environment segment of a project id (acme-stock-uat -> acme-stock).
+func projectFamily(p string) string {
+	if i := strings.LastIndex(p, "-"); i > 0 {
+		return p[:i]
+	}
+	return p
+}
+
 func projectOf(full string) string {
 	parts := strings.Split(full, "/")
 	if len(parts) > 1 && parts[0] == "projects" {
@@ -813,6 +902,19 @@ func (a *assembly) pendingFor(f repoFacts) []pending {
 	for _, r := range f.Resources {
 		if r.Type != "pubsub_topic" && r.Type != "pubsub_subscription" {
 			continue
+		}
+		for _, p := range r.MissingIn {
+			present := []string{}
+			for _, ev := range r.Evidence {
+				if (ev.Kind == "platform" || ev.Kind == "platform-variant") && ev.Project != "" && ev.Project != p {
+					present = appendUnique(present, ev.Project)
+				}
+			}
+			detail := "configuration declaring project " + p + " uses this name, but " + p + " has no such resource"
+			if len(present) > 0 {
+				detail += " (it exists in " + strings.Join(present, ", ") + ")"
+			}
+			out = append(out, pending{Kind: "not-in-platform", Subject: r.Name + " @ " + p, Detail: detail, Confirm: a.platform.projects[p].Confirm})
 		}
 		confirmed := false
 		for _, ev := range r.Evidence {
