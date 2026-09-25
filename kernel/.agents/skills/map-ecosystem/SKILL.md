@@ -9,7 +9,7 @@ metadata:
 
 ## Activation Contract
 
-Use this skill for a cell-vault query, documentation update, related-vault catalog maintenance, or a pending-work / coverage question. Workspace configuration belongs to `configure-workspace`; Git policy belongs to `manage-git-workflow`. Inventory, lifecycle synchronization, and a `SYNC_PACKAGE_WORKER_V1` card belong to `synchronize-ecosystem`.
+Use this skill for a cell-vault query, documentation update, related-vault catalog maintenance, or a pending-work / coverage question. Workspace configuration belongs to `configure-workspace`; Git policy belongs to `manage-git-workflow`. Inventory and lifecycle synchronization belong to `synchronize-ecosystem`.
 
 ## Hard Rules
 
@@ -43,7 +43,7 @@ Choose the next action from the existing knowledge, not from the number of pendi
 | One durable node | Load `references/single-unit-documentation.md`. |
 | Several related units | Load `references/multi-unit-documentation.md`. |
 | Pending-work or campaign-completion question | Load `references/mapping-completion.md`; keep the query read-only. |
-| Inventory, lifecycle, synchronization, resume of a sync run, or a `SYNC_PACKAGE_WORKER_V1` card | Use `synchronize-ecosystem`. |
+| Inventory, lifecycle, synchronization, or resume of a sync run | Use `synchronize-ecosystem`. |
 | An accepted local map has an unresolved external connection material to the task | Load `references/connection-reconciliation.md`; preserve the accepted local artifact and create separately reviewed external claims. |
 | External reconciliation reaches a required provider, cluster or database | Finish available static reconciliation, resolve its configured executor or adapter, and require a bounded read-only probe against the exact target. Use `configure-workspace` only for a missing procedure binding; ask for the exact missing access setup reported by a bound procedure, then resume the same pending connection after its probe passes. |
 | Tooling, source, or vault resolution issue | Load `references/operational-readiness.md`. |

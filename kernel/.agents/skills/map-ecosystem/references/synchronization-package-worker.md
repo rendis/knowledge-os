@@ -1,4 +1,6 @@
-# Process one frozen synchronization package
+# Resume one legacy synchronization package
+
+This contract exists only for an active recorded run whose stored next action names `SYNC_PACKAGE_WORKER_V1`. New synchronization writes complete final-note candidates and uses [final-note-review.md](final-note-review.md); it does not create an analysis/scaffold/claim package or dispatch this worker.
 
 ## Activation
 
