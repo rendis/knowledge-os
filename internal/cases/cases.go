@@ -67,7 +67,7 @@ type options struct {
 
 // Run executes an investigation command. Legacy verbs are handled by the caller.
 func Run(args []string, out io.Writer) error {
-	if len(args) == 0 || args[0] == "--help" || args[0] == "-h" {
+	if len(args) == 0 || contains(args, "--help") || contains(args, "-h") {
 		_, e := io.WriteString(out, Help+"\n")
 		return e
 	}
@@ -353,4 +353,13 @@ func create(o options, out io.Writer) error {
 	rel, _ := filepath.Rel(o.vault, filepath.Join(dir, "investigation.md"))
 	return emit(out, map[string]any{"id": id, "path": rel, "type": o.kind, "similar_cases": similar,
 		"next": "record evidence, conclusions, questions and decisions with `investigation add --id " + id + "`; keep the current state with `investigation state`"})
+}
+
+func contains(a []string, s string) bool {
+	for _, x := range a {
+		if x == s {
+			return true
+		}
+	}
+	return false
 }

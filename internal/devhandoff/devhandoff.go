@@ -41,7 +41,7 @@ type options struct {
 
 // Run executes a handoff command; legacy verbs are routed by the caller.
 func Run(args []string, out io.Writer) error {
-	if len(args) == 0 || args[0] == "--help" || args[0] == "-h" {
+	if len(args) == 0 || contains(args, "--help") || contains(args, "-h") {
 		_, e := io.WriteString(out, Help+"\n")
 		return e
 	}
@@ -609,4 +609,13 @@ func refresh(o options, out io.Writer) error {
 		return e
 	}
 	return emit(out, res)
+}
+
+func contains(a []string, s string) bool {
+	for _, x := range a {
+		if x == s {
+			return true
+		}
+	}
+	return false
 }
