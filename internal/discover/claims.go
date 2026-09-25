@@ -108,7 +108,8 @@ func knownNames(vault string) (map[string]bool, error) {
 			add(r.Name, r.Topic)
 			add(r.Events...)
 			for _, ev := range r.Evidence {
-				add(ev.Value, ev.Key, ev.Project, filepath.Base(ev.File))
+				_, scope, _ := strings.Cut(ev.Scope, ":")
+				add(ev.Value, ev.Key, scope, filepath.Base(ev.File))
 			}
 		}
 		for _, ev := range rf.Events {
@@ -117,7 +118,7 @@ func knownNames(vault string) (map[string]bool, error) {
 	}
 	snaps, _ := loadSnapshots(vault)
 	for _, s := range snaps {
-		add(s.Project)
+		add(s.Scope)
 		add(s.Topics...)
 		for _, sub := range s.Subscriptions {
 			add(sub.Name, sub.Topic, sub.DeadLetter)

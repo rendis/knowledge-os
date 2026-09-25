@@ -104,13 +104,13 @@ var dependencyOptions = map[string]string{
 }
 
 var resourceOptions = map[string]string{
-	"pubsub_topic":            "Holds the name or path of a Pub/Sub or message-broker topic.",
-	"pubsub_subscription":     "Holds the name or path of a Pub/Sub subscription or a consumer queue.",
+	"message_topic":           "Holds the name, path, ARN or id of a topic or exchange messages are published to (any broker or cloud).",
+	"message_subscription":    "Holds the name, path, ARN, URL or id of a subscription or queue a consumer reads from (any broker or cloud).",
 	"database_object":         "Holds a database, schema, table, collection or dataset name, or a database host/connection.",
 	"storage_bucket":          "Holds a cloud storage bucket or a remote file location (for example an SFTP path or host).",
 	"http_endpoint":           "Holds a URL, host, base path or route of an HTTP API of ANOTHER service that is called.",
 	"service_identity":        "Holds the name of this deployable service itself: deployment, container, cloud function, microservice or application name.",
-	"cloud_project_or_region": "Holds a cloud project id, region, cluster, namespace or environment name.",
+	"cloud_project_or_region": "Holds a cloud project, account or subscription id, region, cluster, namespace or environment name.",
 	"secret_reference":        "Holds a reference to a secret, credential, API key or token.",
 	"other":                   "Anything else: settings, ports, resource limits, labels, images, versions, logging, flags, build or package metadata.",
 }

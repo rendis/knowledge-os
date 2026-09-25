@@ -21,7 +21,7 @@ A missing answer is a gap, not a non-applicable item. For library, schema, IaC a
 Run `<cli> discover run --vault "<vault>"` (add `--repo <name>` for one repository) and read `<cli> discover report --vault "<vault>" --repo <name>`. The facts are the connector inventory, complete by construction:
 
 - `dependencies` and `channels`: every library and runtime module the code imports (company libraries resolved to what they import), with the files that use each one, plus declared-but-not-imported manifest dependencies.
-- `resources`: every topic, subscription, event, database object, HTTP endpoint and bucket named by the repository's configuration, IaC blocks that name the service, or code literals, each with file/key evidence; Pub/Sub resources carry platform wiring (subscription → topic, filtered events) when snapshots exist.
+- `resources`: every topic, subscription, event, database object, HTTP endpoint and bucket named by the repository's configuration, IaC blocks that name the service, or code literals, each with file/key evidence; messaging resources (topics, subscriptions, queues) carry platform wiring (consumer → topic, filtered events) when snapshots of the cell's clouds exist.
 - `pending`: what could not be confirmed (no platform access, name absent from the platform, unjudged dependency), with the exact command that confirms it.
 - The comparison with the current note: supported relations, discrepancies and undocumented resources.
 
@@ -40,13 +40,13 @@ Do not rediscover connectors by searching the repository. Explain each fact's ro
 Cite at the bound commit, one verifiable fact per cited sentence, with the reference right after the fact it supports:
 
 ```markdown
-Publica el ajuste serializado en el topic configurado por `GCP_PUBSUB_TOPIC_IN`. [^e3]
+Publica el ajuste serializado en el topic configurado por `ADJUSTMENT_TOPIC`. [^e3]
 
-[^e3]: [src/services/gcp.go](https://github.com/<org>/<repo>/blob/<full-sha>/src/services/gcp.go#L27-L48) — L27-L48: `os.Getenv("GCP_PUBSUB_TOPIC_IN")` y `publishToPubsubWithRetry`
+[^e3]: [src/services/publisher.go](https://github.com/<org>/<repo>/blob/<full-sha>/src/services/publisher.go#L27-L48) — L27-L48: `os.Getenv("ADJUSTMENT_TOPIC")` y `publishWithRetry`
 ```
 
 - Backticked identifiers in a footnote must appear in its cited lines; backticked paths must exist at the commit.
-- Platform facts cite the snapshot: `[^p1]: platform gcp-pubsub <project> captured <date> — <subscription> → <topic>, filter <expression>`.
+- Platform facts cite the snapshot: `[^p1]: platform <provider> <scope> captured <date> — <subscription or queue> → <topic>, filter <expression>`.
 - Limitations, negations and inferences are written as limits, not cited as if the code proved them.
 - Distinguish implementation, configured behavior and observed runtime.
 

@@ -219,7 +219,7 @@ func Run(args []string, out io.Writer) error {
 				}
 				caps = append(caps, c)
 			}
-			result = Object{"vault_root": root, "orientation": Orientation(root, m), "capabilities": caps, "discovery": DiscoveryAcceleration()}
+			result = Object{"vault_root": root, "orientation": Orientation(root, m), "capabilities": caps, "discovery": DiscoveryAcceleration(), "platform_providers": PlatformProviders(m)}
 		case "capability":
 			if one("--capability") == "" {
 				return errors.New("capability is required")

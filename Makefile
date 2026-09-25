@@ -1,4 +1,4 @@
-.PHONY: build test test-race release test-installer
+.PHONY: build test test-race release test-installer test-platform
 
 build:
 	CGO_ENABLED=0 go build -trimpath -o dist/vaultctl ./cmd/vaultctl
@@ -22,3 +22,7 @@ test-installer:
 	python3 -B evals/bootstrap/test_native_packaging.py
 	python3 -B evals/bootstrap/test_native_installation.py
 	python3 -B evals/bootstrap/test_vault_catalog.py
+
+# Platform providers against local emulators with the clouds' real CLIs (Docker required).
+test-platform:
+	python3 -B evals/platform/test_platform_emulators.py

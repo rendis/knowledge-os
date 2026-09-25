@@ -14,9 +14,9 @@ sys.path.insert(0, str(DIST / 'scripts'))
 from instance import load_instance
 
 PROMPTS = ['Systems as', 'Trackers as', 'Cell name', 'Cell purpose',
-           'Evidence profile', 'Note locale', 'Reference branches', 'Adapters (']
+           'Evidence profile', 'Note locale', 'Reference branches', 'Clouds the systems', 'Adapters (']
 ANSWERS = ['orders:Orders', 'work:github:https://example.org/issues',
-           'Commerce', 'Order fulfillment.', 'documented-source', 'en', 'develop,main', 'reports']
+           'Commerce', 'Order fulfillment.', 'documented-source', 'en', 'develop,main', 'gcp, aws', 'reports']
 
 
 def snapshot(root):
@@ -58,6 +58,7 @@ class InteractiveOnboardingTests(unittest.TestCase):
         self.assertEqual(instance['locale']['notes'], 'es')
         self.assertEqual(instance['adapters'], [])
         self.assertEqual(instance['sources']['reference_branch_order'], ['main', 'master'])
+        self.assertEqual(instance['platform']['providers'], [])
 
     def test_answers_persist_without_local_clone_authority(self):
         discovery = self.root / 'discovery'
@@ -75,6 +76,7 @@ class InteractiveOnboardingTests(unittest.TestCase):
         self.assertEqual(instance['evidence']['profile'], 'documented-source')
         self.assertEqual(instance['locale']['notes'], 'en')
         self.assertEqual(instance['sources']['reference_branch_order'], ['develop', 'main'])
+        self.assertEqual(instance['platform']['providers'], ['gcp', 'aws'])
         self.assertEqual(instance['adapters'], ['reports'])
         self.assertEqual(instance['sources']['discovery_roots'], [str(discovery)])
         self.assertEqual(snapshot(discovery), before)

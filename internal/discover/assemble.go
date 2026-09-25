@@ -33,13 +33,13 @@ type repoScan struct {
 func (s *repoScan) files() []string { return s.paths }
 
 type evidence struct {
-	Kind    string `json:"kind"` // config | iac | code | platform | manifest | import
-	Repo    string `json:"repo,omitempty"`
-	Commit  string `json:"commit,omitempty"`
-	File    string `json:"file,omitempty"`
-	Key     string `json:"key,omitempty"`
-	Value   string `json:"value,omitempty"`
-	Project string `json:"project,omitempty"`
+	Kind   string `json:"kind"` // config | iac | code | platform | manifest | import
+	Repo   string `json:"repo,omitempty"`
+	Commit string `json:"commit,omitempty"`
+	File   string `json:"file,omitempty"`
+	Key    string `json:"key,omitempty"`
+	Value  string `json:"value,omitempty"`
+	Scope  string `json:"scope,omitempty"` // "<provider>:<scope>"
 }
 
 type resource struct {
@@ -88,7 +88,7 @@ type eventFact struct {
 }
 
 var appPrefix = regexp.MustCompile(`^[a-z]+\d+-`)
-var resourceTypes = map[string]bool{"pubsub_topic": true, "pubsub_subscription": true, "database_object": true, "storage_bucket": true, "http_endpoint": true}
+var resourceTypes = map[string]bool{"message_topic": true, "message_subscription": true, "database_object": true, "storage_bucket": true, "http_endpoint": true}
 
 func keySignature(e entry) string {
 	parts := strings.FieldsFunc(e.KeyPath, func(r rune) bool { return r == '.' || r == '[' || r == ']' })
@@ -399,17 +399,14 @@ func (a *assembly) entryType(e entry) (string, float64) {
 		return "", 0
 	}
 	// A platform name decides the type when the value is shaped like a resource name, or when
-	// the key itself was judged to hold a Pub/Sub resource (generic words need the key).
+	// the key itself was judged to hold a messaging resource (generic words need the key).
 	if t := a.platform.typeOf(e.Value); t != "" {
-		if k, ok := a.st.ConfigKeys[keySignature(e)]; resourceShaped(e.Value) || ok && (k.Choice == "pubsub_topic" || k.Choice == "pubsub_subscription") {
+		if k, ok := a.st.ConfigKeys[keySignature(e)]; resourceShaped(e.Value) || ok && isMessaging(k.Choice) {
 			return t, 1
 		}
 	}
-	if m := canonicalPubSub.FindStringSubmatch(strings.ToLower(e.Value)); m != nil {
-		if m[2] == "topics" {
-			return "pubsub_topic", 1
-		}
-		return "pubsub_subscription", 1
+	if t := canonicalKind(e.Value); t != "" {
+		return t, 1
 	}
 	if j, ok := a.st.ConfigValues[entryID(e)]; ok && resourceTypes[j.Choice] && j.Confidence >= 0.5 {
 		return j.Choice, j.Confidence
@@ -546,7 +543,7 @@ func (a *assembly) pendingQuestions() []question {
 			if !ok || !resourceTypes[k.Choice] {
 				continue
 			}
-			if a.platform.typeOf(e.Value) != "" && resourceShaped(e.Value) || canonicalPubSub.MatchString(strings.ToLower(e.Value)) {
+			if a.platform.typeOf(e.Value) != "" && resourceShaped(e.Value) || canonicalKind(e.Value) != "" {
 				continue // decided by the platform or by the canonical resource format
 			}
 			id := entryID(e)
@@ -634,13 +631,13 @@ func (a *assembly) facts() []repoFacts {
 		}
 	}
 	for _, s := range a.scans {
-		fileProject := a.fileProjects(s)
+		fileScope := a.fileScopes(s)
 		blocks := map[string][]entry{}
 		for _, e := range s.entries {
 			if t := a.typed(e); t != "" {
 				ev := evidence{Kind: "config", Repo: s.in.Name, Commit: s.in.Commit, File: e.File, Key: e.KeyPath}
-				if !canonicalPubSub.MatchString(strings.ToLower(e.Value)) {
-					ev.Project = fileProject[e.File] // a short name belongs to the project its file declares
+				if canonicalKind(e.Value) == "" {
+					ev.Scope = fileScope[e.File] // a short name belongs to the scope its file declares
 				}
 				add(s, t, e.Value, ev)
 			}
@@ -720,11 +717,11 @@ func (a *assembly) facts() []repoFacts {
 		}
 		sort.Slice(f.Dependencies, func(i, j int) bool { return f.Dependencies[i].ID < f.Dependencies[j].ID })
 		for _, r := range res[s] {
-			if r.Type == "pubsub_topic" || r.Type == "pubsub_subscription" {
+			if isMessaging(r.Type) {
 				channels["messaging"] = true
 			}
 			a.wire(r)
-			if r.Type == "pubsub_topic" || r.Type == "pubsub_subscription" {
+			if isMessaging(r.Type) {
 				r.MissingIn = a.scopedMisses(r)
 			}
 			f.Resources = append(f.Resources, *r)
@@ -762,124 +759,124 @@ func isConnectorCategory(c string) bool {
 	return false
 }
 
-// wire completes a Pub/Sub resource with platform facts: subscription -> topic and filters.
+func isMessaging(t string) bool { return t == "message_topic" || t == "message_subscription" }
+
+// wire completes a messaging resource with platform facts: subscription or queue -> topic and filters.
 func (a *assembly) wire(r *resource) {
-	if r.Type != "pubsub_subscription" && r.Type != "pubsub_topic" {
+	if !isMessaging(r.Type) {
 		return
 	}
 	n := normalizeResource(r.Name)
-	if r.Type == "pubsub_subscription" {
+	if r.Type == "message_subscription" {
 		if len(a.platform.subs[n]) == 0 {
 			if v := a.platform.variants(n); len(v) > 0 {
-				r.Evidence = append(r.Evidence, evidence{Kind: "platform-variant", Project: projectOf(v[0]), Value: strings.Join(v, ", ")})
+				r.Evidence = append(r.Evidence, evidence{Kind: "platform-variant", Scope: scopeOf(v[0]), Value: strings.Join(v, ", ")})
 			}
 		}
 		for _, s := range a.platform.subs[n] {
 			r.Direction = "consume"
-			r.Topic = s.Topic
+			if s.Topic != "" {
+				r.Topic = s.Topic
+			}
 			for _, at := range s.Attributes {
 				if strings.EqualFold(at[0], "eventType") {
 					r.Events = appendUnique(r.Events, at[1])
 				}
 			}
-			r.Evidence = append(r.Evidence, evidence{Kind: "platform", Project: projectOf(s.Name), Value: s.Name})
+			r.Evidence = append(r.Evidence, evidence{Kind: "platform", Scope: scopeOf(s.Name), Value: s.Name})
 		}
 		return
 	}
 	if full := a.platform.topics[n]; len(full) > 0 {
-		r.Evidence = append(r.Evidence, evidence{Kind: "platform", Project: projectOf(full[0]), Value: full[0]})
+		r.Evidence = append(r.Evidence, evidence{Kind: "platform", Scope: scopeOf(full[0]), Value: full[0]})
 		return
 	}
 	// IaC modules often declare a base name and append a country or environment suffix.
 	if v := a.platform.variants(n); len(v) > 0 {
-		r.Evidence = append(r.Evidence, evidence{Kind: "platform-variant", Project: projectOf(v[0]), Value: strings.Join(v, ", ")})
+		r.Evidence = append(r.Evidence, evidence{Kind: "platform-variant", Scope: scopeOf(v[0]), Value: strings.Join(v, ", ")})
 	}
 }
 
-// fileProjects maps each configuration file to the captured platform project it declares (an entry
-// judged a cloud project whose value is a captured project); files naming several projects map to none.
-func (a *assembly) fileProjects(s *repoScan) map[string]string {
+// fileScopes maps each configuration file to the captured platform scope it declares (an entry judged a
+// cloud project or region whose value is a captured scope); files naming several scopes map to none.
+func (a *assembly) fileScopes(s *repoScan) map[string]string {
+	captured := map[string]string{}
+	for k, snap := range a.platform.scopes {
+		captured[strings.ToLower(snap.Scope)] = k
+	}
 	found := map[string]map[string]bool{}
 	for _, e := range s.entries {
 		if e.Secret || len(e.Placeholders) > 0 {
 			continue
 		}
-		v := strings.ToLower(strings.TrimSpace(e.Value))
-		if _, captured := a.platform.projects[v]; !captured {
+		key, ok := captured[strings.ToLower(strings.TrimSpace(e.Value))]
+		if !ok {
 			continue
 		}
 		if k, ok := a.st.ConfigKeys[keySignature(e)]; ok && k.Choice == "cloud_project_or_region" {
 			if found[e.File] == nil {
 				found[e.File] = map[string]bool{}
 			}
-			found[e.File][v] = true
+			found[e.File][key] = true
 		}
 	}
 	out := map[string]string{}
-	for f, ps := range found {
-		if len(ps) == 1 {
-			for p := range ps {
-				out[f] = p
+	for f, ks := range found {
+		if len(ks) == 1 {
+			for k := range ks {
+				out[f] = k
 			}
 		}
 	}
 	return out
 }
 
-// scopedMisses returns the declared projects (with a readable snapshot) where the resource is absent.
+// scopedMisses returns the declared scopes (with a readable snapshot) where the resource is absent.
 func (a *assembly) scopedMisses(r *resource) []string {
 	n := normalizeResource(r.Name)
 	in := map[string]bool{}
-	if r.Type == "pubsub_subscription" {
+	if r.Type == "message_subscription" {
 		for _, s := range a.platform.subs[n] {
-			in[projectOf(s.Name)] = true
+			in[scopeOf(s.Name)] = true
 		}
 	} else {
 		for _, t := range a.platform.topics[n] {
-			in[projectOf(t)] = true
+			in[scopeOf(t)] = true
 		}
 	}
 	for _, v := range a.platform.variants(n) {
-		in[projectOf(v)] = true
+		in[scopeOf(v)] = true
 	}
 	missing := []string{}
 	if len(in) == 0 {
 		return missing // absent everywhere: the generic pending already reports it
 	}
 	for _, ev := range r.Evidence {
-		if ev.Kind != "config" || ev.Project == "" || in[ev.Project] {
+		if ev.Kind != "config" || ev.Scope == "" || in[ev.Scope] {
 			continue
 		}
-		if snap, ok := a.platform.projects[ev.Project]; !ok || snap.Status != "ok" {
+		if snap, ok := a.platform.scopes[ev.Scope]; !ok || snap.Status != "ok" {
 			continue
 		}
-		// A consumer may name a topic owned by another system's project; only an environment
-		// counterpart of the same project family (acme-x-prd / acme-x-uat) proves a missing resource.
-		sibling := r.Type == "pubsub_subscription"
+		// A consumer may name a topic owned by another system's scope; only an environment
+		// counterpart of the same scope family (acme-x-prd / acme-x-uat) proves a missing resource.
+		sibling := r.Type == "message_subscription"
 		for p := range in {
-			sibling = sibling || projectFamily(p) == projectFamily(ev.Project)
+			sibling = sibling || scopeFamily(p) == scopeFamily(ev.Scope)
 		}
 		if sibling {
-			missing = appendUnique(missing, ev.Project)
+			missing = appendUnique(missing, ev.Scope)
 		}
 	}
 	return missing
 }
 
-// projectFamily drops the trailing environment segment of a project id (acme-stock-uat -> acme-stock).
-func projectFamily(p string) string {
+// scopeFamily drops the trailing environment segment of a scope (gcp:acme-stock-uat -> gcp:acme-stock).
+func scopeFamily(p string) string {
 	if i := strings.LastIndex(p, "-"); i > 0 {
 		return p[:i]
 	}
 	return p
-}
-
-func projectOf(full string) string {
-	parts := strings.Split(full, "/")
-	if len(parts) > 1 && parts[0] == "projects" {
-		return parts[1]
-	}
-	return ""
 }
 
 func (a *assembly) platformEvents() map[string]string {
@@ -900,21 +897,21 @@ func (a *assembly) platformEvents() map[string]string {
 func (a *assembly) pendingFor(f repoFacts) []pending {
 	out := []pending{}
 	for _, r := range f.Resources {
-		if r.Type != "pubsub_topic" && r.Type != "pubsub_subscription" {
+		if !isMessaging(r.Type) {
 			continue
 		}
 		for _, p := range r.MissingIn {
 			present := []string{}
 			for _, ev := range r.Evidence {
-				if (ev.Kind == "platform" || ev.Kind == "platform-variant") && ev.Project != "" && ev.Project != p {
-					present = appendUnique(present, ev.Project)
+				if (ev.Kind == "platform" || ev.Kind == "platform-variant") && ev.Scope != "" && ev.Scope != p {
+					present = appendUnique(present, ev.Scope)
 				}
 			}
-			detail := "configuration declaring project " + p + " uses this name, but " + p + " has no such resource"
+			detail := "configuration declaring scope " + p + " uses this name, but " + p + " has no such resource"
 			if len(present) > 0 {
 				detail += " (it exists in " + strings.Join(present, ", ") + ")"
 			}
-			out = append(out, pending{Kind: "not-in-platform", Subject: r.Name + " @ " + p, Detail: detail, Confirm: a.platform.projects[p].Confirm})
+			out = append(out, pending{Kind: "not-in-platform", Subject: r.Name + " @ " + p, Detail: detail, Confirm: a.platform.scopes[p].Confirm})
 		}
 		confirmed := false
 		for _, ev := range r.Evidence {
@@ -923,21 +920,19 @@ func (a *assembly) pendingFor(f repoFacts) []pending {
 		if confirmed {
 			continue
 		}
-		project := ""
-		if m := canonicalPubSub.FindStringSubmatch(strings.ToLower(r.Name)); m != nil {
-			project = m[1]
-		}
-		switch snap, ok := a.platform.projects[project]; {
-		case project != "" && ok && snap.Status == "ok":
-			out = append(out, pending{Kind: "not-in-platform", Subject: r.Name, Detail: "configured name is absent from the captured project " + project + "; the resource may be removed or renamed", Confirm: snap.Confirm})
-		case project != "" && ok:
-			out = append(out, pending{Kind: "platform-access", Subject: r.Name, Detail: fmt.Sprintf("project %s could not be read (%s)", project, snap.Status), Confirm: snap.Confirm})
+		scope := scopeOf(r.Name)
+		switch snap, ok := a.platform.scopes[scope]; {
+		case scope != "" && ok && snap.Status == "ok":
+			out = append(out, pending{Kind: "not-in-platform", Subject: r.Name, Detail: "configured name is absent from the captured scope " + scope + "; the resource may be removed or renamed", Confirm: snap.Confirm})
+		case scope != "" && ok:
+			out = append(out, pending{Kind: "platform-access", Subject: r.Name, Detail: fmt.Sprintf("scope %s could not be read (%s)", scope, snap.Status), Confirm: snap.Confirm})
 		default:
-			detail := "not found in any captured platform project"
-			if project != "" {
-				detail = "project " + project + " has not been captured"
+			detail, confirm := "not found in any captured platform scope", "vaultctl discover platform --vault <VAULT> --provider <PROVIDER> --scope <SCOPE>"
+			if scope != "" {
+				provider, id, _ := strings.Cut(scope, ":")
+				detail, confirm = "scope "+scope+" has not been captured", "vaultctl discover platform --vault <VAULT> --provider "+provider+" --scope "+id
 			}
-			out = append(out, pending{Kind: "platform-unverified", Subject: r.Name, Detail: detail, Confirm: "vaultctl discover platform --vault <VAULT> --project <PROJECT>"})
+			out = append(out, pending{Kind: "platform-unverified", Subject: r.Name, Detail: detail, Confirm: confirm})
 		}
 	}
 	for _, d := range f.Dependencies {
@@ -948,20 +943,27 @@ func (a *assembly) pendingFor(f repoFacts) []pending {
 	return out
 }
 
-// platformProjects lists GCP project ids referenced by configuration (canonical paths and
-// entries judged as project identifiers).
-func (a *assembly) platformProjects() []string {
+// platformScopes lists the scopes of the given providers that configuration references: canonical
+// identifiers (resource paths, ARNs, resource ids) and entries judged a cloud project or region.
+func (a *assembly) platformScopes(names []string) []string {
 	set := map[string]bool{}
 	for _, s := range a.scans {
 		for _, e := range s.entries {
 			if e.Secret {
 				continue
 			}
-			for _, m := range regexp.MustCompile(`projects/([a-z][a-z0-9\-]{4,28}[a-z0-9])/`).FindAllStringSubmatch(e.Value, -1) {
-				set[m[1]] = true
+			judged := false
+			if k, ok := a.st.ConfigKeys[keySignature(e)]; ok && k.Choice == "cloud_project_or_region" && len(e.Placeholders) == 0 {
+				judged = true
 			}
-			if k, ok := a.st.ConfigKeys[keySignature(e)]; ok && k.Choice == "cloud_project_or_region" && projectID.MatchString(e.Value) && strings.Count(e.Value, "-") >= 2 {
-				set[e.Value] = true
+			for _, n := range names {
+				p := providers[n]
+				for _, sc := range p.scopesIn(e.Value) {
+					set[scopeKey(n, sc)] = true
+				}
+				if judged && p.isScope(strings.TrimSpace(e.Value)) {
+					set[scopeKey(n, strings.TrimSpace(e.Value))] = true
+				}
 			}
 		}
 	}

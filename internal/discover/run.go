@@ -26,9 +26,12 @@ const Help = `discover COMMAND --vault PATH [options]
   questions  [--kind dependency|config_key|config_entry] [--limit N]
              Pending judgments as JSON for the agent to answer (from the last run).
   answer     --file ANSWERS.json   Record agent answers: [{"id":..,"choice":..,"confidence":0..1}]
-  platform   [--project ID ...] [--referenced] [--dry-run]
-             Capture read-only Pub/Sub listings with gcloud (requires authorization).
-             --referenced uses the projects named by configuration in the last run.
+  platform   [--provider NAME] [--scope ID ...] [--referenced] [--dry-run]
+             Capture read-only messaging listings (topics, subscriptions, queues) with the
+             provider's own CLI and the developer's login. Providers: gcp (project id),
+             aws (<account>/<region>), azure (subscription id). --provider may be omitted
+             when the cell configures one (platform.providers). --referenced uses the
+             scopes of the configured providers named by configuration in the last run.
   report     [--repo NAME]   Last run summary, or one repository's facts.
   check      --note PATH [--note PATH ...] [--repo NAME] [--semantic]
              Gates for a repository note: G1 source anchors resolve at their commit and
@@ -46,7 +49,8 @@ const stateRel = ".agents/state/discovery"
 
 type options struct {
 	vault, at, classify, kind, file string
-	repos, projects, notes          []string
+	provider                        string
+	repos, scopes, notes            []string
 	limit                           int
 	referenced, dryRun, semantic    bool
 }
@@ -79,9 +83,11 @@ func parse(args []string) (string, options, error) {
 			o.notes = append(o.notes, v)
 		case "--semantic":
 			o.semantic = true
-		case "--project":
+		case "--scope":
 			v, e = val()
-			o.projects = append(o.projects, v)
+			o.scopes = append(o.scopes, v)
+		case "--provider":
+			o.provider, e = val()
 		case "--at":
 			o.at, e = val()
 		case "--classify":
@@ -191,7 +197,7 @@ type runReport struct {
 	PendingQuestions map[string]int    `json:"pending_questions"`
 	Acceleration     map[string]any    `json:"acceleration"`
 	Classified       map[string]any    `json:"classified_this_run,omitempty"`
-	PlatformProjects []string          `json:"platform_projects_referenced"`
+	PlatformScopes   []string          `json:"platform_scopes_referenced"`
 	PlatformCaptured map[string]string `json:"platform_captured"`
 	Pending          map[string]int    `json:"pending_items"`
 	Comparison       map[string]int    `json:"comparison"`
@@ -284,7 +290,7 @@ func runDiscovery(o options, out io.Writer) error {
 		return e
 	}
 	rep := runReport{Vault: o.vault, GeneratedAt: time.Now().UTC().Format(time.RFC3339), Repositories: len(inputs), Failed: failed,
-		PendingQuestions: map[string]int{}, Acceleration: accelerationStatus(), PlatformProjects: a.platformProjects(),
+		PendingQuestions: map[string]int{}, Acceleration: accelerationStatus(), PlatformScopes: a.platformScopes(configuredProviders(o.vault)),
 		PlatformCaptured: map[string]string{}, Pending: map[string]int{}, Comparison: map[string]int{}}
 	if len(classified) > 0 {
 		rep.Classified = classified
@@ -295,7 +301,7 @@ func runDiscovery(o options, out io.Writer) error {
 	for _, q := range qs {
 		rep.PendingQuestions[q.Kind]++
 	}
-	for p, s := range a.platform.projects {
+	for p, s := range a.platform.scopes {
 		rep.PlatformCaptured[p] = s.Status
 	}
 	for _, f := range facts {
@@ -383,38 +389,77 @@ func answerQuestions(o options, out io.Writer) error {
 	return emit(out, map[string]any{"recorded": n, "remaining": len(pending) - n, "next": "vaultctl discover run --vault <VAULT> --classify off"})
 }
 
+// configuredProviders reads platform.providers from the cell's instance.yaml.
+func configuredProviders(vault string) []string {
+	inst, e := config.LoadInstance(vault)
+	if e != nil {
+		return nil
+	}
+	return config.PlatformProviders(inst)
+}
+
 func capturePlatform(o options, out io.Writer) error {
-	projects := o.projects
+	configured := configuredProviders(o.vault)
+	keys := []string{}
+	if len(o.scopes) > 0 {
+		provider := o.provider
+		if provider == "" && len(configured) == 1 {
+			provider = configured[0]
+		}
+		p := providers[provider]
+		if p == nil {
+			return fmt.Errorf("--provider must be one of %s", strings.Join(ProviderNames(), ", "))
+		}
+		for _, sc := range o.scopes {
+			if !p.validScope(sc) {
+				return fmt.Errorf("%q is not a %s scope (gcp: project id; aws: <account>/<region>; azure: subscription id)", sc, provider)
+			}
+			keys = append(keys, scopeKey(provider, sc))
+		}
+	}
 	if o.referenced {
+		if len(configured) == 0 {
+			return errors.New("no platform provider configured: list the cell's clouds in instance.yaml platform.providers")
+		}
 		var rep runReport
 		if e := readState(o.vault, "report.json", &rep); e != nil {
 			return e
 		}
-		projects = append(projects, rep.PlatformProjects...)
+		for _, k := range rep.PlatformScopes {
+			if n, _, _ := strings.Cut(k, ":"); o.provider == "" || n == o.provider {
+				keys = append(keys, k)
+			}
+		}
 	}
-	sort.Strings(projects)
+	sort.Strings(keys)
 	uniq := []string{}
-	for i, p := range projects {
-		if (i == 0 || p != projects[i-1]) && projectID.MatchString(p) {
-			uniq = append(uniq, p)
+	for i, k := range keys {
+		if i == 0 || k != keys[i-1] {
+			uniq = append(uniq, k)
 		}
 	}
 	if len(uniq) == 0 {
-		return errors.New("no project selected; pass --project or --referenced")
+		return errors.New("no scope selected; pass --scope or --referenced")
 	}
 	if o.dryRun {
-		return emit(out, map[string]any{"would_capture": uniq, "commands": "gcloud pubsub topics list / subscriptions list --format=json (read-only)"})
+		cmds := map[string]string{}
+		for _, k := range uniq {
+			n, _, _ := strings.Cut(k, ":")
+			cmds[n] = providers[n].commands()
+		}
+		return emit(out, map[string]any{"would_capture": uniq, "commands": cmds})
 	}
 	result := map[string]string{}
-	for _, p := range uniq {
-		s := captureGCP(p)
+	for _, k := range uniq {
+		n, sc, _ := strings.Cut(k, ":")
+		s := providers[n].capture(sc)
 		if e := saveSnapshot(o.vault, s); e != nil {
 			return e
 		}
-		result[p] = s.Status
+		result[k] = s.Status
 		if s.Status != "ok" {
-			if b, e := os.ReadFile(snapshotPath(o.vault, p)); e == nil && strings.Contains(string(b), `"refresh_failed"`) {
-				result[p] = s.Status + " (previous snapshot kept)"
+			if b, e := os.ReadFile(snapshotPath(o.vault, n, sc)); e == nil && strings.Contains(string(b), `"refresh_failed"`) {
+				result[k] = s.Status + " (previous snapshot kept)"
 			}
 		}
 	}

@@ -14,6 +14,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -198,6 +199,19 @@ func ValidateInstance(m Object) error {
 				return errors.New("invalid reference_branch_order")
 			}
 			seen[str(b)] = true
+		}
+	}
+	if v, exists := obj(m["platform"])["providers"]; exists && v != nil {
+		names, ok := v.([]any)
+		seen := map[string]bool{}
+		if !ok {
+			return errors.New("platform.providers must list provider names")
+		}
+		for _, n := range names {
+			if !slices.Contains(KnownPlatformProviders, str(n)) || seen[str(n)] {
+				return fmt.Errorf("platform.providers accepts %s, each once", strings.Join(KnownPlatformProviders, ", "))
+			}
+			seen[str(n)] = true
 		}
 	}
 	if t, exists := m["trackers"]; exists && t != nil {
@@ -610,6 +624,20 @@ func ResolvePath(path string) (Object, error) {
 		candidate = parent
 	}
 	return nil, errors.New("explicit path is not inside a vault with instance.yaml")
+}
+
+// KnownPlatformProviders are the clouds whose messaging platform `discover platform` can capture.
+var KnownPlatformProviders = []string{"aws", "azure", "gcp"}
+
+// PlatformProviders lists the clouds the cell runs on (platform.providers); none when unset.
+func PlatformProviders(inst Object) []string {
+	out := []string{}
+	for _, n := range list(obj(inst["platform"])["providers"]) {
+		if s := str(n); s != "" {
+			out = append(out, s)
+		}
+	}
+	return out
 }
 
 // ReferenceBranchOrder is the cell's ordered branch preference for repositories without an explicit

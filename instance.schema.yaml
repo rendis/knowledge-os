@@ -60,6 +60,15 @@ fields:
     fields:
       remote: string
       note: string
+  platform.providers:
+    type: list
+    optional: true
+    default: []
+    values:
+      - gcp
+      - aws
+      - azure
+    description: Clouds the cell's systems run on, one or more. `discover platform` captures their messaging resources read-only with each cloud's own CLI and the developer's login; scopes are gcp project ids, aws <account>/<region>, azure subscription ids. Asked during onboarding.
   database_targets:
     type: list
     optional: true

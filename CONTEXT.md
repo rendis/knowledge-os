@@ -15,6 +15,16 @@ first existing branch of `sources.reference_branch_order`. Never the remote's de
 **Fact** — a connection `discover run` extracted from a repository at an exact commit (topic, event,
 endpoint, database, library), with its file and line.
 
+**Platform provider** — one cloud `discover platform` can read (`gcp`, `aws`, `azure`), each with its own
+CLI and the developer's login. A cell lists its clouds in `platform.providers`; the core only knows topics,
+subscriptions and queues.
+
+**Scope** — the unit a provider captures: a Google Cloud project, an AWS `<account>/<region>`, an Azure
+subscription. Facts and pending items name it as `<provider>:<scope>`.
+
+**Platform snapshot** — the read-only listing of one scope (`90-Meta/discovery/platform/`), versioned; a scope
+that could not be read is kept with its status and the command that confirms it.
+
 **Gate** — a deterministic check that blocks: note gates (`discover check`), the case gate
 (`investigation check`), `sync verify`. A reviewer's verdict is separate from a gate.
 

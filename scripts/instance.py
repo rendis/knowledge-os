@@ -10,6 +10,7 @@ from urllib.parse import urlparse
 ALLOWED_ADAPTERS = ("reports",)
 ALLOWED_PROFILES = ("production-gate", "documented-source", "mixed")
 ALLOWED_LOCALES = ("es", "en")
+PLATFORM_PROVIDERS = ("gcp", "aws", "azure")
 DEFAULT_TYPES = (
     "sistema",
     "servicio",
@@ -276,6 +277,9 @@ def dump_instance(data: dict[str, Any]) -> str:
     lines.append("  schema_repository:")
     lines.append(f"    remote: {_quote(schema.get('remote') or '')}")
     lines.append(f"    note: {_quote(schema.get('note') or '')}")
+    providers = (data.get("platform") or {}).get("providers") or []
+    lines.append("platform:")
+    lines.append(f"  providers: [{', '.join(providers)}]")
     targets = data.get("database_targets", [])
     if targets:
         lines.append("database_targets:")
@@ -439,6 +443,7 @@ def validate_instance(data: dict[str, Any]) -> dict[str, Any]:
         },
         "graph": {"enabled_types": list(types)},
         "evidence": {"profile": profile},
+        "platform": {"providers": validate_platform_providers((data.get("platform") or {}).get("providers", []))},
         "adapters": list(adapters),
         "locale": {"notes": locale},
         "capabilities": normalized_capabilities,
@@ -465,6 +470,14 @@ def validate_reference_branches(value: Any) -> dict[str, str]:
                 or not valid_branch_name(branch)):
             raise InstanceError("sources.reference_branches requires repository basenames and valid Git branch names")
     return dict(value)
+
+
+def validate_platform_providers(value: Any) -> list[str]:
+    if isinstance(value, str):
+        value = [part.strip() for part in value.split(",") if part.strip()]
+    if not isinstance(value, list) or any(item not in PLATFORM_PROVIDERS for item in value) or len(set(value)) != len(value):
+        raise InstanceError(f"platform.providers must list distinct clouds among {', '.join(PLATFORM_PROVIDERS)}")
+    return list(value)
 
 
 def validate_branch_order(value: Any) -> list[str]:
