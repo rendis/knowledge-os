@@ -1,6 +1,6 @@
 # Evidence by cell profile
 
-Read `instance.yaml` `evidence.profile` before a technical documentation decision. A synchronization worker uses the coordinator's frozen `evidence_profile`; legacy cards without that field retain `production-gate`.
+Read `instance.yaml` `evidence.profile` before a technical documentation decision. A cell without that field uses `production-gate`.
 
 The router's evidence contract governs how evidence is obtained and graded; `evidence-driven-analysis` (`../.agents/skills/evidence-driven-analysis/SKILL.md`) adds the diagnosis and audit methods. This policy owns publication thresholds; adapters and configured procedures own source access and environment resolution. Applying the method alone authorizes no instrumentation, code changes, processing, deployment or publication.
 

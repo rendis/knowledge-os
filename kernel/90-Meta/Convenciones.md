@@ -25,9 +25,7 @@ Schema for a cell knowledge vault. Cell identity, systems, and source prefixes l
 
 `.agents/` holds skills and stays outside the Obsidian graph. Versioned `investigations/` is searchable in Obsidian but excluded from the kernel's technical graph traversal and audit gates; the graph helper can still look up investigations explicitly. It is collaborative provenance, not canonical technical truth. Local ignored stores (`.investigations/`, `.investigations-private/`, `.operations/`, worktree `.handoff/` stores, `.knowledge-os-config.yaml`, `.plan/`) are not graph sources. Local plans must live in `.plan/`; never create a visible `plan/` directory in a cell vault.
 
-For native kernel checks and the separate distribution development gates,
-follow [[code-quality]]. Installed vault checks use the CLI selected through
-`use-vault-cli`.
+Installed vault checks use the CLI selected through `use-vault-cli`; the gates and when to run them are in [[Auditoria - Framework#Gates]].
 
 ## Node selection
 

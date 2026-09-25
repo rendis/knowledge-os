@@ -109,3 +109,22 @@ func TestVisualContextEscapeAndSelf(t *testing.T) {
 		}
 	}
 }
+
+func TestVisualLocalSymbols(t *testing.T) {
+	svg := `<svg aria-label="Diagram"><defs><symbol id="db"/></defs><use href="#db"/></svg>`
+	if !Visual(svg, "atomic", false).Pass {
+		t.Fatal("a local symbol reference passes")
+	}
+	for _, bad := range []string{strings.Replace(svg, "#db", "#missing", 1), strings.Replace(svg, "#db", "https://example.org/db.svg", 1)} {
+		if Visual(bad, "atomic", false).Pass {
+			t.Errorf("a missing or remote symbol must fail: %s", bad)
+		}
+	}
+	icon := strings.Replace(svg, "<use ", `<use data-icon="database" aria-hidden="true" focusable="false" `, 1)
+	if !Visual(icon, "atomic", false).Pass {
+		t.Fatal("a decorative icon passes")
+	}
+	if Visual(strings.Replace(icon, `aria-hidden="true"`, `aria-hidden="false"`, 1), "atomic", false).Pass {
+		t.Fatal("an icon exposed to assistive technology must fail")
+	}
+}

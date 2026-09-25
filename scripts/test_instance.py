@@ -8,8 +8,7 @@ import unittest
 from unittest.mock import patch
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "90-Meta"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from instance import (  # noqa: E402
     InstanceError,

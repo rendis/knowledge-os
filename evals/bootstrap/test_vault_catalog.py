@@ -9,7 +9,7 @@ import unittest
 from pathlib import Path
 
 DIST = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(DIST / 'kernel/90-Meta'))
+sys.path.insert(0, str(DIST / 'scripts'))
 from vault_catalog import CATALOG_PATH  # noqa: E402
 
 
