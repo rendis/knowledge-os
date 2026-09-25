@@ -816,6 +816,11 @@ def remove_retired_managed_files(dest: Path, retired: list[str]) -> list[str]:
             continue
         target.unlink()
         removed.append(rel)
+        # Remove directories the retirement left empty (a retired skill leaves no empty folder).
+        parent = target.parent
+        while parent != dest and dest in parent.parents and parent.is_dir() and not any(parent.iterdir()):
+            parent.rmdir()
+            parent = parent.parent
     return removed
 
 

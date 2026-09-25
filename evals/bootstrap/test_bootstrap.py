@@ -316,6 +316,10 @@ class BootstrapEval(unittest.TestCase):
             retired.write_bytes(retired_bytes)
             cell_owned = retired.parent / "cell-owned-helper.py"
             cell_owned.write_text("# keep\n", encoding="utf-8")
+            skill_relative = ".agents/skills/retired-skill/references/guide.md"
+            retired_skill = dest / skill_relative
+            retired_skill.parent.mkdir(parents=True, exist_ok=True)
+            retired_skill.write_bytes(retired_bytes)
 
             lock_path = dest / ".knowledge-os.lock.yaml"
             lock = lock_path.read_text(encoding="utf-8")
@@ -323,7 +327,7 @@ class BootstrapEval(unittest.TestCase):
             lock_path.write_text(
                 lock.replace(
                     "managed_hashes:\n",
-                    f'managed_hashes:\n  "{retired_relative}": {digest}\n',
+                    f'managed_hashes:\n  "{retired_relative}": {digest}\n  "{skill_relative}": {digest}\n',
                     1,
                 ),
                 encoding="utf-8",
@@ -333,6 +337,7 @@ class BootstrapEval(unittest.TestCase):
             self.assertEqual(updated.returncode, 0, updated.stdout + updated.stderr)
             self.assertFalse(retired.exists())
             self.assertTrue(cell_owned.is_file())
+            self.assertFalse((dest / ".agents/skills/retired-skill").exists())
             self.assertNotIn(
                 retired_relative,
                 lock_path.read_text(encoding="utf-8"),
