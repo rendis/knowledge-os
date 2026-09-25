@@ -1,6 +1,7 @@
 package retrieval
 
 import (
+	"documentation-vault/internal/config"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -166,7 +167,64 @@ func WriteOverview(root, folder string, out io.Writer) error {
 		}
 		fmt.Fprintln(out, "- "+n.line)
 	}
+	writeSources(root, out)
 	return nil
+}
+
+// writeSources ends the overview with the evidence reachable beyond the notes, so that a missing or
+// stale note leads to the source instead of to an unknown.
+func writeSources(root string, out io.Writer) {
+	lines := []string{}
+	if facts, _ := filepath.Glob(filepath.Join(root, ".agents", "state", "discovery", "facts", "*.json")); len(facts) > 0 {
+		lines = append(lines, fmt.Sprintf("Repositories: %d with discovery facts (`discover report --repo NAME`); read the source through `config locate`.", len(facts)))
+	}
+	if snaps, _ := filepath.Glob(filepath.Join(root, "90-Meta", "discovery", "platform", "*.json")); len(snaps) > 0 {
+		names := []string{}
+		for _, p := range snaps {
+			names = append(names, strings.TrimSuffix(filepath.Base(p), ".json"))
+		}
+		lines = append(lines, "Platform snapshots: "+strings.Join(names, ", ")+" (`90-Meta/discovery/platform/`).")
+	}
+	if inst, e := config.LoadInstance(root); e == nil {
+		ids := func(key string, fields ...string) []string {
+			out := []string{}
+			items, _ := inst[key].([]any)
+			for _, it := range items {
+				m, _ := it.(map[string]any)
+				parts := []string{}
+				for _, f := range fields {
+					if v, _ := m[f].(string); v != "" {
+						parts = append(parts, v)
+					}
+				}
+				if len(parts) > 0 {
+					out = append(out, strings.Join(parts, " "))
+				}
+			}
+			return out
+		}
+		if dbs := ids("database_targets", "id"); len(dbs) > 0 {
+			lines = append(lines, "Databases: "+strings.Join(dbs, ", ")+" (`config database-target --target ID`).")
+		}
+		if tr := ids("trackers", "id", "provider"); len(tr) > 0 {
+			lines = append(lines, "Trackers: "+strings.Join(tr, ", ")+".")
+		}
+		if caps, _ := inst["capabilities"].(map[string]any); len(caps) > 0 {
+			names := []string{}
+			for k := range caps {
+				names = append(names, k)
+			}
+			sort.Strings(names)
+			lines = append(lines, "Capabilities: "+strings.Join(names, ", ")+" (`config capability --capability ID` gives the access procedure).")
+		}
+	}
+	if len(lines) == 0 {
+		return
+	}
+	fmt.Fprintln(out, "\n## Beyond the vault\n\nWhen notes are missing or stale for the question, follow the trail through these sources (read access) before answering that something is unknown.")
+	for _, l := range lines {
+		fmt.Fprintln(out, "- "+l)
+	}
 }
 
 func readFileBounded(p string, limit int64) ([]byte, error) {

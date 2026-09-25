@@ -34,6 +34,18 @@ func TestOverviewOneLinePerNote(t *testing.T) {
 			t.Fatalf("missing %q in\n%s", want, out)
 		}
 	}
+	if strings.Contains(out, "Beyond the vault") {
+		t.Fatal("without reachable sources the overview adds no source section")
+	}
+	write(".agents/state/discovery/facts/orders.json", "{}")
+	write("instance.yaml", "version: 1\ncell:\n  name: \"C\"\n  purpose: \"p\"\nsystems:\n  - id: \"s\"\n    name: \"S\"\ntrackers:\n  - id: \"acme-jira\"\n    provider: \"jira\"\n    url: \"https://acme.example/jira\"\ncapabilities:\n  database-inspection: [\"DB access\"]\n")
+	b.Reset()
+	_ = WriteOverview(root, "", &b)
+	for _, want := range []string{"## Beyond the vault", "Repositories: 1 with discovery facts", "Trackers: acme-jira jira", "Capabilities: database-inspection"} {
+		if !strings.Contains(b.String(), want) {
+			t.Fatalf("the overview lists the sources reachable beyond the notes: missing %q in\n%s", want, b.String())
+		}
+	}
 	if !strings.Contains(out, "⚠ unsupported by the last discover run, verify before use: publica-en: orders-legacy (repository evidence names orders-out)") {
 		t.Fatalf("a discovery discrepancy must be flagged on its note:\n%s", out)
 	}
