@@ -56,7 +56,7 @@ func gcpFirestore(snap *platformSnapshot, project string) (string, error) {
 func gcpCloudSQL(snap *platformSnapshot, project string) (string, error) {
 	var instances []struct {
 		Name, ConnectionName, DatabaseVersion, State string
-		IPAddresses                           []struct{ IPAddress string } `json:"ipAddresses"`
+		IPAddresses                                  []struct{ IPAddress string } `json:"ipAddresses"`
 	}
 	if msg, e := jsonCLI(&instances, "gcloud", "sql", "instances", "list", "--project", project, "--format=json"); e != nil {
 		return msg, e
@@ -135,7 +135,7 @@ func awsRDS(snap *platformSnapshot, r []string) (string, error) {
 	var inst struct {
 		DBInstances []struct {
 			DBInstanceIdentifier, DBInstanceArn, DBName, Engine, DBInstanceStatus string
-			Endpoint                                            struct{ Address string }
+			Endpoint                                                              struct{ Address string }
 		}
 	}
 	if msg, e := jsonCLI(&inst, "aws", append([]string{"rds", "describe-db-instances"}, r...)...); e != nil {

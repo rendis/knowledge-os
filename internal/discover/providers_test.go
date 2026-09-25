@@ -325,10 +325,10 @@ func TestDataServicesAreCapturedAndLinked(t *testing.T) {
 		"gcloud firestore indexes composite list": `[{"name": "projects/acme-orders-prd/databases/(default)/collectionGroups/orders/indexes/CICAgOjXh4EK", "queryScope": "COLLECTION"}]`,
 		"gcloud firestore indexes fields list": `[{"name": "projects/acme-orders-prd/databases/(default)/collectionGroups/__default__/fields/*"},
 			{"name": "projects/acme-orders-prd/databases/(default)/collectionGroups/stock-moves/fields/createdAt"}]`,
-		"gcloud sql instances list":                                    `[{"name": "orders-db", "connectionName": "acme-orders-prd:us-east4:orders-db", "databaseVersion": "POSTGRES_15"}]`,
-		"gcloud sql databases list":                                    `[{"name": "postgres", "instance": "orders-db"}, {"name": "orders", "instance": "orders-db"}]`,
-		"gcloud storage buckets list":                                  `[{"name": "acme-orders-exports", "storage_url": "gs://acme-orders-exports/"}]`,
-		"bq ls --project_id=acme-orders-prd":                           `[{"datasetReference": {"datasetId": "sales", "projectId": "acme-orders-prd"}, "id": "acme-orders-prd:sales"}]`,
+		"gcloud sql instances list":          `[{"name": "orders-db", "connectionName": "acme-orders-prd:us-east4:orders-db", "databaseVersion": "POSTGRES_15"}]`,
+		"gcloud sql databases list":          `[{"name": "postgres", "instance": "orders-db"}, {"name": "orders", "instance": "orders-db"}]`,
+		"gcloud storage buckets list":        `[{"name": "acme-orders-exports", "storage_url": "gs://acme-orders-exports/"}]`,
+		"bq ls --project_id=acme-orders-prd": `[{"datasetReference": {"datasetId": "sales", "projectId": "acme-orders-prd"}, "id": "acme-orders-prd:sales"}]`,
 		"bq ls --project_id=acme-orders-prd --format=json --max_results=1000 acme-orders-prd:sales": `[{"tableReference": {"projectId": "acme-orders-prd", "datasetId": "sales", "tableId": "daily_close"}, "type": "TABLE"}]`,
 	}
 	fakeCLI(t, outputs, nil)
