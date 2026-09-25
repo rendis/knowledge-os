@@ -34,7 +34,7 @@ def grade(q, rec):
     text = ""
     for _ in range(3):  # a hung judge session is retried, never allowed to abort the whole grading
         try:
-            text = subprocess.run(["codex", "exec", "--skip-git-repo-check", "-m", JUDGE["model"], "-c", f'model_reasoning_effort="{JUDGE["effort"]}"', "-s", "read-only", prompt], capture_output=True, text=True, timeout=300, cwd="/tmp", env=isolated_env("codex")).stdout
+            text = subprocess.run(["codex", "exec", "--skip-git-repo-check", "-m", JUDGE["model"], "-c", f'model_reasoning_effort="{JUDGE["effort"]}"', "-s", "read-only", prompt], stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=300, cwd="/tmp", env=isolated_env("codex")).stdout
         except subprocess.TimeoutExpired:
             continue
         if re.search(r"\{.*\}", text, re.S):
