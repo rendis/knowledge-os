@@ -1,7 +1,7 @@
 """Homologated benchmark of harness settings on real cell vaults: questions and publication flows.
 
 python3 -B evals/benchmark/bench.py prepare --suite SUITE.json --work DIR
-python3 -B evals/benchmark/bench.py qa      --suite SUITE.json --work DIR --setting claude:sonnet:low [--runs 3]
+python3 -B evals/benchmark/bench.py qa      --suite SUITE.json --work DIR --setting claude:sonnet:low [--runs 3 | --quick]
 python3 -B evals/benchmark/bench.py flow    --suite SUITE.json --work DIR --setting claude:sonnet:low [--runs 1]
 python3 -B evals/benchmark/bench.py report  --work DIR
 
@@ -110,9 +110,14 @@ def qa(a):
     suite, work = load_suite(a.suite), pathlib.Path(a.work)
     setting = parse_setting(a.setting)
     qs = json.loads((suite["_dir"] / suite["questions"]).read_text())
+    if a.quick:  # the suite's discriminating subset, one pass: screening a new model against the baseline
+        qs = [q for q in qs if q["id"] in set(suite.get("quick", []))]
+        if not qs:
+            raise SystemExit("the suite declares no quick question ids")
+    runs = a.runs or (1 if a.quick else 3)
     vaults = {k: str(work / "vaults" / k) for k in suite["vaults"]}
-    for i in range(1, a.runs + 1):
-        out = work / "qa" / tag(setting) / f"run{i}"
+    for i in range(1, runs + 1):
+        out = work / "qa" / (tag(setting) + ("-quick" if a.quick else "")) / f"run{i}"
         with cf.ThreadPoolExecutor(a.parallel) as ex:
             list(ex.map(lambda q: runner.run_one(setting[0], q, vaults[q["vault"]], out, setting[1], setting[2]), [q for q in qs if q["vault"] in vaults]))
         subprocess.run([sys.executable, "-B", str(HERE.parent / "regression" / "judge.py"), "--questions", str(suite["_dir"] / suite["questions"]), "--answers", str(out)], check=True)
@@ -255,7 +260,8 @@ def main():
         s.add_argument("--work", required=True)
         if name != "prepare":
             s.add_argument("--setting", required=True)
-            s.add_argument("--runs", type=int, default=3 if name == "qa" else 1)
+            s.add_argument("--runs", type=int, default=0 if name == "qa" else 1)
+            s.add_argument("--quick", action="store_true", help="qa only: the suite's quick subset, one run")
             s.add_argument("--parallel", type=int, default=4)
             s.add_argument("--timeout", type=int, default=3600)
             s.add_argument("--flow", default="")

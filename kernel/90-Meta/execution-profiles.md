@@ -48,22 +48,22 @@ Open translation table, not an allowlist. Updated 2026-09-16 independently of wo
 | Ambiguous diagnosis and complex decisions | gpt-5.6-sol / high | Opus 5 / high | Grok 4.6 / high, non-preferred fallback when available options require it |
 | Deterministic checks | Direct tool execution | Direct tool execution | Direct tool execution |
 
-## Measured (2026-09-25)
+## Measured baseline (2026-09-25)
 
-Read-only evidence questions answered in installed vaults (12 real questions over three cells, graded by an independent judge; one run per setting unless noted). A violation is an unreserved claim the evidence contradicts; all observed ones repeated a relation from a note that discovery had already contradicted.
+Homologated benchmark (`evals/benchmark`): real cell vaults, twelve evidence questions answered three times per setting, graded by one fixed blind judge; publication measured as a repository sync until the fixed reviewer accepts (one run per setting). A violation is an unreserved claim the evidence contradicts. The quick column is the five-question screening subset used to compare a new model with this table.
 
-| Harness / setting | Score | Violations | Time | Usage |
-| --- | --- | --- | --- | --- |
-| Claude Opus 5.5 / medium | 0.99 | 1 | 568 s | USD 5.60 |
-| Claude Sonnet 5 / low (4 runs) | 0.92–0.97 | 0–1 | ~340 s | ~USD 2.3 |
-| Claude Sonnet 5 / medium (2 runs) | 0.93–0.96 | 0–1 | ~350 s | ~USD 2.35 |
-| Claude Haiku 4.5 / low | 0.76 | 2 | 616 s | USD 1.31 |
-| Codex gpt-5.5 / medium | 0.90 | 0 | 1482 s | 5.3M input tokens |
-| Codex gpt-5.5 / low | 0.92 | 1 | 1126 s | 4.1M input tokens |
-| Cursor Grok 4.7 / medium | 0.99 | 1 | 1875 s | 6.3M input tokens (incl. cache) |
-| Cursor Composer 2.5 | 0.94 | 2 | 596 s | 3.8M input tokens (incl. cache) |
+| Setting | Questions: score (range) | Violations / 12 | Quick score | Time / 12 | Usage / 12 | Sync: accepted first pass, author cost |
+| --- | --- | --- | --- | --- | --- | --- |
+| Claude Opus 5.5 / medium | 0.995 (0.99–1.00) | 0 | 0.99 | 991 s | USD 6.14 | yes, USD 3.57 |
+| Cursor Grok 4.7 / medium | 0.986 (0.97–1.00) | 0 | 0.98 | 2288 s | 8.2M input tokens | not measured |
+| Cursor Composer 2.5 | 0.968 (0.94–0.99) | 1.3 | 0.93 | 700 s | 3.9M input tokens | not measured |
+| Claude Sonnet 5 / medium | 0.963 (0.96–0.97) | 0 | 0.92 | 393 s | USD 2.35 | yes, USD 1.09 |
+| Codex gpt-5.5 / medium | 0.926 (0.88–0.96) | 0.3 | 0.90 | 2579 s | 8.2M input tokens | not measured |
+| Claude Sonnet 5 / low | 0.926 (0.89–0.99) | 0.3 | 0.82 | 388 s | USD 2.23 | no (2 repairs), USD 1.32 |
+| Codex gpt-5.5 / low | 0.903 (0.88–0.93) | 1.0 | 0.82 | 2072 s | 7.0M input tokens | not measured |
+| Claude Haiku 4.5 / low | 0.863 (0.84–0.88) | 2.0 | 0.77 | 524 s | USD 1.18 | not measured |
 
-For vault questions the cheapest setting that held quality was Sonnet 5 / low; medium effort did not improve it, and Haiku 4.5 missed facts. Publication (sync authoring and review) was measured only with Opus / medium.
+Reading it: settings without violations are the safe choices; Opus 5.5 / medium and Grok 4.7 / medium set the ceiling, and Claude Sonnet 5 / medium is the cheapest measured setting without violations for both questions and publication. Low effort did not save cost where repairs were needed. Settings not listed (for example Opus 5.5 / low, newer Codex or Grok models) are unmeasured: screen them with the quick check before relying on them. These numbers predate `discover claims`, which caught every judged violation when replayed over the recorded answers.
 
 ## Delegate and verify
 

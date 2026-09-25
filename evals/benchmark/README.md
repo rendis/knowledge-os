@@ -38,6 +38,7 @@ in this repository.
  "questions": "questions.json",
  "vaults": {"<key>": {"source": "<vault checkout>", "commit": "<sha>", "branch": "<default branch>",
                       "config": "fixtures/<key>/config.yaml", "overlay": "fixtures/<key>/overlay"}},
+ "quick": ["<question id>", "..."],
  "flows": [{"id": "sync-<repo>", "vault": "<key>", "kind": "sync", "repo": "<repo>",
             "source_target": "<expected reference commit>", "prompt": "<same prompt for every setting>"}]
 }
@@ -51,7 +52,7 @@ reference branch still points at `source_target`; record a new scenario when it 
 
 ```bash
 python3 -B evals/benchmark/bench.py prepare --suite SUITE.json --work WORK
-python3 -B evals/benchmark/bench.py qa   --suite SUITE.json --work WORK --setting claude:sonnet:low
+python3 -B evals/benchmark/bench.py qa   --suite SUITE.json --work WORK --setting claude:sonnet:low [--quick]
 python3 -B evals/benchmark/bench.py flow --suite SUITE.json --work WORK --setting claude:sonnet:low
 python3 -B evals/benchmark/bench.py report --work WORK
 ```
@@ -60,6 +61,22 @@ Settings: `claude:<model>:<effort>`, `codex:<model>:<effort>`, `cursor:<model id
 in the model id, e.g. `grok-4.7-medium`; `agent --list-models` lists them). Log in to each harness CLI first
 (`claude`, `codex login`, `agent login`). Run different harnesses in parallel if needed, but compare time only
 between runs made under similar load.
+
+## Screening a new model (quick check)
+
+Do not re-run every setting when a model appears. The suite's `quick` list names the most discriminating
+questions (in the reference campaign five of twelve: the two over wrong notes, where every violation
+occurred, and the three with the lowest mean score). One pass ranks settings like the full three-run
+campaign (Spearman 0.99 over eight settings), catches the same violations and costs about a seventh of it:
+
+```bash
+python3 -B evals/benchmark/bench.py qa --suite SUITE.json --work WORK --setting cursor:grok-4.8-medium: --quick
+```
+
+Compare its score and violations with the quick column of the baseline in
+`kernel/90-Meta/execution-profiles.md`. Adopt it for questions when it has no violation and scores at least
+like the recommended minimum; run one `flow` before using it to publish. Re-baseline (full campaign) only
+after a kernel change that alters answering or publication.
 
 ## Metrics
 
