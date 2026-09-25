@@ -1,7 +1,7 @@
 """Run the regression questions against installed cell vaults through a real agent harness.
 
 python3 -B evals/regression/run.py --harness claude|codex|cursor --questions FILE --out DIR \
-    --vault a=PATH --vault b=PATH [--ids S1,S2] [--parallel 4]
+    --vault a=PATH --vault b=PATH [--model M] [--effort low|medium|high] [--ids S1,S2] [--parallel 4]
 
 Each question runs in a fresh headless session whose working directory is the vault, exactly as a
 developer would ask it. Answers, usage and duration are stored per question for judge.py.
@@ -12,26 +12,29 @@ HERE = pathlib.Path(__file__).parent
 SUFFIX = "\n\n(Consulta de solo lectura: no modifiques archivos ni ejecutes acciones con efectos.)"
 
 
-def command(harness, prompt, out_file):
+DEFAULTS = {"claude": ("opus", "medium"), "codex": ("gpt-5.5", "medium"), "cursor": ("", "")}
+
+
+def command(harness, prompt, out_file, model, effort):
     if harness == "claude":
-        return ["claude", "-p", prompt, "--model", "opus", "--effort", "medium", "--output-format", "json", "--permission-mode", "bypassPermissions"]
+        return ["claude", "-p", prompt, "--model", model, "--effort", effort, "--output-format", "json", "--permission-mode", "bypassPermissions"]
     if harness == "codex":
-        return ["codex", "exec", "--skip-git-repo-check", "-m", "gpt-5.5", "-c", 'model_reasoning_effort="medium"', "-s", "read-only", "--json", "--output-last-message", str(out_file), prompt]
+        return ["codex", "exec", "--skip-git-repo-check", "-m", model, "-c", f'model_reasoning_effort="{effort}"', "-s", "read-only", "--json", "--output-last-message", str(out_file), prompt]
     if harness == "cursor":
-        return ["cursor-agent", "-p", "--output-format", "json", "--force", prompt]
+        return ["cursor-agent", "-p", "--output-format", "json", "--force"] + (["--model", model] if model else []) + [prompt]
     raise SystemExit("unknown harness")
 
 
-def run_one(harness, q, vault, out_dir):
+def run_one(harness, q, vault, out_dir, model, effort):
     out_dir.mkdir(parents=True, exist_ok=True)
     last = out_dir / f"{q['id']}.last.txt"
     start = time.time()
     try:
-        r = subprocess.run(command(harness, q["question"] + SUFFIX, last), cwd=vault, capture_output=True, text=True, timeout=1500)
+        r = subprocess.run(command(harness, q["question"] + SUFFIX, last, model, effort), cwd=vault, capture_output=True, text=True, timeout=1500)
         stdout, rc = r.stdout, r.returncode
     except subprocess.TimeoutExpired as e:
         stdout, rc = (e.stdout or b"").decode() if isinstance(e.stdout, bytes) else (e.stdout or ""), "timeout"
-    rec = {"id": q["id"], "harness": harness, "vault": vault, "seconds": round(time.time() - start, 1), "returncode": rc}
+    rec = {"id": q["id"], "harness": harness, "model": model, "effort": effort, "vault": vault, "seconds": round(time.time() - start, 1), "returncode": rc}
     if harness in ("claude", "cursor"):
         try:
             j = json.loads(stdout)
@@ -66,13 +69,16 @@ def main():
     p.add_argument("--questions", required=True, help="cell-owned question set (kept outside this repository)")
     p.add_argument("--out", required=True)
     p.add_argument("--vault", action="append", required=True)
+    p.add_argument("--model", default="", help="model id; Cursor effort goes in bracket overrides, e.g. 'm[effort=medium]'")
+    p.add_argument("--effort", default="")
     p.add_argument("--ids", default="")
     p.add_argument("--parallel", type=int, default=4)
     a = p.parse_args()
     vaults = dict(v.split("=", 1) for v in a.vault)
+    model, effort = a.model or DEFAULTS[a.harness][0], a.effort or DEFAULTS[a.harness][1]
     qs = [q for q in json.load(open(a.questions)) if q["vault"] in vaults and (not a.ids or q["id"] in a.ids.split(","))]
     with cf.ThreadPoolExecutor(a.parallel) as ex:
-        for rec in ex.map(lambda q: run_one(a.harness, q, vaults[q["vault"]], pathlib.Path(a.out)), qs):
+        for rec in ex.map(lambda q: run_one(a.harness, q, vaults[q["vault"]], pathlib.Path(a.out), model, effort), qs):
             print(rec["id"], rec["returncode"], rec["seconds"], "s", rec.get("cost_usd"), flush=True)
 
 

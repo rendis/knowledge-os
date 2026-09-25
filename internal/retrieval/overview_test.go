@@ -21,6 +21,7 @@ func TestOverviewOneLinePerNote(t *testing.T) {
 	write("25-Topics/orders-out.md", "---\ntipo: topic\n---\n# orders-out\n\nTopic de órdenes. [^e1]\n")
 	write(".investigations/x/investigation.md", "hidden\n")
 	write("90-Meta/Convenciones.md", "meta\n")
+	write(".agents/state/discovery/comparison.json", `[{"note":"20-Repos/orders.md","discrepancies":[{"field":"publica-en","target":"orders-legacy","discovered":["orders-out"]}]}]`)
 	var b bytes.Buffer
 	if e := WriteOverview(root, "", &b); e != nil {
 		t.Fatal(e)
@@ -30,6 +31,9 @@ func TestOverviewOneLinePerNote(t *testing.T) {
 		if !strings.Contains(out, want) {
 			t.Fatalf("missing %q in\n%s", want, out)
 		}
+	}
+	if !strings.Contains(out, "⚠ unsupported by the last discover run, verify before use: publica-en: orders-legacy (repository evidence names orders-out)") {
+		t.Fatalf("a discovery discrepancy must be flagged on its note:\n%s", out)
 	}
 	if strings.Contains(out, "hidden") || strings.Contains(out, "Convenciones") {
 		t.Fatalf("overview must list only knowledge notes:\n%s", out)
