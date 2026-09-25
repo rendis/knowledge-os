@@ -67,8 +67,8 @@ func overviewLine(stem string, raw []byte) string {
 		p = ovNoise.ReplaceAllString(strings.Join(strings.Fields(p), " "), "$1")
 		if m := ovSentence.FindStringSubmatch(p); m != nil {
 			summary = m[1]
-		} else if len(p) > 220 {
-			summary = p[:220] + "…"
+		} else if r := []rune(p); len(r) > 220 {
+			summary = string(r[:220]) + "…"
 		} else {
 			summary = p
 		}
