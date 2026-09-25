@@ -50,20 +50,22 @@ Open translation table, not an allowlist. Updated 2026-09-16 independently of wo
 
 ## Measured baseline (2026-09-25)
 
-Homologated benchmark (`evals/benchmark`): real cell vaults, twelve evidence questions answered three times per setting, graded by one fixed blind judge; publication measured as a repository sync until the fixed reviewer accepts (one run per setting). A violation is an unreserved claim the evidence contradicts. The quick column is the five-question screening subset used to compare a new model with this table.
+Homologated benchmark (`evals/benchmark`) on real cell vaults, one fixed blind judge. **Answers** is the quick screening set: five discriminating evidence questions (two over notes known to be wrong), scored only on what each question asks, averaged over the runs shown. **Violations** are unreserved claims the evidence contradicts. **Sync** is one repository synchronization until the fixed reviewer accepts: first-pass acceptance, repairs, and author cost where the harness reports it.
 
-| Setting | Questions: score (range) | Violations / 12 | Quick score | Time / 12 | Usage / 12 | Sync: accepted first pass, author cost |
-| --- | --- | --- | --- | --- | --- | --- |
-| Claude Opus 5.5 / medium | 0.995 (0.99–1.00) | 0 | 0.99 | 991 s | USD 6.14 | yes, USD 3.57 |
-| Cursor Grok 4.7 / medium | 0.986 (0.97–1.00) | 0 | 0.98 | 2288 s | 8.2M input tokens | not measured |
-| Cursor Composer 2.5 | 0.968 (0.94–0.99) | 1.3 | 0.93 | 700 s | 3.9M input tokens | not measured |
-| Claude Sonnet 5 / medium | 0.963 (0.96–0.97) | 0 | 0.92 | 393 s | USD 2.35 | yes, USD 1.09 |
-| Codex gpt-5.5 / medium | 0.926 (0.88–0.96) | 0.3 | 0.90 | 2579 s | 8.2M input tokens | not measured |
-| Claude Sonnet 5 / low | 0.926 (0.89–0.99) | 0.3 | 0.82 | 388 s | USD 2.23 | no (2 repairs), USD 1.32 |
-| Codex gpt-5.5 / low | 0.903 (0.88–0.93) | 1.0 | 0.82 | 2072 s | 7.0M input tokens | not measured |
-| Claude Haiku 4.5 / low | 0.863 (0.84–0.88) | 2.0 | 0.77 | 524 s | USD 1.18 | not measured |
+| Setting | Answers (runs) | Violations / 5 | Extra context covered | Sync |
+| --- | --- | --- | --- | --- |
+| Claude Opus 5.5 / medium | 1.00 (3) | 0 | 100% | first pass, USD 3.57 |
+| Cursor Grok 4.7 / medium | 1.00 (3) | 0 | 100% | after 1 repair (a stale neighbour note) |
+| Claude Opus 5.5 / low | 0.95 (1) | 0 | 100% | after 1 repair, USD 2.08 |
+| Claude Sonnet 5 / medium | 0.95 (3) | 0 | 87% | first pass, USD 1.09 |
+| Codex gpt-6-sol / low | 0.85 (2) | 0 | 20–40% | after 2 repairs |
+| Cursor Composer 2.5 | 1.00 (3) | 1.0 | 80% | not measured |
+| Codex gpt-5.5 / medium | 0.97 (3) | 0.7 | 73% | not measured |
+| Codex gpt-5.5 / low | 0.95 (3) | 0.7 | 63% | not measured |
+| Claude Sonnet 5 / low | 0.83 (3) | 0.7 | 83% | after 2 repairs, USD 1.32 |
+| Claude Haiku 4.5 / low | 0.90 (3) | 1.7 | 57% | not measured |
 
-Reading it: settings without violations are the safe choices; Opus 5.5 / medium and Grok 4.7 / medium set the ceiling, and Claude Sonnet 5 / medium is the cheapest measured setting without violations for both questions and publication. Low effort did not save cost where repairs were needed. Settings not listed (for example Opus 5.5 / low, newer Codex or Grok models) are unmeasured: screen them with the quick check before relying on them. These numbers predate `discover claims`, which caught every judged violation when replayed over the recorded answers.
+Reading it: choose among settings without violations. Opus 5.5 / medium and Grok 4.7 / medium set the ceiling; Opus 5.5 / low and Sonnet 5 / medium are the cheaper safe settings; gpt-6-sol / low answers what is asked without violations but concisely (little unrequested context), and its syncs needed repairs that the gates and the reviewer caught. Every sync reached acceptance: the gates and the independent review, not the model, carry publication quality. Low effort does not lower the total cost of a sync when repairs follow. Settings not listed are unmeasured; screen them with the quick check before relying on them. Answer runs predate `discover claims`, which caught every judged violation when replayed over recorded answers.
 
 ## Delegate and verify
 
