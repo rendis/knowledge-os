@@ -271,9 +271,17 @@ func (a *auditor) check(n note, group string) {
 			}
 		}
 	case "TOPIC_NOTES":
-		a.fields(n, TOPIC_FIELDS, TOPIC_FIELDS)
+		if s(n.f["tipo"]) == "evento" {
+			// An event type carried by a topic and selected by subscription filters.
+			a.fields(n, EVENT_FIELDS, EVENT_FIELDS)
+			if !rx(`^\[\[[^\]]+\]\]$`, s(n.f["topico"])) {
+				a.issue(n, "topico must be one wikilink to the carrier topic")
+			}
+		} else {
+			a.fields(n, TOPIC_FIELDS, TOPIC_FIELDS)
+			a.kind(n, "topic")
+		}
 		a.sections(n, TOPIC_SECTIONS)
-		a.kind(n, "topic")
 		for _, h := range headings(n.body) {
 			if has(TOPIC_FORBIDDEN_HEADINGS, h) {
 				a.issue(n, "forbidden manual relationship section %s", h)

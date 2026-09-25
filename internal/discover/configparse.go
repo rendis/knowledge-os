@@ -39,9 +39,9 @@ func init() {
 }
 
 var (
-	testConfig  = regexp.MustCompile(`(?i)(^|/)(tests?|__tests__|mocks?|fixtures?|testdata|e2e)/|\.(test|spec)\.|(^|/)\.env\.test`)
+	testConfig  = regexp.MustCompile(`(?i)(^|/)(tests?|__tests__|mocks?|fixtures?|testdata|e2e)/|\.(test|spec|e2e)\.|(^|/)\.env\.test`)
 	secretFile  = regexp.MustCompile(`(?i)secret|credential|\.pem$|\.key$`)
-	placeholder = regexp.MustCompile(`\$\{([A-Za-z_][\w.\-]*)(?::[^}]*)?\}|\$\(([A-Za-z_]\w*)\)`)
+	placeholder = regexp.MustCompile(`\$\{([A-Za-z_][\w.\-]*)(?::[^}]*)?\}|\$\(([A-Za-z_]\w*)\)|\$([A-Za-z_]\w*)`)
 	lineKV      = regexp.MustCompile(`^\s*(?:export\s+)?["']?([A-Za-z_][\w.\-/]*)["']?\s*[:=]\s*(.+?)\s*[,;\\]?\s*$`)
 	cliFlag     = regexp.MustCompile(`--([A-Za-z][\w\-]*)[= ]["']?([^\s"'\\]+)`)
 	xmlText     = regexp.MustCompile(`<([A-Za-z][\w.\-:]*)>([^<>]{2,300})</([A-Za-z][\w.\-:]*)>`)
@@ -259,10 +259,11 @@ func scanConfig(s *snapshot) ([]entry, int, error) {
 		for _, x := range parseConfig(f, b) {
 			x.File = f
 			for _, m := range placeholder.FindAllStringSubmatch(x.Value, -1) {
-				if m[1] != "" {
-					x.Placeholders = append(x.Placeholders, m[1])
-				} else {
-					x.Placeholders = append(x.Placeholders, m[2])
+				for _, g := range m[1:] {
+					if g != "" {
+						x.Placeholders = append(x.Placeholders, g)
+						break
+					}
 				}
 			}
 			if secret {

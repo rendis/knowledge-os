@@ -24,7 +24,7 @@ type Object = map[string]any
 
 var kebab = regexp.MustCompile(`^[a-z0-9]+(?:-[a-z0-9]+)*$`)
 var markers = []string{"AGENTS.md", "00-Home.md", "instance.yaml", "90-Meta/Convenciones.md", "90-Meta/Auditoria - Framework.md"}
-var defaultTypes = []string{"sistema", "servicio", "componente", "recurso-runtime", "repositorio", "topic", "flujo", "integracion-externa", "glosario", "operacional", "aprendizaje", "indice"}
+var defaultTypes = []string{"sistema", "servicio", "componente", "recurso-runtime", "repositorio", "topic", "evento", "flujo", "integracion-externa", "glosario", "operacional", "aprendizaje", "indice"}
 
 func obj(x any) Object {
 	if v, ok := x.(map[string]any); ok {

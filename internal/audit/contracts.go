@@ -30,6 +30,8 @@ var ARCH_SECTIONS = map[string][]string{"servicio": {"Interfaces y datos", "Limi
 
 var TOPIC_FIELDS = []string{"nombre-raw", "sistema", "tags", "tipo"}
 
+var EVENT_FIELDS = []string{"nombre-raw", "sistema", "tags", "tipo", "topico"}
+
 var TOPIC_SECTIONS = []string{"Contrato", "Infraestructura verificada", "Limitaciones y desconocimientos", "Qué representa"}
 
 var TOPIC_FORBIDDEN_HEADINGS = []string{"Consumidores", "Productores", "Productores y consumidores"}

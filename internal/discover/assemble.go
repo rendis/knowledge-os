@@ -25,7 +25,10 @@ type repoScan struct {
 	deps     map[string]*dependency
 	entries  []entry
 	cfgFiles int
+	paths    []string
 }
+
+func (s *repoScan) files() []string { return s.paths }
 
 type evidence struct {
 	Kind    string `json:"kind"` // config | iac | code | platform | manifest | import
@@ -256,7 +259,7 @@ func scanRepository(in repoInput) (*repoScan, error) {
 	if e != nil {
 		return nil, e
 	}
-	return &repoScan{in: in, code: code, deps: directDependencies(code), entries: entries, cfgFiles: n}, nil
+	return &repoScan{in: in, code: code, deps: directDependencies(code), entries: entries, cfgFiles: n, paths: s.files}, nil
 }
 
 // resolveLibraries expands imports of local company libraries (Go modules, npm packages)

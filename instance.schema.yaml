@@ -79,6 +79,7 @@ fields:
       - recurso-runtime
       - repositorio
       - topic
+      - evento
       - flujo
       - integracion-externa
       - glosario
