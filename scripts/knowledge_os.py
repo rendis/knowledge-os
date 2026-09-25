@@ -615,6 +615,10 @@ def build_instance_from_args(args: argparse.Namespace) -> dict[str, Any]:
             args.yes,
         ).split(",") if part.strip()
     ]
+    platforms = list(args.platform or [])
+    if not args.yes and not platforms:
+        raw = prompt("Clouds the systems run on (gcp, aws, azure — comma-separated, empty for none)", "", False)
+        platforms = [part.strip() for part in raw.split(",") if part.strip()]
     adapters = list(args.adapter or [])
     if not args.yes and not adapters:
         raw = prompt("Adapters (reports — empty for none)", "", False)
@@ -637,6 +641,7 @@ def build_instance_from_args(args: argparse.Namespace) -> dict[str, Any]:
         },
         "graph": {"enabled_types": types},
         "evidence": {"profile": profile},
+        "platform": {"providers": platforms},
         "adapters": adapters,
         "locale": {"notes": locale},
     }
@@ -1017,6 +1022,7 @@ def main() -> int:
     parser.add_argument("--system", action="append", default=[])
     parser.add_argument("--tracker", action="append", default=[])
     parser.add_argument("--adapter", action="append", default=[])
+    parser.add_argument("--platform", action="append", default=[], help="cloud the systems run on (gcp, aws, azure); repeat for several")
     parser.add_argument("--evidence-profile", default="")
     parser.add_argument("--locale", default="")
     parser.add_argument("--vault-remote", default="")

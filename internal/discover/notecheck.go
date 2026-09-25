@@ -565,8 +565,8 @@ var hostRE = regexp.MustCompile(`^(?:[a-z]+://)?([^/:?#]+)`)
 func resourceGroup(r resource) string {
 	n := normalizeResource(r.Name)
 	switch r.Type {
-	case "pubsub_topic", "pubsub_subscription":
-		return "pubsub " + logicalName(n)
+	case "message_topic", "message_subscription":
+		return "messaging " + logicalName(n)
 	case "http_endpoint":
 		m := hostRE.FindStringSubmatch(n)
 		if m == nil || !strings.Contains(m[1], ".") || loopback(m[1]) {

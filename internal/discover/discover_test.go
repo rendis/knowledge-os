@@ -175,13 +175,13 @@ func TestAssemblyPlatformPendingAndComparison(t *testing.T) {
 		for _, e := range s.entries {
 			st.ConfigKeys[keySignature(e)] = judgment{Choice: "other", Confidence: 0.9}
 			if e.Key == "SUB" || e.Key == "name_subscription" {
-				st.ConfigKeys[keySignature(e)] = judgment{Choice: "pubsub_subscription", Confidence: 0.95}
-				st.ConfigValues[entryID(e)] = judgment{Choice: "pubsub_subscription", Confidence: 0.9}
+				st.ConfigKeys[keySignature(e)] = judgment{Choice: "message_subscription", Confidence: 0.95}
+				st.ConfigValues[entryID(e)] = judgment{Choice: "message_subscription", Confidence: 0.9}
 			}
 		}
 	}
-	snap := platformSnapshot{Project: "p-prd", Status: "ok", Topics: []string{"projects/p-prd/topics/orders-cl-outbound", "projects/p-prd/topics/orders-in"},
-		Subscriptions: []pubsubSubscription{{Name: "projects/p-prd/subscriptions/orders-cl-inbound-sub", Topic: "projects/p-prd/topics/orders-in", Attributes: filterAttributes(`attributes.eventType="orderConfirmed" AND attributes.country="CL"`)}}}
+	snap := platformSnapshot{Provider: "gcp", Scope: "p-prd", Status: "ok", Topics: []string{"projects/p-prd/topics/orders-cl-outbound", "projects/p-prd/topics/orders-in"},
+		Subscriptions: []platformSubscription{{Name: "projects/p-prd/subscriptions/orders-cl-inbound-sub", Topic: "projects/p-prd/topics/orders-in", Attributes: filterAttributes(`attributes.eventType="orderConfirmed" AND attributes.country="CL"`)}}}
 	a := &assembly{scans: scans, st: st, platform: buildPlatformIndex([]platformSnapshot{snap})}
 	if len(a.pendingQuestions()) != 0 {
 		t.Fatalf("unexpected questions: %+v", a.pendingQuestions())
@@ -251,7 +251,7 @@ func TestAgentAnswersAreValidated(t *testing.T) {
 	if n, e := recordAnswers(st, map[string]question{}, []map[string]any{{"id": "go:x", "choice": "document_db", "confidence": 0.9}}, "agent"); e != nil || n != 1 || st.Dependencies["go:x"].Choice != "document_db" {
 		t.Fatalf("correction %v %v %+v", n, e, st.Dependencies)
 	}
-	if _, e := recordAnswers(st, map[string]question{}, []map[string]any{{"id": "go:x", "choice": "pubsub_topic"}}, "agent"); e == nil {
+	if _, e := recordAnswers(st, map[string]question{}, []map[string]any{{"id": "go:x", "choice": "message_topic"}}, "agent"); e == nil {
 		t.Fatal("a correction must use its own kind's options")
 	}
 }
@@ -292,8 +292,8 @@ func TestNoteGates(t *testing.T) {
 	st := &store{Dependencies: map[string]judgment{"go:cloud.google.com/go/pubsub": {Choice: "messaging", Confidence: 1}}, ConfigKeys: map[string]judgment{}, ConfigValues: map[string]judgment{}}
 	s := scan(t, "SVC-orders", repo)
 	for _, e := range s.entries {
-		st.ConfigKeys[keySignature(e)] = judgment{Choice: "pubsub_topic", Confidence: 0.95}
-		st.ConfigValues[entryID(e)] = judgment{Choice: "pubsub_topic", Confidence: 0.95}
+		st.ConfigKeys[keySignature(e)] = judgment{Choice: "message_topic", Confidence: 0.95}
+		st.ConfigValues[entryID(e)] = judgment{Choice: "message_topic", Confidence: 0.95}
 	}
 	if e := st.save(vault); e != nil {
 		t.Fatal(e)
@@ -357,11 +357,11 @@ func TestNoteGates(t *testing.T) {
 
 func TestFailedRefreshKeepsPreviousSnapshot(t *testing.T) {
 	v := t.TempDir()
-	good := platformSnapshot{Provider: "gcp-pubsub", Project: "p-prd", Status: "ok", Topics: []string{"projects/p-prd/topics/t"}}
+	good := platformSnapshot{Provider: "gcp", Scope: "p-prd", Status: "ok", Topics: []string{"projects/p-prd/topics/t"}}
 	if e := saveSnapshot(v, good); e != nil {
 		t.Fatal(e)
 	}
-	if e := saveSnapshot(v, platformSnapshot{Project: "p-prd", Status: "auth-required", Detail: "reauthentication failed", CapturedAt: "later"}); e != nil {
+	if e := saveSnapshot(v, platformSnapshot{Provider: "gcp", Scope: "p-prd", Status: "auth-required", Detail: "reauthentication failed", CapturedAt: "later"}); e != nil {
 		t.Fatal(e)
 	}
 	snaps, _ := loadSnapshots(v)
@@ -485,7 +485,7 @@ func TestStaleNeighboursAfterSync(t *testing.T) {
 
 func TestClaimsAndCorrections(t *testing.T) {
 	vault := t.TempDir()
-	facts := repoFacts{Repo: "SVC-orders", Resources: []resource{{Type: "pubsub_subscription", Name: "projects/p-prd/subscriptions/orders-cl-inbound-sub", Topic: "projects/p-prd/topics/orders-inbound"}}}
+	facts := repoFacts{Repo: "SVC-orders", Resources: []resource{{Type: "message_subscription", Name: "projects/p-prd/subscriptions/orders-cl-inbound-sub", Topic: "projects/p-prd/topics/orders-inbound"}}}
 	if e := writeState(vault, "facts/SVC-orders.json", facts); e != nil {
 		t.Fatal(e)
 	}
@@ -494,7 +494,7 @@ func TestClaimsAndCorrections(t *testing.T) {
 		t.Fatal(e)
 	}
 	write(t, vault, "25-Topics/stock-topic.md", "---\ntipo: topic\nnombre-raw: \"stock-inbound-{cl|pe}\"\n---\n# stock\n")
-	write(t, vault, "90-Meta/discovery/platform/gcp-pubsub-p-prd.json", `{"provider":"gcp-pubsub","project":"p-prd","status":"ok","topics":["projects/p-prd/topics/audit-events"],"subscriptions":[]}`)
+	write(t, vault, "90-Meta/discovery/platform/gcp-p-prd.json", `{"provider":"gcp","scope":"p-prd","status":"ok","topics":["projects/p-prd/topics/audit-events"],"subscriptions":[]}`)
 	draft := "El servicio consume `orders-cl-inbound-sub` del topic `orders-inbound`, y audita en `audit-events` y `stock-inbound-pe`.\n\n" +
 		"Según [[orders]], también lo dispara `legacy-orders-topic`.\n\nPublica además en `invented-orders-topic`; ver `cmd/main.go` y `pubsub.NewClient` con `GCP_PROJECT_ID`.\n"
 	r, e := checkClaims(vault, draft)
@@ -514,7 +514,7 @@ func TestClaimsAndCorrections(t *testing.T) {
 	}
 }
 
-func TestShortNamesAreCheckedInTheProjectTheirFileDeclares(t *testing.T) {
+func TestShortNamesAreCheckedInTheScopeTheirFileDeclares(t *testing.T) {
 	dir := t.TempDir()
 	svc := gitRepo(t, filepath.Join(dir, "SVC-stock"), map[string]string{
 		"go.mod":         "module example.com/stock\n",
@@ -524,14 +524,14 @@ func TestShortNamesAreCheckedInTheProjectTheirFileDeclares(t *testing.T) {
 	st := &store{Dependencies: map[string]judgment{}, ConfigKeys: map[string]judgment{}, ConfigValues: map[string]judgment{}}
 	s := scan(t, "SVC-stock", svc)
 	for _, e := range s.entries {
-		choice := map[string]string{"PROJECT_ID": "cloud_project_or_region", "SUB": "pubsub_subscription", "TOPIC": "pubsub_topic"}[e.Key]
+		choice := map[string]string{"PROJECT_ID": "cloud_project_or_region", "SUB": "message_subscription", "TOPIC": "message_topic"}[e.Key]
 		st.ConfigKeys[keySignature(e)] = judgment{Choice: choice, Confidence: 0.95}
 		st.ConfigValues[entryID(e)] = judgment{Choice: choice, Confidence: 0.95}
 	}
 	snaps := []platformSnapshot{
-		{Project: "x-app-prd", Status: "ok", Subscriptions: []pubsubSubscription{{Name: "projects/x-app-prd/subscriptions/stock-cl-sub", Topic: "projects/other-sys-prd/topics/catalog-topic"}}},
-		{Project: "x-app-uat", Status: "ok"},
-		{Project: "other-sys-prd", Status: "ok", Topics: []string{"projects/other-sys-prd/topics/catalog-topic"}},
+		{Provider: "gcp", Scope: "x-app-prd", Status: "ok", Subscriptions: []platformSubscription{{Name: "projects/x-app-prd/subscriptions/stock-cl-sub", Topic: "projects/other-sys-prd/topics/catalog-topic"}}},
+		{Provider: "gcp", Scope: "x-app-uat", Status: "ok"},
+		{Provider: "gcp", Scope: "other-sys-prd", Status: "ok", Topics: []string{"projects/other-sys-prd/topics/catalog-topic"}},
 	}
 	a := &assembly{scans: []*repoScan{s}, st: st, platform: buildPlatformIndex(snaps)}
 	f := a.facts()[0]
@@ -540,7 +540,7 @@ func TestShortNamesAreCheckedInTheProjectTheirFileDeclares(t *testing.T) {
 		subjects = append(subjects, p.Subject)
 	}
 	joined := strings.Join(subjects, " | ")
-	if !strings.Contains(joined, "stock-cl-sub @ x-app-uat") {
+	if !strings.Contains(joined, "stock-cl-sub @ gcp:x-app-uat") {
 		t.Fatalf("a subscription present in prd but absent in the uat project its file declares is pending: %v", subjects)
 	}
 	if strings.Contains(joined, "catalog-topic @") {

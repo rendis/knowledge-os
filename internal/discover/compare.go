@@ -148,7 +148,7 @@ func compareNotes(vault string, facts []repoFacts) ([]comparison, error) {
 		c := comparison{Repo: f.Repo, Note: f.Note, Supported: []string{}, Discrepancies: []discrepancy{}, Undocumented: []string{}}
 		found := []string{}
 		for _, r := range f.Resources {
-			if r.Type == "pubsub_topic" || r.Type == "pubsub_subscription" {
+			if isMessaging(r.Type) {
 				found = append(found, r.Name)
 				if r.Topic != "" {
 					found = append(found, r.Topic)
@@ -190,7 +190,7 @@ func compareNotes(vault string, facts []repoFacts) ([]comparison, error) {
 			if len(f.Languages) == 0 {
 				break // infrastructure-only repositories declare many resources; gaps are judged cell-wide
 			}
-			if r.Type != "pubsub_topic" && r.Type != "pubsub_subscription" {
+			if !isMessaging(r.Type) {
 				continue
 			}
 			matched := false
@@ -231,7 +231,7 @@ func logicalName(n string) string {
 	return strings.Join(keep, "-")
 }
 
-// cellGaps lists logical Pub/Sub resources found anywhere in the cell that no topic note names.
+// cellGaps lists logical messaging resources found anywhere in the cell that no topic note names.
 func cellGaps(vault string, facts []repoFacts) ([]map[string]any, error) {
 	notes, e := loadNotes(vault)
 	if e != nil {
@@ -251,7 +251,7 @@ func cellGaps(vault string, facts []repoFacts) ([]map[string]any, error) {
 	groups := map[string]*group{}
 	for _, f := range facts {
 		for _, r := range f.Resources {
-			if r.Type != "pubsub_topic" && r.Type != "pubsub_subscription" {
+			if !isMessaging(r.Type) {
 				continue
 			}
 			covered := false
