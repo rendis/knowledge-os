@@ -138,8 +138,8 @@ func WriteOverview(root, folder string, out io.Writer) error {
 			}
 			return nil
 		}
-		if !strings.HasSuffix(p, ".md") || folder != "" && top != folder {
-			return nil
+		if !strings.HasSuffix(p, ".md") || folder != "" && top != folder || !strings.Contains(rel, "/") {
+			return nil // knowledge notes live in the 10-…70- folders; root files are instructions and orientation
 		}
 		raw, e := readFileBounded(p, 512_000)
 		if e != nil {
