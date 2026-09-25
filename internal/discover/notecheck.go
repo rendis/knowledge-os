@@ -349,7 +349,7 @@ func checkNote(vault, notePath, repoOverride string, semantic bool) (noteCheck, 
 			if s, e := scanRepository(in); e != nil {
 				add("G2-coverage", "pending", repoName, "cannot scan the analyzed commit: "+e.Error())
 			} else {
-				resolveLibraries([]*repoScan{s})
+				resolveLibraries(append([]*repoScan{s}, libraryContext(vault, []*repoScan{s})...))
 				st, _ := loadStore(vault)
 				snaps, _ := loadSnapshots(vault)
 				a := &assembly{scans: []*repoScan{s}, st: st, platform: buildPlatformIndex(snaps)}

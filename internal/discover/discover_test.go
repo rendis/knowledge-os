@@ -245,6 +245,13 @@ func TestAgentAnswersAreValidated(t *testing.T) {
 	if e != nil || n != 1 || st.Dependencies["go:x"].Source != "agent" {
 		t.Fatalf("record %v %v %+v", n, e, st.Dependencies)
 	}
+	// A recorded judgment is corrected without being pending, within its kind's options.
+	if n, e := recordAnswers(st, map[string]question{}, []map[string]any{{"id": "go:x", "choice": "document_db", "confidence": 0.9}}, "agent"); e != nil || n != 1 || st.Dependencies["go:x"].Choice != "document_db" {
+		t.Fatalf("correction %v %v %+v", n, e, st.Dependencies)
+	}
+	if _, e := recordAnswers(st, map[string]question{}, []map[string]any{{"id": "go:x", "choice": "pubsub_topic"}}, "agent"); e == nil {
+		t.Fatal("a correction must use its own kind's options")
+	}
 }
 
 func TestNameMatchAndResourceShape(t *testing.T) {
@@ -371,5 +378,34 @@ func TestReferenceRefFollowsPolicy(t *testing.T) {
 	g(other, "branch", "-m", "main", "develop")
 	if ref, note, e := referenceRef(other, ""); e != nil || ref != "HEAD" || note == "" {
 		t.Fatalf("no main/master must scan HEAD and report the fallback: %q %q %v", ref, note, e)
+	}
+}
+
+func TestLibraryContextResolvesSelectedRepository(t *testing.T) {
+	dir := t.TempDir()
+	repos := filepath.Join(dir, "repos")
+	gitRepo(t, filepath.Join(repos, "SVC-common"), map[string]string{
+		"go.mod":           "module example.org/platform/common\n",
+		"publisher/pub.go": "package publisher\nimport (\n\t\"cloud.google.com/go/pubsub\"\n\t\"example.org/platform/common/store\"\n)\n",
+		"store/store.go":   "package store\nimport \"cloud.google.com/go/firestore\"\n",
+	})
+	svc := gitRepo(t, filepath.Join(repos, "SVC-orders"), map[string]string{
+		"go.mod":      "module example.org/orders\n\nrequire example.org/platform/common v1.0.0\n",
+		"cmd/main.go": "package main\nimport \"example.org/platform/common/publisher\"\n",
+	})
+	vault := t.TempDir()
+	write(t, vault, "instance.yaml", "version: 1\ncell:\n  name: \"C\"\n  purpose: \"p\"\nsystems:\n  - id: \"s\"\n    name: \"S\"\nsources:\n  repo_prefixes: [\"SVC\"]\n")
+	write(t, vault, ".knowledge-os-config.yaml", "version: 1\nworkspace:\n  repository_roots:\n    - \""+repos+"\"\n")
+	s := scan(t, "SVC-orders", svc)
+	libs := libraryContext(vault, []*repoScan{s})
+	if len(libs) != 1 || libs[0].in.Name != "SVC-common" {
+		t.Fatalf("the imported company library must be scanned: %v", libs)
+	}
+	resolveLibraries(append([]*repoScan{s}, libs...))
+	if d := s.deps["go:cloud.google.com/go/pubsub"]; d == nil || d.Via != "SVC-common" {
+		t.Fatalf("a --repo run must resolve library dependencies like a full run: %+v", s.deps)
+	}
+	if d := s.deps["go:cloud.google.com/go/firestore"]; d == nil || d.Via != "SVC-common" {
+		t.Fatalf("a library's own imported packages must be followed: %+v", s.deps)
 	}
 }

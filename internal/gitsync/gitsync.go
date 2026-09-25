@@ -197,6 +197,20 @@ func changed(o opts) ([]string, string, error) {
 	return files, mb, nil
 }
 
+// stateOnly reports whether the branch changes only the versioned discovery state.
+func stateOnly(vault, mb string) bool {
+	d, e := git(vault, "diff", "--name-only", "--no-renames", mb, "HEAD")
+	if e != nil || d == "" {
+		return false
+	}
+	for _, f := range strings.Split(d, "\n") {
+		if !strings.HasPrefix(f, "90-Meta/discovery/") {
+			return false
+		}
+	}
+	return true
+}
+
 // digest binds the exact content of the changed files at HEAD (deletions included).
 func digest(vault string, files []string) string {
 	h := sha256.New()
@@ -412,7 +426,13 @@ func verify(o opts) (map[string]any, error) {
 	}
 	d := digest(o.vault, files)
 	rr := lastReview(o, mb)
+	state := len(files) == 0 && stateOnly(o.vault, mb)
 	switch {
+	case state:
+		if e := discover.ValidateState(o.vault); e != nil {
+			problems = append(problems, "discovery state: "+e.Error())
+		}
+		res["discovery_state_only"] = true
 	case len(files) == 0:
 		problems = append(problems, "no knowledge change on this branch")
 	case rr == nil:
