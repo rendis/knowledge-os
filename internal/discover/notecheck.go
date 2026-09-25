@@ -323,20 +323,7 @@ func checkNote(vault, notePath, repoOverride string, semantic bool) (noteCheck, 
 	// The repository is named by the note's own aliases (candidates may live outside the vault).
 	repoName := repoOverride
 	if repoName == "" {
-		names := []string{strings.TrimSuffix(filepath.Base(full), ".md")}
-		if m := regexp.MustCompile(`\[(.*)\]`).FindStringSubmatch(fm["aliases"]); m != nil {
-			for _, a := range strings.Split(m[1], ",") {
-				if a = strings.Trim(strings.TrimSpace(a), `"'`); a != "" {
-					names = append([]string{a}, names...)
-				}
-			}
-		}
-		for _, n := range names {
-			if in, e := discoverRepositories(vault, map[string]bool{n: true}); e == nil && len(in) == 1 {
-				repoName = n
-				break
-			}
-		}
+		repoName = noteRepository(vault, full, fm)
 	}
 	commit := strings.Trim(fm["commit-analizado"], `"'`)
 	r.Repo, r.Commit = repoName, commit

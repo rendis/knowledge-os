@@ -66,7 +66,7 @@ between runs made under similar load.
 - Questions: judge score (share of expected facts stated), violations (forbidden claims asserted without
   reserve), time, tokens, cost.
 - Flows: whether a `sync/` branch with committed changes was produced, deterministic gates (`discover check`,
-  structural issues introduced), reviewer verdict and material findings, source integrity, author time,
+  structural issues introduced, stale neighbour notes), reviewer verdict and material findings, source integrity, author time,
   tokens and cost.
 
 `report` writes `report.md` and `report.json` in the work directory. Publish only the anonymized table
