@@ -27,7 +27,8 @@ const Help = `discover COMMAND --vault PATH [options]
              Pending judgments as JSON for the agent to answer (from the last run).
   answer     --file ANSWERS.json   Record agent answers: [{"id":..,"choice":..,"confidence":0..1}]
   platform   [--provider NAME] [--scope ID ...] [--referenced] [--dry-run] | --record FILE
-             Capture read-only messaging listings (topics, subscriptions, queues) with the
+             Capture read-only listings (names and relations, never data) of messaging,
+             document and SQL databases, object storage and (gcp) the warehouse, with the
              provider's own CLI and the developer's login. Providers: gcp (project id),
              aws (<account>/<region>), azure (subscription id). --provider may be omitted
              when the cell configures one (platform.providers). --referenced uses the
@@ -481,6 +482,17 @@ func capturePlatform(o options, out io.Writer) error {
 			return e
 		}
 		result[k] = s.Status
+		if s.Status == "ok" {
+			partial := []string{}
+			for _, kind := range sortedKeys(s.Kinds) {
+				if s.Kinds[kind] != "ok" {
+					partial = append(partial, kind+": "+s.Kinds[kind])
+				}
+			}
+			if len(partial) > 0 {
+				result[k] = "ok (" + strings.Join(partial, ", ") + ")"
+			}
+		}
 		if s.Status != "ok" {
 			if b, e := os.ReadFile(snapshotPath(o.vault, n, sc)); e == nil && strings.Contains(string(b), `"refresh_failed"`) {
 				result[k] = s.Status + " (previous snapshot kept)"

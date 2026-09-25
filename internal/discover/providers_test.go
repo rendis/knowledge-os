@@ -102,10 +102,21 @@ func TestGCPCapture(t *testing.T) {
 		"gcloud pubsub subscriptions list": `[{"ackDeadlineSeconds": 10, "deadLetterPolicy": {"deadLetterTopic": "projects/acme-orders-prd/topics/orders-dlq", "maxDeliveryAttempts": 5},
 			"filter": "attributes.eventType=\"orderConfirmed\"", "name": "projects/acme-orders-prd/subscriptions/orders-cl-sub", "pushConfig": {}, "topic": "projects/acme-orders-prd/topics/orders-in"},
 			{"name": "projects/acme-orders-prd/subscriptions/orders-bq", "topic": "projects/acme-orders-prd/topics/orders-in", "bigqueryConfig": {"table": "acme.orders.raw"}}]`,
-	}, nil)
+	}, map[string]string{
+		"gcloud firestore": "ERROR: (gcloud.firestore.databases.list) PERMISSION_DENIED: Cloud Firestore API has not been used in project acme-orders-prd before or it is disabled.",
+		"gcloud sql":       "ERROR: (gcloud.sql.instances.list) HTTPError 403: The client is not authorized to make this request.",
+		"gcloud storage":   "ERROR: (gcloud.storage.buckets.list) HTTPError 403: caller does not have storage.buckets.list access",
+		"bq ls":            "BigQuery error in ls operation: Access Denied: Project acme-orders-prd: User does not have bigquery.datasets.get permission",
+	})
 	s := providers["gcp"].capture("acme-orders-prd")
 	if s.Status != "ok" || len(s.Topics) != 1 || len(s.Subscriptions) != 2 {
 		t.Fatalf("%+v", s)
+	}
+	want := map[string]string{"messaging": "ok", "document_db": "not-enabled", "sql_db": "denied", "object_storage": "denied", "warehouse": "denied"}
+	for k, v := range want {
+		if s.Kinds[k] != v {
+			t.Fatalf("each service keeps its own status: %v", s.Kinds)
+		}
 	}
 	cl := s.Subscriptions[1]
 	if cl.Name != "projects/acme-orders-prd/subscriptions/orders-cl-sub" || cl.DeadLetter != "projects/acme-orders-prd/topics/orders-dlq" || len(cl.Attributes) != 1 || cl.Attributes[0] != [2]string{"eventType", "orderConfirmed"} {
@@ -130,6 +141,10 @@ var awsOutputs = map[string]string{
 		{"SubscriptionArn": "PendingConfirmation", "Protocol": "email", "Endpoint": "ops@example.test", "TopicArn": "arn:aws:sns:us-east-1:123456789012:orders-events"}]}`,
 	"aws sns get-subscription-attributes --subscription-arn arn:aws:sns:us-east-1:123456789012:orders-events:f417e61d": `{"Attributes": {"Protocol": "sqs", "FilterPolicy": "{\"eventType\":[\"orderConfirmed\",\"orderCancelled\"]}", "FilterPolicyScope": "MessageAttributes"}}`,
 	"aws sns get-subscription-attributes --subscription-arn arn:aws:sns:us-east-1:123456789012:orders-events:f71b0310": `{"Attributes": {"Protocol": "https"}}`,
+	"aws dynamodb list-tables":      `{"TableNames": ["orders-state"]}`,
+	"aws rds describe-db-instances": `{"DBInstances": [{"DBInstanceIdentifier": "orders-db", "DBInstanceArn": "arn:aws:rds:us-east-1:123456789012:db:orders-db", "DBName": "orders", "Engine": "postgres", "Endpoint": {"Address": "orders-db.abc123.us-east-1.rds.amazonaws.com", "Port": 5432}}]}`,
+	"aws rds describe-db-clusters":  `{"DBClusters": []}`,
+	"aws s3api list-buckets":        `{"Buckets": [{"Name": "acme-orders-exports"}], "Owner": {"ID": "x"}}`,
 }
 
 func TestAWSCapture(t *testing.T) {
@@ -181,6 +196,7 @@ func TestAzureCapture(t *testing.T) {
 		"az servicebus topic subscription rule list --topic-name orders --subscription-name billing": `[{"name": "only-confirmed", "filterType": "CorrelationFilter", "correlationFilter": {"label": "orders", "properties": {"eventType": "orderConfirmed"}}}]`,
 		"az servicebus topic subscription rule list --topic-name orders --subscription-name audit":   `[{"name": "$Default", "filterType": "SqlFilter", "sqlFilter": {"sqlExpression": "1=1"}}, {"name": "cl", "filterType": "SqlFilter", "sqlFilter": {"sqlExpression": "user.country = 'CL' AND eventType = 'orderCancelled'"}}]`,
 		"az servicebus queue list": `[{"id": "` + ns + `/queues/invoices", "name": "invoices"}]`,
+		"az cosmosdb list":         `[]`, "az sql server list": `[]`, "az postgres flexible-server list": `[]`, "az storage account list": `[]`,
 	}, nil)
 	s := providers["azure"].capture(sub)
 	if s.Status != "ok" || len(s.Topics) != 1 || len(s.Subscriptions) != 3 {
@@ -214,7 +230,7 @@ func TestCaptureFailuresAreClassified(t *testing.T) {
 		"An error occurred (AuthorizationError) when calling the ListTopics operation: User is not authorized":                 "denied",
 	}
 	for msg, want := range cases {
-		fakeCLI(t, map[string]string{}, map[string]string{"gcloud": msg})
+		fakeCLI(t, map[string]string{}, map[string]string{"gcloud": msg, "bq": msg})
 		if got := providers["gcp"].capture("acme-orders-prd"); got.Status != want || got.Confirm == "" {
 			t.Errorf("%q -> %s, want %s", msg, got.Status, want)
 		}
@@ -298,5 +314,105 @@ func TestCredentialsInConfigurationAreRedacted(t *testing.T) {
 	st, e := loadStore(vault)
 	if e != nil || st.dropped != 1 || len(st.ConfigValues) != 1 {
 		t.Fatalf("a stored judgment of a credential value is dropped: %v %+v", e, st)
+	}
+}
+
+func TestDataServicesAreCapturedAndLinked(t *testing.T) {
+	outputs := map[string]string{
+		"gcloud pubsub topics list":               `[]`,
+		"gcloud pubsub subscriptions list":        `[]`,
+		"gcloud firestore databases list":         `[{"name": "projects/acme-orders-prd/databases/(default)", "type": "FIRESTORE_NATIVE", "locationId": "nam5"}]`,
+		"gcloud firestore indexes composite list": `[{"name": "projects/acme-orders-prd/databases/(default)/collectionGroups/orders/indexes/CICAgOjXh4EK", "queryScope": "COLLECTION"}]`,
+		"gcloud firestore indexes fields list": `[{"name": "projects/acme-orders-prd/databases/(default)/collectionGroups/__default__/fields/*"},
+			{"name": "projects/acme-orders-prd/databases/(default)/collectionGroups/stock-moves/fields/createdAt"}]`,
+		"gcloud sql instances list":                                    `[{"name": "orders-db", "connectionName": "acme-orders-prd:us-east4:orders-db", "databaseVersion": "POSTGRES_15"}]`,
+		"gcloud sql databases list":                                    `[{"name": "postgres", "instance": "orders-db"}, {"name": "orders", "instance": "orders-db"}]`,
+		"gcloud storage buckets list":                                  `[{"name": "acme-orders-exports", "storage_url": "gs://acme-orders-exports/"}]`,
+		"bq ls --project_id=acme-orders-prd":                           `[{"datasetReference": {"datasetId": "sales", "projectId": "acme-orders-prd"}, "id": "acme-orders-prd:sales"}]`,
+		"bq ls --project_id=acme-orders-prd --format=json --max_results=1000 acme-orders-prd:sales": `[{"tableReference": {"projectId": "acme-orders-prd", "datasetId": "sales", "tableId": "daily_close"}, "type": "TABLE"}]`,
+	}
+	fakeCLI(t, outputs, nil)
+	gcp := providers["gcp"].capture("acme-orders-prd")
+	names := map[string]string{}
+	for _, r := range gcp.Resources {
+		names[r.Kind+" "+r.Type] += shortName(r.Name) + " "
+	}
+	if names["document_db collection"] != "orders stock-moves " || names["sql_db database"] != "orders postgres " ||
+		names["object_storage bucket"] != "gs://acme-orders-exports " && names["object_storage bucket"] != "acme-orders-exports " || names["warehouse table"] == "" {
+		t.Fatalf("gcp data services: %v", names)
+	}
+
+	fakeCLI(t, awsOutputs, nil)
+	aws := providers["aws"].capture("123456789012/us-east-1")
+	kinds := map[string]int{}
+	for _, r := range aws.Resources {
+		kinds[r.Kind]++
+	}
+	if aws.Kinds["sql_db"] != "ok" || kinds["document_db"] != 1 || kinds["sql_db"] != 2 || kinds["object_storage"] != 1 {
+		t.Fatalf("aws data services: %v %v", aws.Kinds, aws.Resources)
+	}
+
+	const sub = "0b1f6471-1bf0-4dda-aec3-111122223333"
+	rg := "/subscriptions/" + sub + "/resourceGroups/rg-orders/providers/"
+	fakeCLI(t, map[string]string{
+		"az servicebus namespace list":        `[]`,
+		"az cosmosdb list":                    `[{"id": "` + rg + `Microsoft.DocumentDB/databaseAccounts/acme-cosmos", "name": "acme-cosmos", "resourceGroup": "rg-orders", "documentEndpoint": "https://acme-cosmos.documents.azure.com:443/"}]`,
+		"az cosmosdb sql database list":       `[{"id": "` + rg + `Microsoft.DocumentDB/databaseAccounts/acme-cosmos/sqlDatabases/orders", "name": "orders"}]`,
+		"az cosmosdb sql container list":      `[{"id": "` + rg + `Microsoft.DocumentDB/databaseAccounts/acme-cosmos/sqlDatabases/orders/containers/carts", "name": "carts"}]`,
+		"az sql server list":                  `[]`,
+		"az postgres flexible-server list":    `[{"id": "` + rg + `Microsoft.DBforPostgreSQL/flexibleServers/acme-pg", "name": "acme-pg", "resourceGroup": "rg-orders", "fullyQualifiedDomainName": "acme-pg.postgres.database.azure.com"}]`,
+		"az postgres flexible-server db list": `[{"id": "` + rg + `Microsoft.DBforPostgreSQL/flexibleServers/acme-pg/databases/billing", "name": "billing"}]`,
+		"az storage account list":             `[{"id": "` + rg + `Microsoft.Storage/storageAccounts/acmefiles", "name": "acmefiles", "primaryEndpoints": {"blob": "https://acmefiles.blob.core.windows.net/"}}]`,
+	}, nil)
+	az := providers["azure"].capture(sub)
+	azNames := []string{}
+	for _, r := range az.Resources {
+		azNames = append(azNames, r.Type+":"+shortName(r.Name))
+	}
+	for _, w := range []string{"container:carts", "database:billing", "server:acme-pg", "account:acmefiles"} {
+		if !slices.Contains(azNames, w) {
+			t.Fatalf("azure data services: %v", azNames)
+		}
+	}
+
+	dir := t.TempDir()
+	svc := gitRepo(t, filepath.Join(dir, "SVC-orders"), map[string]string{
+		"go.mod":         "module example.com/orders\n",
+		"repo.go":        "package main\nimport \"cloud.google.com/go/firestore\"\nvar _ = firestore.NewClient\nconst coll = \"orders\"\nconst other = \"daily_close\"\n",
+		"config/app.env": "DB_CONNECTION=acme-orders-prd:us-east4:orders-db\nEXPORTS=acme-orders-exports\n",
+	})
+	st := &store{Dependencies: map[string]judgment{"go:cloud.google.com/go/firestore": {Choice: "document_db"}}, ConfigKeys: map[string]judgment{}, ConfigValues: map[string]judgment{}}
+	sc := scan(t, "SVC-orders", svc)
+	for _, e := range sc.entries {
+		st.ConfigKeys[keySignature(e)] = judgment{Choice: "other", Confidence: 0.9}
+	}
+	a := &assembly{scans: []*repoScan{sc}, st: st, platform: buildPlatformIndex([]platformSnapshot{gcp}), providers: []string{"gcp"}}
+	f := a.facts()[0]
+	got := map[string]resource{}
+	for _, r := range f.Resources {
+		got[r.Name] = r
+	}
+	platformBacked := func(name, typ string) bool {
+		r, ok := got[name]
+		if !ok || r.Type != typ {
+			return false
+		}
+		for _, ev := range r.Evidence {
+			if ev.Kind == "platform" && ev.Scope == "gcp:acme-orders-prd" {
+				return true
+			}
+		}
+		return false
+	}
+	if !platformBacked("orders", "database_object") || !platformBacked("acme-orders-prd:us-east4:orders-db", "database_object") || !platformBacked("acme-orders-exports", "storage_bucket") {
+		t.Fatalf("collections named in code and instances and buckets named in configuration are linked: %+v", f.Resources)
+	}
+	if _, ok := got["daily_close"]; ok {
+		t.Fatalf("a table name in a repository without a warehouse dependency is not linked: %+v", got["daily_close"])
+	}
+	for _, p := range f.Pending {
+		if p.Kind == "platform-unmanaged" {
+			t.Fatalf("gcp reads document databases: %+v", p)
+		}
 	}
 }

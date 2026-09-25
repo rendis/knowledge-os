@@ -21,7 +21,7 @@ A missing answer is a gap, not a non-applicable item. For library, schema, IaC a
 Run `<cli> discover run --vault "<vault>"` (add `--repo <name>` for one repository) and read `<cli> discover report --vault "<vault>" --repo <name>`. The facts are the connector inventory, complete by construction:
 
 - `dependencies` and `channels`: every library and runtime module the code imports (company libraries resolved to what they import), with the files that use each one, plus declared-but-not-imported manifest dependencies.
-- `resources`: every topic, subscription, event, database object, HTTP endpoint and bucket named by the repository's configuration, IaC blocks that name the service, or code literals, each with file/key evidence; messaging resources (topics, subscriptions, queues) carry platform wiring (consumer → topic, filtered events) when snapshots of the cell's clouds exist.
+- `resources`: every topic, subscription, event, database object, HTTP endpoint and bucket named by the repository's configuration, IaC blocks that name the service, or code literals, each with file/key evidence; messaging resources (topics, subscriptions, queues) carry platform wiring (consumer → topic, filtered events), and databases, collections, tables and buckets the platform lists carry `platform` evidence, when snapshots of the cell's clouds exist. Firestore collections appear only through their indexes, so an absence there proves nothing.
 - `pending`: what could not be confirmed (no platform access, name absent from the platform, unjudged dependency), with the exact command that confirms it.
 - The comparison with the current note: supported relations, discrepancies and undocumented resources.
 

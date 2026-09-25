@@ -33,6 +33,16 @@ type platformSubscription struct {
 	DeadLetter string      `json:"dead_letter,omitempty"`
 }
 
+// platformResource is a data service a provider lists: a database, collection, table, instance, bucket
+// or dataset. Aliases are the other names configuration uses for it (short name, host, connection name).
+type platformResource struct {
+	Kind    string   `json:"kind"` // document_db | sql_db | object_storage | warehouse
+	Type    string   `json:"type"`
+	Name    string   `json:"name"`
+	State   string   `json:"state,omitempty"` // as the provider reports it (RUNNABLE, STOPPED, available…)
+	Aliases []string `json:"aliases,omitempty"`
+}
+
 type platformSnapshot struct {
 	Provider      string                 `json:"provider"`
 	Scope         string                 `json:"scope"`
@@ -41,8 +51,54 @@ type platformSnapshot struct {
 	RefreshFailed map[string]string      `json:"refresh_failed,omitempty"`
 	Detail        string                 `json:"detail,omitempty"`
 	Confirm       string                 `json:"confirm_with"`
+	Kinds         map[string]string      `json:"kinds,omitempty"` // status of each service read
 	Topics        []string               `json:"topics"`
 	Subscriptions []platformSubscription `json:"subscriptions"`
+	Resources     []platformResource     `json:"resources,omitempty"`
+}
+
+// kindCapture reads one kind of service into the snapshot; on failure it returns the CLI's message.
+type kindCapture func(*platformSnapshot) (string, error)
+
+var notEnabled = []string{"has not been used", "is disabled", "service_disabled", "api not enabled", "not been enabled", "is not enabled"}
+
+// captureKinds reads each kind independently: a service that is disabled or unreadable in the scope
+// leaves the others captured. The scope fails only when no kind could be read.
+func captureKinds(snap platformSnapshot, fns map[string]kindCapture, order []string) platformSnapshot {
+	snap.Kinds = map[string]string{}
+	first, anyOK := "", false
+	for i, k := range order {
+		msg, e := fns[k](&snap)
+		if e == nil {
+			snap.Kinds[k], anyOK = "ok", true
+			continue
+		}
+		status := snap.failed(msg).Status
+		low := strings.ToLower(msg)
+		for _, m := range notEnabled {
+			if strings.Contains(low, m) {
+				status = "not-enabled"
+			}
+		}
+		snap.Kinds[k] = status
+		if first == "" && status != "not-enabled" {
+			first = msg
+		}
+		if status == "auth-required" || status == "unavailable" {
+			for _, rest := range order[i+1:] {
+				snap.Kinds[rest] = status // the same login or tool fails every service
+			}
+			break
+		}
+	}
+	if anyOK {
+		return snap.sorted()
+	}
+	if first == "" {
+		snap.Status, snap.Detail = "not-enabled", "none of the captured services is enabled in this scope"
+		return snap
+	}
+	return snap.failed(first)
 }
 
 // key identifies a scope across providers: "<provider>:<scope>".
@@ -122,7 +178,7 @@ func (s platformSnapshot) failed(stderr string) platformSnapshot {
 		strings.Contains(low, "sso session") || strings.Contains(low, "credentials"):
 		s.Status = "auth-required"
 	case strings.Contains(low, "permission") || strings.Contains(low, "denied") || strings.Contains(low, "authorizationfailed") ||
-		strings.Contains(low, "not authorized") || strings.Contains(low, "forbidden"):
+		strings.Contains(low, "not authorized") || strings.Contains(low, "forbidden") || strings.Contains(low, "does not have"):
 		s.Status = "denied"
 	case strings.Contains(low, "not found") || strings.Contains(low, "not exist") || strings.Contains(low, "notfound") || strings.Contains(low, "nonexistent"):
 		s.Status = "not-found"
@@ -156,6 +212,7 @@ func jsonCLI(v any, name string, args ...string) (string, error) {
 
 func (s platformSnapshot) sorted() platformSnapshot {
 	sort.Strings(s.Topics)
+	sort.Slice(s.Resources, func(i, j int) bool { return s.Resources[i].Name < s.Resources[j].Name })
 	sort.Slice(s.Subscriptions, func(i, j int) bool {
 		a, b := s.Subscriptions[i], s.Subscriptions[j]
 		if a.Name != b.Name {
@@ -268,14 +325,45 @@ type platformIndex struct {
 	topics map[string][]string               // short name -> full names
 	subs   map[string][]platformSubscription // short name -> subscriptions
 	scopes map[string]platformSnapshot       // scope key -> snapshot
+	// objects holds data services by every name configuration may use (lower case).
+	objects map[string][]objectRef
 	// observed holds names the agent recorded outside the built-in providers (short name -> refs).
 	observed map[string][]observedRef
 }
 
+type objectRef struct {
+	scope string
+	res   platformResource
+}
+
+// objectsNamed returns the data services a configuration value or code literal names.
+func (ix platformIndex) objectsNamed(v string) []objectRef {
+	seen, out := map[string]bool{}, []objectRef{}
+	for _, k := range []string{strings.ToLower(strings.TrimSpace(v)), normalizeResource(v), shortName(v), hostOf(v)} {
+		for _, o := range ix.objects[k] {
+			if !seen[o.scope+o.res.Name] {
+				seen[o.scope+o.res.Name] = true
+				out = append(out, o)
+			}
+		}
+	}
+	return out
+}
+
 func buildPlatformIndex(snaps []platformSnapshot) platformIndex {
-	ix := platformIndex{topics: map[string][]string{}, subs: map[string][]platformSubscription{}, scopes: map[string]platformSnapshot{}}
+	ix := platformIndex{topics: map[string][]string{}, subs: map[string][]platformSubscription{}, scopes: map[string]platformSnapshot{}, objects: map[string][]objectRef{}}
 	for _, s := range snaps {
 		ix.scopes[s.key()] = s
+		for _, r := range s.Resources {
+			ref := objectRef{scope: s.key(), res: r}
+			keys := map[string]bool{strings.ToLower(r.Name): true}
+			for _, a := range r.Aliases {
+				keys[strings.ToLower(a)] = true
+			}
+			for k := range keys {
+				ix.objects[k] = append(ix.objects[k], ref)
+			}
+		}
 		for _, t := range s.Topics {
 			ix.topics[shortName(t)] = appendUnique(ix.topics[shortName(t)], t)
 		}
