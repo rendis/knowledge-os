@@ -321,3 +321,18 @@ func TestNoteGates(t *testing.T) {
 		t.Fatal("dotted key paths follow YAML nesting")
 	}
 }
+
+func TestFailedRefreshKeepsPreviousSnapshot(t *testing.T) {
+	v := t.TempDir()
+	good := platformSnapshot{Provider: "gcp-pubsub", Project: "p-prd", Status: "ok", Topics: []string{"projects/p-prd/topics/t"}}
+	if e := saveSnapshot(v, good); e != nil {
+		t.Fatal(e)
+	}
+	if e := saveSnapshot(v, platformSnapshot{Project: "p-prd", Status: "auth-required", Detail: "reauthentication failed", CapturedAt: "later"}); e != nil {
+		t.Fatal(e)
+	}
+	snaps, _ := loadSnapshots(v)
+	if len(snaps) != 1 || snaps[0].Status != "ok" || len(snaps[0].Topics) != 1 || snaps[0].RefreshFailed["status"] != "auth-required" {
+		t.Fatalf("previous evidence lost: %+v", snaps)
+	}
+}

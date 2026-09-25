@@ -32,7 +32,8 @@ type platformSnapshot struct {
 	Provider      string               `json:"provider"`
 	Project       string               `json:"project"`
 	CapturedAt    string               `json:"captured_at"`
-	Status        string               `json:"status"` // ok | denied | not-found | error
+	Status        string               `json:"status"` // ok | auth-required | denied | not-found | error
+	RefreshFailed map[string]string    `json:"refresh_failed,omitempty"`
 	Detail        string               `json:"detail,omitempty"`
 	Confirm       string               `json:"confirm_with"`
 	Topics        []string             `json:"topics"`
@@ -71,6 +72,9 @@ func captureGCP(project string) platformSnapshot {
 	fail := func(stderr string) platformSnapshot {
 		low := strings.ToLower(stderr)
 		switch {
+		case strings.Contains(low, "auth login") || strings.Contains(low, "reauthentication") || strings.Contains(low, "credentials"):
+			snap.Status = "auth-required"
+			snap.Confirm = "gcloud auth login, then " + snap.Confirm
 		case strings.Contains(low, "permission") || strings.Contains(low, "denied"):
 			snap.Status = "denied"
 		case strings.Contains(low, "not found") || strings.Contains(low, "not exist"):
@@ -134,6 +138,16 @@ func snapshotPath(vault, project string) string {
 
 func saveSnapshot(vault string, s platformSnapshot) error {
 	p := snapshotPath(vault, s.Project)
+	// A failed refresh never discards evidence captured before: keep it and record the attempt.
+	if s.Status != "ok" {
+		if b, e := os.ReadFile(p); e == nil {
+			var prev platformSnapshot
+			if json.Unmarshal(b, &prev) == nil && prev.Status == "ok" {
+				prev.RefreshFailed = map[string]string{"at": s.CapturedAt, "status": s.Status, "detail": s.Detail, "confirm_with": s.Confirm}
+				s = prev
+			}
+		}
+	}
 	if e := os.MkdirAll(filepath.Dir(p), 0o755); e != nil {
 		return e
 	}
