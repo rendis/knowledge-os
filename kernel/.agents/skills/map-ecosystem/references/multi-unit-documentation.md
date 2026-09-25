@@ -23,7 +23,7 @@ For a package of confirmed investigation-discovered map defects, use the correct
 2. Resolve asynchronous edges through topics and HTTP edges through direct links.
 3. Update composite services, runtime, topics, integrations, flows, glossary, operational notes, MOCs, and indices only when the [node-selection standard](../../../../90-Meta/node-selection.md) and evidence threshold are satisfied.
 4. Detect contradictions across units; preserve both pieces of evidence and record the issue as a limitation until resolved.
-5. Validate source-derived cross-unit questions against the resulting notes, apply [final-note-review.md](final-note-review.md) to the complete group candidate, then run the gates once per group and again for the complete synthesis. External-only updates use this documentation recipe after the local sync is closed; they retain source analysis metadata and have their own bound review.
+5. Validate source-derived cross-unit questions against the resulting notes and apply [final-note-review.md](final-note-review.md) once to each complete independent group candidate. Run deterministic vault checks after publishing each group and against the complete synthesis. External-only updates use this documentation recipe after source sync; they retain source analysis metadata and have their own complete candidate review.
 
 ## Output
 

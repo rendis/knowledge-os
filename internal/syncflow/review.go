@@ -465,8 +465,22 @@ func manifest(v any) (map[string]any, error) {
 	if !ok {
 		return nil, fail("manifest-invalid")
 	}
-	allowed := map[string]bool{"version": true, "candidate_files": true, "base_files": true, "base_present": true, "deleted_files": true, "evidence_files": true, "connections": true, "projection_digest": true}
-	if len(m) != 7 && len(m) != 8 {
+	allowed := map[string]bool{"version": true, "candidate_files": true, "base_files": true, "base_present": true, "deleted_files": true, "evidence_files": true, "connections": true, "projection_digest": true, "source_bindings": true, "acknowledgements": true}
+	version := m["version"]
+	if version != json.Number("1") && version != json.Number("2") {
+		return nil, fail("manifest-invalid")
+	}
+	want := 7
+	if _, ok := m["projection_digest"]; ok {
+		want++
+	}
+	if version == json.Number("2") {
+		if _, exists := m["projection_digest"]; exists {
+			return nil, fail("manifest-invalid")
+		}
+		want += 2
+	}
+	if len(m) != want {
 		return nil, fail("manifest-invalid")
 	}
 	for k := range m {
@@ -474,12 +488,9 @@ func manifest(v any) (map[string]any, error) {
 			return nil, fail("manifest-invalid")
 		}
 	}
-	if m["version"] != json.Number("1") {
-		return nil, fail("manifest-invalid")
-	}
 	for _, f := range []string{"candidate_files", "base_files", "evidence_files"} {
 		x, ok := m[f].(map[string]any)
-		if !ok || len(x) == 0 {
+		if !ok || len(x) == 0 && (version == json.Number("1") || f == "evidence_files") {
 			return nil, fail("manifest-invalid")
 		}
 		for n, d := range x {
@@ -542,19 +553,35 @@ func manifest(v any) (map[string]any, error) {
 			return nil, fail("manifest-invalid")
 		}
 	}
+	if version == json.Number("2") {
+		if e := validateSourceBindings(m["source_bindings"]); e != nil {
+			return nil, e
+		}
+		if e := validateAcknowledgementBindings(obj(m["acknowledgements"]), arr(m["source_bindings"])); e != nil {
+			return nil, e
+		}
+	}
 	return m, nil
 }
 func review(v any, m map[string]any) error {
 	r, ok := v.(map[string]any)
-	if !ok || len(r) != 5 {
+	if !ok {
 		return fail("review-invalid")
 	}
-	for _, k := range []string{"version", "manifest_digest", "verdict", "findings", "connection_decisions"} {
+	v2 := m["version"] == json.Number("2")
+	fields := []string{"version", "manifest_digest", "verdict", "findings", "connection_decisions"}
+	if v2 {
+		fields = []string{"version", "manifest_digest", "verdict", "findings", "retired_connections"}
+	}
+	if len(r) != len(fields) {
+		return fail("review-invalid")
+	}
+	for _, k := range fields {
 		if _, ok := r[k]; !ok {
 			return fail("review-invalid")
 		}
 	}
-	if r["version"] != json.Number("1") {
+	if !v2 && r["version"] != json.Number("1") || v2 && r["version"] != json.Number("2") {
 		return fail("review-invalid")
 	}
 	d, e := digest(m)
@@ -573,6 +600,36 @@ func review(v any, m map[string]any) error {
 	}
 	if len(f) != 0 {
 		return fail("review-invalid")
+	}
+	if v2 {
+		retired, ok := r["retired_connections"].(map[string]any)
+		if !ok {
+			return fail("connection-decisions-invalid")
+		}
+		expected := map[string]bool{}
+		for p, v := range m["connections"].(map[string]any) {
+			im := v.(map[string]any)
+			before, _ := stringsFrom(im["base"])
+			after, _ := stringsFrom(im["candidate"])
+			keep := map[string]bool{}
+			for _, id := range after {
+				keep[id] = true
+			}
+			for _, id := range before {
+				if !keep[id] {
+					expected[p+"#"+id] = true
+				}
+			}
+		}
+		if !reflect.DeepEqual(sortedKeys(expected), sortedKeys(retired)) {
+			return fail("connection-decisions-invalid")
+		}
+		for _, reason := range retired {
+			if s, ok := reason.(string); !ok || strings.TrimSpace(s) == "" {
+				return fail("connection-decisions-invalid")
+			}
+		}
+		return nil
 	}
 	dec, ok := r["connection_decisions"].(map[string]any)
 	if !ok {
@@ -622,7 +679,7 @@ func Run(args []string, out io.Writer) error {
 Discovery: scan
 Packages: build, build-new, init-analysis, close-package, gate-batch
 Analysis: analysis finalize-analysis|check
-Review: review freeze|check|verify-published, review-finalize
+Review: review freeze|check|publish|verify-published, review-finalize
 Correction: correction prepare|check
 Lifecycle: begin, checkpoint-package, seal-gate, status, validate-unit,
            review-unit, apply-unit, resume, close, tool-digest
@@ -660,8 +717,18 @@ review and mutation prerequisites. This help does not read or modify vault state
 	if cmd == "verify-published" {
 		return runPublished(args, out)
 	}
-	if cmd != "freeze" && cmd != "check" && cmd != "verify-published" {
+	if cmd != "freeze" && cmd != "check" && cmd != "publish" && cmd != "verify-published" {
 		return fmt.Errorf("unknown sync operation %q; use vaultctl sync --help; no state changed", cmd)
+	}
+	var sources []directSourceArg
+	var checkouts map[string]string
+	var e error
+	args, sources, checkouts, e = directArguments(args)
+	if e != nil {
+		return e
+	}
+	if cmd == "freeze" && len(checkouts) > 0 || cmd != "freeze" && len(sources) > 0 {
+		return fail("direct-arguments-invalid")
 	}
 	f := flag.NewFlagSet(cmd, flag.ContinueOnError)
 	f.SetOutput(io.Discard)
@@ -672,6 +739,8 @@ review and mutation prerequisites. This help does not read or modify vault state
 	output := f.String("output", "", "output")
 	mp := f.String("manifest", "", "manifest")
 	rp := f.String("review", "", "review")
+	stateRoot := f.String("state-root", defaultStateRoot, "state root")
+	analysisDate := f.String("analysis-date", "", "analysis date")
 	var ev, del repeated
 	f.Var(&ev, "evidence", "evidence path")
 	f.Var(&del, "delete", "deleted note")
@@ -684,9 +753,20 @@ review and mutation prerequisites. This help does not read or modify vault state
 	var result any
 	switch cmd {
 	case "freeze":
-		m, e := freeze(*vault, *candidate, *evidence, ev, del, *projection)
+		var m map[string]any
+		var issues []any
+		var e error
+		if len(sources) > 0 {
+			m, issues, e = freezeBound(*vault, *candidate, *evidence, ev, del, *projection, *analysisDate, sources)
+		} else {
+			m, e = freeze(*vault, *candidate, *evidence, ev, del, *projection)
+		}
 		if e != nil {
 			return e
+		}
+		if len(issues) > 0 {
+			result = map[string]any{"status": "blocked", "code": "output-scan-blocked", "issues": issues}
+			break
 		}
 		if *output == "" {
 			return fail("output-required")
@@ -724,7 +804,7 @@ review and mutation prerequisites. This help does not read or modify vault state
 		}
 		d, _ := digest(m)
 		result = map[string]any{"status": "pass", "code": "note-candidate-frozen", "manifest": target, "manifest_digest": d}
-	case "check":
+	case "check", "publish":
 		v, e := readJSON(*mp)
 		if e != nil {
 			return e
@@ -737,16 +817,41 @@ review and mutation prerequisites. This help does not read or modify vault state
 		if e != nil {
 			return e
 		}
+		if m["version"] == json.Number("2") {
+			if *projection != "" {
+				return fail("direct-projection-not-supported")
+			}
+			if cmd == "publish" {
+				result, e = directPublish(*stateRoot, *vault, *candidate, *evidence, *projection, m, r, checkouts, 0, 0)
+				if e != nil {
+					return e
+				}
+				break
+			}
+			issues, e := checkBound(m, r, *vault, *candidate, *evidence, *projection, checkouts)
+			if e != nil {
+				return e
+			}
+			if len(issues) > 0 {
+				result = map[string]any{"status": "blocked", "code": "output-scan-blocked", "issues": issues}
+				break
+			}
+			d, _ := digest(m)
+			result = map[string]any{"status": "pass", "code": "note-candidate-reviewed", "manifest_digest": d}
+			break
+		}
+		if cmd == "publish" {
+			return fail("direct-manifest-required")
+		}
 		if e = review(r, m); e != nil {
 			return e
 		}
-
-		ev := []string{}
+		evidencePaths := []string{}
 		for n := range m["evidence_files"].(map[string]any) {
-			ev = append(ev, n)
+			evidencePaths = append(evidencePaths, n)
 		}
-		del, _ := stringsFrom(m["deleted_files"])
-		current, e := freeze(*vault, *candidate, *evidence, ev, del, *projection)
+		deletedPaths, _ := stringsFrom(m["deleted_files"])
+		current, e := freeze(*vault, *candidate, *evidence, evidencePaths, deletedPaths, *projection)
 		if e != nil {
 			return e
 		}

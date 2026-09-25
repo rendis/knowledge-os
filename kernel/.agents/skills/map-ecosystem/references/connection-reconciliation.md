@@ -1,6 +1,6 @@
 # Reconcile external connections after local mapping
 
-Use this phase only after a service-local map has passed its independent review or has an explicitly accepted partial subset. Its input is the accepted `connection.*` claims. Preserve that reviewed artifact: external evidence creates separate claims and node decisions rather than changing the completed local extraction or entering its closed Git synchronization package.
+Use this phase only after a service-local map has passed its independent review or has an explicitly accepted partial subset. Its input is the accepted `connection.*` anchors and prose. Preserve that reviewed source result: external evidence updates complete note candidates separately and does not change the frozen repository analysis or source metadata.
 
 Apply [evidence-sufficiency.md](evidence-sufficiency.md) before requesting access or reusing a pending close condition.
 
@@ -35,7 +35,7 @@ After the binding or access setup becomes available, rerun the same executor or 
 
 ## Publication
 
-Publish external reconciliation through the ordinary [single-unit](single-unit-documentation.md) or [multi-unit](multi-unit-documentation.md) documentation recipe, outside the closed Git synchronization package. Treat that package as immutable accepted context; a later provider, cluster or database observation cannot be appended to it or presented as evidence frozen at its source revision.
+Publish external reconciliation through the ordinary [single-unit](single-unit-documentation.md) or [multi-unit](multi-unit-documentation.md) documentation recipe after the source-backed candidate is closed. Treat its frozen source evidence and metadata as immutable context; a later provider, cluster or database observation cannot be presented as evidence observed at the repository revision.
 
 Before applying any note change, follow [final-note-review.md](final-note-review.md). Freeze the complete resulting bytes for every target note together with their baselines and the exact versioned or observation evidence hashes. An independent reviewer must accept that complete candidate and evidence binding. Apply only the reviewed resulting bytes; when review rejects or any baseline or evidence binding changes, preserve the current notes and prepare a fresh candidate and review. Durable notes must cite the authoritative technical evidence; ignored local candidate and review artifacts are lineage records, not the sole source for a claim.
 
