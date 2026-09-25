@@ -11,7 +11,7 @@ Apply it to every material answer, diagram and retained conclusion.
 3. **Resolve** checks that can change the answer: callers, conditions, consumers, outcomes, contradictions and evidence against the leading explanation. A missing source blocks only the claims that depend on it.
 4. **Bound** each assertion by its evidence level. A flag's value does not establish its effect without the consumer; samples, truncated results and empty searches are bounded observations; an inventory of a type needs an exhaustive query. Show unknown segments of a flow as unknown instead of connecting verified steps across a gap.
 5. **Retain** established facts, retract what new evidence contradicts, and separate observations, grounded inferences, proposals and open questions. Stop expanding when another read cannot change the scoped answer.
-6. **Answer** first, in clear language, with the decisive references and limits. Deliver the result, not the investigation narrative.
+6. **Answer** first, in clear language, with the decisive references and limits. Deliver the result, not the investigation narrative. When the answer names topics, subscriptions, events or repositories, save the draft (for example in `.scratch/answer.md`) and run `<CLI> discover claims --vault "<root>" --file <draft>` before delivering it; confirm at the source or state as unverified every name and relation it flags.
 
 ### Review by novelty
 
