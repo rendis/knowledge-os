@@ -241,6 +241,11 @@ func runDiscovery(o options, out io.Writer) error {
 	if e != nil {
 		return e
 	}
+	if st.dropped > 0 {
+		if e := st.save(o.vault); e != nil {
+			return e
+		}
+	}
 	snaps, e := loadSnapshots(o.vault)
 	if e != nil {
 		return e

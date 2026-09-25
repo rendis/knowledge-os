@@ -39,17 +39,23 @@ func init() {
 }
 
 var (
-	testConfig  = regexp.MustCompile(`(?i)(^|/)(tests?|__tests__|mocks?|fixtures?|testdata|e2e)/|\.(test|spec|e2e)\.|(^|/)\.env\.test`)
-	secretFile  = regexp.MustCompile(`(?i)secret|credential|\.pem$|\.key$`)
-	placeholder = regexp.MustCompile(`\$\{([A-Za-z_][\w.\-]*)(?::[^}]*)?\}|\$\(([A-Za-z_]\w*)\)|\$([A-Za-z_]\w*)`)
-	lineKV      = regexp.MustCompile(`^\s*(?:export\s+)?["']?([A-Za-z_][\w.\-/]*)["']?\s*[:=]\s*(.+?)\s*[,;\\]?\s*$`)
-	cliFlag     = regexp.MustCompile(`--([A-Za-z][\w\-]*)[= ]["']?([^\s"'\\]+)`)
-	xmlText     = regexp.MustCompile(`<([A-Za-z][\w.\-:]*)>([^<>]{2,300})</([A-Za-z][\w.\-:]*)>`)
-	hclHeader   = regexp.MustCompile(`^\s*(resource|module|data|variable|output|locals)\s*(?:"([^"]+)")?\s*(?:"([^"]+)")?\s*\{`)
-	hclSource   = regexp.MustCompile(`^\s*source\s*=\s*"([^"]+)"`)
-	hclLiteral  = regexp.MustCompile(`"((?:[^"\\]|\\.)*)"`)
-	sqlDDL      = regexp.MustCompile(`(?i)\bcreate\s+(?:or\s+replace\s+)?(table|view|schema|dataset)\s+(?:if\s+not\s+exists\s+)?[` + "`" + `"\[]?([\w.\-${}]+)`)
-	scalarNoise = regexp.MustCompile(`(?i)^(true|false|yes|no|null|none|~|\d+(\.\d+)?[a-z]{0,3}|\{|\[|\||>|-)$`)
+	testConfig = regexp.MustCompile(`(?i)(^|/)(tests?|__tests__|mocks?|fixtures?|testdata|e2e)/|\.(test|spec|e2e)\.|(^|/)\.env\.test`)
+	secretFile = regexp.MustCompile(`(?i)secret|credential|\.pem$|\.key$`)
+	// A credential inside an ordinary configuration file: never judged, stored or sent anywhere.
+	credentialKey   = regexp.MustCompile(`(?i)(^|[_.\-])(pass(word|wd)?|pwd|secret|token|api[_\-]?key|apikey|private[_\-]?key|client[_\-]?secret|access[_\-]?key|account[_\-]?key|auth[_\-]?key|sas|signature|credentials?)($|[_.\-])`)
+	credentialValue = regexp.MustCompile(`(?i)[?&](sig|signature|x-amz-signature|x-amz-credential|x-goog-signature|x-goog-credential|access_token|token|api[_\-]?key|key|code|password|pwd)=[^&\s]{6,}|(password|pwd|sharedaccesskey|accountkey|accesskey)\s*=\s*[^;\s]{4,}|://[^/\s:@]+:[^/\s@]{3,}@|AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_\-]{35}|gh[pousr]_[0-9A-Za-z]{30,}|xox[abprs]-[0-9A-Za-z\-]{10,}|-----BEGIN [A-Z ]*PRIVATE KEY`)
+	secretPointer   = regexp.MustCompile(`(?i)(^|[_.\-])(name|id|ref|reference|path|file|arn|url|uri|endpoint|version|header|type|ttl|expiry|expiration|length|enabled)($|[_.\-])`)
+	// A value that names where a secret lives is a reference, not the secret.
+	secretReference = regexp.MustCompile(`(?i)^\$|^<|/secrets/|secretmanager|arn:aws[a-z\-]*:secretsmanager|vault\.azure\.net|^vault:|^env\(|^\*+$`)
+	placeholder     = regexp.MustCompile(`\$\{([A-Za-z_][\w.\-]*)(?::[^}]*)?\}|\$\(([A-Za-z_]\w*)\)|\$([A-Za-z_]\w*)`)
+	lineKV          = regexp.MustCompile(`^\s*(?:export\s+)?["']?([A-Za-z_][\w.\-/]*)["']?\s*[:=]\s*(.+?)\s*[,;\\]?\s*$`)
+	cliFlag         = regexp.MustCompile(`--([A-Za-z][\w\-]*)[= ]["']?([^\s"'\\]+)`)
+	xmlText         = regexp.MustCompile(`<([A-Za-z][\w.\-:]*)>([^<>]{2,300})</([A-Za-z][\w.\-:]*)>`)
+	hclHeader       = regexp.MustCompile(`^\s*(resource|module|data|variable|output|locals)\s*(?:"([^"]+)")?\s*(?:"([^"]+)")?\s*\{`)
+	hclSource       = regexp.MustCompile(`^\s*source\s*=\s*"([^"]+)"`)
+	hclLiteral      = regexp.MustCompile(`"((?:[^"\\]|\\.)*)"`)
+	sqlDDL          = regexp.MustCompile(`(?i)\bcreate\s+(?:or\s+replace\s+)?(table|view|schema|dataset)\s+(?:if\s+not\s+exists\s+)?[` + "`" + `"\[]?([\w.\-${}]+)`)
+	scalarNoise     = regexp.MustCompile(`(?i)^(true|false|yes|no|null|none|~|\d+(\.\d+)?[a-z]{0,3}|\{|\[|\||>|-)$`)
 )
 
 // HCL meta-arguments are language syntax, not values.
@@ -266,11 +272,25 @@ func scanConfig(s *snapshot) ([]entry, int, error) {
 					}
 				}
 			}
-			if secret {
+			if secret || credentialEntry(x.Key, x.Value) {
 				x.Value, x.Secret = "<redacted>", true
 			}
 			out = append(out, x)
 		}
 	}
 	return out, files, nil
+}
+
+// credentialEntry reports whether a configuration entry holds a credential: a value carrying a signature,
+// token, password or key, or a literal under a secret-named key (not a name, path or URL of the secret).
+func credentialEntry(key, value string) bool {
+	v := strings.TrimSpace(value)
+	if v == "" || secretReference.MatchString(v) {
+		return false
+	}
+	if credentialValue.MatchString(v) {
+		return true
+	}
+	return credentialKey.MatchString(key) && !secretPointer.MatchString(key) && len(v) >= 6 &&
+		!strings.ContainsAny(v, " \t") && !strings.Contains(v, "://") && !strings.HasPrefix(v, "/")
 }

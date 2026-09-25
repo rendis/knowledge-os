@@ -262,3 +262,41 @@ func TestConfigKnowsEveryProvider(t *testing.T) {
 		t.Fatalf("config accepts %v, discover captures %v", config.KnownPlatformProviders, ProviderNames())
 	}
 }
+
+func TestCredentialsInConfigurationAreRedacted(t *testing.T) {
+	credential := []struct{ key, value string }{
+		{"path_notification_email", "workflows/abc/triggers/manual/paths/invoke?api-version=2016-06-01&sp=%2Ftriggers&sv=1.0&sig=1PpVPoS0u2vufxD3nCtqBU"},
+		{"STORAGE", "DefaultEndpointsProtocol=https;AccountName=acme;AccountKey=bXlrZXlteWtleQ==;EndpointSuffix=core.windows.net"},
+		{"DB_URL", "postgres://orders:s3cr3tpass@db.internal:5432/orders"},
+		{"DB_PASSWORD", "s3cr3tpass"},
+		{"api.key", "AIzaSyA1234567890abcdefghijklmnopqrstuv"},
+		{"MAPS", "https://maps.example.test/api?key=AIzaSyA1234567890abcdefghijklmnopqrstuv"},
+	}
+	for _, c := range credential {
+		if !credentialEntry(c.key, c.value) {
+			t.Errorf("%s=%s is a credential", c.key, c.value)
+		}
+	}
+	reference := []struct{ key, value string }{
+		{"DB_PASSWORD", "${DB_PASSWORD}"},
+		{"DB_PASSWORD_SECRET", "projects/acme-orders-prd/secrets/db-password/versions/latest"},
+		{"secret_name", "orders-db-password"},
+		{"token_url", "https://auth.example.test/oauth/token"},
+		{"TOPIC", "projects/acme-orders-prd/topics/orders-in"},
+		{"api_url", "https://api.example.test/reports?outputFormat=001&reportGroup=FALA"},
+		{"password", "***"},
+	}
+	for _, c := range reference {
+		if credentialEntry(c.key, c.value) {
+			t.Errorf("%s=%s is not a credential", c.key, c.value)
+		}
+	}
+	vault := t.TempDir()
+	write(t, vault, storeRel, `{"schema":1,"dependencies":{},"config_keys":{},"config_entries":{
+		"path_notification_email||||workflows/abc/invoke?sp=%2Ftriggers&sig=1PpVPoS0u2vufxD3nCtqBU":{"choice":"http_endpoint","confidence":0.9},
+		"api_url||||https://api.example.test/reports":{"choice":"http_endpoint","confidence":0.9}}}`)
+	st, e := loadStore(vault)
+	if e != nil || st.dropped != 1 || len(st.ConfigValues) != 1 {
+		t.Fatalf("a stored judgment of a credential value is dropped: %v %+v", e, st)
+	}
+}

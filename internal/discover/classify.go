@@ -36,6 +36,7 @@ type store struct {
 	Dependencies map[string]judgment `json:"dependencies"`
 	ConfigKeys   map[string]judgment `json:"config_keys"`
 	ConfigValues map[string]judgment `json:"config_entries"`
+	dropped      int
 }
 
 func loadStore(vault string) (*store, error) {
@@ -55,7 +56,20 @@ func loadStore(vault string) (*store, error) {
 			*m = map[string]judgment{}
 		}
 	}
+	s.dropCredentials()
 	return s, nil
+}
+
+// dropCredentials removes judgments recorded for entries whose value is a credential, so a store written
+// before a credential was recognized loses it on the next save.
+func (s *store) dropCredentials() {
+	for id := range s.ConfigValues {
+		parts := strings.SplitN(id, "|", 5) // key|parent|context||value
+		if len(parts) == 5 && credentialEntry(parts[0], parts[4]) {
+			delete(s.ConfigValues, id)
+			s.dropped++
+		}
+	}
 }
 
 func (s *store) save(vault string) error {
