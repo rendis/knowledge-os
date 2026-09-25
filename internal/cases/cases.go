@@ -26,28 +26,27 @@ change that would introduce a gate error is refused. All output is JSON.
   new      --title TEXT --type understanding|development --objective TEXT [--source-ref REF]
            Open an unpublished case from the request (neutral, formalized) and report
            existing cases with a similar title.
-  list     [--id ID]   Unpublished, published and retired cases (earlier formats included).
+  list     [--id ID]   Unpublished, published and retired cases (earlier formats readable).
   check    [--id ID]   The gate: sourced evidence, unique and resolving record IDs, resolving
-           links, no credential or local path, no paragraph copied from a vault note.
+           links, no credential or local path, no paragraph copied from a vault note, handoff
+           packages complete and citing defined requirements.
   add      --id ID --kind KIND --text TEXT [fields] [--resolves Q-NNN] [--supersedes ID]
-           [--reconciles DH-NNN --through "<commit> / DELTA-NNN"]  (handoff progress read back)
-           evidence     --source SRC --level demonstrated|observed [--limits TEXT]
-           finding      --level demonstrated|inferred --from E-NNN,...  | --level unresolved --missing TEXT
+           evidence     --source SRC --level demonstrated|observed [--limits TEXT] [--file PATH...]
+           finding      --level demonstrated|inferred --from E-NNN,... | --level unresolved --missing TEXT
+                        [--for-vault [[note]]] [--file PATH...]
            question     --resolve-by TEXT
            decision     --by ROLE
-           requirement  --origin TEXT
-           change       --component [[repository]] --serves R-NNN,...
-           acceptance   --proves R-NNN,...
-           handoff      --package handoffs/DH-NNN.md
-           absorption   --target [[note]] --status pending|absorbed|deferred|discarded
-  attach   --id ID --file PATH [--file PATH...] --text TEXT   Copy provided files into
-           artifacts/ as one A- record (several files: one unit, e.g. a visual and its context).
+           requirement  --origin TEXT                       (development)
+           handoff      --package handoffs/DH-NNN.md        (development)
+           --file copies the file into artifacts/ named after the record, refusing credentials.
   state    --id ID --text TEXT   Rewrite the current state; it cites the records it summarizes.
+  absorb   --id ID --finding F-NNN   Mark a finding for the vault as absorbed (published case,
+           on the sync branch that changes its note).
   close    --id ID --outcome completed|abandoned|superseded-by:ID --reason TEXT
   reopen   --id ID --reason TEXT
-  migrate  [--id ID] [--apply]   Convert cases written in the earlier format.
 A published case changes only on a sync branch; publish, absorb and retire follow
-synchronize-ecosystem, and sync verify runs check.`
+synchronize-ecosystem, and sync verify runs check. Handoff progress comes in with
+handoff reconcile.`
 
 var (
 	idPattern  = regexp.MustCompile(`^\d{8}-\d{6}-[a-z0-9]+(?:-[a-z0-9]+)*(?:-\d{2})?$`)
@@ -59,10 +58,10 @@ var (
 type options struct {
 	vault, title, kind, sourceRef, id, objective, date                 string
 	recKind, text, source, level, limits, from, missing, resolveBy, by string
-	origin, component, serves, proves, pkg, target, status, resolves   string
-	supersedes, outcome, reason, reconciles, through                   string
+	origin, pkg, forVault, finding, resolves, supersedes               string
+	outcome, reason, worktree                                          string
 	files                                                              []string
-	apply                                                              bool
+	apply, dryRun                                                      bool
 }
 
 // Run executes an investigation command. Legacy verbs are handled by the caller.
@@ -76,9 +75,9 @@ func Run(args []string, out io.Writer) error {
 	fields := map[string]*string{"--vault": &o.vault, "--title": &o.title, "--type": &o.kind, "--source-ref": &o.sourceRef,
 		"--id": &o.id, "--objective": &o.objective, "--date": &o.date, "--kind": &o.recKind, "--text": &o.text,
 		"--source": &o.source, "--level": &o.level, "--limits": &o.limits, "--from": &o.from, "--missing": &o.missing,
-		"--resolve-by": &o.resolveBy, "--by": &o.by, "--origin": &o.origin, "--component": &o.component,
-		"--serves": &o.serves, "--proves": &o.proves, "--package": &o.pkg, "--target": &o.target, "--status": &o.status,
-		"--resolves": &o.resolves, "--supersedes": &o.supersedes, "--reconciles": &o.reconciles, "--through": &o.through, "--outcome": &o.outcome, "--reason": &o.reason}
+		"--resolve-by": &o.resolveBy, "--by": &o.by, "--origin": &o.origin, "--package": &o.pkg, "--for-vault": &o.forVault,
+		"--finding": &o.finding, "--resolves": &o.resolves, "--supersedes": &o.supersedes, "--outcome": &o.outcome,
+		"--reason": &o.reason, "--worktree": &o.worktree}
 	for i := 1; i < len(args); i++ {
 		if args[i] == "--apply" {
 			o.apply = true
@@ -128,16 +127,16 @@ func Run(args []string, out io.Writer) error {
 		return runCheck(o, out)
 	case "add":
 		return add(o, out)
-	case "attach":
-		return attach(o, out)
 	case "state":
 		return setState(o, out)
+	case "absorb":
+		return absorb(o, out)
 	case "close":
 		return closeCase(o, out)
 	case "reopen":
 		return reopen(o, out)
-	case "migrate":
-		return migrate(o, out)
+	case "reconcile":
+		return reconcile(o, out)
 	}
 	return fmt.Errorf("unknown investigation command %q", verb)
 }
@@ -158,8 +157,7 @@ type Case struct {
 	Outcome    string `json:"outcome,omitempty"`
 	Visibility string `json:"visibility"` // unpublished | published | retired
 	Path       string `json:"path,omitempty"`
-	Private    string `json:"private_overlay,omitempty"`
-	Local      string `json:"local_store,omitempty"`
+	Private    string `json:"private,omitempty"` // sensitive notes and scratch, never shared
 	Legacy     bool   `json:"legacy,omitempty"`
 	Updated    string `json:"updated,omitempty"`
 }
@@ -222,11 +220,8 @@ func readCase(vault, dir, visibility string) (Case, bool) {
 		c.Updated = st.ModTime().UTC().Format(time.RFC3339)
 	}
 	priv := filepath.Join(vault, ".investigations-private", c.ID)
-	if _, e := os.Stat(filepath.Join(priv, "private.md")); e == nil {
-		c.Private, _ = filepath.Rel(vault, filepath.Join(priv, "private.md"))
-	}
-	if _, e := os.Stat(filepath.Join(priv, "local")); e == nil {
-		c.Local, _ = filepath.Rel(vault, filepath.Join(priv, "local"))
+	if st, e := os.Stat(priv); e == nil && st.IsDir() {
+		c.Private, _ = filepath.Rel(vault, priv)
 	}
 	return c, true
 }

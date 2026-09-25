@@ -69,7 +69,7 @@ Under **Evidencia acumulada**, assign immutable IDs `EV-001`, `EV-002`, and so o
 
 Append the next ID. Never renumber, recycle, delete, or rewrite an older entry to match a newer conclusion. Correct an error with a new entry that identifies what it corrects.
 
-The note summarizes evidence and links its durable locations; it does not copy raw logs, production rows, sensitive attachments, private-overlay content, local working material, or secret values. `Fuentes durables` never points into ignored local workspaces such as `.investigations/`, `.investigations-private/`, `.operations/`, worktree `.handoff/` stores, or `.plan/`. A versioned published investigation is provenance, not proof of behavior. If case narrative or a local-only artifact is the sole support, the assessment is `insufficient-evidence`.
+The note summarizes evidence and links its durable locations; it does not copy raw logs, production rows, sensitive attachments, private-directory content, local working material, or secret values. `Fuentes durables` never points into ignored local workspaces such as `.investigations/`, `.investigations-private/`, `.operations/`, worktree `.handoff/` stores, or `.plan/`. A versioned published investigation is provenance, not proof of behavior. If case narrative or a local-only artifact is the sole support, the assessment is `insufficient-evidence`.
 
 ## Lifecycle
 

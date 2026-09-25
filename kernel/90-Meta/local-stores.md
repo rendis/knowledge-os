@@ -6,7 +6,7 @@ local to one checkout and ignored by Git.
 | Store | Holds | Owner |
 |---|---|---|
 | `.investigations/` | Unpublished investigation cases | `manage-investigation` |
-| `.investigations-private/<id>/` | Private overlay (`private.md`) and local working material (`local/`) of a case | `manage-investigation` |
+| `.investigations-private/<id>/` | What a case needs but never shares: sensitive notes and scratch (scripts, outputs, drafts) | `manage-investigation` |
 | `.operations/` | Operational runs | `manage-operational-workflow` |
 | `<worktree>/.handoff/` | Task copy and deltas of a development handoff, excluded from Git in each repository worktree | `manage-development-handoff` |
 | `.agents/state/discovery/` | Facts, questions, comparison and gaps of the last `discover run` | `vaultctl discover` |
@@ -17,8 +17,7 @@ local to one checkout and ignored by Git.
 `investigations/` is versioned and searchable but outside the technical graph traversal and note audit;
 `links` still returns investigation pointers, and `sync verify` gates changed cases with `investigation check`.
 
-When temporary work in `.scratch/<task>/` later belongs to an investigation, move it through
-`manage-investigation`: working material into the case's private `local/` store, reviewed methods or
-evidence worth retaining into its `artifacts/` register. Remove only the files the task created after
-verifying the move. Open an investigation for continuity of evidence and decisions, not to hold
-temporary code.
+When temporary work in `.scratch/<task>/` later belongs to an investigation, move it to the case's
+private directory; a file that is the source or method of a result a record cites is attached to that
+record instead (`investigation add … --file`). Open an investigation for continuity of evidence and
+decisions, not to hold temporary code.
