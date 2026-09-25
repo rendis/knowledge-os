@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"unicode/utf8"
 )
 
 func TestOverviewOneLinePerNote(t *testing.T) {
@@ -18,6 +19,7 @@ func TestOverviewOneLinePerNote(t *testing.T) {
 		}
 	}
 	write("20-Repos/orders.md", "---\ntipo: api\nsistema: \"[[Sales]]\"\npublica-en: [\"[[orders-out]]\"]\n---\n# orders\n\n## Propósito\n\nPublica órdenes confirmadas hacia [[orders-out]] con reintentos. Segunda frase.\n")
+	write("30-Flujos/long.md", "---\ntipo: flujo\n---\n# long\n\n"+strings.Repeat("a", 219)+"ó sin punto final y con más texto\n")
 	write("25-Topics/orders-out.md", "---\ntipo: topic\n---\n# orders-out\n\nTopic de órdenes. [^e1]\n")
 	write(".investigations/x/investigation.md", "hidden\n")
 	write("90-Meta/Convenciones.md", "meta\n")
@@ -34,6 +36,9 @@ func TestOverviewOneLinePerNote(t *testing.T) {
 	}
 	if !strings.Contains(out, "⚠ unsupported by the last discover run, verify before use: publica-en: orders-legacy (repository evidence names orders-out)") {
 		t.Fatalf("a discovery discrepancy must be flagged on its note:\n%s", out)
+	}
+	if !utf8.ValidString(out) {
+		t.Fatal("a truncated summary must stay valid UTF-8")
 	}
 	if strings.Contains(out, "hidden") || strings.Contains(out, "Convenciones") {
 		t.Fatalf("overview must list only knowledge notes:\n%s", out)
