@@ -219,7 +219,11 @@ func runDiscovery(o options, out io.Writer) error {
 		s.in.Commit, _ = resolveCommit(in.Path, in.Ref)
 		scans = append(scans, s)
 	}
-	resolveLibraries(scans)
+	if len(o.repos) > 0 {
+		resolveLibraries(append(scans, libraryContext(o.vault, scans)...))
+	} else {
+		resolveLibraries(scans)
+	}
 	st, e := loadStore(o.vault)
 	if e != nil {
 		return e

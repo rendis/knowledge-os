@@ -449,6 +449,7 @@ func Orientation(root string, m Object) Object {
 	}
 	return Object{"ready": len(issues) == 0, "reason": reason, "cell": m["cell"], "systems": names, "issues": issues, "start_here": []string{"00-Home.md", "instance.yaml", "10-Sistemas/"}, "evidence_profile": profile, "enabled_types": types, "pending_inventory": pending}
 }
+
 // DiscoveryAcceleration reports whether classification questions can be answered by Jev.
 // It is optional: without it the agent answers the same questions.
 func DiscoveryAcceleration() Object {

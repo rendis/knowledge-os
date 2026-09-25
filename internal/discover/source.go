@@ -337,8 +337,8 @@ func scanCode(s *snapshot, goLocals map[string]string) (codeSurface, error) {
 		}
 		for _, spec := range imports(x.lang, x.text) {
 			c := classifyImport(x.lang, spec, ctx)
-			if c.kind != "own" {
-				refs = append(refs, importRef{c.kind, c.family, spec})
+			if c.kind != "own" || x.lang == "go" && strings.Contains(strings.SplitN(spec, "/", 2)[0], ".") {
+				refs = append(refs, importRef{c.kind, c.family, spec}) // Go own packages: followed inside libraries
 			}
 		}
 		cs.Files[x.file] = refs
@@ -357,6 +357,9 @@ func directDependencies(cs codeSurface) map[string]*dependency {
 	for f, refs := range cs.Files {
 		lang := codeExt[path.Ext(f)]
 		for _, r := range refs {
+			if r.Kind == "own" {
+				continue
+			}
 			id := dependencyID(lang, r.Family)
 			d := out[id]
 			if d == nil {

@@ -175,3 +175,25 @@ func TestChangedKeepsNonASCIIPaths(t *testing.T) {
 		t.Fatalf("an accented path must be listed as changed: %v %v", e, res)
 	}
 }
+
+func TestDiscoveryStateOnlyPublishesWhenValid(t *testing.T) {
+	v := vault(t)
+	if _, e := call(t, "start", "--vault", v, "--name", "classify"); e != nil {
+		t.Fatal(e)
+	}
+	store := "90-Meta/discovery/classifications.json"
+	write(t, v, store, `{"schema":1,"dependencies":{"example.org/bus":{"choice":"not-an-option","confidence":0.9,"source":"agent"}}}`+"\n")
+	run(t, v, "add", "-A")
+	run(t, v, "commit", "-qm", "chore: classify")
+	if res, e := call(t, "verify", "--vault", v); e == nil || res["ok"] != false {
+		t.Fatalf("an invalid judgment must not verify: %v", res)
+	}
+	write(t, v, store, `{"schema":1,"dependencies":{"example.org/bus":{"choice":"messaging","confidence":0.9,"source":"agent"}}}`+"\n")
+	run(t, v, "commit", "-qam", "chore: fix classification")
+	if res, e := call(t, "verify", "--vault", v); e != nil || res["ok"] != true || res["discovery_state_only"] != true {
+		t.Fatalf("valid discovery state must verify without a knowledge review: %v %v", e, res)
+	}
+	if res, e := call(t, "finish", "--vault", v); e != nil || res["merged"] != "sync/classify" {
+		t.Fatalf("finish %v %v", e, res)
+	}
+}

@@ -285,8 +285,16 @@ func recordAnswers(s *store, pending map[string]question, answers []map[string]a
 		id, _ := a["id"].(string)
 		choice, _ := a["choice"].(string)
 		q, ok := pending[id]
+		if !ok { // a recorded judgment can be corrected, e.g. after a review finding
+			for _, kind := range []string{"dependency", "config_key", "config_entry"} {
+				if _, done := s.table(kind)[id]; done {
+					q, ok = question{ID: id, Kind: kind, Options: optionsFor(kind)}, true
+					break
+				}
+			}
+		}
 		if !ok {
-			return n, fmt.Errorf("answer %q does not match a pending question", id)
+			return n, fmt.Errorf("answer %q matches neither a pending question nor a recorded judgment", id)
 		}
 		if q.Options[choice] == "" {
 			return n, fmt.Errorf("answer %q: choice %q is not one of the options", id, choice)
@@ -302,3 +310,23 @@ func recordAnswers(s *store, pending map[string]question, answers []map[string]a
 }
 
 func accelerationStatus() map[string]any { return config.DiscoveryAcceleration() }
+
+// ValidateState checks the versioned discovery state (classifications and platform snapshots):
+// it parses, every judgment picks one of its kind's options with a confidence in [0,1] and a
+// source. A branch that changes only this state publishes without a knowledge review.
+func ValidateState(vault string) error {
+	s, e := loadStore(vault)
+	if e != nil {
+		return e
+	}
+	for kind, t := range map[string]map[string]judgment{"dependency": s.Dependencies, "config_key": s.ConfigKeys, "config_entry": s.ConfigValues} {
+		opts := optionsFor(kind)
+		for id, j := range t {
+			if opts[j.Choice] == "" || j.Confidence < 0 || j.Confidence > 1 || j.Source == "" {
+				return fmt.Errorf("%s: %s %q has an invalid judgment", storeRel, kind, id)
+			}
+		}
+	}
+	_, e = loadSnapshots(vault)
+	return e
+}

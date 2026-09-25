@@ -1,6 +1,7 @@
 package discover
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path"
@@ -304,6 +305,17 @@ func resolveLibraries(scans []*repoScan) {
 				}
 				if best != "" && goMods[best] != owner {
 					lib, sub = goMods[best], strings.Trim(strings.TrimPrefix(r.Spec, best), "/")
+				} else if best != "" && via != "" {
+					// Inside a library only imported packages are expanded, so follow its own packages.
+					for id, dep := range pkgDeps(owner, strings.Trim(strings.TrimPrefix(r.Spec, best), "/"), stack) {
+						if into[id] == nil {
+							cp := *dep
+							into[id] = &cp
+						}
+					}
+					continue
+				} else if r.Kind == "own" {
+					continue // the repository's own package: its files are expanded directly
 				}
 			} else if lang == "js" && npmNames[r.Family] != nil && npmNames[r.Family] != owner {
 				lib, sub = npmNames[r.Family], "*"
@@ -852,4 +864,66 @@ func (a *assembly) platformProjects() []string {
 		}
 	}
 	return firstN(set, 1000)
+}
+
+// libraryContext scans, transitively, the tracked repositories whose Go module or npm package the
+// given scans import, so a run limited to some repositories resolves company libraries exactly as a
+// full run does. The returned scans only feed resolveLibraries; they produce no facts.
+func libraryContext(vault string, scans []*repoScan) []*repoScan {
+	all, e := discoverRepositories(vault, nil)
+	if e != nil {
+		return nil
+	}
+	have := map[string]bool{}
+	for _, s := range scans {
+		have[s.in.Name] = true
+	}
+	type candidate struct {
+		in           repoInput
+		module, name string
+	}
+	cands := []candidate{}
+	for _, in := range all {
+		if have[in.Name] || in.RefErr != "" {
+			continue
+		}
+		c := candidate{in: in}
+		if b, e := gitOutput(in.Path, "show", in.Ref+":go.mod"); e == nil {
+			if m := goModule.FindStringSubmatch(b); m != nil {
+				c.module = m[1]
+			}
+		}
+		if b, e := gitOutput(in.Path, "show", in.Ref+":package.json"); e == nil {
+			var j map[string]any
+			if json.Unmarshal([]byte(b), &j) == nil {
+				c.name, _ = j["name"].(string)
+			}
+		}
+		if c.module != "" || c.name != "" {
+			cands = append(cands, c)
+		}
+	}
+	out := []*repoScan{}
+	queue := append([]*repoScan{}, scans...)
+	for len(queue) > 0 {
+		s := queue[0]
+		queue = queue[1:]
+		for _, refs := range s.code.Files {
+			for _, r := range refs {
+				for i, c := range cands {
+					if have[c.in.Name] {
+						continue
+					}
+					if c.module != "" && (r.Spec == c.module || strings.HasPrefix(r.Spec, c.module+"/")) || c.name != "" && r.Family == c.name {
+						have[c.in.Name] = true
+						if lib, e := scanRepository(cands[i].in); e == nil {
+							out = append(out, lib)
+							queue = append(queue, lib)
+						}
+					}
+				}
+			}
+		}
+	}
+	return out
 }
