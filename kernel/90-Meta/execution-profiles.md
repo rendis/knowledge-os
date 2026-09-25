@@ -48,6 +48,23 @@ Open translation table, not an allowlist. Updated 2026-09-16 independently of wo
 | Ambiguous diagnosis and complex decisions | gpt-5.6-sol / high | Opus 5 / high | Grok 4.6 / high, non-preferred fallback when available options require it |
 | Deterministic checks | Direct tool execution | Direct tool execution | Direct tool execution |
 
+## Measured (2026-09-25)
+
+Read-only evidence questions answered in installed vaults (12 real questions over three cells, graded by an independent judge; one run per setting unless noted). A violation is an unreserved claim the evidence contradicts; all observed ones repeated a relation from a note that discovery had already contradicted.
+
+| Harness / setting | Score | Violations | Time | Usage |
+| --- | --- | --- | --- | --- |
+| Claude Opus 5.5 / medium | 0.99 | 1 | 568 s | USD 5.60 |
+| Claude Sonnet 5 / low (4 runs) | 0.92–0.97 | 0–1 | ~340 s | ~USD 2.3 |
+| Claude Sonnet 5 / medium (2 runs) | 0.93–0.96 | 0–1 | ~350 s | ~USD 2.35 |
+| Claude Haiku 4.5 / low | 0.76 | 2 | 616 s | USD 1.31 |
+| Codex gpt-5.5 / medium | 0.90 | 0 | 1482 s | 5.3M input tokens |
+| Codex gpt-5.5 / low | 0.92 | 1 | 1126 s | 4.1M input tokens |
+| Cursor Grok 4.7 / medium | 0.99 | 1 | 1875 s | 6.3M input tokens (incl. cache) |
+| Cursor Composer 2.5 | 0.94 | 2 | 596 s | 3.8M input tokens (incl. cache) |
+
+For vault questions the cheapest setting that held quality was Sonnet 5 / low; medium effort did not improve it, and Haiku 4.5 missed facts. Publication (sync authoring and review) was measured only with Opus / medium.
+
 ## Delegate and verify
 
 The coordinator supplies the question, exact readable sources and revisions or observation times, authorized targets and effects, output ownership, acceptance criteria, and material unknowns. Include relevant provenance and disclosure restrictions. Prefer fresh or bounded context over full-history copying, without dropping constraints. Give concurrent workers separate output files within their assigned writable scope.

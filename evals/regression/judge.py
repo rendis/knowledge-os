@@ -22,8 +22,14 @@ Responde SOLO un objeto JSON: {{"points": [<puntaje por hecho en orden>], "viola
 def grade(q, rec):
     prompt = PROMPT.format(question=q["question"], expected="\n".join(f"- {e}" for e in q["expected"]), must_not="\n".join(f"- {m}" for m in q["must_not"]) or "- (ninguna)", answer=rec.get("answer", "")[:12000])
     # Independent judge from another model family than the Claude answers (Codex gpt-5.5).
-    r = subprocess.run(["codex", "exec", "--skip-git-repo-check", "-m", "gpt-5.5", "-c", 'model_reasoning_effort="medium"', "-s", "read-only", prompt], capture_output=True, text=True, timeout=900, cwd="/tmp")
-    text = r.stdout
+    text = ""
+    for _ in range(3):  # a hung judge session is retried, never allowed to abort the whole grading
+        try:
+            text = subprocess.run(["codex", "exec", "--skip-git-repo-check", "-m", "gpt-5.5", "-c", 'model_reasoning_effort="medium"', "-s", "read-only", prompt], capture_output=True, text=True, timeout=300, cwd="/tmp").stdout
+        except subprocess.TimeoutExpired:
+            continue
+        if re.search(r"\{.*\}", text, re.S):
+            break
     m = re.search(r"\{.*\}", text, re.S)
     g = json.loads(m.group(0)) if m else {"verdict": "error", "points": [], "violations": [], "unsupported_claims": []}
     g["score"] = round(sum(g.get("points", [])) / max(len(q["expected"]), 1), 3)
