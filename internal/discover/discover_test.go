@@ -306,6 +306,16 @@ func TestNoteGates(t *testing.T) {
 	if !r.OK || r.Anchors["verified"] != 1 || r.Coverage["connector_categories_evidenced"] != 1 || r.Coverage["resource_groups_addressed"] != 1 {
 		t.Fatalf("good note must pass: %+v", r)
 	}
+	write(t, vault, "25-Topics/orders-legacy.md", "---\ntipo: topic\n---\n# orders-legacy\n")
+	write(t, vault, "20-Repos/orders.md", strings.Replace(good, "---\n# orders", "publica-en: [\"[[orders-legacy]]\"]\n---\n# orders", 1))
+	r, _ = checkNote(vault, "20-Repos/orders.md", "", false)
+	flagged := false
+	for _, i := range r.Issues {
+		flagged = flagged || i.Gate == "G3-relation" && i.Severity == "review" && i.Where == "orders-legacy"
+	}
+	if !r.OK || !flagged {
+		t.Fatalf("a relation the evidence does not support goes to review without failing the gate: %+v", r.Issues)
+	}
 	bad := strings.Replace(good, "`pubsub.NewClient`", "`kafka.NewWriter`", 1)
 	bad = strings.Replace(bad, "#L5-L8", "#L5-L40", 1)
 	bad = strings.Replace(bad, "Publica en el topic `orders-cl-outbound` usando `TOPIC_OUT`.", "Publica eventos.", 1)

@@ -468,6 +468,13 @@ func checkNote(vault, notePath, repoOverride string, semantic bool) (noteCheck, 
 				for _, p := range f.Pending {
 					add("pending", "pending", p.Subject, p.Kind+": "+p.Detail)
 				}
+				if cmp, e := compareNotes(vault, []repoFacts{f}); e == nil {
+					for _, c := range cmp {
+						for _, d := range c.Discrepancies {
+							add("G3-relation", "review", d.Target, fmt.Sprintf("the note declares %s [[%s]] but the repository evidence at the analyzed commit names %s; verify it before relying on it", d.Field, d.Target, strings.Join(firstList(d.Found, 4), ", ")))
+						}
+					}
+				}
 				// Freshness: anchors on files changed since the analyzed commit.
 				head, e := resolveCommit(in.Path, ref)
 				if refErr != "" {
