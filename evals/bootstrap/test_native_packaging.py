@@ -27,7 +27,6 @@ class NativePackagingTests(unittest.TestCase):
         self.dest = Path(self.tmp.name) / "vault"
         (self.dist / "dist").mkdir(parents=True)
         (self.dist / "VERSION").write_text("1.2.3\n")
-        (self.dist / "NATIVE_RUNTIME.json").write_text(json.dumps({"schema": 1, "retired_paths": ["90-Meta/old.py"]}))
         for directory in ("cmd", "internal"):
             (self.dist / directory).mkdir()
         (self.dist / "go.mod").write_text("module fixture\n")
@@ -46,12 +45,6 @@ class NativePackagingTests(unittest.TestCase):
 
     def write_manifest(self):
         (self.dist / "dist/runtime-manifest.json").write_text(json.dumps(self.manifest))
-
-    def test_inactive_without_policy(self):
-        (self.dist / "NATIVE_RUNTIME.json").unlink()
-        self.assertIsNone(runtime.release(self.dist))
-        runtime.install(self.dist, self.dest, None)
-        self.assertFalse(self.dest.exists())
 
     def test_platform_selection_and_portable_lock(self):
         current = runtime.release(self.dist)
@@ -102,32 +95,16 @@ class NativePackagingTests(unittest.TestCase):
             runtime.install(self.dist, self.dest, current)
         self.assertEqual(list(outside.iterdir()), [])
 
-    def test_only_explicit_kernel_paths_retired(self):
-        (self.dist / "kernel/90-Meta").mkdir(parents=True)
-        (self.dist / "kernel/90-Meta/old.py").write_text("legacy")
-        (self.dist / "kernel/90-Meta/browser.cjs").write_text("browser resource")
-        (self.dist / "MANAGED_PATHS").write_text("90-Meta/\n")
-        with mock.patch.object(installer, "DIST", self.dist):
-            sources = installer.managed_sources([])
-        self.assertEqual(set(sources), {"90-Meta/browser.cjs"})
-        (self.dist / "NATIVE_RUNTIME.json").write_text(json.dumps({"schema": 1, "retired_paths": ["../user.md"]}))
-        with self.assertRaisesRegex(RuntimeError, "unsafe"):
-            runtime.policy(self.dist)
-
     def test_same_version_modified_source_invalidates_release(self):
         runtime.release(self.dist)
         (self.dist / "cmd/main.go").write_text("package main\n// changed build input\n")
         with self.assertRaisesRegex(RuntimeError, "stale for current source"):
             runtime.release(self.dist)
 
-    def test_non_host_drift_and_old_host_only_upgrade(self):
+    def test_non_host_drift(self):
         current = runtime.release(self.dist)
-        old = self.dest / ".bin/vaultctl"
-        old.parent.mkdir(parents=True)
-        old.write_bytes(b"legacy local executable")
         self.assertEqual(runtime.conflicts(self.dest, current, current), [])
         runtime.install(self.dist, self.dest, current)
-        self.assertEqual(old.read_bytes(), b"legacy local executable")
         other = self.dest / ".agents/bin/vaultctl-windows-amd64.exe"
         other.write_bytes(b"corrupt non-host artifact")
         self.assertIn(other.relative_to(self.dest).as_posix(), runtime.conflicts(self.dest, current, current))

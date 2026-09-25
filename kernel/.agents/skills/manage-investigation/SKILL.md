@@ -63,10 +63,6 @@ Story drafts: [export-contract](references/export-contract.md); sufficiency of a
 
 `<CLI> investigation close --id <id> --outcome completed|abandoned|superseded-by:<id> --reason "<why, and the limits that remain>"`. `completed` needs the evidence or conclusions that answer the objective; a merge, a deployment claim or a terminal handoff alone does not complete a case. `abandoned` keeps its unresolved questions. New material evidence reopens it with `reopen --reason`.
 
-## Earlier cases
-
-Cases written before this format list and check as they are and cannot be changed through the CLI. To continue one, open a new case in the current format from it (objective, the evidence still valid with its sources, open questions and decisions), then close the earlier one as `superseded-by:<new id>`.
-
 ## Where cases live
 
 | Store | Holds |

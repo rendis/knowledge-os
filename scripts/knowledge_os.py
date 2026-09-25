@@ -152,10 +152,6 @@ def managed_sources(adapters: list[str]) -> dict[str, Path]:
                         )
     # Consumer catalogs are never distribution payload, even if accidentally added.
     sources.pop(CATALOG_PATH.as_posix(), None)
-    runtime_policy = native_runtime.policy(DIST)
-    if runtime_policy is not None:
-        for retired_path in runtime_policy["retired_paths"]:
-            sources.pop(retired_path, None)
     return dict(sorted(sources.items()))
 
 
@@ -281,9 +277,6 @@ def copy_kernel(dest: Path, adapters: list[str]) -> None:
             raise RuntimeError(f"managed target is not a file: {rel}")
         shutil.copy2(source, target)
     native_runtime.install(DIST, dest, native_runtime.release(DIST))
-    legacy_claude = dest / "CLAUDE.md"
-    if legacy_claude.is_symlink() and os.readlink(legacy_claude) == "AGENTS.md":
-        legacy_claude.unlink()
     for name in ("Arquitectura.base", "Auditoria.base", "Operacion.base", "Repos.base"):
         target = dest / name
         if not target.is_file():
@@ -308,7 +301,6 @@ def ensure_gitignore_lines(dest: Path) -> None:
         "/.investigations-private/",
         "/.knowledge-os-config.yaml",
         "/.knowledge-os-config.*.tmp",
-        "/.agents/state/map-ecosystem/",
         "/.agents/state/discovery/",
         "/.plan/",
         "/.scratch/",
@@ -325,8 +317,6 @@ def ensure_gitignore_lines(dest: Path) -> None:
             "/.knowledge-os.lock.yaml",
             "plan/",
             "/plan/",
-            "/.agents/state/map-ecosystem/sync/",
-            "/.agents/state/map-ecosystem/sync-history/",
         }
     ]
     changed = not path.is_file() or portable_lines != lines
@@ -335,12 +325,11 @@ def ensure_gitignore_lines(dest: Path) -> None:
         if item not in lines:
             lines.append(item)
             changed = True
-    if native_runtime.policy(DIST) is not None:
-        portable = ["!/.agents/bin/"] + ["!/" + name for name in sorted(native_runtime.bundle_hashes(native_runtime.release(DIST)))]
-        # Place exceptions last so pre-existing *.exe or bin rules cannot hide the bundle.
-        updated = [line for line in lines if line not in portable] + portable
-        changed = changed or updated != lines
-        lines = updated
+    portable = ["!/.agents/bin/"] + ["!/" + name for name in sorted(native_runtime.bundle_hashes(native_runtime.release(DIST)))]
+    # Place exceptions last so pre-existing *.exe or bin rules cannot hide the bundle.
+    updated = [line for line in lines if line not in portable] + portable
+    changed = changed or updated != lines
+    lines = updated
     if changed:
         path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
 
@@ -531,10 +520,9 @@ def write_bootstrap(dest: Path, instance: dict[str, Any]) -> None:
 def write_lock(dest: Path, adapters: list[str]) -> None:
     revision, dirty = distribution_provenance()
     runtime_release = native_runtime.release(DIST)
-    if runtime_release is not None:
-        dirty = dirty or runtime_release["source_dirty"] or runtime_release["source_revision"] != revision
+    dirty = dirty or runtime_release["source_dirty"] or runtime_release["source_revision"] != revision
     payload = {
-        "version": "4" if runtime_release else "3",
+        "version": "4",
         "kernel_version": dist_version(),
         "distribution_revision": revision,
         "distribution_dirty": dirty,
@@ -955,7 +943,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         payload["kernel_version_installed"] = lock.get("kernel_version")
         payload["kernel_version_dist"] = dist_version()
         payload["lock_version"] = lock.get("version")
-        payload["portable_lock"] = lock.get("version") in {"2", "3", "4"}
+        payload["portable_lock"] = lock.get("version") == "4"
         payload["native_runtime"] = native_runtime.status(dest, native_runtime.release(DIST), lock.get("runtime_release"))
         revision, dirty = distribution_provenance()
         payload["distribution_revision_installed"] = lock.get("distribution_revision")
@@ -999,8 +987,8 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         or payload.get("drift") or payload.get("topology_drift")
         or payload.get("adapter_configuration_drift")
         or not payload.get("managed_matches_dist")
-        or payload.get("native_runtime", {}).get("status") not in {"legacy", "ready"}
-        or (payload.get("native_runtime", {}).get("status") == "ready" and not payload["native_runtime"].get("release_matches_dist"))
+        or payload.get("native_runtime", {}).get("status") != "ready"
+        or not payload["native_runtime"].get("release_matches_dist")
         or not payload["personal_instructions"]["ignored"]
         or payload["personal_instructions"]["tracked"]
     ):

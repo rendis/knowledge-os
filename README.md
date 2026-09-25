@@ -25,7 +25,7 @@ This repository is the **distribution**. A cell vault is a separate directory cr
 
 Without flags, `init` asks for systems, trackers, cell name and purpose, evidence profile, note locale, the **reference branch order** (the branches tried in order in every repository, default `main` then `master`; teams and older projects differ) and adapters. `--yes` tests unattended installation; the `configure-workspace` skill collects local source roots, source access and capabilities afterwards. A cancelled interactive input creates no vault. With no arguments, the script updates the current directory when it holds a lock and initializes it when empty; knowledge Markdown without a lock is refused. `adopt` installs the kernel into an existing vault without rewriting its notes.
 
-The lock (`.knowledge-os.lock.yaml`) is portable and committed with the cell. `update` refuses kernel files changed locally until `--force`, removes files the distribution retired, and never rewrites cell-owned files.
+The lock (`.knowledge-os.lock.yaml`) is portable and committed with the cell. `update` refuses kernel files changed locally until `--force`, removes the managed files the distribution no longer ships (as recorded in the lock), and never rewrites cell-owned files.
 
 ## Native CLI
 
@@ -60,7 +60,7 @@ Local, ignored stores (unpublished cases, private case material, operational run
 | `kernel/` | Files copied into every cell |
 | `adapters/` | Optional skills a cell selects (`reports`) |
 | `evals/` | Checks and benchmarks; never installed ([evals](evals/README.md)) |
-| `instance.schema.yaml`, `MANAGED_PATHS`, `NATIVE_RUNTIME.json` | The `instance.yaml` contract, the update allowlist, the paths retired from cells |
+| `instance.schema.yaml`, `MANAGED_PATHS` | The `instance.yaml` contract and the update allowlist |
 | `docs/adr/` | Decisions that are not obvious from the code |
 
 ```bash

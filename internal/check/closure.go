@@ -14,8 +14,7 @@ import (
 	"strings"
 )
 
-// The two summary forms are persisted cell contracts. Keep compatibility until
-// the summaries and their consumers have an explicitly migrated representation.
+// Cells state what remains to verify in one of these two forms (Spanish or English notes).
 var closureCount = regexp.MustCompile(`(?i)(?:permanecen|remaining\s*:?)\s+(\d+)\s+(?:verificaciones|verification items)\s+(?:en|in)\s+(\d+)\s+(?:notas|notes)`)
 var uncheckedItem = regexp.MustCompile(`(?m)^\s*- \[ \]`)
 

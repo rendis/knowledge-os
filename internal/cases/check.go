@@ -13,8 +13,8 @@ import (
 	"documentation-vault/internal/discover"
 )
 
-// Issue is one finding of the case gate: error blocks publication, warning is reported (legacy cases
-// report schema findings as warnings), review goes to the reviewer.
+// Issue is one finding of the case gate: error blocks publication, warning is reported, review goes to
+// the reviewer.
 type Issue struct {
 	Severity string `json:"severity"`
 	Where    string `json:"where"`
@@ -27,7 +27,6 @@ type Result struct {
 	Path    string         `json:"path"`
 	Type    string         `json:"type"`
 	Status  string         `json:"status"`
-	Legacy  bool           `json:"legacy,omitempty"`
 	OK      bool           `json:"ok"`
 	Records map[string]int `json:"records"`
 	Issues  []Issue        `json:"issues"`
@@ -135,19 +134,15 @@ func checkContent(vault, full, raw string, ix vaultIndex) Result {
 	fm := frontmatter(raw)
 	r := Result{ID: fm["id"], Records: map[string]int{}, Issues: []Issue{}}
 	r.Path, _ = filepath.Rel(vault, full)
-	r.Type, r.Status, _, r.Legacy = normalize(fm)
-	strict := "error"
-	if r.Legacy {
-		strict = "warning"
-	}
+	r.Type, r.Status, _ = normalize(fm)
 	add := func(sev, where, detail string) { r.Issues = append(r.Issues, Issue{sev, where, detail}) }
 
 	// Leaks are errors in every schema: the case is shareable content.
 	for _, m := range secret.FindAllString(raw, 3) {
-		add("error", "credential", "remove the credential value ("+firstRunes(m, 24)+"…); keep secrets out of the case, the overlay only names where they live")
+		add("error", "credential", "remove the credential value ("+firstRunes(m, 24)+"…); keep secrets out of the case; name only where they live")
 	}
 	for _, m := range localPath.FindAllString(raw, 3) {
-		add("error", "local path", "`"+strings.TrimSpace(m)+"` is machine-specific; keep it in .investigations-private/<id>/local/ or reference a portable source")
+		add("error", "local path", "`"+strings.TrimSpace(m)+"` is machine-specific; keep it in the case's private directory or reference a portable source")
 	}
 
 	text := fence.ReplaceAllString(comment.ReplaceAllString(raw, ""), "")
@@ -157,30 +152,28 @@ func checkContent(vault, full, raw string, ix vaultIndex) Result {
 	}
 
 	// Schema.
-	if !r.Legacy {
-		if !idPattern.MatchString(fm["id"]) {
-			add("error", "frontmatter", "id must look like 20260925-091623-short-slug")
-		}
-		if fm["title"] == "" || fm["created"] == "" {
-			add("error", "frontmatter", "title and created are required")
-		}
-		if fm["type"] != "understanding" && fm["type"] != "development" {
-			add("error", "frontmatter", "type must be understanding or development")
-		}
-		if fm["status"] != "open" && fm["status"] != "closed" {
-			add("error", "frontmatter", "status must be open or closed")
-		}
-		if fm["status"] == "closed" && !outcomes.MatchString(fm["outcome"]) {
-			add("error", "frontmatter", "a closed case needs outcome: completed, abandoned or superseded-by:<id>")
-		}
-		present := map[string]bool{}
-		for _, m := range heading2.FindAllStringSubmatch(body, -1) {
-			present[sectionKey(m[1])] = true
-		}
-		for _, s := range requiredSections[r.Type] {
-			if !present[s] {
-				add("error", "sections", "missing section "+sectionNames["es"][s]+" / "+sectionNames["en"][s])
-			}
+	if !idPattern.MatchString(fm["id"]) {
+		add("error", "frontmatter", "id must look like 20260925-091623-short-slug")
+	}
+	if fm["title"] == "" || fm["created"] == "" {
+		add("error", "frontmatter", "title and created are required")
+	}
+	if fm["type"] != "understanding" && fm["type"] != "development" {
+		add("error", "frontmatter", "type must be understanding or development")
+	}
+	if fm["status"] != "open" && fm["status"] != "closed" {
+		add("error", "frontmatter", "status must be open or closed")
+	}
+	if fm["status"] == "closed" && !outcomes.MatchString(fm["outcome"]) {
+		add("error", "frontmatter", "a closed case needs outcome: completed, abandoned or superseded-by:<id>")
+	}
+	present := map[string]bool{}
+	for _, m := range heading2.FindAllStringSubmatch(body, -1) {
+		present[sectionKey(m[1])] = true
+	}
+	for _, s := range requiredSections[r.Type] {
+		if !present[s] {
+			add("error", "sections", "missing section "+sectionNames["es"][s]+" / "+sectionNames["en"][s])
 		}
 	}
 
@@ -194,7 +187,7 @@ func checkContent(vault, full, raw string, ix vaultIndex) Result {
 		}
 		id := m[1]
 		if defs[id] && !strings.HasPrefix(strings.TrimSpace(l), "|") {
-			add(strict, id, "defined more than once")
+			add("error", id, "defined more than once")
 		}
 		defs[id] = true
 		r.Records[strings.SplitN(id, "-", 2)[0]]++
@@ -210,7 +203,7 @@ func checkContent(vault, full, raw string, ix vaultIndex) Result {
 				block += "\n" + next
 			}
 			if !sourceRef.MatchString(strings.Replace(block, id, "", 1)) { // its own ID is not a source
-				add(strict, id, "evidence without a source: cite the permalink or file@commit, platform snapshot, query, work item, record (E-/A-) or the requester statement with its date")
+				add("error", id, "evidence without a source: cite the permalink or file@commit, platform snapshot, query, work item, record (E-/A-) or the requester statement with its date")
 			}
 		}
 	}
@@ -221,9 +214,9 @@ func checkContent(vault, full, raw string, ix vaultIndex) Result {
 			continue
 		}
 		defs[id] = true // report once
-		add(strict, id, "referenced but not defined in the case")
+		add("error", id, "referenced but not defined in the case")
 	}
-	if !r.Legacy && fm["status"] == "closed" && fm["outcome"] == "completed" && r.Records["E"]+r.Records["F"] == 0 {
+	if fm["status"] == "closed" && fm["outcome"] == "completed" && r.Records["E"]+r.Records["F"] == 0 {
 		add("error", "outcome", "a completed case needs at least one evidence or conclusion record")
 	}
 
@@ -231,7 +224,7 @@ func checkContent(vault, full, raw string, ix vaultIndex) Result {
 	for _, m := range wikilink.FindAllStringSubmatch(body, -1) {
 		t := strings.ToLower(strings.TrimSpace(m[1]))
 		if !ix.notes[t] {
-			add(strict, "[["+m[1]+"]]", "link does not resolve to a vault note")
+			add("error", "[["+m[1]+"]]", "link does not resolve to a vault note")
 		}
 	}
 
@@ -249,7 +242,7 @@ func checkContent(vault, full, raw string, ix vaultIndex) Result {
 		}
 		for n, c := range hits {
 			if c*10 >= len(sh)*6 {
-				add(strict, "[["+n+"]]", fmt.Sprintf("a paragraph repeats %d%% of this note; reference it with [[%s]] and keep only what is new", c*100/len(sh), n))
+				add("error", "[["+n+"]]", fmt.Sprintf("a paragraph repeats %d%% of this note; reference it with [[%s]] and keep only what is new", c*100/len(sh), n))
 				break
 			}
 		}
@@ -352,7 +345,7 @@ func firstRunes(s string, n int) string {
 }
 
 // CheckIntroduced gates a case changed on a branch: without base content every error fails; with the
-// base version only errors absent from it fail, so legacy debt does not block an edit.
+// base version only errors absent from it fail, so earlier debt does not block an unrelated edit.
 func CheckIntroduced(vault, path string, base []byte) (bool, []string, int, error) {
 	full := filepathJoin(vault, path)
 	b, e := os.ReadFile(full)
@@ -389,9 +382,7 @@ func introducedErrors(vault, full string, prev *string, next string, ix vaultInd
 	if prev == nil {
 		return false, sortedKeys(now), 0, r
 	}
-	// A finding the previous version already had is not introduced, whatever its severity there: the
-	// earlier format reports its debt as warnings, and migrating it does not create that debt.
-	before := keys(checkContent(vault, full, *prev, ix), "error", "warning")
+	before := keys(checkContent(vault, full, *prev, ix), "error")
 	introduced := []string{}
 	for k := range now {
 		if !before[k] {

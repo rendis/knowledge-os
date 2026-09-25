@@ -117,7 +117,7 @@ class InstanceTests(unittest.TestCase):
                 with self.assertRaisesRegex(InstanceError, "invalid instance.yaml syntax"):
                     _parse_simple_yaml(text)
 
-    def test_reference_branch_policy_roundtrip_and_legacy_defaults(self) -> None:
+    def test_reference_branch_policy_roundtrip_and_defaults(self) -> None:
         data = self.sample()
         data["sources"]["reference_branches"] = {"payments-api": "release/stable", "123": "trunk", "quoted": 'release/"stable"'}
         for loaded in (validate_instance(_parse_minimal_yaml(dump_instance(data))),):

@@ -6,11 +6,9 @@ import "strings"
 // records and passes check; check ignores comments.
 var sectionNames = map[string]map[string]string{
 	"es": {"objective": "Objetivo y alcance", "state": "Estado actual", "evidence": "Evidencia", "findings": "Conclusiones",
-		"requirements": "Requisitos", "changes": "Cambios por componente", "acceptance": "Criterios de aceptación",
-		"decisions": "Decisiones", "questions": "Preguntas abiertas", "handoffs": "Handoffs", "absorption": "Absorción", "log": "Bitácora"},
+		"requirements": "Requisitos", "decisions": "Decisiones", "questions": "Preguntas abiertas", "handoffs": "Handoffs", "log": "Bitácora"},
 	"en": {"objective": "Objective and scope", "state": "Current state", "evidence": "Evidence", "findings": "Conclusions",
-		"requirements": "Requirements", "changes": "Changes by component", "acceptance": "Acceptance criteria",
-		"decisions": "Decisions", "questions": "Open questions", "handoffs": "Handoffs", "absorption": "Absorption", "log": "Log"},
+		"requirements": "Requirements", "decisions": "Decisions", "questions": "Open questions", "handoffs": "Handoffs", "log": "Log"},
 }
 
 // Sections each case type must keep, in template order.
@@ -31,12 +29,9 @@ var guidance = map[string]map[string]string{
 		"evidence":     "Solo evidencia nueva, un hecho por registro con su fuente y nivel (`investigation add --kind evidence`); lo que el vault ya documenta se referencia con [[nota]].",
 		"findings":     "Conclusiones con su nivel: demostrada o inferida desde registros, o sin resolver con lo que falta. Lo que debe pasar al vault se marca con --for-vault.",
 		"requirements": "Qué pide el desarrollo y de dónde sale (pedido, ticket o decisión).",
-		"changes":      "Qué cambia y dónde, por componente, y a qué requisito atiende.",
-		"acceptance":   "Resultados observables que verifican cada requisito.",
 		"decisions":    "Decisiones, quién las tomó y por qué.",
 		"questions":    "Lo que falta saber o buscar, y cómo se resuelve (fuente, acceso o persona).",
 		"handoffs":     "Paquetes de tarea (handoffs/DH-NNN.md): cada uno define qué cambia, dónde y cómo se acepta, citando los requisitos.",
-		"absorption":   "Conocimiento durable que pasa a una nota del vault al publicar, y su estado.",
 		"log":          "La escribe la CLI: una línea por cambio del caso (fecha, acción, registros).",
 	},
 	"en": {
@@ -45,12 +40,9 @@ var guidance = map[string]map[string]string{
 		"evidence":     "New evidence only, one fact per record with its source and level (`investigation add --kind evidence`); what the vault already documents is referenced with [[note]].",
 		"findings":     "Conclusions with their level: demonstrated or inferred from records, or unresolved with what is missing. What belongs in the vault is marked with --for-vault.",
 		"requirements": "What the development asks and where it comes from (request, ticket or decision).",
-		"changes":      "What changes where, per component, and which requirement it serves.",
-		"acceptance":   "Observable results that verify each requirement.",
 		"decisions":    "Decisions, who made them and why.",
 		"questions":    "What is still to be known or searched, and how it gets resolved (source, access or person).",
 		"handoffs":     "Task packages (handoffs/DH-NNN.md): each defines what changes, where and how it is accepted, citing the requirements.",
-		"absorption":   "Durable knowledge that goes into a vault note on publication, and its status.",
 		"log":          "Written by the CLI: one line per change to the case (date, action, records).",
 	},
 }
