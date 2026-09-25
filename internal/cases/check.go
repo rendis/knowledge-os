@@ -116,15 +116,17 @@ func Check(vault, path string) (Result, error) {
 }
 
 func checkWith(vault, path string, ix vaultIndex) (Result, error) {
-	full := path
-	if !filepath.IsAbs(full) {
-		full = filepath.Join(vault, path)
-	}
+	full := filepathJoin(vault, path)
 	b, e := os.ReadFile(full)
 	if e != nil {
 		return Result{}, e
 	}
-	raw := string(b)
+	return checkContent(vault, full, string(b), ix), nil
+}
+
+// checkContent gates case content as if it were stored at full (its directory resolves artifacts and
+// handoff packages).
+func checkContent(vault, full, raw string, ix vaultIndex) Result {
 	fm := frontmatter(raw)
 	r := Result{ID: fm["id"], Records: map[string]int{}, Issues: []Issue{}}
 	r.Path, _ = filepath.Rel(vault, full)
@@ -250,13 +252,25 @@ func checkWith(vault, path string, ix vaultIndex) (Result, error) {
 
 	// Task packages prepared for handoffs pass their own gate.
 	pkgs, _ := filepath.Glob(filepath.Join(dir, "handoffs", "DH-*.md"))
+	deps := map[string][]string{}
 	for _, pp := range pkgs {
-		_, issues, e := devhandoff.CheckPackage(pp)
+		p, issues, e := devhandoff.CheckPackage(pp)
 		if e != nil {
 			continue
 		}
 		for _, i := range issues {
 			add(i.Severity, "handoffs/"+filepath.Base(pp), i.Detail)
+		}
+		deps[p.Handoff] = p.DependsOn
+	}
+	for id, ds := range deps {
+		for _, d := range ds {
+			if _, ok := deps[d]; !ok {
+				add("error", "handoffs/"+id+".md", "depends-on "+d+", which is not a package of this case")
+			}
+		}
+		if dependsOnItself(id, deps) {
+			add("error", "handoffs/"+id+".md", "depends-on forms a cycle")
 		}
 	}
 
@@ -271,7 +285,24 @@ func checkWith(vault, path string, ix vaultIndex) (Result, error) {
 			r.OK = false
 		}
 	}
-	return r, nil
+	return r
+}
+
+func dependsOnItself(start string, deps map[string][]string) bool {
+	seen := map[string]bool{}
+	stack := append([]string{}, deps[start]...)
+	for len(stack) > 0 {
+		d := stack[len(stack)-1]
+		stack = stack[:len(stack)-1]
+		if d == start {
+			return true
+		}
+		if !seen[d] {
+			seen[d] = true
+			stack = append(stack, deps[d]...)
+		}
+	}
+	return false
 }
 
 // fileRecord accepts artifact and story IDs defined as files under artifacts/ or exports/.
@@ -298,38 +329,44 @@ func firstRunes(s string, n int) string {
 // CheckIntroduced gates a case changed on a branch: without base content every error fails; with the
 // base version only errors absent from it fail, so legacy debt does not block an edit.
 func CheckIntroduced(vault, path string, base []byte) (bool, []string, int, error) {
-	ix := indexVault(vault)
-	r, e := checkWith(vault, path, ix)
-	if e != nil || r.OK {
-		return r.OK, nil, 0, e
+	full := filepathJoin(vault, path)
+	b, e := os.ReadFile(full)
+	if e != nil {
+		return false, nil, 0, e
 	}
-	keys := func(res Result) map[string]bool {
+	var prev *string
+	if base != nil {
+		s := string(base)
+		prev = &s
+	}
+	ok, introduced, pre := introducedErrors(vault, full, prev, string(b), indexVault(vault))
+	return ok, introduced, pre, nil
+}
+
+// introducedErrors compares the gate on the next content with the gate on the previous content.
+func introducedErrors(vault, full string, prev *string, next string, ix vaultIndex) (bool, []string, int) {
+	keys := func(res Result, severities ...string) map[string]bool {
 		out := map[string]bool{}
 		for _, i := range res.Issues {
-			if i.Severity == "error" {
-				out[i.Where+"|"+i.Detail] = true
+			for _, s := range severities {
+				if i.Severity == s {
+					out[i.Where+"|"+i.Detail] = true
+				}
 			}
 		}
 		return out
 	}
-	now := keys(r)
-	if base == nil {
-		return false, sortedKeys(now), 0, nil
+	r := checkContent(vault, full, next, ix)
+	if r.OK {
+		return true, nil, 0
 	}
-	tmp, e := os.CreateTemp(filepath.Dir(filepathJoin(vault, path)), ".base-*.md")
-	if e != nil {
-		return false, nil, 0, e
+	now := keys(r, "error")
+	if prev == nil {
+		return false, sortedKeys(now), 0
 	}
-	defer os.Remove(tmp.Name())
-	if _, e := tmp.Write(base); e != nil {
-		return false, nil, 0, e
-	}
-	tmp.Close()
-	rb, e := checkWith(vault, tmp.Name(), ix)
-	if e != nil {
-		return false, nil, 0, e
-	}
-	before := keys(rb)
+	// A finding the previous version already had is not introduced, whatever its severity there: the
+	// earlier format reports its debt as warnings, and migrating it does not create that debt.
+	before := keys(checkContent(vault, full, *prev, ix), "error", "warning")
 	introduced := []string{}
 	for k := range now {
 		if !before[k] {
@@ -337,7 +374,7 @@ func CheckIntroduced(vault, path string, base []byte) (bool, []string, int, erro
 		}
 	}
 	sort.Strings(introduced)
-	return len(introduced) == 0, introduced, len(now) - len(introduced), nil
+	return len(introduced) == 0, introduced, len(now) - len(introduced)
 }
 
 func filepathJoin(vault, path string) string {
