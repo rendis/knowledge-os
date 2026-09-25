@@ -30,7 +30,9 @@ A sync brings repository notes to the current production commit of their sources
 
 ## Concurrency and recovery
 
-- Base moved (another developer published): rebase the branch, resolve note conflicts by re-applying this run's facts onto the new note, re-run the gates and get the merged meaning reviewed. Never force-push.
+- Keep the base current with `<cli> sync pull --vault "<vault>"`: it fast-forwards when possible and never merges meaning automatically.
+- Base moved (another developer published): `sync pull` lists the knowledge files changed on both sides. Rebase the branch; for each listed file re-apply this run's facts onto the upstream note, commit, re-run the gates and get the merged meaning reviewed. Never force-push.
+- To make the remote enforce the gates on every pull request, the team can copy `90-Meta/ci/knowledge-gates.yml` to `.github/workflows/`; it runs `sync verify` with the vault's own Linux binary.
 - Source moved during the run: re-run `discover run --repo <name>` and redo only that repository's delta.
 - Interrupted run: the branch and its commits are the state; continue from `sync status`.
 - Branches made by the legacy run state machine (`.agents/state/map-ecosystem/sync/`) are not resumable with this kernel; their completed receipts remain history.

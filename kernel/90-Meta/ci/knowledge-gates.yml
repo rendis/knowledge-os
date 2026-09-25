@@ -1,0 +1,20 @@
+# Optional CI gate for a cell vault. Copy to .github/workflows/knowledge-gates.yml when the team
+# wants the remote to enforce the same gates as `vaultctl sync verify` on every pull request.
+# It runs the vault's own versioned Linux binary; no source repository or cloud access is needed:
+# anchors whose sources are not checked out are reported as pending, structural checks and the
+# review binding are enforced.
+name: knowledge-gates
+on:
+  pull_request:
+    paths: ["[1-7]*-*/**", "00-Home.md", "*.base", "90-Meta/.sync-acknowledgements.json"]
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify reviewed knowledge
+        run: |
+          chmod +x .agents/bin/vaultctl-linux-amd64
+          .agents/bin/vaultctl-linux-amd64 sync verify --vault . --base "origin/${{ github.base_ref }}"

@@ -39,6 +39,9 @@ const Help = `sync COMMAND --vault PATH [options]
                                         (D: no-documentation-change | no-durable-node |
                                         review-rejected | inspection-limited).
   finish  [--base BRANCH]               verify, then fast-forward the base and delete the branch.
+  pull    [--base BRANCH]               Fetch; fast-forward the base when possible. On divergence or
+                                        on a sync/ branch whose base moved, list the knowledge files
+                                        changed on both sides (they need the merged meaning reviewed).
 Publishing to the remote follows the repository's Git policy. All output is JSON.`
 
 const ackRel = "90-Meta/.sync-acknowledgements.json"
@@ -128,6 +131,8 @@ func Run(args []string, out io.Writer) error {
 		return acknowledge(o, out)
 	case "finish":
 		return finish(o, out)
+	case "pull":
+		return pull(o, out)
 	}
 	return fmt.Errorf("unknown sync command %q; the legacy run commands were retired, see synchronize-ecosystem", cmd)
 }
@@ -497,4 +502,64 @@ func acknowledge(o opts, out io.Writer) error {
 		return e
 	}
 	return emit(out, map[string]any{"acknowledged": o.repo, "commit": o.commit[:12], "decision": o.decision, "file": ackRel, "next": "commit it on the sync branch; it goes through the same review and verify"})
+}
+
+func filesBetween(vault, from, to string) map[string]bool {
+	d, _ := git(vault, "diff", "--name-only", "--no-renames", from, to)
+	m := map[string]bool{}
+	for _, f := range strings.Split(d, "\n") {
+		if f != "" && knowledgePath.MatchString(f) {
+			m[f] = true
+		}
+	}
+	return m
+}
+
+// pull integrates the remote base without merging meaning automatically: fast-forward only;
+// anything else reports the overlapping knowledge files for a rebase and a review.
+func pull(o opts, out io.Writer) error {
+	if _, e := git(o.vault, "fetch", "--quiet", "origin"); e != nil {
+		return e
+	}
+	remote := "origin/" + o.base
+	if _, e := git(o.vault, "rev-parse", "--verify", "--quiet", remote); e != nil {
+		return fmt.Errorf("remote base %s not found", remote)
+	}
+	branch := current(o.vault)
+	if d, _ := dirty(o.vault); len(d) > 0 {
+		return fmt.Errorf("uncommitted knowledge changes %v: commit them on a sync/ branch first", d)
+	}
+	mb, e := git(o.vault, "merge-base", remote, "HEAD")
+	if e != nil {
+		return e
+	}
+	head, _ := git(o.vault, "rev-parse", "HEAD")
+	upstream, _ := git(o.vault, "rev-parse", remote)
+	res := map[string]any{"branch": branch, "base": o.base}
+	switch {
+	case upstream == head || upstream == mb && branch != o.base:
+		res["status"] = "up-to-date"
+	case branch == o.base && mb == head:
+		if _, e := git(o.vault, "merge", "--ff-only", remote); e != nil {
+			return e
+		}
+		res["status"] = "fast-forwarded"
+	default:
+		theirs := filesBetween(o.vault, mb, remote)
+		ours := filesBetween(o.vault, mb, "HEAD")
+		both := []string{}
+		for f := range ours {
+			if theirs[f] {
+				both = append(both, f)
+			}
+		}
+		sort.Strings(both)
+		res["status"] = "diverged"
+		res["changed_on_both_sides"] = both
+		res["next"] = "rebase this branch onto " + remote + "; for each file changed on both sides re-apply this run's facts onto the upstream note, commit, re-run the gates and get the merged meaning reviewed"
+		if branch == o.base {
+			res["next"] = "move local commits to a sync/ branch (git switch -c sync/<slug>), reset " + o.base + " to " + remote + ", then rebase the sync branch and review the merged meaning"
+		}
+	}
+	return emit(out, res)
 }
