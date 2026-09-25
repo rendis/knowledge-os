@@ -1,45 +1,49 @@
-# Investigation visibility
+# Glossary
 
-A cell investigation is a case file with one contract. Visibility and local machine material are separate from that contract.
+Terms used by the kernel, the CLI and this repository. Prefer them over synonyms.
 
-## Language
+**Cell** — a team and the systems it owns; it has one vault, created from this distribution.
+_Avoid_: tenant, project.
 
-**Investigation**:
-A case that records request, evidence, decisions, and acceptance criteria under the investigation contract.
-_Avoid_: dossier, ticket, chat log
+**Evidence contract** — the rules in the vault's `AGENTS.md` that every answer follows: bind the scope,
+inspect the source, grade each conclusion (demonstrated, observed within limits, inferred, unresolved),
+check the draft, review new conclusions.
 
-**Published investigation**:
-The versioned, shareable case under `investigations/`. After publish it is the sole authority for status, evidence, decisions, and acceptance criteria.
-_Avoid_: public investigation as internet-visible, canonical overlay
+**Reference branch** — the branch a repository is read at: its `sources.reference_branches` entry, else the
+first existing branch of `sources.reference_branch_order`. Never the remote's default branch by itself.
 
-**Unpublished investigation**:
-The same case contract stored only under `.investigations/`, ignored by Git. New investigations start here.
-_Avoid_: draft overlay, private overlay, legacy case
+**Fact** — a connection `discover run` extracted from a repository at an exact commit (topic, event,
+endpoint, database, library), with its file and line.
 
-**Private overlay**:
-A non-authoritative sensitive complement at `.investigations-private/<id>/private.md`. It never restates or overrides investigation knowledge.
-_Avoid_: private investigation, second case file
+**Gate** — a deterministic check that blocks: note gates (`discover check`), the case gate
+(`investigation check`), `sync verify`. A reviewer's verdict is separate from a gate.
 
-**Local working material**:
-Machine- or tool-specific files needed to continue locally (HTTP collections, smoke dumps, host paths). They live under `.investigations-private/<id>/local/` and are not case knowledge.
-_Avoid_: public artifact, overlay note, gitignored case attachment
+**Sync branch** — `sync/<slug>`, the only way versioned knowledge changes; it carries the review bound to
+the exact content.
 
-**Investigation case file**:
-The authoritative `investigation.md`, unpublished or published. Distinct from the private overlay and from local working material.
-_Avoid_: public case as a synonym of published investigation
+**Case** — one investigation: the formalized request, its records and a log, in one Markdown file written
+through the CLI. Types: *understanding* and *development*.
+_Avoid_: dossier, ticket, chat log.
 
-**Case artifact**:
-A source, method, result, or deliverable retained with an investigation because it supports understanding, review, or continuation. One `A-NNN` may identify a related group of files. Its inclusion in a published case establishes availability at that revision, not execution or reproducibility.
-_Avoid_: treating every executed script as an operational run or maintained tool
+**Record** — an entry of a case with an immutable ID: evidence `E-`, finding `F-`, question `Q-`,
+decision `D-`, requirement `R-`, handoff `DH-`.
 
-**Operational run**:
-One bounded audit, observation, or external action with its own scope, authorization, steps, and outcome, recorded under `.operations/`. A run can provide evidence to an investigation without becoming its case file.
-_Avoid_: using the run as the sole durable source for a shared investigation claim
+**Unpublished / published case** — `.investigations/<id>/` (ignored by Git) until published to
+`investigations/<id>/` on a sync branch; there is no unpublish.
 
-**Artifact disposition**:
-The reviewed fate of a case artifact when knowledge is absorbed: a maintained destination, a durable note resource, a recoverable historical snapshot, no continuing use, or a pending dependency. Disposition does not create another investigation lifecycle state.
-_Avoid_: equating knowledge absorption with automatic code promotion or deletion
+**Private directory** — `.investigations-private/<id>/`: sensitive notes and scratch a case needs but never
+shares; never authoritative.
 
-**Publish**:
-The one-way, sanitized move of an unpublished investigation into `investigations/`. One ID keeps at most one `investigation.md`. There is no unpublish.
-_Avoid_: sync, copy both ways, promote-to-vault, learning-note write, ticket or story platform publication
+**Handoff package** — `<case>/handoffs/DH-NNN.md`: one atomic task in one repository (task, changes,
+acceptance criteria, required context), self-sufficient without the vault.
+
+**Worktree** — the repository checkout on a task branch; tasks of one milestone (same repository and
+branch) share it. Its `.handoff/` holds the task copies and `deltas.md`.
+
+**Delta** — what the implementing agent records for the cell: a definition change, a finding, a decision
+or deviation, a question, a verification; each with its evidence.
+
+**Reconciliation** — `handoff reconcile`: commits and deltas since the last mark become case records
+through a fixed mapping.
+
+**Absorption** — moving a finding marked for the vault into its note on publication.

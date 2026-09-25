@@ -6,7 +6,7 @@ The readiness check itself is read-only and non-publishing: do not change versio
 
 ## When to run
 
-Run this branch after **attempting** vault resolution with the resolver bundled in the installed skill directory. A readiness request naming a specific operation selects **operational readiness** as its primary branch. Resolve which operation an ambiguous “ready?” refers to before selecting checks. If resolution is not `resolved`, classify the requested capability as blocked, report the resolver status and smallest remediation, and stop every check that depends on `VAULT_ROOT`.
+Run this branch after **attempting** vault resolution with `<CLI> config resolve --vault "<root>"`. A readiness request naming a specific operation selects **operational readiness** as its primary branch. Resolve which operation an ambiguous “ready?” refers to before selecting checks. If resolution is not `resolved`, classify the requested capability as blocked, report the resolver status and smallest remediation, and stop every check that depends on `VAULT_ROOT`.
 
 This branch may also support another primary branch when that branch observes a signal that can block its requested capability: unavailable source evidence, clone authority mismatching required acquisition, a required gate failure, or a GitHub identity error. An unavailable optional integration does not trigger the full preflight by itself; report its fallback and limitation.
 
