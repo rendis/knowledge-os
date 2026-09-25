@@ -78,6 +78,16 @@ Compare its score and violations with the quick column of the baseline in
 like the recommended minimum; run one `flow` before using it to publish. Re-baseline (full campaign) only
 after a kernel change that alters answering or publication.
 
+## Measuring one behavior
+
+`--ids` runs named questions only. Keep in the suite at least one question whose answer is in no note, only
+in a source the vault reaches (a repository, a platform snapshot, a database): it measures whether a setting
+follows the trail beyond the notes or stops at "unknown". Mark such questions with a `purpose` field.
+
+```bash
+python3 -B evals/benchmark/bench.py qa --suite SUITE.json --work WORK --setting codex:gpt-6-sol:low --ids S6
+```
+
 ## Metrics
 
 - Questions: judge score (share of expected facts stated), violations (forbidden claims asserted without
