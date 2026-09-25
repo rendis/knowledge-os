@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"documentation-vault/internal/config"
-	"documentation-vault/internal/handoff"
 )
 
 const Help = `handoff COMMAND --vault PATH [options]
@@ -28,13 +27,12 @@ const Help = `handoff COMMAND --vault PATH [options]
   status   [--worktree PATH]   Read-only, per worktree: its tasks with state (pending,
            blocked, in-progress, verified), commits (by Handoff trailer) and deltas, the next
            task, local changes, stale packages and the segment state; every worktree under the
-           configured root when --worktree is omitted (legacy handoff stores included).
+           configured root when --worktree is omitted.
   refresh  --worktree PATH --handoff DH-NNN [--apply]   Replace the task with the current
            package when it changed; deltas stay.
   reconcile --worktree PATH [--id CASE] [--apply]   Import the commits and deltas since the
            last mark into the development case with a fixed mapping (see investigation --help).
-All output is JSON. Legacy verbs (plan, apply, validate, set-state, ...) remain for
-worktrees prepared by earlier versions.`
+All output is JSON.`
 
 type options struct {
 	vault, pkg, worktree, handoffID string
@@ -333,7 +331,7 @@ func excludeLocally(worktree string) error {
 	return os.WriteFile(p, []byte(s+".handoff/\n"), 0o644)
 }
 
-var deltaHeading = regexp.MustCompile(`(?m)^##\s+((?:DELTA|UPD)-\d{3,})\s+—\s+(.+)$`)
+var deltaHeading = regexp.MustCompile(`(?m)^##\s+(DELTA-\d{3,})\s+—\s+(.+)$`)
 var deltaField = regexp.MustCompile(`(?m)^-\s+(Handoff|Type|Tipo|Detail|Detalle|Evidence|Evidencia):\s*(.+)$`)
 
 // Delta is one entry of a worktree's deltas.md.
@@ -379,7 +377,9 @@ func readDeltas(path string) []Delta {
 }
 
 // Deltas returns the deltas recorded in a worktree, in order.
-func Deltas(worktree string) []Delta { return readDeltas(filepath.Join(worktree, ".handoff", "deltas.md")) }
+func Deltas(worktree string) []Delta {
+	return readDeltas(filepath.Join(worktree, ".handoff", "deltas.md"))
+}
 
 // Tasks returns the task copies of a worktree and, per task, the commits since the base that belong to
 // it ("<short sha> <subject>", newest first).
@@ -545,27 +545,7 @@ func worktreeStatus(vault, dir string) map[string]any {
 		seg[filepath.Base(f)] = segmentStatus(f)
 	}
 	res["managed_segment"] = seg
-	if _, e := os.Stat(filepath.Join(dir, ".knowledge-os-handoffs")); e == nil {
-		// Worktree prepared by an earlier version: its store stays readable, never rewritten here.
-		if legacy, e := handoff.Inspect(dir); e == nil {
-			res["legacy"] = legacy
-		} else {
-			res["legacy"] = map[string]string{"status": "unreadable", "error": e.Error()}
-		}
-		res["legacy_deltas"] = readDeltasGlob(filepath.Join(dir, ".knowledge-os-handoffs"))
-	}
 	return res
-}
-
-func readDeltasGlob(root string) []Delta {
-	out := []Delta{}
-	_ = filepath.WalkDir(root, func(p string, d os.DirEntry, err error) error {
-		if err == nil && !d.IsDir() && d.Name() == "implementation-updates.md" {
-			out = append(out, readDeltas(p)...)
-		}
-		return nil
-	})
-	return out
 }
 
 func status(o options, out io.Writer) error {
@@ -585,9 +565,7 @@ func status(o options, out io.Writer) error {
 		dirs, _ := os.ReadDir(filepath.Join(root, r.Name()))
 		for _, d := range dirs {
 			dir := filepath.Join(root, r.Name(), d.Name())
-			_, a := os.Stat(filepath.Join(dir, ".handoff"))
-			_, b := os.Stat(filepath.Join(dir, ".knowledge-os-handoffs"))
-			if a == nil || b == nil {
+			if _, e := os.Stat(filepath.Join(dir, ".handoff")); e == nil {
 				found = append(found, worktreeStatus(o.vault, dir))
 			}
 		}
