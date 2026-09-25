@@ -66,7 +66,8 @@ func readFiles(paths []string) ([]file, error) {
 			return nil, e
 		}
 		if utf8.Valid(b) && !strings.ContainsRune(string(b[:min(len(b), 8192)]), 0) {
-			if m := secret.FindString(string(b)); m != "" {
+			if ms := credentials(string(b), 1); len(ms) > 0 {
+				m := ms[0]
 				return nil, errors.New(filepath.Base(p) + " contains a credential (" + firstRunes(m, 16) + "…): redact it and attach the redacted copy")
 			}
 		}
