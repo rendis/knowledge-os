@@ -11,6 +11,7 @@ import (
 	"documentation-vault/internal/cases"
 	"documentation-vault/internal/check"
 	"documentation-vault/internal/config"
+	"documentation-vault/internal/devhandoff"
 	"documentation-vault/internal/discover"
 	"documentation-vault/internal/gitsync"
 	"documentation-vault/internal/handoff"
@@ -47,7 +48,7 @@ check visual-context FILE
 check obsidian-binding --vault PATH --vault-name NAME
 check map-closure --vault PATH --checkpoint FILE
 investigation new|list|check --vault PATH ...   (legacy transactional verbs remain during migration)
-handoff inspect|plan-worktree|create-worktree|plan-handoff|prepare-handoff|plan|apply|validate|resolve-branch|set-state ...
+handoff start|status|refresh --vault PATH ...   (legacy verbs remain for earlier worktrees)
 sync start|status|review|verify|acknowledge|finish|pull --vault PATH ...
 
 Search refreshes a private local SQLite index before querying. --cache PATH
@@ -79,6 +80,11 @@ version`)
 		}
 		return investigation.Run(args[1:], os.Stdout)
 	case "handoff":
+		// start/status/refresh prepare and read atomic task worktrees; the remaining verbs keep
+		// worktrees prepared by earlier versions working.
+		if len(args) < 2 || args[1] == "--help" || args[1] == "-h" || args[1] == "start" || args[1] == "status" || args[1] == "refresh" {
+			return devhandoff.Run(args[1:], os.Stdout)
+		}
 		return handoff.Run(args[1:], os.Stdout)
 	case "sync":
 		return gitsync.Run(args[1:], os.Stdout)

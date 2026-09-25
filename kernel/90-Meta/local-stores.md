@@ -8,7 +8,7 @@ local to one checkout and ignored by Git.
 | `.investigations/` | Unpublished investigation cases | `manage-investigation` |
 | `.investigations-private/<id>/` | Private overlay (`private.md`) and local working material (`local/`) of a case | `manage-investigation` |
 | `.operations/` | Operational runs | `manage-operational-workflow` |
-| `.knowledge-os-handoffs/` | Handoff working state | `manage-development-handoff` |
+| `<worktree>/.handoff/` | Task copy and deltas of a development handoff, excluded from Git in each repository worktree | `manage-development-handoff` |
 | `.agents/state/discovery/` | Facts, questions, comparison and gaps of the last `discover run` | `vaultctl discover` |
 | `.plan/` | Local implementation plans (a visible `plan/` directory would become graph content) | any workflow |
 | `.scratch/<task>/` | Helper scripts or code with no selected investigation or workflow location | any workflow |

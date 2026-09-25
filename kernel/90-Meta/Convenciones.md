@@ -23,7 +23,7 @@ Schema for a cell knowledge vault. Cell identity, systems, and source prefixes l
 | `70-Aprendizajes/` | Evidence-bounded engineering learnings |
 | `90-Meta/` | Schema, evidence framework, validators |
 
-`.agents/` holds skills and stays outside the Obsidian graph. Versioned `investigations/` is searchable in Obsidian but excluded from the kernel's technical graph traversal and audit gates; the graph helper can still look up investigations explicitly. It is collaborative provenance, not canonical technical truth. Local ignored stores (`.investigations/`, `.investigations-private/`, `.operations/`, `.knowledge-os-handoffs/`, `.knowledge-os-config.yaml`, `.plan/`) are not graph sources. Local plans must live in `.plan/`; never create a visible `plan/` directory in a cell vault.
+`.agents/` holds skills and stays outside the Obsidian graph. Versioned `investigations/` is searchable in Obsidian but excluded from the kernel's technical graph traversal and audit gates; the graph helper can still look up investigations explicitly. It is collaborative provenance, not canonical technical truth. Local ignored stores (`.investigations/`, `.investigations-private/`, `.operations/`, worktree `.handoff/` stores, `.knowledge-os-config.yaml`, `.plan/`) are not graph sources. Local plans must live in `.plan/`; never create a visible `plan/` directory in a cell vault.
 
 For native kernel checks and the separate distribution development gates,
 follow [[code-quality]]. Installed vault checks use the CLI selected through
