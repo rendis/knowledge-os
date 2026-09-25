@@ -90,7 +90,7 @@ Select `<cli>` through `use-vault-cli` (`.agents/skills/use-vault-cli/SKILL.md`)
 
 | Operation | When and output | Boundary |
 |---|---|---|
-| `<cli> config resolve --vault "<vault_root>"` | Resolve canonical identity and configured sources before vault-dependent work. | Read-only; configuration changes belong to `configure-workspace`. |
+| `<cli> config resolve --vault "<vault_root>"` | Resolve canonical identity and configured sources before vault-dependent work. | Read-only; configuration changes belong to `onboard-developer`. |
 | `<cli> config status --vault "<vault_root>"` | Validate instance identity and inspect configured capabilities. | Missing capabilities remain explicit; no procedure is executed. |
 | `<cli> config workspace --vault "<vault_root>"` | Read local repository, worktree and proxy configuration. | Local settings preserve consumer namespaces; credentials and remote target identities stay outside this file. |
 | `<cli> config areas --vault "<vault_root>"`, `config reports`, `config operation` | Discover areas/reports and resolve a procedure by basename or report ID. | Derived catalog; executing a procedure requires its skill and authority. |

@@ -13,10 +13,10 @@ DIST = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(DIST / 'scripts'))
 from instance import load_instance
 
-PROMPTS = ['Systems as', 'Trackers as', 'Cell name', 'Cell purpose',
-           'Evidence profile', 'Note locale', 'Reference branches', 'Clouds the systems', 'Adapters (']
-ANSWERS = ['orders:Orders', 'work:github:https://example.org/issues',
-           'Commerce', 'Order fulfillment.', 'documented-source', 'en', 'develop,main', 'gcp, aws', 'reports']
+PROMPTS = ['Cell name', 'What the cell owns', 'Systems it owns', 'GitHub organization', 'Repository name prefixes',
+           'Reference branches', 'Clouds the systems', 'Issue tracker URLs', 'Language of the notes']
+ANSWERS = ['Commerce', 'Order fulfillment.', 'Orders, order-returns:Returns', 'acme', 'APP01-, APP02-',
+           'develop,main', 'gcp, aws', 'https://acme.atlassian.net/jira/software/projects/ORD', 'en']
 
 
 def snapshot(root):
@@ -57,6 +57,7 @@ class InteractiveOnboardingTests(unittest.TestCase):
         self.assertEqual(instance['evidence']['profile'], 'production-gate')
         self.assertEqual(instance['locale']['notes'], 'es')
         self.assertEqual(instance['adapters'], [])
+        self.assertEqual(instance['systems'][0]['id'], 'platform')
         self.assertEqual(instance['sources']['reference_branch_order'], ['main', 'master'])
         self.assertEqual(instance['platform']['providers'], [])
 
@@ -70,14 +71,16 @@ class InteractiveOnboardingTests(unittest.TestCase):
         positions = [result.stdout.index(prompt) for prompt in PROMPTS]
         self.assertEqual(positions, sorted(positions))
         instance = load_instance(self.dest / 'instance.yaml')
-        self.assertEqual(instance['systems'][0]['id'], 'orders')
+        self.assertEqual([(s['id'], s['name']) for s in instance['systems']], [('orders', 'Orders'), ('order-returns', 'Returns')])
         self.assertEqual(instance['cell'], {'name': 'Commerce', 'purpose': 'Order fulfillment.'})
-        self.assertEqual(instance['trackers'], [{'id': 'work', 'provider': 'github', 'url': 'https://example.org/issues'}])
-        self.assertEqual(instance['evidence']['profile'], 'documented-source')
+        self.assertEqual(instance['sources']['github_org'], 'acme')
+        self.assertEqual(instance['sources']['repo_prefixes'], ['APP01-', 'APP02-'])
+        self.assertEqual(instance['trackers'], [{'id': 'jira', 'provider': 'jira', 'url': 'https://acme.atlassian.net/jira/software/projects/ORD'}])
+        self.assertEqual(instance['evidence']['profile'], 'production-gate')
         self.assertEqual(instance['locale']['notes'], 'en')
         self.assertEqual(instance['sources']['reference_branch_order'], ['develop', 'main'])
         self.assertEqual(instance['platform']['providers'], ['gcp', 'aws'])
-        self.assertEqual(instance['adapters'], ['reports'])
+        self.assertEqual(instance['adapters'], [])
         self.assertEqual(instance['sources']['discovery_roots'], [str(discovery)])
         self.assertEqual(snapshot(discovery), before)
         self.assertFalse((self.dest / '.knowledge-os-config.yaml').exists())
@@ -92,7 +95,7 @@ class InteractiveOnboardingTests(unittest.TestCase):
         result = self.run_init('\n'.join(ANSWERS) + '\n')
         self.assertEqual(result.returncode, 2)
         self.assertEqual(snapshot(self.dest), before)
-        self.assertNotIn('Systems as', result.stdout)
+        self.assertNotIn('Cell name', result.stdout)
 
     def test_keyboard_interrupt_at_prompt_writes_nothing(self):
         process = subprocess.Popen(self.command(), stdin=subprocess.PIPE, stdout=subprocess.PIPE,
@@ -101,7 +104,7 @@ class InteractiveOnboardingTests(unittest.TestCase):
             ready, _, _ = select.select([process.stdout], [], [], 10)
             self.assertTrue(ready, 'installer never reached a prompt')
             prefix = os.read(process.stdout.fileno(), 4096)
-            self.assertIn(b'Systems as', prefix)
+            self.assertIn(b'Cell name', prefix)
             process.send_signal(signal.SIGINT)
             stdout, stderr = process.communicate(timeout=10)
             print('\nTRANSCRIPT interrupt\n' + (prefix + stdout + stderr).decode())

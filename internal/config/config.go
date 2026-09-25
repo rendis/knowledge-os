@@ -420,7 +420,7 @@ func Resolve(root string) (Object, error) {
 	}
 	workspace, e := Workspace(r)
 	if e != nil {
-		workspace = Object{"source_context": Object{"status": "unavailable", "roots": []any{}, "clone_root": nil, "clone_origin": nil, "clone_authorized": false, "warnings": []string{"workspace configuration is invalid; run configure-workspace before source access"}}}
+		workspace = Object{"source_context": Object{"status": "unavailable", "roots": []any{}, "clone_root": nil, "clone_origin": nil, "clone_authorized": false, "warnings": []string{"workspace configuration is invalid; run onboard-developer before source access"}}}
 	}
 	available, name := obsidianBinding(r)
 	mode := "filesystem"

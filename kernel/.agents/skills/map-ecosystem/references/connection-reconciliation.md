@@ -12,7 +12,7 @@ Use repository, dependency, IaC and schema evidence first. A discovered connecti
 
 - When the exact probe passes, execute only the bounded read-only query needed by the pending item's close condition.
 - When a configured fallback can answer less, record that smaller evidence and keep the remaining question partial.
-- When the procedure binding is missing, complete independent static work, retain the pending item, and hand the exact capability, target and read-only question to `configure-workspace`; workspace configuration binds the procedure but does not grant target access.
+- When the procedure binding is missing, complete independent static work, retain the pending item, and hand the exact capability, target and read-only question to `onboard-cell`; workspace configuration binds the procedure but does not grant target access.
 - When the procedure is bound but its probe cannot use the existing authentication, ask for the exact missing executor, profile, role, session, network route or target-specific setup reported by the procedure. Keep credential values outside the vault and preserve the configured access path.
 
 After the binding or access setup becomes available, rerun the same executor or adapter probe and resume the pending `connection.*` item. Reuse the accepted local map and prior external evidence; access acquisition does not trigger repository extraction again.

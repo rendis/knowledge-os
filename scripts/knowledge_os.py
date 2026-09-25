@@ -6,11 +6,13 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 DIST = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(DIST / "scripts"))
@@ -561,68 +563,65 @@ def prompt(label: str, default: str, yes: bool) -> str:
     return value or default
 
 
+TRACKER_HOSTS = (("atlassian.net", "jira"), ("jira", "jira"), ("github.com", "github"), ("gitlab", "gitlab"),
+                 ("dev.azure.com", "azure-devops"), ("visualstudio.com", "azure-devops"), ("linear.app", "linear"))
+
+
 def parse_tracker(value: str) -> dict[str, str]:
-    tracker_id, separator, remainder = value.strip().partition(":")
+    """A tracker URL (its provider is read from the host) or id:provider:https://url."""
+    value = value.strip()
+    if value.startswith("https://"):
+        host = urlparse(value).hostname or ""
+        provider = next((name for marker, name in TRACKER_HOSTS if marker in host), host.split(".")[0] or "tracker")
+        return {"id": provider, "provider": provider, "url": value}
+    tracker_id, separator, remainder = value.partition(":")
     provider, second_separator, url = remainder.partition(":")
     if not separator or not second_separator or not tracker_id or not provider or not url:
-        raise InstanceError(
-            "tracker must use id:provider:https://tracker.example form"
-        )
-    return {
-        "id": tracker_id.strip(),
-        "provider": provider.strip(),
-        "url": url.strip(),
-    }
+        raise InstanceError("a tracker is an https:// URL, or id:provider:https://url")
+    return {"id": tracker_id.strip(), "provider": provider.strip(), "url": url.strip()}
+
+
+def parse_system(value: str) -> dict[str, Any] | None:
+    """A system name (its id is derived) or id:Name."""
+    ident, colon, name = value.strip().partition(":")
+    if not colon:
+        name = ident
+        ident = re.sub(r"[^a-z0-9]+", "-", ident.lower()).strip("-")
+    ident, name = ident.strip(), (name or ident).strip()
+    return {"id": ident, "name": name, "aliases": [ident]} if ident else None
+
+
+def listed(raw: str) -> list[str]:
+    return [part.strip() for part in raw.split(",") if part.strip()]
 
 
 def build_instance_from_args(args: argparse.Namespace) -> dict[str, Any]:
-    systems: list[dict[str, Any]] = []
-    for item in args.system or []:
-        ident, _, name = item.partition(":")
-        ident = ident.strip()
-        name = (name or ident).strip()
-        systems.append({"id": ident, "name": name, "aliases": [ident]})
+    """Project onboarding: who the cell is, where its code is, where it runs. Flags skip the questions;
+    the evidence profile and adapters keep their defaults unless passed."""
+    interactive = not args.yes
+    cell_name = args.cell_name or prompt("Cell name", "Cell", args.yes)
+    purpose = args.purpose or prompt("What the cell owns, in 1-3 sentences", "Describe this cell.", args.yes)
+    systems = [s for s in (parse_system(item) for item in args.system or []) if s]
     if not systems:
         if args.yes:
-            raise SystemExit("--system id:Name is required with --yes")
-        raw = prompt("Systems as id:Name, comma-separated", "platform:Platform", False)
-        for part in raw.split(","):
-            ident, _, name = part.partition(":")
-            ident = ident.strip()
-            name = (name or ident).strip()
-            if ident:
-                systems.append({"id": ident, "name": name, "aliases": [ident]})
-    trackers = [parse_tracker(item) for item in (args.tracker or [])]
-    if not args.yes and not trackers:
-        raw = prompt(
-            "Trackers as id:provider:https://url, comma-separated (empty for none)",
-            "",
-            False,
-        )
-        trackers = [parse_tracker(part) for part in raw.split(",") if part.strip()]
-    cell_name = args.cell_name or prompt("Cell name", "Cell", args.yes)
-    purpose = args.purpose or prompt("Cell purpose (1-3 sentences)", "Describe this cell.", args.yes)
-    profile = args.evidence_profile or prompt(
-        "Evidence profile (production-gate|documented-source|mixed)",
-        "production-gate",
+            raise SystemExit("--system Name (or id:Name) is required with --yes")
+        systems = [s for s in (parse_system(part) for part in listed(prompt("Systems it owns, comma-separated (e.g. Orders, Payments)", "Platform", False))) if s]
+    github_org = args.github_org or (prompt("GitHub organization of its repositories (empty to skip)", "", False) if interactive else "")
+    prefixes = list(args.repo_prefix or [])
+    if interactive and not prefixes:
+        prefixes = listed(prompt("Repository name prefixes, comma-separated (e.g. APP01234-; empty to list them later)", "", False))
+    branch_order = args.reference_branch or listed(prompt(
+        "Reference branches, in order: the first that exists in each repository is read (main, master, develop…)",
+        "main,master",
         args.yes,
-    )
-    locale = args.locale or prompt("Note locale (es|en)", "es", args.yes)
-    branch_order = args.reference_branch or [
-        part.strip() for part in prompt(
-            "Reference branches, in order: the first that exists in each repository is read as its reference (main, master, develop…)",
-            "main,master",
-            args.yes,
-        ).split(",") if part.strip()
-    ]
+    ))
     platforms = list(args.platform or [])
-    if not args.yes and not platforms:
-        raw = prompt("Clouds the systems run on (gcp, aws, azure — comma-separated, empty for none)", "", False)
-        platforms = [part.strip() for part in raw.split(",") if part.strip()]
-    adapters = list(args.adapter or [])
-    if not args.yes and not adapters:
-        raw = prompt("Adapters (reports — empty for none)", "", False)
-        adapters = [part.strip() for part in raw.split(",") if part.strip()]
+    if interactive and not platforms:
+        platforms = listed(prompt("Clouds the systems run on (gcp, aws, azure; empty for none)", "", False))
+    trackers = [parse_tracker(item) for item in (args.tracker or [])]
+    if interactive and not trackers:
+        trackers = [parse_tracker(part) for part in listed(prompt("Issue tracker URLs, comma-separated (empty for none)", "", False))]
+    locale = args.locale or prompt("Language of the notes (es|en)", "es", args.yes)
     types = list(DEFAULT_TYPES)
     if args.disable_topics:
         types = [item for item in types if item != "topic"]
@@ -633,16 +632,16 @@ def build_instance_from_args(args: argparse.Namespace) -> dict[str, Any]:
         "trackers": trackers,
         "vault": {"remote": args.vault_remote or ""},
         "sources": {
-            "github_org": args.github_org or "",
-            "repo_prefixes": args.repo_prefix or [],
+            "github_org": github_org,
+            "repo_prefixes": prefixes,
             "discovery_roots": args.discovery_root or [],
             "reference_branch_order": branch_order,
             "schema_repository": {"remote": "", "note": ""},
         },
         "graph": {"enabled_types": types},
-        "evidence": {"profile": profile},
+        "evidence": {"profile": args.evidence_profile or "production-gate"},
         "platform": {"providers": platforms},
-        "adapters": adapters,
+        "adapters": list(args.adapter or []),
         "locale": {"notes": locale},
     }
     return validate_instance(data)
@@ -687,7 +686,10 @@ def cmd_init(args: argparse.Namespace) -> int:
     ensure_gitignore_lines(dest)
     ensure_obsidian_ignore_filters(dest)
     write_lock(dest, instance["adapters"])
-    print(json.dumps({"status": "initialized", "dest": str(dest), "cell": instance["cell"]}, indent=2))
+    print(json.dumps({"status": "initialized", "dest": str(dest), "cell": instance["cell"],
+                      "next": "Open the vault with your agent and ask it to finish onboarding (onboard-cell): it lists the "
+                              "repositories, runs the first discovery and reports what the vault can answer. Each teammate "
+                              "is onboarded the first time they open it (onboard-developer)."}, indent=2))
     return 0
 
 

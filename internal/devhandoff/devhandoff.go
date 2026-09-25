@@ -115,7 +115,7 @@ func worktreeRoot(vault string) (string, error) {
 	}
 	root, _ := w["worktree_root"].(string)
 	if root == "" {
-		return "", errors.New("no development worktree root configured: set it with configure-workspace")
+		return "", errors.New("no development worktree root configured: set it with onboard-developer")
 	}
 	return root, nil
 }
@@ -180,7 +180,7 @@ func start(o options, out io.Writer) error {
 	}
 	repo, _ := loc["path"].(string)
 	if loc["status"] != "ok" {
-		return fmt.Errorf("repository %s is not in the configured roots (%v): clone it through configure-workspace", p.Repository, loc["status"])
+		return fmt.Errorf("repository %s is not in the configured roots (%v): clone it through onboard-developer", p.Repository, loc["status"])
 	}
 	dest := o.worktree
 	if dest == "" {

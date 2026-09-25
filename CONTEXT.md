@@ -26,6 +26,10 @@ subscription. Facts and pending items name it as `<provider>:<scope>`.
 **Platform snapshot** — the read-only listing of one scope (`90-Meta/discovery/platform/`), versioned; a scope
 that could not be read is kept with its status and the command that confirms it.
 
+**Onboarding** — two levels. The cell's (`onboard-cell`, `install.sh init`): identity, sources, clouds and
+operations, shared in `instance.yaml`. Each developer's (`onboard-developer`, `config detect`): clones,
+worktrees, cloud logins and ports on one machine, in the ignored `.knowledge-os-config.yaml`.
+
 **Gate** — a deterministic check that blocks: note gates (`discover check`), the case gate
 (`investigation check`), `sync verify`. A reviewer's verdict is separate from a gate.
 

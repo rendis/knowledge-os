@@ -38,6 +38,7 @@ Execute the commands documented in this reference or the owning workflow, substi
 | Need | Operation |
 |---|---|
 | Initial vault orientation | `config status --vault "<root>"` |
+| Propose this person's workspace (clones, worktrees, cloud logins, ports) | `config --vault "<root>" detect` |
 | Choose which notes to open | `overview --vault "<root>" [--folder 20-Repos]` — one line per note: type, relations, first sentence; always current |
 | Find a term the overview does not reveal | `search --vault "<root>" --query "<subject terms>" --limit 5` |
 | Inspect a known note's relationships | `links --vault "<root>" --node "<note basename>"` |
