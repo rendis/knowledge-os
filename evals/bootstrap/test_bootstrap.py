@@ -31,11 +31,39 @@ def resolve_command(vault: Path) -> list[str]:
         return [native_cli(vault), "config", "resolve", "--vault", str(vault)]
     return [sys.executable, "-B", str(vault / "90-Meta/resolve-vault.py"), "--path", str(vault)]
 
-FORBIDDEN = re.compile(
-    r"iot|acme|APP90001|APP90002|cell-dbs|tagger|\bsateo\b|vendorx|"
-    r"cell-monthly|proj-a|\bSOS\b",
-    re.I,
-)
+# Terms of the cells this distribution was developed with, kept as SHA-256 prefixes so the check itself
+# does not publish them. A word, or a run of up to three hyphen-joined parts, whose hash is listed is a leak.
+FORBIDDEN_HASHES = {
+    "22e46dd1bd16cea8",
+    "e630c3f619ec4216",
+    "2e4a371afd76312b",
+    "77746564a9e21b8b",
+    "4f4e126ecbf32a4a",
+    "55ff678aa1c288ee",
+    "ed56268824fda178",
+    "c7bda2b7fb830942",
+    "699d196ac56550b8",
+    "69ac84241b077025",
+    "c0946106b732f9f6",
+    "b5c4bc3f4f333bc8",
+    "999e6ca5ab3c4316",
+    "f57043e9707368e1",
+    "60fa2fc8a5f0f8a9",
+    "545a20faf7cbb6f3",
+    "8cb514f9de4b71fc",
+    "c06944f83fe7ccbf",
+}
+WORD = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
+
+
+def leaked_terms(text: str) -> bool:
+    for word in WORD.findall(text.lower()):
+        parts = word.split("-")
+        for i in range(len(parts)):
+            for j in range(i + 1, min(i + 3, len(parts)) + 1):
+                if hashlib.sha256("-".join(parts[i:j]).encode()).hexdigest()[:16] in FORBIDDEN_HASHES:
+                    return True
+    return False
 SCAN_SUFFIXES = {".md", ".py", ".yaml", ".yml", ".sh", ".txt", ".json", ".sql", ".tmpl", ".toml"}
 
 
@@ -752,7 +780,7 @@ class BootstrapEval(unittest.TestCase):
             if path.suffix not in SCAN_SUFFIXES:
                 continue
             text = path.read_text(encoding="utf-8", errors="ignore")
-            if FORBIDDEN.search(text):
+            if leaked_terms(text):
                 leaks.append(str(path.relative_to(DIST)))
         self.assertEqual(leaks, [], f"product leaks: {leaks}")
 
@@ -761,13 +789,15 @@ class BootstrapEval(unittest.TestCase):
             root = Path(tmp)
             report = root / "docs/research/example.md"
             report.parent.mkdir(parents=True)
-            report.write_text("IoT evaluation evidence", encoding="utf-8")
-            with mock.patch.dict(globals(), {"DIST": root}):
+            probe = "forbidden-probe"
+            report.write_text(f"{probe} evaluation evidence", encoding="utf-8")
+            hashes = FORBIDDEN_HASHES | {hashlib.sha256(probe.encode()).hexdigest()[:16]}
+            with mock.patch.dict(globals(), {"DIST": root, "FORBIDDEN_HASHES": hashes}):
                 self.test_kernel_has_no_product_leak()
                 for relative in ("kernel/AGENTS.md", "kernel/.codex/agents/example.toml", "adapters/example/SKILL.md", "README.md"):
                     target = root / relative
                     target.parent.mkdir(parents=True, exist_ok=True)
-                    target.write_text("IoT consumer-specific policy", encoding="utf-8")
+                    target.write_text(f"{probe} consumer-specific policy", encoding="utf-8")
                     with self.assertRaises(AssertionError):
                         self.test_kernel_has_no_product_leak()
                     target.unlink()
