@@ -301,6 +301,8 @@ func TestCredentialsInConfigurationAreRedacted(t *testing.T) {
 		{"TOPIC", "projects/acme-orders-prd/topics/orders-in"},
 		{"api_url", "https://api.example.test/reports?outputFormat=001&reportGroup=FALA"},
 		{"password", "***"},
+		{"DB_PASSWORD", "postgres"},
+		{"sonar.password", "changeme"},
 	}
 	for _, c := range reference {
 		if credentialEntry(c.key, c.value) {

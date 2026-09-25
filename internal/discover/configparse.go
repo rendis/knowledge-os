@@ -46,6 +46,8 @@ var (
 	credentialKey   = regexp.MustCompile(`(?i)(^|[_.\-])(pass(word|wd)?|pwd|secret|token|api[_\-]?key|apikey|private[_\-]?key|client[_\-]?secret|access[_\-]?key|account[_\-]?key|auth[_\-]?key|sas|signature|credentials?)($|[_.\-])`)
 	credentialValue = regexp.MustCompile(`(?i)[?&](sig|signature|x-amz-signature|x-amz-credential|x-goog-signature|x-goog-credential|access_token|token|api[_\-]?key|key|code|password|pwd)=[^&\s]{6,}|(password|pwd|sharedaccesskey|accountkey|accesskey)\s*=\s*[^;\s]{4,}|://[^/\s:@]+:[^/\s@]{3,}@|AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_\-]{35}|gh[pousr]_[0-9A-Za-z]{30,}|xox[abprs]-[0-9A-Za-z\-]{10,}|-----BEGIN [A-Z ]*PRIVATE KEY`)
 	secretPointer   = regexp.MustCompile(`(?i)(^|[_.\-])(name|id|ref|reference|path|file|arn|url|uri|endpoint|version|header|type|ttl|expiry|expiration|length|enabled)($|[_.\-])`)
+	// A placeholder a developer is expected to replace is not a credential.
+	exampleValue = regexp.MustCompile(`(?i)^(postgres|password|passw0rd|admin|root|secret|changeme|change[_\-]?me|example|dummy|sample|test|testing|x{3,}|\*{3,}|your[_\-].*|<.*>|none|null|default)$`)
 	// A value that names where a secret lives is a reference, not the secret.
 	secretReference = regexp.MustCompile(`(?i)^\$|^<|/secrets/|secretmanager|arn:aws[a-z\-]*:secretsmanager|vault\.azure\.net|^vault:|^env\(|^\*+$`)
 	placeholder     = regexp.MustCompile(`\$\{([A-Za-z_][\w.\-]*)(?::[^}]*)?\}|\$\(([A-Za-z_]\w*)\)|\$([A-Za-z_]\w*)`)
@@ -295,6 +297,6 @@ func credentialEntry(key, value string) bool {
 	if credentialValue.MatchString(v) {
 		return true
 	}
-	return credentialKey.MatchString(key) && !secretPointer.MatchString(key) && len(v) >= 6 &&
+	return credentialKey.MatchString(key) && !secretPointer.MatchString(key) && len(v) >= 6 && !exampleValue.MatchString(strings.Trim(v, `"'`)) &&
 		!strings.ContainsAny(v, " \t") && !strings.Contains(v, "://") && !strings.HasPrefix(v, "/")
 }
