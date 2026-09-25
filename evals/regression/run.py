@@ -64,7 +64,7 @@ def execute(harness, prompt, cwd, model, effort, out_file, write=False, timeout=
     out_file = pathlib.Path(out_file)
     start = time.time()
     try:
-        r = subprocess.run(command(harness, prompt, out_file, model, effort, write), cwd=cwd, capture_output=True, text=True, timeout=timeout, env=isolated_env(harness))
+        r = subprocess.run(command(harness, prompt, out_file, model, effort, write), cwd=cwd, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=timeout, env=isolated_env(harness))
         stdout, rc = r.stdout, r.returncode
     except subprocess.TimeoutExpired as e:
         stdout, rc = (e.stdout or b"").decode() if isinstance(e.stdout, bytes) else (e.stdout or ""), "timeout"
