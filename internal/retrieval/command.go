@@ -21,11 +21,19 @@ func Run(ctx context.Context, command string, args []string, out io.Writer) erro
 	limit := fs.Int("limit", 5, "source limit 1..10")
 	visibility := fs.String("visibility", "all", "all or public")
 	rebuild := fs.Bool("rebuild", false, "rebuild index")
+	fs.String("folder", "", "overview: limit to one knowledge folder, e.g. 20-Repos")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
 	if fs.NArg() != 0 {
 		return fmt.Errorf("unexpected arguments: %v", fs.Args())
+	}
+	folder := fs.Lookup("folder")
+	if command == "overview" {
+		if _, err := config.LoadInstance(*vault); err != nil {
+			return fmt.Errorf("invalid vault configuration: %w", err)
+		}
+		return WriteOverview(*vault, folder.Value.String(), out)
 	}
 	if command == "search" && *rebuild {
 		return fmt.Errorf("--rebuild belongs to index")

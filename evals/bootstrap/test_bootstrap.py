@@ -3406,14 +3406,14 @@ change:
         router = (DIST / "kernel" / "AGENTS.md").read_text(encoding="utf-8")
         self.assertIn("## Personal instructions", router)
         self.assertIn("@AGENTS.personal.md", router)
-        self.assertIn("## Evidence and completion", router)
+        self.assertIn("## Evidence contract", router)
         self.assertLess(
             router.index("## Personal instructions"),
-            router.index("## Routing"),
+            router.index("## Route the request"),
         )
         self.assertLess(
             router.index("## Personal instructions"),
-            router.index("## Investigation and local stores"),
+            router.index("## Guardrails"),
         )
 
         with tempfile.TemporaryDirectory() as tmp:

@@ -32,6 +32,7 @@ func run(ctx context.Context, args []string) error {
 	if len(args) == 0 || args[0] == "--help" || args[0] == "help" {
 		fmt.Println(`vaultctl — local vault operations
 
+overview --vault PATH [--folder 20-Repos]   one line per knowledge note (Markdown)
 search --vault PATH --query TEXT [--limit 1..10] [--visibility all|public]
 index --vault PATH [--rebuild]
 links --vault PATH --node BASENAME
@@ -81,7 +82,7 @@ version`)
 		return handoff.Run(args[1:], os.Stdout)
 	case "sync":
 		return syncflow.Run(args[1:], os.Stdout)
-	case "search", "index", "links":
+	case "search", "index", "links", "overview":
 		return retrieval.Run(ctx, args[0], args[1:], os.Stdout)
 	default:
 		return fmt.Errorf("unknown command %q; use --help", args[0])

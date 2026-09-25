@@ -31,7 +31,7 @@ Shared mapping recipes live under `../map-ecosystem/references/`. Durable sync s
 
 ## Execution Steps
 
-1. Load `../../../90-Meta/vault-resolution.md` and run `<cli> config resolve --vault "<candidate-root>"`; the supplied path or the root three levels above this installed skill is the candidate. Bind the resolved vault and configured source roots; a failed resolution blocks root-dependent work.
+1. Bind the vault through [use-vault-cli](../use-vault-cli/SKILL.md#bind-the-executable-and-vault), reusing the session's binding. Bind the resolved vault and configured source roots; a failed resolution blocks root-dependent work.
 2. Select one primary branch from the table. Load only its recipe and supporting references it explicitly requires.
 3. For coordinator synchronization, follow the vault-synchronization recipe: one complete candidate, one independent semantic review, deterministic checks and resumable exact publication. Load `../map-ecosystem/references/evidence-extraction.md` before freezing inventory. Before a source read or delegation, bind its checkout by configured remote identity. Before a technical write, load `../../../90-Meta/evidence-policy.md` and `../../../90-Meta/node-selection.md`.
 4. After the source-backed candidate is accepted and published, reconcile only external connections required by the task through `../map-ecosystem/references/connection-reconciliation.md`. Publish that separately observed evidence with `map-ecosystem`'s single-unit or multi-unit recipe and the same final-note review, while preserving the repository analysis metadata.
