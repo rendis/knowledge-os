@@ -22,10 +22,13 @@ const Help = `handoff COMMAND --vault PATH [options]
            Prepare the repository for the task: create (or reuse) its worktree and branch,
            copy the task into .handoff/, exclude .handoff/ locally, and keep the managed
            development-handoff segment in AGENTS.md (and CLAUDE.md when it does not import
-           AGENTS.md). Without --apply it only shows the effects.
-  status   [--worktree PATH]   Read-only: handoffs, branch, commits since the base, local
-           changes, deltas, stale packages and the segment state, for one worktree or every
-           worktree under the configured root (legacy handoff stores included).
+           AGENTS.md). Packages naming the same repository and branch are tasks of one
+           milestone and share the worktree; a task whose depends-on names a task of the same
+           worktree starts after it. Without --apply it only shows the effects.
+  status   [--worktree PATH]   Read-only, per worktree: its tasks with state (pending,
+           blocked, in-progress, verified), commits (by Handoff trailer) and deltas, the next
+           task, local changes, stale packages and the segment state; every worktree under the
+           configured root when --worktree is omitted (legacy handoff stores included).
   refresh  --worktree PATH --handoff DH-NNN [--apply]   Replace the task with the current
            package when it changed; deltas stay.
 All output is JSON. Legacy verbs (plan, apply, validate, set-state, ...) remain for
@@ -218,6 +221,22 @@ func start(o options, out io.Writer) error {
 			effects = append(effects, effect{"create-worktree", dest, "new branch " + p.Branch + " from " + ref + " (" + baseCommit[:12] + ")"})
 		}
 	}
+	// A task that builds on another task of the same worktree starts after it; one in another
+	// repository or branch is a prerequisite the package itself must describe.
+	for _, dep := range p.DependsOn {
+		dp, e := ReadPackage(filepath.Join(filepath.Dir(pkgPath), dep+".md"))
+		if e != nil {
+			return fmt.Errorf("%s depends on %s, which is not a package of this case", p.Handoff, dep)
+		}
+		if dp.Repository == p.Repository && dp.Branch == p.Branch {
+			if _, e := os.Stat(filepath.Join(dest, ".handoff", dep+".md")); e != nil {
+				return fmt.Errorf("%s builds on %s in the same worktree: start %s first", p.Handoff, dep, dep)
+			}
+			effects = append(effects, effect{"depends-on", dep, "same worktree, already started"})
+		} else {
+			effects = append(effects, effect{"prerequisite", dep, dp.Repository + " on " + dp.Branch + ": the package states what this task needs from it"})
+		}
+	}
 	taskRel := filepath.Join(".handoff", p.Handoff+".md")
 	if b, e := os.ReadFile(filepath.Join(dest, taskRel)); e == nil {
 		fm, _ := frontmatter(string(b))
@@ -349,13 +368,53 @@ func readDeltas(path string) []delta {
 }
 
 type task struct {
-	Handoff      string `json:"handoff"`
-	Title        string `json:"title"`
-	Case         string `json:"case"`
-	Package      string `json:"package"`
-	PackageStale bool   `json:"package_changed,omitempty"`
-	BaseCommit   string `json:"base_commit"`
-	Started      string `json:"started"`
+	Handoff      string   `json:"handoff"`
+	Title        string   `json:"title"`
+	Case         string   `json:"case"`
+	Package      string   `json:"package"`
+	PackageStale bool     `json:"package_changed,omitempty"`
+	BaseCommit   string   `json:"base_commit"`
+	Started      string   `json:"started"`
+	DependsOn    []string `json:"depends_on,omitempty"`
+	State        string   `json:"state"` // pending | blocked | in-progress | verified
+	Commits      []string `json:"commits"`
+	Deltas       []string `json:"deltas"`
+}
+
+var trailer = regexp.MustCompile(`(?mi)^Handoff:\s*(.+)$`)
+
+// commitsByTask attributes the branch's commits to tasks through their Handoff trailers; with a single
+// task every commit is its own.
+func commitsByTask(dir, base string, tasks []task) (map[string][]string, []string) {
+	by, loose := map[string][]string{}, []string{}
+	if base == "" {
+		return by, loose
+	}
+	out, e := git(dir, "log", "--format=%h %s%x00%B%x1e", base+"..HEAD")
+	if e != nil || out == "" {
+		return by, loose
+	}
+	for _, rec := range strings.Split(out, "\x1e") {
+		head, msg, _ := strings.Cut(strings.TrimSpace(rec), "\x00")
+		if head == "" {
+			continue
+		}
+		named := false
+		for _, m := range trailer.FindAllStringSubmatch(msg, -1) {
+			for _, id := range strings.FieldsFunc(m[1], func(r rune) bool { return r == ',' || r == ' ' }) {
+				by[id] = append(by[id], head)
+				named = true
+			}
+		}
+		if !named {
+			if len(tasks) == 1 {
+				by[tasks[0].Handoff] = append(by[tasks[0].Handoff], head)
+			} else {
+				loose = append(loose, head)
+			}
+		}
+	}
+	return by, loose
 }
 
 func worktreeStatus(vault, dir string) map[string]any {
@@ -370,7 +429,7 @@ func worktreeStatus(vault, dir string) map[string]any {
 		if e != nil {
 			continue
 		}
-		t := task{Handoff: p.Handoff, Title: p.Title, Case: p.Case, Package: p.Fields["package"], BaseCommit: p.Fields["base-commit"], Started: p.Fields["started"]}
+		t := task{Handoff: p.Handoff, Title: p.Title, Case: p.Case, Package: p.Fields["package"], BaseCommit: p.Fields["base-commit"], Started: p.Fields["started"], DependsOn: p.DependsOn}
 		if t.Package != "" {
 			src := t.Package
 			if !filepath.IsAbs(src) {
@@ -385,13 +444,57 @@ func worktreeStatus(vault, dir string) map[string]any {
 		}
 		tasks = append(tasks, t)
 	}
-	res["handoffs"] = tasks
 	if base != "" {
 		if log, e := git(dir, "log", "--format=%h %s", base+"..HEAD"); e == nil && log != "" {
 			res["commits_since_base"] = strings.Split(log, "\n")
 		} else {
 			res["commits_since_base"] = []string{}
 		}
+	}
+	deltas := readDeltas(filepath.Join(dir, ".handoff", "deltas.md"))
+	res["deltas"] = deltas
+	byTask, loose := commitsByTask(dir, base, tasks)
+	verified := map[string]bool{}
+	for i := range tasks {
+		t := &tasks[i]
+		t.Commits, t.Deltas = append([]string{}, byTask[t.Handoff]...), []string{}
+		for _, d := range deltas {
+			if d.Handoff == t.Handoff {
+				t.Deltas = append(t.Deltas, d.ID)
+				if strings.EqualFold(d.Type, "verification") {
+					verified[t.Handoff] = true
+				}
+			}
+		}
+	}
+	started := map[string]bool{}
+	for _, t := range tasks {
+		started[t.Handoff] = true
+	}
+	next := ""
+	for i := range tasks {
+		t := &tasks[i]
+		switch {
+		case verified[t.Handoff]:
+			t.State = "verified"
+		case len(t.Commits) > 0 || len(t.Deltas) > 0:
+			t.State = "in-progress"
+		default:
+			t.State = "pending"
+			for _, d := range t.DependsOn {
+				if started[d] && !verified[d] {
+					t.State = "blocked"
+				}
+			}
+		}
+		if next == "" && (t.State == "pending" || t.State == "in-progress") {
+			next = t.Handoff
+		}
+	}
+	res["handoffs"] = tasks
+	res["next_task"] = next
+	if len(loose) > 0 {
+		res["commits_without_task"] = loose
 	}
 	if st, e := git(dir, "status", "--porcelain"); e == nil {
 		n := 0
@@ -402,7 +505,6 @@ func worktreeStatus(vault, dir string) map[string]any {
 		}
 		res["uncommitted_changes"] = n
 	}
-	res["deltas"] = readDeltas(filepath.Join(dir, ".handoff", "deltas.md"))
 	seg := map[string]string{}
 	for _, f := range instructionFiles(dir) {
 		seg[filepath.Base(f)] = segmentStatus(f)

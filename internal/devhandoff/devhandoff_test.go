@@ -166,3 +166,32 @@ func TestSegmentReachesClaudeWhenItDoesNotImportAgents(t *testing.T) {
 }
 
 func toJSON(v any) string { b, _ := json.Marshal(v); return string(b) }
+
+func TestSeveralTasksShareOneWorktree(t *testing.T) {
+	f := setup(t)
+	dir := ".investigations/20260925-100000-ordenes/handoffs/"
+	write(t, f.vault, dir+"DH-001.md", pkg)
+	second := strings.Replace(strings.Replace(pkg, "handoff: DH-001", "handoff: DH-002\ndepends-on: DH-001", 1), "# Evitar órdenes duplicadas en el reintento", "# Registrar el reintento en la auditoría", 1)
+	write(t, f.vault, dir+"DH-002.md", second)
+	if _, e := run(t, "start", "--vault", f.vault, "--package", dir+"DH-002.md"); e == nil || !strings.Contains(e.Error(), "start DH-001 first") {
+		t.Fatalf("a dependent task starts after the task it builds on: %v", e)
+	}
+	for _, id := range []string{"DH-001", "DH-002"} {
+		if _, e := run(t, "start", "--vault", f.vault, "--package", dir+id+".md", "--apply"); e != nil {
+			t.Fatal(e)
+		}
+	}
+	dest := filepath.Join(f.root, "svc-orders", "idempotent-orders")
+	st, _ := run(t, "status", "--vault", f.vault, "--worktree", dest)
+	if toJSON(st["next_task"]) != `"DH-001"` || !strings.Contains(toJSON(st["handoffs"]), `"state":"blocked"`) {
+		t.Fatalf("two tasks in one worktree, the dependent one blocked: %v", st)
+	}
+	write(t, dest, "src/order.go", "package src\n// idempotent\n")
+	tgit(t, dest, "commit", "-qam", "feat: idempotent retry\n\nHandoff: DH-001")
+	write(t, dest, ".handoff/deltas.md", deltasHeader+"\n## DELTA-001 — Criterios de DH-001\n- Handoff: DH-001\n- Type: verification\n- Detail: AC ok.\n- Evidence: go test\n")
+	st, _ = run(t, "status", "--vault", f.vault, "--worktree", dest)
+	hs := toJSON(st["handoffs"])
+	if !strings.Contains(hs, `"handoff":"DH-001"`) || !strings.Contains(hs, `"state":"verified"`) || toJSON(st["next_task"]) != `"DH-002"` {
+		t.Fatalf("commits and deltas are attributed per task: %v", st)
+	}
+}
