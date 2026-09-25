@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"documentation-vault/internal/audit"
+	"documentation-vault/internal/cases"
 	"documentation-vault/internal/check"
 	"documentation-vault/internal/config"
 	"documentation-vault/internal/discover"
@@ -47,7 +48,7 @@ Publishing to the remote follows the repository's Git policy. All output is JSON
 const ackRel = "90-Meta/.sync-acknowledgements.json"
 
 var (
-	knowledgePath = regexp.MustCompile(`^([1-7]\d-[^/]+/.+\.md|00-Home\.md|[^/]+\.base|90-Meta/\.sync-acknowledgements\.json)$`)
+	knowledgePath = regexp.MustCompile(`^([1-7]\d-[^/]+/.+\.md|00-Home\.md|[^/]+\.base|90-Meta/\.sync-acknowledgements\.json|investigations/[^/]+/.+)$`)
 	slugRE        = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{1,80}$`)
 	sha12         = regexp.MustCompile(`^[0-9a-f]{12,40}$`)
 	decisions     = map[string]bool{"no-documentation-change": true, "no-durable-node": true, "review-rejected": true, "inspection-limited": true}
@@ -408,6 +409,32 @@ func verify(o opts) (map[string]any, error) {
 		}
 	}
 	res["note_gates"] = notes
+	caseGates := []any{}
+	for _, f := range files {
+		if !strings.HasPrefix(f, "investigations/") || filepath.Base(f) != "investigation.md" {
+			continue
+		}
+		if _, e := os.Stat(filepath.Join(o.vault, f)); e != nil {
+			continue // retired: removed on this branch
+		}
+		var base []byte
+		if old, e := git(o.vault, "show", mb+":"+f); e == nil {
+			base = []byte(old + "\n")
+		}
+		ok, introduced, preexisting, e := cases.CheckIntroduced(o.vault, f, base)
+		if e != nil {
+			return nil, e
+		}
+		entry := map[string]any{"case": f, "ok": ok}
+		if preexisting > 0 {
+			entry["preexisting_errors"] = preexisting
+		}
+		caseGates = append(caseGates, entry)
+		if !ok {
+			problems = append(problems, fmt.Sprintf("case gate failed: %s, %d error(s) (run `investigation check`)", f, len(introduced)))
+		}
+	}
+	res["case_gates"] = caseGates
 	repoNotes := []string{}
 	for _, n := range notes {
 		repoNotes = append(repoNotes, n.(map[string]any)["note"].(string))

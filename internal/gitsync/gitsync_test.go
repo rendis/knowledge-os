@@ -197,3 +197,26 @@ func TestDiscoveryStateOnlyPublishesWhenValid(t *testing.T) {
 		t.Fatalf("finish %v %v", e, res)
 	}
 }
+
+func TestPublishingACaseRunsTheCaseGate(t *testing.T) {
+	v := vault(t)
+	if _, e := call(t, "start", "--vault", v, "--name", "publish-case"); e != nil {
+		t.Fatal(e)
+	}
+	c := "---\nid: 20260925-100000-caso\ntitle: \"Caso\"\ntype: understanding\nstatus: open\ncreated: 2026-09-25\n---\n\n# Caso\n\n## Objetivo y alcance\n\nx\n\n## Estado actual\n\nx\n\n## Evidencia\n\n- **E-001** — hecho sin fuente.\n\n## Conclusiones\n\n## Preguntas abiertas\n"
+	write(t, v, "investigations/20260925-100000-caso/investigation.md", c)
+	run(t, v, "add", "-A")
+	run(t, v, "commit", "-qm", "docs: publish case")
+	res, _ := call(t, "verify", "--vault", v)
+	if !strings.Contains(strings.Join(toStrings(res["problems"]), " "), "case gate failed") {
+		t.Fatalf("an unsourced evidence record must block publication: %v", res)
+	}
+	write(t, v, "investigations/20260925-100000-caso/investigation.md", strings.Replace(c, "hecho sin fuente.", "hecho. Fuente: `src/a.go@abc1234`.", 1))
+	run(t, v, "commit", "-qam", "docs: cite source")
+	if _, e := call(t, "review", "--vault", v, "--verdict", "accept", "--reviewer", "fresh-session"); e != nil {
+		t.Fatal(e)
+	}
+	if res, e := call(t, "verify", "--vault", v); e != nil || res["ok"] != true {
+		t.Fatalf("a sourced, reviewed case publishes: %v %v", e, res)
+	}
+}

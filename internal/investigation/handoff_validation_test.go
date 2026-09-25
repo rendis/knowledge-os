@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"reflect"
@@ -72,6 +73,9 @@ func TestHandoffValidationPythonParity(t *testing.T) {
 	script, err := filepath.Abs("../../kernel/.agents/skills/manage-investigation/scripts/investigation-case.py")
 	if err != nil {
 		t.Fatal(err)
+	}
+	if _, err = os.Stat(script); err != nil {
+		t.Skip("reference script retired")
 	}
 	text, _ := dhFixture()
 	samples := []string{text, "", "## Development handoffs\n", "## Development handoffs\n## Development handoffs\n", strings.Replace(text, "## History", "## Historial", 1)}

@@ -271,3 +271,19 @@ func runClaims(o options, out io.Writer) error {
 	}
 	return emit(out, r)
 }
+
+// ContradictedRelations returns the note relations discovery could not support that a text mentions,
+// as name/detail pairs. It is empty when no discovery comparison exists yet.
+func ContradictedRelations(vault, text string) [][2]string {
+	r, e := checkClaims(vault, text)
+	if e != nil {
+		return nil
+	}
+	out := [][2]string{}
+	if flags, ok := r["contradicted_relations"].([]claimFlag); ok {
+		for _, f := range flags {
+			out = append(out, [2]string{f.Name, f.Detail})
+		}
+	}
+	return out
+}
