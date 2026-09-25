@@ -336,3 +336,40 @@ func TestFailedRefreshKeepsPreviousSnapshot(t *testing.T) {
 		t.Fatalf("previous evidence lost: %+v", snaps)
 	}
 }
+
+func TestReferenceRefFollowsPolicy(t *testing.T) {
+	g := func(root string, args ...string) {
+		t.Helper()
+		cmd := exec.Command("git", append([]string{"-C", root, "-c", "user.email=t@t", "-c", "user.name=t"}, args...)...)
+		if b, e := cmd.CombinedOutput(); e != nil {
+			t.Fatalf("git %v: %s", args, b)
+		}
+	}
+	remote := gitRepo(t, filepath.Join(t.TempDir(), "remote"), map[string]string{"a.txt": "1\n"})
+	g(remote, "checkout", "-q", "-b", "trunk")
+	clone := filepath.Join(t.TempDir(), "clone")
+	if b, e := exec.Command("git", "clone", "-q", remote, clone).CombinedOutput(); e != nil {
+		t.Fatalf("clone: %s", b)
+	}
+	// The remote moves ahead after the clone's local main was checked out.
+	g(remote, "checkout", "-q", "main")
+	write(t, remote, "a.txt", "2\n")
+	g(remote, "commit", "-qam", "ahead")
+	g(clone, "checkout", "-q", "main")
+	g(clone, "fetch", "-q", "origin")
+	g(clone, "remote", "set-head", "origin", "--delete")
+	if ref, note, e := referenceRef(clone, ""); e != nil || note != "" || ref != "refs/remotes/origin/main" {
+		t.Fatalf("unlisted repo must use origin/main over a lagging local branch: %q %q %v", ref, note, e)
+	}
+	if ref, _, e := referenceRef(clone, "trunk"); e != nil || ref != "refs/remotes/origin/trunk" {
+		t.Fatalf("configured branch must be exact: %q %v", ref, e)
+	}
+	if _, _, e := referenceRef(clone, "release/x"); e == nil {
+		t.Fatal("a missing configured branch must block, not fall back")
+	}
+	other := gitRepo(t, filepath.Join(t.TempDir(), "other"), map[string]string{"a.txt": "1\n"})
+	g(other, "branch", "-m", "main", "develop")
+	if ref, note, e := referenceRef(other, ""); e != nil || ref != "HEAD" || note == "" {
+		t.Fatalf("no main/master must scan HEAD and report the fallback: %q %q %v", ref, note, e)
+	}
+}

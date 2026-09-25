@@ -21,7 +21,7 @@ type snapshot struct {
 }
 
 func execGit(repo string, args ...string) *exec.Cmd {
-	return exec.Command("git", append([]string{"-C", repo}, args...)...)
+	return exec.Command("git", append([]string{"-c", "core.quotePath=false", "-C", repo}, args...)...)
 }
 
 func gitOutput(repo string, args ...string) (string, error) {
@@ -40,12 +40,30 @@ func resolveCommit(repo, ref string) (string, error) {
 	return gitOutput(repo, "rev-parse", "--verify", "--quiet", ref+"^{commit}")
 }
 
-// defaultRef prefers the remote default branch, then the checked-out HEAD.
-func defaultRef(repo string) string {
-	if r, e := gitOutput(repo, "symbolic-ref", "--quiet", "refs/remotes/origin/HEAD"); e == nil && r != "" {
-		return r
+// referenceRef applies the vault's reference-branch policy (90-Meta/reference-branches.md): a
+// configured branch is exact; otherwise main, then master. The remote-tracking ref wins over the
+// local branch, which may lag behind it. A non-empty note explains a fallback the caller reports
+// as pending.
+func referenceRef(repo, configured string) (ref, note string, err error) {
+	candidates := []string{"main", "master"}
+	if configured != "" {
+		candidates = []string{configured}
 	}
-	return "HEAD"
+	for _, b := range candidates {
+		for _, r := range []string{"refs/remotes/origin/" + b, "refs/heads/" + b} {
+			if _, e := resolveCommit(repo, r); e == nil {
+				return r, "", nil
+			}
+		}
+	}
+	if configured != "" {
+		return "", "", fmt.Errorf("reference branch %s is absent; fetch it or correct sources.reference_branches", configured)
+	}
+	fallback := "HEAD"
+	if r, e := gitOutput(repo, "symbolic-ref", "--quiet", "refs/remotes/origin/HEAD"); e == nil && r != "" {
+		fallback = r
+	}
+	return fallback, "no main or master branch; scanned " + fallback + "; declare the production branch in sources.reference_branches", nil
 }
 
 func openSnapshot(repo, ref string) (*snapshot, error) {
