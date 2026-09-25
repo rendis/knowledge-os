@@ -2,7 +2,7 @@
 
 Judges and the automated harness use the same bars.
 
-1. No product leak: IoT, Acme, APP90001, APP90002, cell-dbs, tagging, VendorX must not appear in the installed kernel or distribution (evals may mention them as forbidden strings).
+1. No product leak: names of the cells the distribution was developed with must not appear in the installed kernel or distribution. The check matches hashed terms, so the list itself names no cell.
 2. `init` on an empty dest writes `instance.yaml`, `00-Home.md`, system stubs, skills, and a portable lock that survives a clean Git clone and permits `update` there.
 3. `adopt` and `update` preserve `instance.yaml`, `00-Home.md`, and all knowledge under `10/`–`70/` byte for byte.
 4. Knowledge Markdown without a lock is refused.
