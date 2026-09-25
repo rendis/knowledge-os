@@ -39,7 +39,7 @@ Cell identity lives in `instance.yaml` and `00-Home.md`; scope exceptions in `90
 
 Select one primary skill; an auxiliary skill supplies a method and the primary keeps ownership. Reclassify follow-ups that ask for new methods or presentation. Answer without a persistent record by default; recommend an investigation when preserving evidence, decisions or open questions would help continuation, and open it when the user asks or accepts.
 
-- [evidence-driven-analysis](.agents/skills/evidence-driven-analysis/SKILL.md) — analysis, diagnosis or audit without a specialized workflow.
+- [evidence-driven-analysis](.agents/skills/evidence-driven-analysis/SKILL.md) — confirming or refuting a claim, explaining how something works or failed, diagnosis or audit without a specialized workflow.
 - [map-ecosystem](.agents/skills/map-ecosystem/SKILL.md) — questions about the vault, knowledge publication, related-vault catalog, mapping completion; orientation when bootstrap is incomplete.
 - [synchronize-ecosystem](.agents/skills/synchronize-ecosystem/SKILL.md) — inventory, repository map synchronization and manual or scheduled refresh cycles; the publication path for every technical note.
 - [configure-workspace](.agents/skills/configure-workspace/SKILL.md) — sole writer of `.knowledge-os-config.yaml`; onboarding when repositories cannot be resolved.

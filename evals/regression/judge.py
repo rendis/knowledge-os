@@ -3,7 +3,10 @@
 python3 -B evals/regression/judge.py --questions FILE --answers DIR [--answers DIR2 ...]
 Writes <DIR>/grades.json and prints accuracy, violations, time and cost per run.
 """
-import argparse, concurrent.futures as cf, json, pathlib, re, subprocess
+import argparse, concurrent.futures as cf, json, pathlib, re, subprocess, sys
+
+sys.path.insert(0, str(pathlib.Path(__file__).parent))
+from run import isolated_env  # noqa: E402
 
 HERE = pathlib.Path(__file__).parent
 # Fixed judge for every graded run, so settings are compared under the same grader. The judge sees only
@@ -11,23 +14,27 @@ HERE = pathlib.Path(__file__).parent
 JUDGE = {"harness": "codex", "model": "gpt-5.5", "effort": "medium"}
 PROMPT = """Eres un evaluador estricto. Compara la RESPUESTA con los HECHOS ESPERADOS y las AFIRMACIONES PROHIBIDAS.
 Pregunta: {question}
-Hechos esperados (cada uno vale 1 punto; 0.5 si está parcial o impreciso; 0 si falta o es incorrecto):
+Hechos esperados: lo que la pregunta pide (cada uno vale 1 punto; 0.5 si está parcial o impreciso; 0 si falta o es incorrecto):
 {expected}
+Contexto adicional: útil pero no pedido; NO suma ni resta al puntaje, solo indica cuáles aparecen (1 si aparece correcto, 0 si no):
+{extra}
 Afirmaciones prohibidas (si la respuesta afirma alguna sin reserva, es una violación):
 {must_not}
 RESPUESTA:
 <<<
 {answer}
 >>>
-Responde SOLO un objeto JSON: {{"points": [<puntaje por hecho en orden>], "violations": [<texto de cada violación>], "unsupported_claims": [<afirmaciones técnicas relevantes que no se desprenden de evidencia citada o parecen inventadas>], "verdict": "correct|partial|incorrect"}}"""
+Una respuesta concisa que cubre lo pedido es correcta: no la penalices por omitir el contexto adicional.
+Responde SOLO un objeto JSON: {{"points": [<puntaje por hecho esperado en orden>], "extra_points": [<1 o 0 por cada contexto adicional en orden>], "violations": [<texto de cada violación>], "unsupported_claims": [<afirmaciones técnicas relevantes que no se desprenden de evidencia citada o parecen inventadas>], "verdict": "correct|partial|incorrect"}}"""
 
 
 def grade(q, rec):
-    prompt = PROMPT.format(question=q["question"], expected="\n".join(f"- {e}" for e in q["expected"]), must_not="\n".join(f"- {m}" for m in q["must_not"]) or "- (ninguna)", answer=rec.get("answer", "")[:12000])
+    prompt = PROMPT.format(question=q["question"], expected="\n".join(f"- {e}" for e in q["expected"]), extra="\n".join(f"- {e}" for e in q.get("extra", [])) or "- (ninguno)",
+                           must_not="\n".join(f"- {m}" for m in q["must_not"]) or "- (ninguna)", answer=rec.get("answer", "")[:12000])
     text = ""
     for _ in range(3):  # a hung judge session is retried, never allowed to abort the whole grading
         try:
-            text = subprocess.run(["codex", "exec", "--skip-git-repo-check", "-m", JUDGE["model"], "-c", f'model_reasoning_effort="{JUDGE["effort"]}"', "-s", "read-only", prompt], capture_output=True, text=True, timeout=300, cwd="/tmp").stdout
+            text = subprocess.run(["codex", "exec", "--skip-git-repo-check", "-m", JUDGE["model"], "-c", f'model_reasoning_effort="{JUDGE["effort"]}"', "-s", "read-only", prompt], capture_output=True, text=True, timeout=300, cwd="/tmp", env=isolated_env("codex")).stdout
         except subprocess.TimeoutExpired:
             continue
         if re.search(r"\{.*\}", text, re.S):
@@ -35,6 +42,8 @@ def grade(q, rec):
     m = re.search(r"\{.*\}", text, re.S)
     g = json.loads(m.group(0)) if m else {"verdict": "error", "points": [], "violations": [], "unsupported_claims": []}
     g["score"] = round(sum(g.get("points", [])) / max(len(q["expected"]), 1), 3)
+    if q.get("extra"):
+        g["extra_score"] = round(sum(g.get("extra_points", [])) / len(q["extra"]), 3)
     return g
 
 

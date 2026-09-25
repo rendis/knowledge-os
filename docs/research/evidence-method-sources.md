@@ -1,6 +1,6 @@
 # Method provenance
 
-Reviewed 2026-09-14. These sources informed the comparison of practices; this skill and its references are independently written for the vault's existing access and ownership contracts. No upstream code, templates, or verbatim instruction blocks are included. Upstream plugins are not runtime dependencies.
+Reviewed 2026-09-14 for `kernel/.agents/skills/evidence-driven-analysis`. These sources informed the comparison of practices; this skill and its references are independently written for the vault's existing access and ownership contracts. No upstream code, templates, or verbatim instruction blocks are included. Upstream plugins are not runtime dependencies.
 
 | Source / pinned revision | Reviewed material | License at revision | Practice considered and local boundary |
 |---|---|---|---|
