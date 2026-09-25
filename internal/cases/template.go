@@ -7,16 +7,16 @@ import "strings"
 var sectionNames = map[string]map[string]string{
 	"es": {"objective": "Objetivo y alcance", "state": "Estado actual", "evidence": "Evidencia", "findings": "Conclusiones",
 		"requirements": "Requisitos", "changes": "Cambios por componente", "acceptance": "Criterios de aceptación",
-		"decisions": "Decisiones", "questions": "Preguntas abiertas", "handoffs": "Handoffs", "absorption": "Absorción"},
+		"decisions": "Decisiones", "questions": "Preguntas abiertas", "handoffs": "Handoffs", "absorption": "Absorción", "log": "Bitácora"},
 	"en": {"objective": "Objective and scope", "state": "Current state", "evidence": "Evidence", "findings": "Conclusions",
 		"requirements": "Requirements", "changes": "Changes by component", "acceptance": "Acceptance criteria",
-		"decisions": "Decisions", "questions": "Open questions", "handoffs": "Handoffs", "absorption": "Absorption"},
+		"decisions": "Decisions", "questions": "Open questions", "handoffs": "Handoffs", "absorption": "Absorption", "log": "Log"},
 }
 
 // Sections each case type must keep, in template order.
 var typeSections = map[string][]string{
-	"understanding": {"objective", "state", "evidence", "findings", "decisions", "questions", "absorption"},
-	"development":   {"objective", "state", "requirements", "evidence", "changes", "acceptance", "decisions", "questions", "handoffs", "absorption"},
+	"understanding": {"objective", "state", "evidence", "findings", "decisions", "questions", "absorption", "log"},
+	"development":   {"objective", "state", "requirements", "evidence", "changes", "acceptance", "decisions", "questions", "handoffs", "absorption", "log"},
 }
 
 var requiredSections = map[string][]string{
@@ -26,30 +26,32 @@ var requiredSections = map[string][]string{
 
 var guidance = map[string]map[string]string{
 	"es": {
-		"objective":    "Qué se quiere entender o construir, qué entra y qué queda fuera.",
-		"state":        "Resumen vivo para retomar en frío: qué se sabe, qué falta y el siguiente paso. Reescríbelo en cada actualización; el historial es Git.",
-		"evidence":     "Solo evidencia nueva: lo que ya está en el vault se referencia con [[nota]], no se copia. Un registro por hecho con su fuente y nivel, p. ej.: - **E-001** — hecho. Fuente: permalink o archivo@commit, snapshot, consulta o registro. Nivel: demostrado | observado con límites.",
-		"findings":     "Conclusiones con su nivel, p. ej.: - **F-001** — conclusión (demostrada por E-001 | inferida desde E-001 y E-002 | sin resolver: falta …).",
-		"requirements": "Qué pide el desarrollo y de dónde sale, p. ej.: - **R-001** — requisito. Origen: pedido, ticket o decisión D-001.",
-		"changes":      "Qué cambia y dónde, por componente, p. ej.: - **CH-001** — [[repositorio]]: qué cambia (archivo o módulo) y por qué (R-001).",
-		"acceptance":   "Criterios verificables, p. ej.: - **AC-001** — resultado observable que prueba R-001.",
-		"decisions":    "- **D-001** — decisión, quién la tomó y por qué.",
-		"questions":    "- **Q-001** — pregunta; cómo se resuelve (fuente, acceso o persona).",
-		"handoffs":     "Un handoff por repositorio, p. ej.: - **DH-001** — [[repositorio]], rama issue/…, cambios CH-001, criterios AC-001.",
-		"absorption":   "Conocimiento que pasa al vault al publicar: | Afirmación | Destino [[nota]] | Estado |",
+		"objective":    "La solicitud formalizada: qué se necesita y para qué, el resultado esperado, qué entra y qué queda fuera. En lenguaje neutro y práctico, sin transcribir al solicitante.",
+		"state":        "Resumen vivo para retomar en frío: qué se sabe, qué falta y el siguiente paso, citando registros. Se reescribe con `investigation state`.",
+		"evidence":     "Solo evidencia nueva, un hecho por registro con su fuente y nivel (`investigation add --kind evidence`); lo que el vault ya documenta se referencia con [[nota]].",
+		"findings":     "Conclusiones con su nivel: demostrada o inferida desde registros, o sin resolver con lo que falta.",
+		"requirements": "Qué pide el desarrollo y de dónde sale (pedido, ticket o decisión).",
+		"changes":      "Qué cambia y dónde, por componente, y a qué requisito atiende.",
+		"acceptance":   "Resultados observables que verifican cada requisito.",
+		"decisions":    "Decisiones, quién las tomó y por qué.",
+		"questions":    "Lo que falta saber o buscar, y cómo se resuelve (fuente, acceso o persona).",
+		"handoffs":     "Paquetes de tarea preparados (handoffs/DH-NNN.md), por repositorio.",
+		"absorption":   "Conocimiento durable que pasa a una nota del vault al publicar, y su estado.",
+		"log":          "La escribe la CLI: una línea por cambio del caso (fecha, acción, registros).",
 	},
 	"en": {
-		"objective":    "What is to be understood or built, what is in and out of scope.",
-		"state":        "Living summary to resume cold: what is known, what is missing and the next step. Rewrite it on each update; history is Git.",
-		"evidence":     "New evidence only: what the vault already holds is referenced with [[note]], never copied. One record per fact with its source and level, e.g.: - **E-001** — fact. Source: permalink or file@commit, snapshot, query or record. Level: demonstrated | observed within limits.",
-		"findings":     "Conclusions with their level, e.g.: - **F-001** — conclusion (demonstrated by E-001 | inferred from E-001 and E-002 | unresolved: missing …).",
-		"requirements": "What the development asks and where it comes from, e.g.: - **R-001** — requirement. Origin: request, ticket or decision D-001.",
-		"changes":      "What changes where, per component, e.g.: - **CH-001** — [[repository]]: what changes (file or module) and why (R-001).",
-		"acceptance":   "Verifiable criteria, e.g.: - **AC-001** — observable result that proves R-001.",
-		"decisions":    "- **D-001** — decision, who made it and why.",
-		"questions":    "- **Q-001** — question; how it gets resolved (source, access or person).",
-		"handoffs":     "One handoff per repository, e.g.: - **DH-001** — [[repository]], branch issue/…, changes CH-001, criteria AC-001.",
-		"absorption":   "Knowledge that goes into the vault on publication: | Claim | Destination [[note]] | Status |",
+		"objective":    "The formalized request: what is needed and why, the expected result, what is in and out of scope. Neutral, practical language; never a transcript of the requester.",
+		"state":        "Living summary to resume cold: what is known, what is missing and the next step, citing records. Rewritten with `investigation state`.",
+		"evidence":     "New evidence only, one fact per record with its source and level (`investigation add --kind evidence`); what the vault already documents is referenced with [[note]].",
+		"findings":     "Conclusions with their level: demonstrated or inferred from records, or unresolved with what is missing.",
+		"requirements": "What the development asks and where it comes from (request, ticket or decision).",
+		"changes":      "What changes where, per component, and which requirement it serves.",
+		"acceptance":   "Observable results that verify each requirement.",
+		"decisions":    "Decisions, who made them and why.",
+		"questions":    "What is still to be known or searched, and how it gets resolved (source, access or person).",
+		"handoffs":     "Prepared task packages (handoffs/DH-NNN.md), per repository.",
+		"absorption":   "Durable knowledge that goes into a vault note on publication, and its status.",
+		"log":          "Written by the CLI: one line per change to the case (date, action, records).",
 	},
 }
 

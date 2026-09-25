@@ -21,15 +21,33 @@ import (
 )
 
 const Help = `investigation COMMAND --vault PATH [options]
-  new     --title TEXT --type understanding|development [--source-ref REF]
-          Create an unpublished case (.investigations/<id>/investigation.md) from the template
-          of its type; reports existing cases with a similar title.
-  list    [--id ID]   Unpublished, published and retired cases (legacy cases included).
-  check   [--id ID]   Gate a case: every evidence record cites its source, record IDs are unique
-          and resolve, links resolve, no credential or local path, no paragraph copied from a
-          vault note (reference it instead), relations discovery contradicts go to review.
-Edit the case file directly. Publish, absorb and retire on a sync branch (synchronize-ecosystem):
-move the case to investigations/, edit notes, and sync verify runs check. All output is JSON.`
+Every change to a case goes through these commands; each one is gated and logged, and a
+change that would introduce a gate error is refused. All output is JSON.
+  new      --title TEXT --type understanding|development --objective TEXT [--source-ref REF]
+           Open an unpublished case from the request (neutral, formalized) and report
+           existing cases with a similar title.
+  list     [--id ID]   Unpublished, published and retired cases (earlier formats included).
+  check    [--id ID]   The gate: sourced evidence, unique and resolving record IDs, resolving
+           links, no credential or local path, no paragraph copied from a vault note.
+  add      --id ID --kind KIND --text TEXT [fields] [--resolves Q-NNN] [--supersedes ID]
+           [--reconciles DH-NNN --through "<commit> / DELTA-NNN"]  (handoff progress read back)
+           evidence     --source SRC --level demonstrated|observed [--limits TEXT]
+           finding      --level demonstrated|inferred --from E-NNN,...  | --level unresolved --missing TEXT
+           question     --resolve-by TEXT
+           decision     --by ROLE
+           requirement  --origin TEXT
+           change       --component [[repository]] --serves R-NNN,...
+           acceptance   --proves R-NNN,...
+           handoff      --package handoffs/DH-NNN.md
+           absorption   --target [[note]] --status pending|absorbed|deferred|discarded
+  attach   --id ID --file PATH [--file PATH...] --text TEXT   Copy provided files into
+           artifacts/ as one A- record (several files: one unit, e.g. a visual and its context).
+  state    --id ID --text TEXT   Rewrite the current state; it cites the records it summarizes.
+  close    --id ID --outcome completed|abandoned|superseded-by:ID --reason TEXT
+  reopen   --id ID --reason TEXT
+  migrate  [--id ID] [--apply]   Convert cases written in the earlier format.
+A published case changes only on a sync branch; publish, absorb and retire follow
+synchronize-ecosystem, and sync verify runs check.`
 
 var (
 	idPattern  = regexp.MustCompile(`^\d{8}-\d{6}-[a-z0-9]+(?:-[a-z0-9]+)*(?:-\d{2})?$`)
@@ -39,7 +57,12 @@ var (
 )
 
 type options struct {
-	vault, title, kind, sourceRef, id string
+	vault, title, kind, sourceRef, id, objective, date                 string
+	recKind, text, source, level, limits, from, missing, resolveBy, by string
+	origin, component, serves, proves, pkg, target, status, resolves   string
+	supersedes, outcome, reason, reconciles, through                   string
+	files                                                              []string
+	apply                                                              bool
 }
 
 // Run executes an investigation command. Legacy verbs are handled by the caller.
@@ -50,25 +73,30 @@ func Run(args []string, out io.Writer) error {
 	}
 	verb := args[0]
 	var o options
+	fields := map[string]*string{"--vault": &o.vault, "--title": &o.title, "--type": &o.kind, "--source-ref": &o.sourceRef,
+		"--id": &o.id, "--objective": &o.objective, "--date": &o.date, "--kind": &o.recKind, "--text": &o.text,
+		"--source": &o.source, "--level": &o.level, "--limits": &o.limits, "--from": &o.from, "--missing": &o.missing,
+		"--resolve-by": &o.resolveBy, "--by": &o.by, "--origin": &o.origin, "--component": &o.component,
+		"--serves": &o.serves, "--proves": &o.proves, "--package": &o.pkg, "--target": &o.target, "--status": &o.status,
+		"--resolves": &o.resolves, "--supersedes": &o.supersedes, "--reconciles": &o.reconciles, "--through": &o.through, "--outcome": &o.outcome, "--reason": &o.reason}
 	for i := 1; i < len(args); i++ {
+		if args[i] == "--apply" {
+			o.apply = true
+			continue
+		}
+		if args[i] == "--file" && i+1 < len(args) { // repeatable: one artifact made of several files
+			o.files = append(o.files, args[i+1])
+			i++
+			continue
+		}
+		f, ok := fields[args[i]]
+		if !ok {
+			return fmt.Errorf("unknown option %s", args[i])
+		}
 		if i+1 >= len(args) {
 			return fmt.Errorf("%s requires a value", args[i])
 		}
-		v := args[i+1]
-		switch args[i] {
-		case "--vault":
-			o.vault = v
-		case "--title":
-			o.title = v
-		case "--type":
-			o.kind = v
-		case "--source-ref":
-			o.sourceRef = v
-		case "--id":
-			o.id = v
-		default:
-			return fmt.Errorf("unknown option %s", args[i])
-		}
+		*f = args[i+1]
 		i++
 	}
 	if o.vault == "" {
@@ -98,6 +126,18 @@ func Run(args []string, out io.Writer) error {
 		return emit(out, map[string]any{"cases": cs, "count": len(cs)})
 	case "check":
 		return runCheck(o, out)
+	case "add":
+		return add(o, out)
+	case "attach":
+		return attach(o, out)
+	case "state":
+		return setState(o, out)
+	case "close":
+		return closeCase(o, out)
+	case "reopen":
+		return reopen(o, out)
+	case "migrate":
+		return migrate(o, out)
 	}
 	return fmt.Errorf("unknown investigation command %q", verb)
 }
@@ -273,6 +313,9 @@ func create(o options, out io.Writer) error {
 	if o.kind != "understanding" && o.kind != "development" {
 		return errors.New("--type must be understanding (explain, reconstruct, diagnose) or development (requirements and changes to build)")
 	}
+	if strings.TrimSpace(o.objective) == "" {
+		return errors.New("--objective is required: the request formalized in neutral language (what is needed, the expected result, scope)")
+	}
 	existing, _ := List(o.vault)
 	similar := []map[string]string{}
 	mine := words(o.title)
@@ -296,23 +339,18 @@ func create(o options, out io.Writer) error {
 		}
 		id = fmt.Sprintf("%s-%s-%02d", now.Format("20060102-150405"), slug(o.title), n)
 	}
-	locale := "es"
-	if inst, e := config.LoadInstance(o.vault); e == nil {
-		if l, _ := inst["locale"].(map[string]any); l != nil {
-			if v, _ := l["notes"].(string); v == "en" {
-				locale = "en"
-			}
-		}
-	}
+	locale := noteLocale(o.vault)
 	dir := filepath.Join(o.vault, ".investigations", id)
 	if e := os.MkdirAll(dir, 0o755); e != nil {
 		return e
 	}
-	text := template(locale, o.kind, id, o.title, o.sourceRef, now.Format("2006-01-02"))
+	text := template(locale, o.kind, id, o.title, o.sourceRef, today(o))
+	text = replaceSection(text, "objective", locale, o.objective)
+	text = appendToSection(text, "log", locale, "- "+today(o)+" — "+labels[locale]["opened"])
 	if e := os.WriteFile(filepath.Join(dir, "investigation.md"), []byte(text), 0o644); e != nil {
 		return e
 	}
 	rel, _ := filepath.Rel(o.vault, filepath.Join(dir, "investigation.md"))
 	return emit(out, map[string]any{"id": id, "path": rel, "type": o.kind, "similar_cases": similar,
-		"next": "edit the case file directly; run `investigation check --id " + id + "` after each update"})
+		"next": "record evidence, conclusions, questions and decisions with `investigation add --id " + id + "`; keep the current state with `investigation state`"})
 }

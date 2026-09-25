@@ -47,7 +47,7 @@ check visual FILE [--kind diagram|spatial] [--temporal]
 check visual-context FILE
 check obsidian-binding --vault PATH --vault-name NAME
 check map-closure --vault PATH --checkpoint FILE
-investigation new|list|check --vault PATH ...   (legacy transactional verbs remain during migration)
+investigation new|list|check|add|attach|state|close|reopen|migrate --vault PATH ...
 handoff start|status|refresh --vault PATH ...   (legacy verbs remain for earlier worktrees)
 sync start|status|review|verify|acknowledge|finish|pull --vault PATH ...
 
@@ -73,9 +73,9 @@ version`)
 	case "check":
 		return check.Run(args[1:], os.Stdout)
 	case "investigation":
-		// new/list/check with --vault are the case workflow; the remaining verbs are the legacy
-		// transactional helper, kept until development handoffs stop depending on it.
-		if len(args) < 2 || args[1] == "--help" || args[1] == "-h" || args[1] == "new" || args[1] == "check" || args[1] == "list" && !contains(args, "--root") {
+		// The case workflow takes --vault; the legacy transactional helper takes --root (or
+		// --case-dir) and stays until the earlier format is retired.
+		if !contains(args, "--root") && !contains(args, "--case-dir") {
 			return cases.Run(args[1:], os.Stdout)
 		}
 		return investigation.Run(args[1:], os.Stdout)

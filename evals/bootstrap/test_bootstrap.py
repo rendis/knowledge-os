@@ -1264,7 +1264,7 @@ class BootstrapEval(unittest.TestCase):
         investigation = (
             DIST / "kernel/.agents/skills/manage-investigation/SKILL.md"
         ).read_text(encoding="utf-8")
-        for required in ("**understanding**", "**development**", "investigation new", "investigation check", "sync start --vault", "Retired-Case:", "instead of copying them"):
+        for required in ("**understanding**", "**development**", "investigation new", "investigation check", "sync start --vault", "Retired-Case:", "never copied", "investigation add", "investigation migrate", "neutral, practical language", "write it only through the CLI"):
             self.assertIn(required, investigation)
         for retired in ("record-contract", "--expected-public-sha256", "transition --to"):
             self.assertNotIn(retired, investigation)
