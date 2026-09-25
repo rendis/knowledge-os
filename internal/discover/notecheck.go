@@ -361,8 +361,8 @@ func checkNote(vault, notePath, repoOverride string, semantic bool) (noteCheck, 
 			} else {
 				resolveLibraries(append([]*repoScan{s}, libraryContext(vault, []*repoScan{s})...))
 				st, _ := loadStore(vault)
-				snaps, _ := loadSnapshots(vault)
-				a := &assembly{scans: []*repoScan{s}, st: st, platform: buildPlatformIndex(snaps)}
+				ix, _ := loadPlatform(vault)
+				a := &assembly{scans: []*repoScan{s}, st: st, platform: ix, providers: configuredProviders(vault)}
 				if jev := newJev(); jev != nil {
 					if qs := a.pendingQuestions(); len(qs) > 0 && len(qs) <= 500 {
 						if n, _ := jev.answerAll(context.Background(), st, qs); n > 0 {

@@ -116,6 +116,17 @@ func knownNames(vault string) (map[string]bool, error) {
 			add(ev.Name, ev.Topic)
 		}
 	}
+	if obs, e := loadObservations(vault); e == nil {
+		for _, ob := range obs {
+			add(ob.Scope)
+			for _, r := range ob.Resources {
+				add(r.Name)
+				for _, l := range r.Links {
+					add(l.Target)
+				}
+			}
+		}
+	}
 	snaps, _ := loadSnapshots(vault)
 	for _, s := range snaps {
 		add(s.Scope)

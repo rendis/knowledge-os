@@ -26,12 +26,14 @@ const Help = `discover COMMAND --vault PATH [options]
   questions  [--kind dependency|config_key|config_entry] [--limit N]
              Pending judgments as JSON for the agent to answer (from the last run).
   answer     --file ANSWERS.json   Record agent answers: [{"id":..,"choice":..,"confidence":0..1}]
-  platform   [--provider NAME] [--scope ID ...] [--referenced] [--dry-run]
+  platform   [--provider NAME] [--scope ID ...] [--referenced] [--dry-run] | --record FILE
              Capture read-only messaging listings (topics, subscriptions, queues) with the
              provider's own CLI and the developer's login. Providers: gcp (project id),
              aws (<account>/<region>), azure (subscription id). --provider may be omitted
              when the cell configures one (platform.providers). --referenced uses the
              scopes of the configured providers named by configuration in the last run.
+             The providers are a floor: --record stores what the agent read elsewhere
+             (any service, cluster or host) with its command, so facts and claims use it.
   report     [--repo NAME]   Last run summary, or one repository's facts.
   check      --note PATH [--note PATH ...] [--repo NAME] [--semantic]
              Gates for a repository note: G1 source anchors resolve at their commit and
@@ -49,7 +51,7 @@ const stateRel = ".agents/state/discovery"
 
 type options struct {
 	vault, at, classify, kind, file string
-	provider                        string
+	provider, record                string
 	repos, scopes, notes            []string
 	limit                           int
 	referenced, dryRun, semantic    bool
@@ -88,6 +90,8 @@ func parse(args []string) (string, options, error) {
 			o.scopes = append(o.scopes, v)
 		case "--provider":
 			o.provider, e = val()
+		case "--record":
+			o.record, e = val()
 		case "--at":
 			o.at, e = val()
 		case "--classify":
@@ -175,6 +179,9 @@ func Run(args []string, out io.Writer) error {
 	case "answer":
 		return answerQuestions(o, out)
 	case "platform":
+		if o.record != "" {
+			return recordObservation(o, out)
+		}
 		return capturePlatform(o, out)
 	case "report":
 		return showReport(o, out)
@@ -199,9 +206,13 @@ type runReport struct {
 	Classified       map[string]any    `json:"classified_this_run,omitempty"`
 	PlatformScopes   []string          `json:"platform_scopes_referenced"`
 	PlatformCaptured map[string]string `json:"platform_captured"`
-	Pending          map[string]int    `json:"pending_items"`
-	Comparison       map[string]int    `json:"comparison"`
-	Duration         string            `json:"duration"`
+	PlatformObserved int               `json:"platform_observed_names,omitempty"`
+	// CredentialsInSources lists credentials versioned in a source (file and key; the value is never read
+	// back): the source owners' to fix, reported to the user, never copied into the vault.
+	CredentialsInSources []map[string]string `json:"credentials_in_sources,omitempty"`
+	Pending              map[string]int      `json:"pending_items"`
+	Comparison           map[string]int      `json:"comparison"`
+	Duration             string              `json:"duration"`
 }
 
 func runDiscovery(o options, out io.Writer) error {
@@ -246,11 +257,11 @@ func runDiscovery(o options, out io.Writer) error {
 			return e
 		}
 	}
-	snaps, e := loadSnapshots(o.vault)
+	ix, e := loadPlatform(o.vault)
 	if e != nil {
 		return e
 	}
-	a := &assembly{scans: scans, st: st, platform: buildPlatformIndex(snaps)}
+	a := &assembly{scans: scans, st: st, platform: ix, providers: configuredProviders(o.vault)}
 	classified := map[string]any{}
 	if jev := newJev(); jev != nil && o.classify == "auto" {
 		// Dependencies and keys first: entry questions depend on key judgments.
@@ -309,6 +320,14 @@ func runDiscovery(o options, out io.Writer) error {
 	for p, s := range a.platform.scopes {
 		rep.PlatformCaptured[p] = s.Status
 	}
+	observed := map[string]bool{}
+	for _, refs := range a.platform.observed {
+		for _, r := range refs {
+			observed[r.scope+" "+r.name] = true
+		}
+	}
+	rep.PlatformObserved = len(observed)
+	rep.CredentialsInSources = credentialsInSources(scans)
 	for _, f := range facts {
 		for _, p := range f.Pending {
 			rep.Pending[p.Kind]++
@@ -491,4 +510,25 @@ func showReport(o options, out io.Writer) error {
 		return e
 	}
 	return emit(out, rep)
+}
+
+// credentialsInSources lists each versioned credential once by repository, file and key.
+func credentialsInSources(scans []*repoScan) []map[string]string {
+	out, seen := []map[string]string{}, map[string]bool{}
+	for _, s := range scans {
+		for _, e := range s.entries {
+			k := s.in.Name + "\x00" + e.File + "\x00" + e.KeyPath
+			if e.Credential && !seen[k] {
+				seen[k] = true
+				out = append(out, map[string]string{"repo": s.in.Name, "file": e.File, "key": e.KeyPath})
+			}
+		}
+	}
+	sort.Slice(out, func(i, j int) bool {
+		return out[i]["repo"]+out[i]["file"]+out[i]["key"] < out[j]["repo"]+out[j]["file"]+out[j]["key"]
+	})
+	if len(out) > 200 {
+		out = out[:200]
+	}
+	return out
 }

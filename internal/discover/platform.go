@@ -62,6 +62,8 @@ type platformProvider interface {
 	// validScope reports whether a scope given on the command line has this provider's format.
 	validScope(scope string) bool
 	capture(scope string) platformSnapshot
+	// kinds lists the dependency categories whose platform service this provider reads.
+	kinds() []string
 	confirm(scope string) string
 	commands() string
 }
@@ -75,6 +77,17 @@ func ProviderNames() []string {
 		out = append(out, n)
 	}
 	sort.Strings(out)
+	return out
+}
+
+// Coverage returns, for each given provider, the dependency categories whose platform service it reads.
+func Coverage(names []string) map[string][]string {
+	out := map[string][]string{}
+	for _, n := range names {
+		if p := providers[n]; p != nil {
+			out[n] = p.kinds()
+		}
+	}
 	return out
 }
 
@@ -255,6 +268,8 @@ type platformIndex struct {
 	topics map[string][]string               // short name -> full names
 	subs   map[string][]platformSubscription // short name -> subscriptions
 	scopes map[string]platformSnapshot       // scope key -> snapshot
+	// observed holds names the agent recorded outside the built-in providers (short name -> refs).
+	observed map[string][]observedRef
 }
 
 func buildPlatformIndex(snaps []platformSnapshot) platformIndex {

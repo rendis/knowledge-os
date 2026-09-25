@@ -47,6 +47,8 @@ func (p gcpProvider) isScope(v string) bool {
 
 func (gcpProvider) validScope(s string) bool { return gcpProjectID.MatchString(s) }
 
+func (gcpProvider) kinds() []string { return []string{"messaging"} }
+
 func (gcpProvider) confirm(project string) string {
 	return fmt.Sprintf("gcloud pubsub topics list --project %s && gcloud pubsub subscriptions list --project %s", project, project)
 }
@@ -142,6 +144,8 @@ func (p awsProvider) scopesIn(v string) []string {
 func (awsProvider) isScope(string) bool { return false } // an account id alone does not say the region
 
 func (awsProvider) validScope(s string) bool { return awsScope.MatchString(s) }
+
+func (awsProvider) kinds() []string { return []string{"messaging"} }
 
 func (awsProvider) confirm(scope string) string {
 	account, region, _ := strings.Cut(scope, "/")
@@ -260,6 +264,8 @@ func (azureProvider) scopesIn(v string) []string {
 func (azureProvider) isScope(string) bool { return false } // a bare GUID may be a tenant or a client id
 
 func (azureProvider) validScope(s string) bool { return azureGUID.MatchString(s) }
+
+func (azureProvider) kinds() []string { return []string{"messaging"} }
 
 func (azureProvider) confirm(sub string) string {
 	return fmt.Sprintf("az servicebus namespace list --subscription %s, then az servicebus topic list / topic subscription list / queue list per namespace", sub)

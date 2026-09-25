@@ -7,6 +7,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 
@@ -388,10 +389,11 @@ func resolveLibraries(scans []*repoScan) {
 
 // assembly holds the typed, cross-repository view used by the report and the notes.
 type assembly struct {
-	scans    []*repoScan
-	st       *store
-	platform platformIndex
-	global   map[string]string // value -> resource type agreed across the cell
+	scans     []*repoScan
+	st        *store
+	platform  platformIndex
+	providers []string          // clouds the cell configured (platform.providers)
+	global    map[string]string // value -> resource type agreed across the cell
 }
 
 func (a *assembly) entryType(e entry) (string, float64) {
@@ -763,6 +765,9 @@ func isMessaging(t string) bool { return t == "message_topic" || t == "message_s
 
 // wire completes a messaging resource with platform facts: subscription or queue -> topic and filters.
 func (a *assembly) wire(r *resource) {
+	for _, ob := range a.platform.observed[normalizeResource(r.Name)] {
+		r.Evidence = append(r.Evidence, evidence{Kind: "platform-observed", Scope: ob.scope, Value: ob.service + " " + ob.name})
+	}
 	if !isMessaging(r.Type) {
 		return
 	}
@@ -915,7 +920,7 @@ func (a *assembly) pendingFor(f repoFacts) []pending {
 		}
 		confirmed := false
 		for _, ev := range r.Evidence {
-			confirmed = confirmed || ev.Kind == "platform" || ev.Kind == "platform-variant"
+			confirmed = confirmed || ev.Kind == "platform" || ev.Kind == "platform-variant" || ev.Kind == "platform-observed"
 		}
 		if confirmed {
 			continue
@@ -935,10 +940,45 @@ func (a *assembly) pendingFor(f repoFacts) []pending {
 			out = append(out, pending{Kind: "platform-unverified", Subject: r.Name, Detail: detail, Confirm: confirm})
 		}
 	}
+	out = append(out, a.unmanaged(f)...)
 	for _, d := range f.Dependencies {
 		if d.Category == "unclassified" {
 			out = append(out, pending{Kind: "classification", Subject: d.ID, Detail: "dependency category not yet judged", Confirm: "vaultctl discover questions --vault <VAULT>"})
 		}
+	}
+	return out
+}
+
+// platformCategories are the dependency categories that reach a platform service.
+var platformCategories = []string{"messaging", "document_db", "sql_db", "warehouse", "object_storage", "file_transfer", "scheduler_or_queue_runner", "secrets_or_identity", "cloud_sdk_other"}
+
+// captures reports whether a configured provider reads the platform service behind a category.
+func (a *assembly) captures(category string) bool {
+	for _, n := range a.providers {
+		if p := providers[n]; p != nil && slices.Contains(p.kinds(), category) {
+			return true
+		}
+	}
+	return false
+}
+
+// unmanaged lists the platform services a repository uses that no configured provider captures: the
+// agent inspects them with the tools in reach instead of stopping at the binary's coverage.
+func (a *assembly) unmanaged(f repoFacts) []pending {
+	out := []pending{}
+	for _, c := range platformCategories {
+		if !slices.Contains(f.Channels, c) || a.captures(c) {
+			continue
+		}
+		deps := []string{}
+		for _, d := range append(append([]dependency{}, f.Dependencies...), f.DeclaredOnly...) {
+			if d.Category == c && len(deps) < 3 {
+				deps = appendUnique(deps, d.ID)
+			}
+		}
+		out = append(out, pending{Kind: "platform-unmanaged", Subject: c,
+			Detail:  fmt.Sprintf("no configured platform provider reads %s (%s): inspect it read-only with the tools in reach and record what you observe", c, strings.Join(deps, ", ")),
+			Confirm: "vaultctl discover platform --vault <VAULT> --record <FILE>"})
 	}
 	return out
 }
