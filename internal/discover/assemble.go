@@ -17,6 +17,7 @@ import (
 
 type repoInput struct {
 	Name, Remote, Path, Ref, Commit, Note string
+	RefNote, RefErr                       string // reference-branch fallback or blocker
 }
 
 type repoScan struct {
@@ -50,7 +51,7 @@ type resource struct {
 }
 
 type pending struct {
-	Kind    string `json:"kind"` // platform-access | not-in-platform | classification | direction
+	Kind    string `json:"kind"` // platform-access | not-in-platform | classification | direction | reference-branch
 	Subject string `json:"subject"`
 	Detail  string `json:"detail"`
 	Confirm string `json:"confirm_with,omitempty"`
@@ -119,7 +120,9 @@ func discoverRepositories(vault string, only map[string]bool) ([]repoInput, erro
 		return nil, e
 	}
 	prefixes := []string{}
+	branches := map[string]any{}
 	if src, ok := inst["sources"].(map[string]any); ok {
+		branches = asMap(src["reference_branches"])
 		for _, p := range asList(src["repo_prefixes"]) {
 			if s, ok := p.(string); ok && s != "" {
 				prefixes = append(prefixes, strings.TrimRight(s, "-")+"-")
@@ -170,7 +173,13 @@ func discoverRepositories(vault string, only map[string]bool) ([]repoInput, erro
 				tracked = only[name]
 			}
 			if tracked {
-				out = append(out, repoInput{Name: name, Remote: remote, Path: p, Note: notes[name]})
+				in := repoInput{Name: name, Remote: remote, Path: p, Note: notes[name]}
+				configured, _ := branches[name].(string)
+				var e error
+				if in.Ref, in.RefNote, e = referenceRef(p, configured); e != nil {
+					in.RefErr = e.Error()
+				}
+				out = append(out, in)
 			}
 		}
 	}
@@ -659,6 +668,9 @@ func (a *assembly) facts() []repoFacts {
 	for _, s := range a.scans {
 		f := repoFacts{Repo: s.in.Name, Remote: s.in.Remote, Path: s.in.Path, Commit: s.in.Commit, Ref: s.in.Ref, Note: s.in.Note,
 			Languages: s.code.Languages, ConfigFiles: s.cfgFiles, ConfigCount: len(s.entries), Pending: []pending{}}
+		if s.in.RefNote != "" {
+			f.Pending = append(f.Pending, pending{Kind: "reference-branch", Subject: s.in.Name, Detail: s.in.RefNote, Confirm: "configure-workspace: 90-Meta/reference-branches.md"})
+		}
 		f.ServiceIDs = firstN(ids[s], 50)
 		channels := map[string]bool{}
 		imported := map[string]bool{}

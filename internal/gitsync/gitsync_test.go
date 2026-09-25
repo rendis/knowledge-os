@@ -161,3 +161,17 @@ func TestPullFastForwardsAndReportsOverlap(t *testing.T) {
 		t.Fatalf("divergence must list overlapping notes: %v %v", e, res)
 	}
 }
+
+func TestChangedKeepsNonASCIIPaths(t *testing.T) {
+	v := vault(t)
+	if _, e := call(t, "start", "--vault", v, "--name", "flows"); e != nil {
+		t.Fatal(e)
+	}
+	write(t, v, "30-Flujos/Flujo - Sincronización.md", "---\ntipo: flujo\nsistema: \"[[Sales]]\"\n---\n# Flujo\n\nSincroniza ventas.\n")
+	run(t, v, "add", "-A")
+	run(t, v, "commit", "-qm", "docs: add flow")
+	res, e := call(t, "status", "--vault", v)
+	if e != nil || !strings.Contains(strings.Join(toStrings(res["changed"]), " "), "30-Flujos/Flujo - Sincronización.md") {
+		t.Fatalf("an accented path must be listed as changed: %v %v", e, res)
+	}
+}

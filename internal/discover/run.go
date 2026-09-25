@@ -204,11 +204,12 @@ func runDiscovery(o options, out io.Writer) error {
 	scans := []*repoScan{}
 	failed := []string{}
 	for _, in := range inputs {
-		in.Ref = defaultRef(in.Path)
-		if o.at == "note" {
-			if c := noteCommit(o.vault, in.Note); c != "" {
-				in.Ref = c
-			}
+		if c := noteCommit(o.vault, in.Note); o.at == "note" && c != "" {
+			in.Ref, in.RefNote, in.RefErr = c, "", ""
+		}
+		if in.RefErr != "" {
+			failed = append(failed, in.Name+": "+in.RefErr)
+			continue
 		}
 		s, e := scanRepository(in)
 		if e != nil {

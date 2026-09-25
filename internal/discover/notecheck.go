@@ -344,6 +344,7 @@ func checkNote(vault, notePath, repoOverride string, semantic bool) (noteCheck, 
 		inputs, e := discoverRepositories(vault, map[string]bool{repoName: true})
 		if e == nil && len(inputs) == 1 {
 			in := inputs[0]
+			ref, refErr := in.Ref, in.RefErr
 			in.Ref = commit
 			if s, e := scanRepository(in); e != nil {
 				add("G2-coverage", "pending", repoName, "cannot scan the analyzed commit: "+e.Error())
@@ -468,7 +469,10 @@ func checkNote(vault, notePath, repoOverride string, semantic bool) (noteCheck, 
 					add("pending", "pending", p.Subject, p.Kind+": "+p.Detail)
 				}
 				// Freshness: anchors on files changed since the analyzed commit.
-				head, e := resolveCommit(in.Path, defaultRef(in.Path))
+				head, e := resolveCommit(in.Path, ref)
+				if refErr != "" {
+					add("freshness", "pending", repoName, refErr)
+				}
 				full, _ := resolveCommit(in.Path, commit)
 				if e == nil && full != "" && head != full {
 					changed, _ := gitOutput(in.Path, "diff", "--name-only", full, head)
@@ -485,9 +489,9 @@ func checkNote(vault, notePath, repoOverride string, semantic bool) (noteCheck, 
 						}
 					}
 					sort.Strings(stale)
-					r.Freshness = map[string]any{"head": head[:12], "changed_files": len(set), "stale_cited_files": stale}
+					r.Freshness = map[string]any{"ref": ref, "head": head[:12], "changed_files": len(set), "stale_cited_files": stale}
 				} else if e == nil {
-					r.Freshness = map[string]any{"head": head[:12], "changed_files": 0, "stale_cited_files": []string{}}
+					r.Freshness = map[string]any{"ref": ref, "head": head[:12], "changed_files": 0, "stale_cited_files": []string{}}
 				}
 			}
 		}
