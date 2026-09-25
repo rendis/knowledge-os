@@ -47,8 +47,8 @@ check visual FILE [--kind diagram|spatial] [--temporal]
 check visual-context FILE
 check obsidian-binding --vault PATH --vault-name NAME
 check map-closure --vault PATH --checkpoint FILE
-investigation new|list|check|add|attach|state|close|reopen|migrate --vault PATH ...
-handoff start|status|refresh --vault PATH ...   (legacy verbs remain for earlier worktrees)
+investigation new|list|check|add|state|absorb|close|reopen --vault PATH ...
+handoff start|status|refresh|reconcile --vault PATH ...   (legacy verbs remain for earlier worktrees)
 sync start|status|review|verify|acknowledge|finish|pull --vault PATH ...
 
 Search refreshes a private local SQLite index before querying. --cache PATH
@@ -82,6 +82,10 @@ version`)
 	case "handoff":
 		// start/status/refresh prepare and read atomic task worktrees; the remaining verbs keep
 		// worktrees prepared by earlier versions working.
+		if len(args) > 1 && args[1] == "reconcile" {
+			// Reconciliation writes the development case, so the case package owns it.
+			return cases.Run(args[1:], os.Stdout)
+		}
 		if len(args) < 2 || args[1] == "--help" || args[1] == "-h" || args[1] == "start" || args[1] == "status" || args[1] == "refresh" {
 			return devhandoff.Run(args[1:], os.Stdout)
 		}

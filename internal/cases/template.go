@@ -15,13 +15,13 @@ var sectionNames = map[string]map[string]string{
 
 // Sections each case type must keep, in template order.
 var typeSections = map[string][]string{
-	"understanding": {"objective", "state", "evidence", "findings", "decisions", "questions", "absorption", "log"},
-	"development":   {"objective", "state", "requirements", "evidence", "changes", "acceptance", "decisions", "questions", "handoffs", "absorption", "log"},
+	"understanding": {"objective", "state", "evidence", "findings", "decisions", "questions", "log"},
+	"development":   {"objective", "state", "requirements", "evidence", "findings", "decisions", "questions", "handoffs", "log"},
 }
 
 var requiredSections = map[string][]string{
 	"understanding": {"objective", "state", "evidence", "findings", "questions"},
-	"development":   {"objective", "state", "requirements", "changes", "acceptance", "questions"},
+	"development":   {"objective", "state", "requirements", "questions"},
 }
 
 var guidance = map[string]map[string]string{
@@ -29,13 +29,13 @@ var guidance = map[string]map[string]string{
 		"objective":    "La solicitud formalizada: qué se necesita y para qué, el resultado esperado, qué entra y qué queda fuera. En lenguaje neutro y práctico, sin transcribir al solicitante.",
 		"state":        "Resumen vivo para retomar en frío: qué se sabe, qué falta y el siguiente paso, citando registros. Se reescribe con `investigation state`.",
 		"evidence":     "Solo evidencia nueva, un hecho por registro con su fuente y nivel (`investigation add --kind evidence`); lo que el vault ya documenta se referencia con [[nota]].",
-		"findings":     "Conclusiones con su nivel: demostrada o inferida desde registros, o sin resolver con lo que falta.",
+		"findings":     "Conclusiones con su nivel: demostrada o inferida desde registros, o sin resolver con lo que falta. Lo que debe pasar al vault se marca con --for-vault.",
 		"requirements": "Qué pide el desarrollo y de dónde sale (pedido, ticket o decisión).",
 		"changes":      "Qué cambia y dónde, por componente, y a qué requisito atiende.",
 		"acceptance":   "Resultados observables que verifican cada requisito.",
 		"decisions":    "Decisiones, quién las tomó y por qué.",
 		"questions":    "Lo que falta saber o buscar, y cómo se resuelve (fuente, acceso o persona).",
-		"handoffs":     "Paquetes de tarea preparados (handoffs/DH-NNN.md), por repositorio.",
+		"handoffs":     "Paquetes de tarea (handoffs/DH-NNN.md): cada uno define qué cambia, dónde y cómo se acepta, citando los requisitos.",
 		"absorption":   "Conocimiento durable que pasa a una nota del vault al publicar, y su estado.",
 		"log":          "La escribe la CLI: una línea por cambio del caso (fecha, acción, registros).",
 	},
@@ -43,13 +43,13 @@ var guidance = map[string]map[string]string{
 		"objective":    "The formalized request: what is needed and why, the expected result, what is in and out of scope. Neutral, practical language; never a transcript of the requester.",
 		"state":        "Living summary to resume cold: what is known, what is missing and the next step, citing records. Rewritten with `investigation state`.",
 		"evidence":     "New evidence only, one fact per record with its source and level (`investigation add --kind evidence`); what the vault already documents is referenced with [[note]].",
-		"findings":     "Conclusions with their level: demonstrated or inferred from records, or unresolved with what is missing.",
+		"findings":     "Conclusions with their level: demonstrated or inferred from records, or unresolved with what is missing. What belongs in the vault is marked with --for-vault.",
 		"requirements": "What the development asks and where it comes from (request, ticket or decision).",
 		"changes":      "What changes where, per component, and which requirement it serves.",
 		"acceptance":   "Observable results that verify each requirement.",
 		"decisions":    "Decisions, who made them and why.",
 		"questions":    "What is still to be known or searched, and how it gets resolved (source, access or person).",
-		"handoffs":     "Prepared task packages (handoffs/DH-NNN.md), per repository.",
+		"handoffs":     "Task packages (handoffs/DH-NNN.md): each defines what changes, where and how it is accepted, citing the requirements.",
 		"absorption":   "Durable knowledge that goes into a vault note on publication, and its status.",
 		"log":          "Written by the CLI: one line per change to the case (date, action, records).",
 	},

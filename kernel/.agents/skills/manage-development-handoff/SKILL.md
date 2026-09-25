@@ -16,7 +16,7 @@ Bind the vault through [use-vault-cli](../use-vault-cli/SKILL.md#bind-the-execut
 
 ## Write the package
 
-In the development case ([manage-investigation](../manage-investigation/SKILL.md)), once requirements, changes by component and acceptance criteria for a repository are settled:
+In the development case ([manage-investigation](../manage-investigation/SKILL.md)), once the requirements are settled, write per repository and task what changes and how it is accepted, citing the requirements it serves (`R-NNN`, checked by the case gate):
 
 ```markdown
 ---
@@ -57,11 +57,15 @@ When the package changes in the case, `<CLI> handoff status` reports `package_ch
 
 `<CLI> handoff status --vault "<root>" [--worktree <path>]` is read-only: per worktree, its tasks with their state (`pending`, `blocked` by an unverified dependency, `in-progress`, `verified` by a verification delta), the commits of each task (by their `Handoff:` trailer), deltas, the next task, uncommitted changes, changed packages and the segment state; all worktrees under the root when `--worktree` is omitted. Worktrees prepared by earlier versions (`.knowledge-os-handoffs/`) are listed with their legacy store and their `implementation-updates.md` entries read as deltas; the legacy verbs keep working for them.
 
+## What comes back
+
+The implementing agent records in `.handoff/deltas.md` what the cell must know: the task was incomplete or wrong (`definition`), something learned about the system (`finding`), a decision or deviation, a question, and the verification of each task. The managed segment in `AGENTS.md` carries that guide and the entry format; routine progress stays in commits.
+
 ## Reconcile into the investigation
 
-1. `handoff status --worktree <path>`; per task, take the commits and deltas after the `DH-NNN` record's last reconciliation mark.
-2. Record each in the case with `investigation add`: implemented changes as evidence citing commits or pull requests; changed definitions as new requirement, change or acceptance records that `--supersedes` the old ones; decisions and questions as their records. Evidence of deployment is required before any production claim; a merge alone is not deployment.
-3. Mark the point read with `--reconciles DH-NNN --through "<commit> / DELTA-NNN"` on the last evidence record, and answer with what changed in the case. The worktree is read only; reconciling never closes the investigation by itself.
+`<CLI> handoff reconcile --vault "<root>" --worktree <path>` previews what the worktree produced since each `DH-NNN` record's last mark, with a fixed mapping: commits and `finding`, `verification`, `definition` and `deviation` deltas become evidence citing their source; decisions and questions become their records; a delta without verifiable evidence becomes a question asking for it. `--apply` writes them and moves the mark, so a second run imports nothing new.
+
+The result lists what needs judgment: for each `definition` or `deviation`, record the requirement it changes with `add --kind requirement --supersedes R-NNN`, and update the package (then `handoff refresh`) when pending tasks depend on it. A `finding` that belongs in the vault gets a finding marked `--for-vault`. Evidence of deployment is required before any production claim; a merge alone is not deployment. The worktree is read only; reconciling never closes the investigation.
 
 ## Guardrails
 

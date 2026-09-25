@@ -262,6 +262,11 @@ func checkContent(vault, full, raw string, ix vaultIndex) Result {
 			add(i.Severity, "handoffs/"+filepath.Base(pp), i.Detail)
 		}
 		deps[p.Handoff] = p.DependsOn
+		for _, m := range recordRef.FindAllStringSubmatch(comment.ReplaceAllString(p.Text, ""), -1) {
+			if strings.HasPrefix(m[1], "R-") && !defs[m[1]] {
+				add("error", "handoffs/"+filepath.Base(pp), m[1]+" is cited but not defined in the case")
+			}
+		}
 	}
 	for id, ds := range deps {
 		for _, d := range ds {

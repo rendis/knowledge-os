@@ -22,33 +22,6 @@ import (
 // conclusion, an origin for a requirement), logs the change, and refuses a write that would introduce
 // a gate error before it reaches the file.
 
-type recordKind struct{ prefix, section string }
-
-var kinds = map[string]recordKind{
-	"evidence": {"E", "evidence"}, "finding": {"F", "findings"}, "question": {"Q", "questions"},
-	"decision": {"D", "decisions"}, "requirement": {"R", "requirements"}, "change": {"CH", "changes"},
-	"acceptance": {"AC", "acceptance"}, "handoff": {"DH", "handoffs"}, "absorption": {"", "absorption"},
-}
-
-var labels = map[string]map[string]string{
-	"es": {"source": "Fuente", "level": "Nivel", "demonstrated": "demostrado", "observed": "observado", "limits": "límites",
-		"demonstrated-by": "demostrada por", "inferred-from": "inferida desde", "unresolved": "sin resolver; falta",
-		"resolve-by": "Se resuelve con", "by": "Decidió", "origin": "Origen", "serves": "Atiende", "proves": "Verifica",
-		"repository": "Repositorio", "branch": "rama", "package": "paquete", "file": "Archivo",
-		"pending": "pendiente", "absorbed": "absorbido", "deferred": "diferido", "discarded": "descartado",
-		"superseded": "reemplazado por", "resolved": "resuelta por", "reconciled": "reconciliado hasta", "opened": "caso abierto", "added": "agregado",
-		"resolves": "resuelve", "supersedes": "reemplaza a", "state": "estado actual actualizado", "closed": "cerrado",
-		"reopened": "reabierto", "attached": "adjunto", "absorption": "absorción registrada", "migrated": "migrado al formato actual"},
-	"en": {"source": "Source", "level": "Level", "demonstrated": "demonstrated", "observed": "observed", "limits": "limits",
-		"demonstrated-by": "demonstrated by", "inferred-from": "inferred from", "unresolved": "unresolved; missing",
-		"resolve-by": "Resolved by", "by": "Decided by", "origin": "Origin", "serves": "Serves", "proves": "Verifies",
-		"repository": "Repository", "branch": "branch", "package": "package", "file": "File",
-		"pending": "pending", "absorbed": "absorbed", "deferred": "deferred", "discarded": "discarded",
-		"superseded": "superseded by", "resolved": "resolved by", "reconciled": "reconciled through", "opened": "case opened", "added": "added",
-		"resolves": "resolves", "supersedes": "supersedes", "state": "current state updated", "closed": "closed",
-		"reopened": "reopened", "attached": "attached", "absorption": "absorption recorded", "migrated": "migrated to the current format"},
-}
-
 var (
 	heading2Line = regexp.MustCompile(`^##\s+(.+?)\s*$`)
 	idList       = regexp.MustCompile(`^(?:AC|DH|CH|[EDQRSAF])-\d{3,}$`)
@@ -318,7 +291,7 @@ func mutate(o options, out io.Writer, change func(c Case, text, locale string) (
 		return e
 	}
 	if c.Legacy {
-		return fmt.Errorf("case %s uses the earlier format: run `investigation migrate --id %s` first", c.ID, c.ID)
+		return fmt.Errorf("case %s uses the earlier format: open a new case in the current format from it (read it, then new and add), and close this one as superseded", c.ID)
 	}
 	full := filepath.Join(o.vault, c.Path)
 	b, e := os.ReadFile(full)
@@ -339,6 +312,13 @@ func mutate(o options, out io.Writer, change func(c Case, text, locale string) (
 		_ = emit(out, map[string]any{"ok": false, "id": c.ID, "introduced": introduced})
 		return errors.New("the change would introduce gate errors; nothing was written")
 	}
+	if res == nil {
+		res = map[string]any{}
+	}
+	if o.dryRun {
+		res["ok"], res["applied"], res["id"], res["path"] = true, false, c.ID, c.Path
+		return emit(out, res)
+	}
 	if after != nil {
 		if e := after(c); e != nil {
 			return e
@@ -352,152 +332,6 @@ func mutate(o options, out io.Writer, change func(c Case, text, locale string) (
 	}
 	res["ok"], res["id"], res["path"] = true, c.ID, c.Path
 	return emit(out, res)
-}
-
-func add(o options, out io.Writer) error {
-	k, ok := kinds[o.recKind]
-	if !ok {
-		return errors.New("--kind must be evidence, finding, question, decision, requirement, change, acceptance, handoff or absorption")
-	}
-	if strings.TrimSpace(o.text) == "" && o.recKind != "handoff" {
-		return errors.New("--text is required")
-	}
-	return mutate(o, out, func(c Case, text, loc string) (string, []string, map[string]any, error) {
-		L := labels[loc]
-		id := ""
-		if k.prefix != "" {
-			id = nextID(text, k.prefix)
-		}
-		body := sentence(o.text)
-		switch o.recKind {
-		case "evidence":
-			if !sourceRef.MatchString(o.source) {
-				return "", nil, nil, errors.New("--source must cite a permalink or file@commit, platform snapshot, query, work item key, record (E-/A-) or the requester statement with its date")
-			}
-			level := L["demonstrated"]
-			switch o.level {
-			case "demonstrated":
-			case "observed":
-				if strings.TrimSpace(o.limits) == "" {
-					return "", nil, nil, errors.New("--limits is required for observed evidence (sample, environment, time window or truncation)")
-				}
-				level = L["observed"] + " (" + L["limits"] + ": " + clause(o.limits) + ")"
-			default:
-				return "", nil, nil, errors.New("--level must be demonstrated or observed")
-			}
-			body += " " + L["source"] + ": " + clause(o.source) + ". " + L["level"] + ": " + level + "."
-		case "finding":
-			switch o.level {
-			case "demonstrated", "inferred":
-				ids, e := requireRefs(text, "--from", o.from, "E", "F", "A")
-				if e != nil {
-					return "", nil, nil, e
-				}
-				key := map[string]string{"demonstrated": "demonstrated-by", "inferred": "inferred-from"}[o.level]
-				body += " " + L["level"] + ": " + L[key] + " " + strings.Join(ids, ", ") + "."
-			case "unresolved":
-				if strings.TrimSpace(o.missing) == "" {
-					return "", nil, nil, errors.New("--missing is required for an unresolved conclusion: the source or check that would settle it")
-				}
-				body += " " + L["level"] + ": " + L["unresolved"] + " " + clause(o.missing) + "."
-			default:
-				return "", nil, nil, errors.New("--level must be demonstrated, inferred or unresolved")
-			}
-		case "question":
-			if strings.TrimSpace(o.resolveBy) == "" {
-				return "", nil, nil, errors.New("--resolve-by is required: the source, access or person that answers it")
-			}
-			body += " " + L["resolve-by"] + ": " + clause(o.resolveBy) + "."
-		case "decision":
-			if strings.TrimSpace(o.by) == "" {
-				return "", nil, nil, errors.New("--by is required: the role that made the decision")
-			}
-			body += " " + L["by"] + ": " + clause(o.by) + "."
-		case "requirement":
-			if strings.TrimSpace(o.origin) == "" {
-				return "", nil, nil, errors.New("--origin is required: the request, ticket or decision it comes from")
-			}
-			body += " " + L["origin"] + ": " + clause(o.origin) + "."
-		case "change":
-			if strings.TrimSpace(o.component) == "" {
-				return "", nil, nil, errors.New("--component is required: the repository or component, e.g. [[repository]]")
-			}
-			ids, e := requireRefs(text, "--serves", o.serves, "R")
-			if e != nil {
-				return "", nil, nil, e
-			}
-			body = strings.TrimSpace(o.component) + ": " + body + " " + L["serves"] + ": " + strings.Join(ids, ", ") + "."
-		case "acceptance":
-			ids, e := requireRefs(text, "--proves", o.proves, "R")
-			if e != nil {
-				return "", nil, nil, e
-			}
-			body += " " + L["proves"] + ": " + strings.Join(ids, ", ") + "."
-		case "handoff":
-			p, e := casePackage(o.vault, c, o.pkg)
-			if e != nil {
-				return "", nil, nil, e
-			}
-			if definedRecords(text)[p.Handoff] {
-				return "", nil, nil, fmt.Errorf("%s is already recorded in the case", p.Handoff)
-			}
-			id = p.Handoff
-			rel := "handoffs/" + filepath.Base(p.Path)
-			body = sentence(p.Title)
-			if o.text != "" {
-				body += " " + sentence(o.text)
-			}
-			body += " " + L["repository"] + ": " + p.Repository + "; " + L["branch"] + " `" + p.Branch + "`; " + L["package"] + " `" + rel + "`."
-		case "absorption":
-			if !wikilink.MatchString(o.target) {
-				return "", nil, nil, errors.New("--target must be the destination note as [[note]]")
-			}
-			if o.status != "pending" && o.status != "absorbed" && o.status != "deferred" && o.status != "discarded" {
-				return "", nil, nil, errors.New("--status must be pending, absorbed, deferred or discarded")
-			}
-			line := "- " + clause(o.text) + " → " + strings.TrimSpace(o.target) + " (" + L[o.status] + ")"
-			return appendToSection(text, k.section, loc, line), []string{L["absorption"] + ": " + strings.TrimSpace(o.target)}, nil, nil
-		}
-		logParts := []string{id + " " + L["added"]}
-		if o.supersedes != "" {
-			ids, e := requireRefs(text, "--supersedes", o.supersedes, k.prefix)
-			if e != nil {
-				return "", nil, nil, e
-			}
-			for _, old := range ids {
-				text = annotate(text, old, L["superseded"]+" "+id)
-			}
-			logParts = append(logParts, L["supersedes"]+" "+strings.Join(ids, ", "))
-		}
-		if o.resolves != "" {
-			if o.recKind != "evidence" && o.recKind != "finding" && o.recKind != "decision" {
-				return "", nil, nil, errors.New("--resolves applies to evidence, findings and decisions")
-			}
-			ids, e := requireRefs(text, "--resolves", o.resolves, "Q")
-			if e != nil {
-				return "", nil, nil, e
-			}
-			for _, q := range ids {
-				text = annotate(text, q, L["resolved"]+" "+id)
-			}
-			logParts = append(logParts, L["resolves"]+" "+strings.Join(ids, ", "))
-		}
-		if o.reconciles != "" {
-			ids, e := requireRefs(text, "--reconciles", o.reconciles, "DH")
-			if e != nil {
-				return "", nil, nil, e
-			}
-			if strings.TrimSpace(o.through) == "" {
-				return "", nil, nil, errors.New("--through is required: the last commit and delta read, e.g. \"eb10385 / DELTA-002\"")
-			}
-			for _, dh := range ids {
-				text = annotate(text, dh, L["reconciled"]+" "+strings.TrimSpace(o.through))
-			}
-			logParts = append(logParts, L["reconciled"]+" "+strings.TrimSpace(o.through)+" ("+strings.Join(ids, ", ")+")")
-		}
-		line := "- **" + id + "** — " + body
-		return appendToSection(text, k.section, loc, line), logParts, map[string]any{"record": id}, nil
-	}, nil)
 }
 
 // casePackage reads a task package that belongs to the case (under its handoffs/ directory).
@@ -570,59 +404,4 @@ func reopen(o options, out io.Writer) error {
 		text = setFrontmatter(setFrontmatter(text, "status", "open"), "outcome", "")
 		return text, []string{labels[loc]["reopened"] + ": " + clause(o.reason)}, nil, nil
 	}, nil)
-}
-
-const maxArtifact = 20 << 20
-
-// attach copies files the requester or the agent provides into the case as one artifact record, after
-// refusing credentials in text content.
-func attach(o options, out io.Writer) error {
-	if len(o.files) == 0 || strings.TrimSpace(o.text) == "" {
-		return errors.New("--file and --text (what it shows and its limits) are required")
-	}
-	data := map[string][]byte{}
-	for _, f := range o.files {
-		st, e := os.Stat(f)
-		if e != nil || st.IsDir() {
-			return fmt.Errorf("%s is not a readable file", f)
-		}
-		if st.Size() > maxArtifact {
-			return fmt.Errorf("%s is larger than 20 MB: keep an excerpt or a summary with its coverage", f)
-		}
-		b, e := os.ReadFile(f)
-		if e != nil {
-			return e
-		}
-		if utf8.Valid(b) && !strings.ContainsRune(string(b[:min(len(b), 8192)]), 0) {
-			if m := secret.FindString(string(b)); m != "" {
-				return errors.New(filepath.Base(f) + " contains a credential (" + firstRunes(m, 16) + "…): redact it and attach the redacted copy")
-			}
-		}
-		data[f] = b
-	}
-	var dir string
-	rels := []string{}
-	return mutate(o, out, func(c Case, text, loc string) (string, []string, map[string]any, error) {
-		id := nextID(text, "A")
-		dir = filepath.Dir(filepath.Join(o.vault, c.Path))
-		quoted := []string{}
-		for _, f := range o.files {
-			rel := "artifacts/" + id + "-" + unsafeName.ReplaceAllString(filepath.Base(f), "-")
-			rels = append(rels, rel)
-			quoted = append(quoted, "`"+rel+"`")
-		}
-		line := "- **" + id + "** — " + sentence(o.text) + " " + labels[loc]["file"] + ": " + strings.Join(quoted, ", ") + "."
-		return appendToSection(text, "evidence", loc, line), []string{id + " " + labels[loc]["attached"]}, map[string]any{"record": id, "artifacts": rels}, nil
-	}, func(Case) error {
-		for i, f := range o.files {
-			dest := filepath.Join(dir, rels[i])
-			if e := os.MkdirAll(filepath.Dir(dest), 0o755); e != nil {
-				return e
-			}
-			if e := os.WriteFile(dest, data[f], 0o644); e != nil {
-				return e
-			}
-		}
-		return nil
-	})
 }
