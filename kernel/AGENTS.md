@@ -29,7 +29,7 @@ Load @AGENTS.personal.md from the vault root when present, before classifying re
 Read [use-vault-cli](.agents/skills/use-vault-cli/SKILL.md) before the first CLI operation; it binds `<CLI>` and the vault root once per session.
 
 1. `<CLI> overview --vault "<root>"` lists every knowledge note in one line (type, relations, first sentence). Choose the notes to open from it.
-2. Open identified notes directly. Use `search` for a term the overview does not reveal and `links` for a known note's relationships.
+2. Open identified notes directly. Use `search` for a term the overview does not reveal and `links` for a known note's relationships. Before an answer relies on a repository note, run `<CLI> discover check --vault "<root>" --note <path>`: it reports stale cited files and relations the repository's evidence does not support (G3); treat those as unverified until the source confirms them.
 3. For connections of repositories (topics, subscriptions, events, databases, endpoints) use the discovery facts (`discover report --repo NAME`) and confirm destinations in the platform snapshots they cite.
 4. Before using an existing investigation as context, load it read-only through `manage-investigation`.
 
