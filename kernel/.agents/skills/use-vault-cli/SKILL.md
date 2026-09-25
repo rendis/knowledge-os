@@ -41,6 +41,7 @@ Execute the commands documented in this reference or the owning workflow, substi
 | Find an unknown starting document | `search --vault "<root>" --query "<subject terms>" --limit 5` |
 | Inspect a known note's relationships | `links --vault "<root>" --node "<note basename>"` |
 | Inspect an identified source | Read its file directly with the available file tool |
+| Discover connections of the cell's repositories | `discover run --vault "<root>"` (see [Discovery](#discovery)) |
 | Validate structure | Use the workflow-required `check` or `audit` command |
 | Change configuration, investigations, handoffs or synchronization state | Follow the owning skill, then invoke its CLI commands |
 
@@ -55,6 +56,19 @@ Default retrieval includes eligible local/private investigation material. Use `-
 An empty `cards` array after a successful command means no results for that query and scope. Check the subject terms and visibility, try a concrete identifier or documented alternative term when relevant, and inspect a known source directly. The index covers eligible vault Markdown, not external repositories, databases or live services. Route remaining evidence gaps to the appropriate source workflow.
 
 `links` returns recorded incoming/outgoing relationships and investigation pointers. Inspect truncation indicators and source notes when completeness matters; recorded relationships alone do not establish runtime behavior.
+
+## Discovery
+
+`discover run` scans every tracked repository at an exact commit (default: remote default branch; `--at note` uses each note's `commit-analizado`), parses code imports, build manifests and every configuration/IaC file by format, applies stored judgments and platform snapshots, and writes facts, pending items and the comparison with notes under `.agents/state/discovery/`. It prints a summary. Facts are deterministic evidence pointers: repository, commit, file and key.
+
+Some judgments need semantic understanding (what a dependency talks to, what a configuration key holds). They are asked once and stored, versioned, in `90-Meta/discovery/classifications.json`:
+
+- With `TYPESAFE_API_KEY` set, `discover run` answers them automatically.
+- Without it, run `discover questions --vault "<root>" --limit 100`, answer each question with exactly one of its `options` (judge only from the question's `state`), save `[{"id":..,"choice":..,"confidence":0-1}]` to a file, record it with `discover answer --vault "<root>" --file <file>`, and repeat until `pending` is 0, then `discover run --vault "<root>" --classify off`. Tell the user once that setting the key makes this automatic; missing acceleration never blocks the task.
+
+`discover platform --vault "<root>" --referenced` captures read-only Pub/Sub listings with `gcloud` for the projects named by configuration; it contacts the cloud provider, so run it only with the user's authorization. Projects that cannot be read stay as `platform-access` pending items with the exact confirm command. Nothing unverified is presented as confirmed.
+
+`discover report --vault "<root>" [--repo NAME]` returns the last summary or one repository's facts and comparison.
 
 ## Refresh and failures
 

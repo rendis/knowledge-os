@@ -10,6 +10,7 @@ import (
 	"documentation-vault/internal/audit"
 	"documentation-vault/internal/check"
 	"documentation-vault/internal/config"
+	"documentation-vault/internal/discover"
 	"documentation-vault/internal/handoff"
 	"documentation-vault/internal/inventory"
 	"documentation-vault/internal/investigation"
@@ -35,6 +36,7 @@ search --vault PATH --query TEXT [--limit 1..10] [--visibility all|public]
 index --vault PATH [--rebuild]
 links --vault PATH --node BASENAME
 inventory --vault PATH [--repo NAME] [--github-user LOGIN]
+discover run|questions|answer|platform|report --vault PATH ...
 config status|resolve|workspace|locate|capability|bind|catalog|areas|operation ...
 check links|bases --vault PATH
 audit --vault PATH
@@ -65,6 +67,8 @@ version`)
 		return nil
 	case "inventory":
 		return inventory.Run(args[1:], os.Stdout)
+	case "discover":
+		return discover.Run(args[1:], os.Stdout)
 	case "config":
 		return config.Run(args[1:], os.Stdout)
 	case "audit":

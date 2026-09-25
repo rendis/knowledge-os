@@ -310,6 +310,7 @@ def ensure_gitignore_lines(dest: Path) -> None:
         "/.knowledge-os-config.yaml",
         "/.knowledge-os-config.*.tmp",
         "/.agents/state/map-ecosystem/",
+        "/.agents/state/discovery/",
         "/.plan/",
         "/.scratch/",
         "/.venv/",
