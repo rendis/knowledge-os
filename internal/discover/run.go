@@ -30,6 +30,12 @@ const Help = `discover COMMAND --vault PATH [options]
              Capture read-only Pub/Sub listings with gcloud (requires authorization).
              --referenced uses the projects named by configuration in the last run.
   report     [--repo NAME]   Last run summary, or one repository's facts.
+  check      --note PATH [--note PATH ...] [--repo NAME] [--semantic]
+             Gates for a repository note: G1 source anchors resolve at their commit and
+             the identifiers they name are in the cited lines; G2 every connector and
+             configured resource is evidenced or addressed; freshness of cited files;
+             --semantic asks Jev whether each cited sentence is supported (review aid).
+             A candidate outside the vault is matched to its repository by its aliases.
 Facts and questions are local (.agents/state/discovery). Judgments and platform snapshots
 are versioned under 90-Meta/discovery/. All output is JSON.`
 
@@ -37,9 +43,9 @@ const stateRel = ".agents/state/discovery"
 
 type options struct {
 	vault, at, classify, kind, file string
-	repos, projects                 []string
+	repos, projects, notes          []string
 	limit                           int
-	referenced, dryRun              bool
+	referenced, dryRun, semantic    bool
 }
 
 func parse(args []string) (string, options, error) {
@@ -65,6 +71,11 @@ func parse(args []string) (string, options, error) {
 		case "--repo":
 			v, e = val()
 			o.repos = append(o.repos, v)
+		case "--note":
+			v, e = val()
+			o.notes = append(o.notes, v)
+		case "--semantic":
+			o.semantic = true
 		case "--project":
 			v, e = val()
 			o.projects = append(o.projects, v)
@@ -158,6 +169,8 @@ func Run(args []string, out io.Writer) error {
 		return capturePlatform(o, out)
 	case "report":
 		return showReport(o, out)
+	case "check":
+		return runCheck(o, out, o.semantic)
 	}
 	return fmt.Errorf("unknown discover command %q", cmd)
 }

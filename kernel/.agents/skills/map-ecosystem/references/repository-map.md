@@ -1,64 +1,67 @@
 # Map repository purpose, main flows and connectors
 
-This is the default scope for repository mapping and sync extraction. A map explains what the repository does, how work enters, what meaningful logic executes and which effects leave it. It is not an exhaustive code, security or deployment audit.
+This is the scope for repository mapping and sync. A map explains what the repository does, how work enters, what meaningful logic executes and which effects leave it. It is not an exhaustive code, security or deployment audit.
 
 ## What a useful map answers
 
-The reader should be able to explain the service's behavior, follow its main data movements and locate the evidence needed for a change or investigation without rediscovering the repository. Evaluate these five questions across the repository note and its linked flow/integration notes; they do not require a new document or duplicated answers.
+The reader can explain the service's behavior, follow its main data movements and locate the evidence for a change or investigation without rediscovering the repository. Answer these across the repository note and its linked flow/integration/topic/event notes.
 
 | ID | Question | Required answer |
 | --- | --- | --- |
-| P1 | What does this repository do, and what is its responsibility? | Business or technical purpose, owned responsibilities, boundaries, language/framework and role within the system. |
-| P2 | How does it start, and what makes it act? | Actual startup command or composition path, essential configuration keys, and business triggers: routes, subscriptions, schedules, batches or CLI. Distinguish internal scheduling from external callers and diagnostics from business work. |
-| P3 | What happens in each main flow, from trigger to result? | Trigger → relevant decisions/transformations → reads/writes/calls → result or failure. Retain branches with different effects and distinguish scheduled asynchronous work from completed work. |
-| P4 | Where does it obtain, store, modify or send data? | Dependencies and connectors with a stable claim ID, direction, operation, protocol and evidenced table/view, topic/subscription, endpoint or resource/configuration key. Identify the owning flow and unresolved destinations. |
-| P5 | Which rules determine the outcome? | Material filters, validation, calculations, mappings, state transitions, ordering, retries/ACKs, idempotency or failure handling when present. Explain conditions and consequences; a named rule without its behavior is insufficient. |
+| P1 | What does this repository do, and what is its responsibility? | Purpose, owned responsibilities, boundaries, language/framework and role within the system. |
+| P2 | How does it start, and what makes it act? | Startup/composition path, essential configuration keys, and business triggers: routes, subscriptions, schedules, batches or CLI. Distinguish internal scheduling from external callers and diagnostics from business work. |
+| P3 | What happens in each main flow, from trigger to result? | Trigger → relevant decisions/transformations → reads/writes/calls → result or failure. Keep branches with different effects. |
+| P4 | Where does it obtain, store, modify or send data? | Every connector with direction, operation, protocol and the evidenced table, topic/subscription/event, endpoint, bucket or configuration key; its owning flow; unresolved destinations. |
+| P5 | Which rules determine the outcome? | Material filters, validation, calculations, mappings, state transitions, ordering, retries/ACKs, idempotency or failure handling, with conditions and consequences. |
 
-Every answer carries a bound source revision and resolvable path/line or symbol anchors. Distinguish implementation, configured behavior and observed runtime. Record unknowns and justify non-applicable items from the repository's actual role. A missing answer is a gap, not a non-applicable item. Main flows are behaviors with distinct business results or externally significant effects; shared plumbing and equivalent routes can be grouped.
+A missing answer is a gap, not a non-applicable item. For library, schema, IaC and documentation repositories describe their actual role and exposed contracts/resources; do not invent triggers.
 
-Apply [evidence-sufficiency.md](evidence-sufficiency.md) to set the extraction and review boundary before creating pending items.
+## Start from discovery facts
 
-## Trace once
+Run `<cli> discover run --vault "<vault>"` (add `--repo <name>` for one repository) and read `<cli> discover report --vault "<vault>" --repo <name>`. The facts are the connector inventory, complete by construction:
 
-1. Bind the exact configured reference-branch revision (see `90-Meta/reference-branches.md`). Reuse valid existing notes and analysis at that revision; use a diff for an existing map. Preserve supported facts, relationships and provenance even when they exceed today's scope. Missing mention is never deletion evidence.
-2. Read stack manifests, startup/composition code and README or other local documentation selectively. Establish how the service starts and which configuration controls its main triggers and dependencies. Use documentation when it adds a description supported by implementation; report material contradictions. An empty or generic README needs no separate investigation.
-3. Find API registrations, subscriptions, push handlers, schedules, batch/CLI and other triggers. Distinguish business entrypoints from health/diagnostic endpoints. Follow each main entrypoint through its handler into reads, writes, publications and outbound calls. Record shared branches once.
-4. For connectors participating in those flows, record direction/operation, protocol, resource or config key, environment when resolved, terminal behavior, unresolved question and source reference. Include database reads as well as writes, HTTP/gRPC/FTP/file/object-store effects and messaging as observed. Mark encountered unused/example wiring separately; discovering every unused method is outside main-flow closure. Keep unresolved dynamic destinations explicit.
-5. Explain only transformations, validation, routing/filter conditions, calculations, state changes or failure behavior that materially changes a main flow. Describe passthrough briefly. Summarize mappings and special rules; field-by-field DTO copies and generic utility internals remain in source.
-6. Return a concise map with purpose and stack; entrypoints; main flow sequences; connectors; relevant rules/mappings; evidence and limits. Project every partial or unresolved connection as one concrete `Verificaciones pendientes` item under the repository note's `Limitaciones y desconocimientos`, using the format in `90-Meta/Convenciones.md`. Cite the bound commit, complete repository-relative path and line range or exact symbol beside assertions. Keep each reference independently resolvable; ellipses or abbreviated paths are not evidence anchors. Keep code/configuration observations distinct from observed runtime. Stop when every discovered main entrypoint has a flow or explicit gap, significant effects have an owner or gap, and no known contradiction misstates a main flow. Unresolved peer identities and full deployment topology do not block this result.
+- `dependencies` and `channels`: every library and runtime module the code imports (company libraries resolved to what they import), with the files that use each one, plus declared-but-not-imported manifest dependencies.
+- `resources`: every topic, subscription, event, database object, HTTP endpoint and bucket named by the repository's configuration, IaC blocks that name the service, or code literals, each with file/key evidence; Pub/Sub resources carry platform wiring (subscription → topic, filtered events) when snapshots exist.
+- `pending`: what could not be confirmed (no platform access, name absent from the platform, unjudged dependency), with the exact command that confirms it.
+- The comparison with the current note: supported relations, discrepancies and undocumented resources.
 
-For documentation-only, library, schema and IaC repositories, describe their actual role and exposed contracts/resources. Do not invent a service or triggers. Node eligibility is a later publication decision, not a reason to discard inventory evidence.
+Do not rediscover connectors by searching the repository. Explain each fact's role, trace the flows that reach it, and give every fact an owner flow, a documented relation or an explicit limitation. A fact you judge irrelevant is still named once with the reason. Missing platform or source access becomes a `Verificaciones pendientes` item with the fact's confirm command; never present an unconfirmed destination as confirmed.
 
-Produce flows and connectors together in the complete resulting note candidate. Group entrypoints by behavior, retaining materially different conditions, destinations and effects within each group. A compact flow states trigger → relevant decisions/transformations → reads/writes/calls → significant result or failure. Give every externally significant connector a stable `connection.` key based on its owning flow and connector slot, not its current destination value. Its prose carries the owning flow, direction/operation, protocol/client, resource or configuration key, environment scope, terminal success/failure behavior, local resolution status (`resolved`, `partial` or `unresolved`) and the exact remaining external question. `resolved` means the local source establishes the required connection contract; it does not claim deployment or runtime success. Persist the key as a connection anchor in the owning note using `90-Meta/Convenciones.md`; final-note-review.md checks explicit dispositions against the published baseline. No parallel claim inventory or exhaustive method catalog is required.
+## Trace flows once
 
-## Verify proportionally
+1. Bind the exact revision the facts were computed at (the facts' `commit`). For an existing note, read it first and keep supported facts, relationships and provenance; a missing mention is never deletion evidence. For sync, inspect the delta since `commit-analizado` and the files its cited anchors point to (`discover check` lists stale cited files).
+2. Read manifests, startup/composition code and README selectively to answer P1–P2. Documentation adds description only when implementation supports it; report material contradictions.
+3. For each business entrypoint, follow the handler to the reads, writes, publications and calls that the facts list (P3–P4). Record shared branches once and keep dynamic destinations explicit.
+4. Explain only transformations, conditions, calculations, state changes and failure behavior that change a main flow (P5). For changed filters, time windows and retry limits keep decision order, units and boundary inclusivity from the exact predicate. For claimed ACK/NACK, retry or success behavior follow the return/throw to its terminal effect.
+5. Stop when every entrypoint has a flow or explicit gap, every fact has an owner or limitation, and no known contradiction misstates a main flow.
 
-Before extraction, fix the repository-specific checks under P1–P5 in the existing execution record. Record each result as pass, gap or justified non-applicable, with evidence; an aggregate score cannot compensate for a materially wrong or missing main flow. For sync, record the existing answers and useful facts in the affected notes before editing, then identify which the source delta should change. P1–P5 are a minimum: retain supported knowledge beyond them, including historical provenance. Preserve unaffected text and links; when the delta adds an exception, reconcile retained blanket statements (`all`, `always`, `never`, `only`) in that same affected flow without revalidating the whole baseline. For changed filters, time windows and retry limits in the affected flow, preserve decision order, units and boundary inclusivity from the exact predicate rather than variable names or prose handoffs. Reconcile affected claims in related notes without inferring unverified downstream effects. Before accepting a sync, compare every changed value and removed behavior with the final claims and reject any surviving statement contradicted by the new commit.
+## Evidence format (checked mechanically)
 
-Use existing manifest/scanner tools for file inventory, frozen revision, shape and references. Scanner matches are leads, not proof of reachability or completeness. Reuse a successful scan. Repair structural or prohibited-pattern findings locally and rerun deterministic checks without another source pass.
+Cite at the bound commit, one verifiable fact per cited sentence, with the reference right after the fact it supports:
 
-Freeze the complete resulting note candidate before review and record its content hash; changes during review invalidate that binding. A fresh reviewer checks the changed meaning and preservation against the exact sources behind its main entrypoints, connectors and meaningful rules. It also checks that each partial or unresolved connection has one actionable pending verification and that each condition is necessary for the requested outcome under evidence-sufficiency.md. Reclassify obsolete functional-test demands explicitly; local `resolved` alone does not prove a deployed resource or successful execution. Use targeted registration/composition searches only to check a plausible missed main flow; do not reconstruct the whole repository or require every configuration value and utility rule. A README alone cannot validate an implementation assertion. Verify remote read/write direction from the operation actually called, separately from local variable assignments. For claimed ACK/NACK, retry or success behavior, follow the relevant return/throw through its caller and catch to the terminal effect; do not generalize across different branches.
+```markdown
+Publica el ajuste serializado en el topic configurado por `GCP_PUBSUB_TOPIC_IN`. [^e3]
 
-Accept a useful partial map when its limits are explicit and it accurately describes the observed main flows. Request correction for unsupported assertions, materially wrong destinations/conditions, missing main flows or loss of valid knowledge. Missing secondary detail is a limitation, not a whole-map rejection. Target isolated defects to their claims so supported subsets remain usable. Review verdicts never override evidence or publication authorization.
+[^e3]: [src/services/gcp.go](https://github.com/<org>/<repo>/blob/<full-sha>/src/services/gcp.go#L27-L48) — L27-L48: `os.Getenv("GCP_PUBSUB_TOPIC_IN")` y `publishToPubsubWithRetry`
+```
 
-Close the source analysis when the frozen questions are answered in the candidate and the preservation checks pass. Keep incomplete results explicitly partial. A review finding repairs only the affected candidate meaning from available evidence, then re-reviews that change; it does not restart extraction. Do not add acceptance questions during review or reopen accepted work for optional enrichment.
+- Backticked identifiers in a footnote must appear in its cited lines; backticked paths must exist at the commit.
+- Platform facts cite the snapshot: `[^p1]: platform gcp-pubsub <project> captured <date> — <subscription> → <topic>, filter <expression>`.
+- Limitations, negations and inferences are written as limits, not cited as if the code proved them.
+- Distinguish implementation, configured behavior and observed runtime.
+
+## Gates before review
+
+Run `<cli> discover check --vault "<vault>" --note <candidate>` (add `--semantic` when Jev is configured). Fix every `error`: G1 (an anchor that does not resolve, lines that do not exist, an identifier absent from the cited lines) and G2 (a connector category or resource group of the facts that the note neither cites nor names). Carry `pending` items into `Verificaciones pendientes`. `review` items and semantic `says_nothing`/`contradicts` results go to the reviewer with their sentences. Mechanical fixes never reopen source analysis.
+
+## Review
+
+A fresh reviewer receives the candidate, the baseline, the facts and the check output, and checks changed meaning and preservation against the exact sources behind main entrypoints, connectors and rules. Anchors that passed G1 are not re-verified for existence; the reviewer judges interpretation. Request correction for unsupported assertions, wrong destinations/conditions, missing main flows or lost valid knowledge; missing secondary detail is a limitation. A finding repairs only the affected text from available evidence and is re-reviewed; it does not restart extraction. Accept a useful partial map when its limits are explicit.
 
 ## Connect after local maps
 
-An accepted local map may end at an unresolved external connection. When that connection matters to the selected system map, flow or investigation, use [connection-reconciliation.md](connection-reconciliation.md). The coordinator resolves the external end as separately reviewed evidence and leaves the accepted local extraction immutable. Missing access to the relevant external authority leaves only the dependent external decision partial or unresolved.
+When an external end matters to the selected map, flow or investigation, use [connection-reconciliation.md](connection-reconciliation.md). Platform snapshots (`discover platform`) usually resolve subscription → topic → publisher without re-reading other repositories.
 
-## Read efficiently
+## Budget
 
-Use inventory and targeted registration/connector searches before opening implementation ranges. Batch independent narrow ranges within the response limit, including ranges from different files; inspect continuations when a relevant result is truncated. Reuse already inspected evidence. Keep a compact list of main entrypoints, effects and unresolved questions as you work. Each further read should resolve a question in that list or check a possible main-flow omission.
-
-Default pilot time envelope: 8 minutes per worker, with a usage budget recorded before dispatch. Size reads to complete relevant fragments rather than imposing a fixed number of calls or a token limit that cuts evidence mid-flow. At the budget boundary, write the supported result and unanswered acceptance questions; budget exhaustion is not evidence of completeness. Record any extension before dispatch. Schema/format validation runs separately. The coordinator checks actual time and usage and interrupts overruns; prompt limits alone are not enforced quotas.
-
-## Execution budget and reuse
-
-Default to one authoring context per repository delta and one independent review of its complete final-note candidate. A large file or route count alone does not justify splitting analysis into families. Delegate only an independent unresolved question whose evidence can be returned compactly without repeating shared source acquisition. The author reconciles that answer into the same candidate.
-
-Record the configured model and effort; keep them unless an observed quality/cost problem warrants a comparison. When considering a lighter model for a batch, test it on a representative service and a complex case against the same quality contract. Reuse applicable pilot evidence and accepted maps under unchanged scope/profile/model settings. Judge useful flow coverage, claim correctness and preservation alongside acquisition, coordination and review cost. A stronger-model escalation receives the existing artifact, source anchors and one unresolved question. A peer using the same model in a fresh context may review it; model size is not a substitute for source verification.
-
-Before dispatch record scope, model/effort, time and usage limits in local execution records. Use runner-enforced limits when available; otherwise limit dispatch count/concurrency and monitor usage, explicitly reporting that a hard token cap is unavailable. Start with at most two pilot analyses and one fresh review per candidate, with no speculative correction. Stop the pilot on timeout or excessive usage and diagnose before expanding. Report actual time and usage separately from quality.
-
-For an established batch, select small independent groups, persist each completed result promptly and avoid waiting for unrelated repositories. Reuse valid candidate, evidence and review artifacts instead of rerunning source analysis because instructions, rendering or publication changed. Reassess only conclusions actually affected by the change, keeping original bytes and verdict history.
+One authoring context per repository delta and one review per candidate. Delegate only an independent unresolved question whose evidence returns compactly. Record model, effort, time and usage before dispatch; stop on overruns and diagnose before expanding. Reuse candidates, facts and reviews instead of re-running analysis because instructions or rendering changed.

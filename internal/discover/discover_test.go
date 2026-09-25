@@ -261,3 +261,63 @@ func TestNameMatchAndResourceShape(t *testing.T) {
 		t.Fatal("variants must share a logical name")
 	}
 }
+
+func TestNoteGates(t *testing.T) {
+	dir := t.TempDir()
+	repo := gitRepo(t, filepath.Join(dir, "repos", "SVC-orders"), map[string]string{
+		"go.mod":          "module example.com/orders\n\nrequire cloud.google.com/go/pubsub v1.0.0\n",
+		"pub/pub.go":      "package pub\n\nimport \"cloud.google.com/go/pubsub\"\n\nfunc Publish() {\n\ttopic := os.Getenv(\"TOPIC_OUT\")\n\t_ = pubsub.NewClient\n}\n",
+		"k8s/prod/env-cl": "TOPIC_OUT=orders-cl-outbound\n",
+	})
+	sha, _ := resolveCommit(repo, "HEAD")
+	cmd := exec.Command("git", "-C", repo, "remote", "add", "origin", "https://github.com/acme/SVC-orders.git")
+	if b, e := cmd.CombinedOutput(); e != nil {
+		t.Fatal(string(b))
+	}
+	vault := t.TempDir()
+	for _, m := range []string{"AGENTS.md", "00-Home.md", "90-Meta/Convenciones.md", "90-Meta/Auditoria - Framework.md"} {
+		write(t, vault, m, "x\n")
+	}
+	write(t, vault, "instance.yaml", "version: 1\ncell:\n  name: \"C\"\n  purpose: \"p\"\nsystems:\n  - id: \"s\"\n    name: \"S\"\nsources:\n  repo_prefixes: [\"SVC\"]\n")
+	write(t, vault, ".knowledge-os-config.yaml", "version: 1\nworkspace:\n  repository_roots:\n    - \""+filepath.Join(dir, "repos")+"\"\n")
+	st := &store{Dependencies: map[string]judgment{"go:cloud.google.com/go/pubsub": {Choice: "messaging", Confidence: 1}}, ConfigKeys: map[string]judgment{}, ConfigValues: map[string]judgment{}}
+	s := scan(t, "SVC-orders", repo)
+	for _, e := range s.entries {
+		st.ConfigKeys[keySignature(e)] = judgment{Choice: "pubsub_topic", Confidence: 0.95}
+		st.ConfigValues[entryID(e)] = judgment{Choice: "pubsub_topic", Confidence: 0.95}
+	}
+	if e := st.save(vault); e != nil {
+		t.Fatal(e)
+	}
+	link := "https://github.com/acme/SVC-orders/blob/" + sha + "/pub/pub.go#L5-L8"
+	good := "---\naliases: [\"SVC-orders\"]\ncommit-analizado: \"" + sha[:12] + "\"\n---\n# orders\n\nPublica en el topic `orders-cl-outbound` usando `TOPIC_OUT`. [^e1]\n\n[^e1]: [pub/pub.go](" + link + ") — L5-L8: `os.Getenv(\"TOPIC_OUT\")` y `pubsub.NewClient`\n"
+	write(t, vault, "20-Repos/orders.md", good)
+	r, e := checkNote(vault, "20-Repos/orders.md", "", false)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if !r.OK || r.Anchors["verified"] != 1 || r.Coverage["connector_categories_evidenced"] != 1 || r.Coverage["resource_groups_addressed"] != 1 {
+		t.Fatalf("good note must pass: %+v", r)
+	}
+	bad := strings.Replace(good, "`pubsub.NewClient`", "`kafka.NewWriter`", 1)
+	bad = strings.Replace(bad, "#L5-L8", "#L5-L40", 1)
+	bad = strings.Replace(bad, "Publica en el topic `orders-cl-outbound` usando `TOPIC_OUT`.", "Publica eventos.", 1)
+	bad = strings.Replace(bad, "pub/pub.go](", "pub/pub.go]("+"", 1)
+	write(t, vault, "20-Repos/orders.md", bad)
+	r, _ = checkNote(vault, "20-Repos/orders.md", "", false)
+	gates := map[string]int{}
+	for _, i := range r.Issues {
+		if i.Severity == "error" {
+			gates[i.Gate]++
+		}
+	}
+	if r.OK || gates["G1-anchor"] == 0 {
+		t.Fatalf("invented identifier or impossible range must fail G1: %+v", r.Issues)
+	}
+	if claim := claimFor("Hace A. Luego publica B. [^e2] [^e3]\n", "e3"); claim != "Luego publica B." {
+		t.Fatalf("claim %q", claim)
+	}
+	if !tokenPresent("health.port", "health:\n  port: 8086\n") || tokenPresent("health.host", "health:\n  port: 1\n") {
+		t.Fatal("dotted key paths follow YAML nesting")
+	}
+}

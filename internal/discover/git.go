@@ -20,8 +20,12 @@ type snapshot struct {
 	out    *bufio.Reader
 }
 
+func execGit(repo string, args ...string) *exec.Cmd {
+	return exec.Command("git", append([]string{"-C", repo}, args...)...)
+}
+
 func gitOutput(repo string, args ...string) (string, error) {
-	cmd := exec.Command("git", append([]string{"-C", repo}, args...)...)
+	cmd := execGit(repo, args...)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	b, e := cmd.Output()

@@ -17,6 +17,7 @@ DEFAULT_TYPES = (
     "recurso-runtime",
     "repositorio",
     "topic",
+    "evento",
     "flujo",
     "integracion-externa",
     "glosario",

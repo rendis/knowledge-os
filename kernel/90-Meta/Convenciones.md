@@ -42,6 +42,7 @@ Choose the type from the observed identity. Search basename, `aliases`, `nombre-
 | `15-Arquitectura/` `tipo: recurso-runtime` | Productive scheduler/function/runtime without an identifiable repo | Names seen only in templates |
 | `20-Repos/` functional `tipo` from the repository contract below | An in-scope source repository, including a library or scaffold with an observed role | This vault container or an empty placeholder without an observed contract |
 | `25-Topics/` `tipo: topic` | An async contract with topology relevance (`topic` enabled) | A subscription, a test name, or HTTP |
+| `25-Topics/` `tipo: evento` | An event type (message attribute such as `eventType`) carried by a topic and selected by subscription filters | A topic, a subscription, or an internal enum never published |
 | `30-Flujos/` `tipo: flujo` | An end-to-end business outcome crossing two durable nodes or a system boundary | Internal methods or a service composition copy |
 | `40-Integraciones/` `tipo: integracion-externa` | An external system with a stable business role | Internal repos or isolated endpoints |
 | `50-Glosario/` `tipo: glosario` | A term used in two or more durable nodes, or needed to disambiguate a contract | Generic technical terms |
@@ -179,6 +180,22 @@ Required headings:
 
 The headings `Productores`, `Consumidores`, and `Productores y consumidores` are forbidden. Derive inverse relationships through backlinks.
 
+### Event
+
+An event is one message type on a shared topic, observed in subscription filters (platform or IaC) or in the publisher's code. All five fields are required; no other fields are allowed:
+
+```yaml
+---
+tipo: evento
+nombre-raw: "<attribute value, e.g. saleTransactionConfirmed>"
+sistema: "[[System]]"
+topico: "[[<carrier topic>]]"
+tags: []
+---
+```
+
+Required headings are the topic headings. `Contrato` names the attribute (`eventType` or another key) and value; `Infraestructura verificada` cites the subscription filters that select it.
+
 ### External integration
 
 `tipo` and `tags` are required; `aliases` is optional. No other fields are allowed:
@@ -227,7 +244,7 @@ Include exactly two Mermaid blocks. The block under `Diagrama de componentes` mu
 
 Persist one durable direction. Inverse lists are backlinks.
 
-- Asynchronous messaging: producer `publica-en` → topic; consumer `gatillado-por` the topic.
+- Asynchronous messaging: producer `publica-en` → topic; consumer `gatillado-por` the topic. When a shared topic carries several event types and the consumer's subscription filters one, the consumer is `gatillado-por` the event note and the publisher that sets that attribute `publica-en` the event note; the event note links its carrier topic.
 - HTTP: caller `consume-de` callee or integration.
 - Data: `lee-de` / `escribe-en` as strings unless a runtime or integration node qualifies.
 - Runtime: `usa-infra`.

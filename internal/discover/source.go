@@ -34,7 +34,7 @@ func lines(s string) map[string]bool {
 var codeExt = map[string]string{".go": "go", ".java": "java", ".kt": "java", ".ts": "js", ".tsx": "js", ".js": "js", ".jsx": "js", ".mjs": "js", ".cjs": "js", ".py": "py"}
 
 // Tests, vendored and generated trees are excluded from the evidence surface.
-var skipCode = regexp.MustCompile(`(^|/)(vendor|node_modules|dist|build|target|coverage|__pycache__|\.venv|venv|\.next|www|public)/|_test\.go$|\.(spec|test)\.[jt]sx?$|(^|/)(tests?|__tests__|mocks?|testdata)/|(^|/)test_[^/]+\.py$|\.d\.ts$|\.min\.js$|\.config\.[jt]s$`)
+var skipCode = regexp.MustCompile(`(^|/)\.[^/]+/|(^|/)(vendor|node_modules|dist|build|target|coverage|__pycache__|\.venv|venv|\.next|www|public)/|_test\.go$|\.(spec|test)\.[jt]sx?$|(^|/)(tests?|__tests__|mocks?|testdata)/|(^|/)test_[^/]+\.py$|\.d\.ts$|\.min\.js$|\.config\.[jt]s$`)
 
 var (
 	goBlock   = regexp.MustCompile(`(?ms)^import\s*\((.*?)^\)`)
