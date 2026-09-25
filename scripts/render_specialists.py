@@ -15,7 +15,7 @@ DESCRIPTIONS = {
 
 def projections() -> dict[Path, str]:
     router = (ROOT / "kernel/AGENTS.md").read_text(encoding="utf-8")
-    contract = router.split("## Evidence and completion\n", 1)[1].split("### Initiative within authority", 1)[0].strip()
+    contract = router.split("## Evidence contract\n", 1)[1].split("\n## ", 1)[0].strip()
     output = {}
     for name, description in DESCRIPTIONS.items():
         role = (ROOT / "kernel/90-Meta/specialists" / f"{name}.md").read_text(encoding="utf-8").strip()

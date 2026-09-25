@@ -36,6 +36,9 @@ const Help = `discover COMMAND --vault PATH [options]
              configured resource is evidenced or addressed; freshness of cited files;
              --semantic asks Jev whether each cited sentence is supported (review aid).
              A candidate outside the vault is matched to its repository by its aliases.
+  corrections  Note relations the last run could not support, as correction tasks.
+  claims     --file DRAFT|-   Check a draft answer before delivery: resource names that no
+             fact, platform snapshot or note knows, and relations discovery contradicts.
 Facts and questions are local (.agents/state/discovery). Judgments and platform snapshots
 are versioned under 90-Meta/discovery/. All output is JSON.`
 
@@ -171,6 +174,10 @@ func Run(args []string, out io.Writer) error {
 		return showReport(o, out)
 	case "check":
 		return runCheck(o, out, o.semantic)
+	case "corrections":
+		return listCorrections(o, out)
+	case "claims":
+		return runClaims(o, out)
 	}
 	return fmt.Errorf("unknown discover command %q", cmd)
 }

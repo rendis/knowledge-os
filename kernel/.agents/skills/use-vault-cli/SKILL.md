@@ -73,6 +73,8 @@ Some judgments need semantic understanding (what a dependency talks to, what a c
 
 `discover check --vault "<root>" --note <path> [--semantic]` gates a repository note or candidate (a candidate outside the vault is matched by its `aliases`): G1 source permalinks resolve at their commit and the backticked identifiers of each footnote are in the cited lines; G2 every connector category and resource group of the facts is cited or named; G3 (`review`) a relation to a topic/event note that the repository's evidence does not name; stale cited files since `commit-analizado`. `error` blocks publication; `pending` becomes `Verificaciones pendientes`; `review` goes to the reviewer. `--semantic` (Jev) flags cited sentences the code does not support; it is a review aid for atomic sentences, not a verdict.
 
+`discover claims --vault "<root>" --file <draft>` checks a draft answer before delivery: quoted or linked resource names that no discovery fact, platform snapshot or vault text knows (`unknown_names`), and relations the last run found unsupported that the answer mentions (`contradicted_relations`). It needs a previous `discover run`. `discover corrections --vault "<root>"` lists every unsupported note relation as a correction task.
+
 ## Refresh and failures
 
 Retrieval refreshes the local SQLite index automatically by comparing file fingerprints and updating changed files. Markdown remains authoritative. Run `index --vault "<root>" --rebuild` only for an explicit rebuild request or diagnosed index recovery; an empty search alone is not evidence of corruption.

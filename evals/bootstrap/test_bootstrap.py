@@ -255,6 +255,10 @@ class BootstrapEval(unittest.TestCase):
         self.assertNotIn("90-Meta/jira-evidence.md", operational)
         self.assertIn("references/work-items.md", operational)
 
+    def test_specialists_follow_the_router_contract(self) -> None:
+        result = subprocess.run([sys.executable, "-B", str(DIST / "scripts/render_specialists.py"), "--check"], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
     def test_shared_vault_interfaces_are_kernel_owned(self) -> None:
         for relative in (
             "90-Meta/resolve-vault.py",

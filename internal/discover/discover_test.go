@@ -1,6 +1,8 @@
 package discover
 
 import (
+	"bytes"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -471,5 +473,36 @@ func TestStaleNeighboursAfterSync(t *testing.T) {
 	}
 	if len(stale) != 1 || !strings.HasPrefix(stale[0], "25-Topics/orders-out.md") || !strings.Contains(stale[0], "svc/save.go") || strings.Contains(stale[0], "other.go") {
 		t.Fatalf("only the neighbour citing a changed file at an older commit is stale: %v", stale)
+	}
+}
+
+func TestClaimsAndCorrections(t *testing.T) {
+	vault := t.TempDir()
+	facts := repoFacts{Repo: "SVC-orders", Resources: []resource{{Type: "pubsub_subscription", Name: "projects/p-prd/subscriptions/orders-cl-inbound-sub", Topic: "projects/p-prd/topics/orders-inbound"}}}
+	if e := writeState(vault, "facts/SVC-orders.json", facts); e != nil {
+		t.Fatal(e)
+	}
+	cmp := []comparison{{Repo: "SVC-orders", Note: "20-Repos/orders.md", Discrepancies: []discrepancy{{Field: "gatillado-por", Target: "legacy-orders-topic", Found: []string{"orders-inbound"}}}}}
+	if e := writeState(vault, "comparison.json", cmp); e != nil {
+		t.Fatal(e)
+	}
+	write(t, vault, "25-Topics/stock-topic.md", "---\ntipo: topic\nnombre-raw: \"stock-inbound-{cl|pe}\"\n---\n# stock\n")
+	write(t, vault, "90-Meta/discovery/platform/gcp-pubsub-p-prd.json", `{"provider":"gcp-pubsub","project":"p-prd","status":"ok","topics":["projects/p-prd/topics/audit-events"],"subscriptions":[]}`)
+	draft := "El servicio consume `orders-cl-inbound-sub` del topic `orders-inbound`, y audita en `audit-events` y `stock-inbound-pe`.\n\n" +
+		"Según [[orders]], también lo dispara `legacy-orders-topic`.\n\nPublica además en `invented-orders-topic`; ver `cmd/main.go` y `pubsub.NewClient` con `GCP_PROJECT_ID`.\n"
+	r, e := checkClaims(vault, draft)
+	if e != nil {
+		t.Fatal(e)
+	}
+	unknown := fmt.Sprint(r["unknown_names"])
+	if r["ok"] != false || !strings.Contains(unknown, "invented-orders-topic") || strings.Contains(unknown, "stock-inbound-pe") || strings.Contains(unknown, "main.go") || strings.Contains(unknown, "GCP_PROJECT_ID") {
+		t.Fatalf("only names no evidence knows are flagged: %v", r)
+	}
+	if !strings.Contains(fmt.Sprint(r["contradicted_relations"]), "legacy-orders-topic") {
+		t.Fatalf("a relation discovery contradicts must be flagged: %v", r)
+	}
+	var b bytes.Buffer
+	if e := listCorrections(options{vault: vault}, &b); e != nil || !strings.Contains(b.String(), `"target": "legacy-orders-topic"`) {
+		t.Fatalf("corrections %v %s", e, b.String())
 	}
 }
