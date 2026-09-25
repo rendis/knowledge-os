@@ -33,7 +33,7 @@ Group related missing choices into concise questions. Stop only the actions that
 
 On a missing vault, first initialize it through the distribution installer once portable identity/profile/locale and optional selections or deferrals are resolved; then use the resolver and local configuration steps below. Keep local paths in workspace configuration. Cloning, source inspection and sync wait for their source scope and access choices. External vault publication and live-environment access remain separate capabilities, required only when requested.
 
-Before reading or changing configuration, load `../../../90-Meta/vault-resolution.md`. Resolve an explicit vault-root directory with `<VAULTCTL> config resolve --vault "<CANDIDATE_ROOT>"`. Bind `VAULT_ROOT` only from a successful `resolved` result. Bind `<VAULTCTL>` through [use-vault-cli](../use-vault-cli/SKILL.md) before resolution. A resolution error blocks configuration. The native resolver checks the explicit path and its ancestors; an optional Obsidian registration probe never selects another vault.
+Bind the vault through [use-vault-cli](../use-vault-cli/SKILL.md#bind-the-executable-and-vault), reusing the session's binding. Bind `VAULT_ROOT` only from a successful `resolved` result. Bind `<VAULTCTL>` through [use-vault-cli](../use-vault-cli/SKILL.md) before resolution. A resolution error blocks configuration. The native resolver checks the explicit path and its ancestors; an optional Obsidian registration probe never selects another vault.
 
 ## 1. Inspect
 

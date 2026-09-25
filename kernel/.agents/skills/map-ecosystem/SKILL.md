@@ -37,6 +37,7 @@ Choose the next action from the existing knowledge, not from the number of pendi
 | --- | --- |
 | Full onboarding requested, or the selected task requires source access and roots/acquisition choice are missing | Use `configure-workspace` to collect unresolved decisions before source acquisition; return to the selected map branch afterward. |
 | Incomplete bootstrap or where-to-start request | Load `references/orientation.md`. |
+| Which service publishes/consumes a topic, event, table or endpoint | Read the discovery facts (`<cli> discover report --vault "<vault>" --repo <name>`, or run `discover run` when absent) and the platform wiring they cite; open the owning notes for behavior. |
 | Context, dependency, or impact question | Load `references/interrogation.md`. |
 | A related vault is discovered in authorized repository exploration or supplied by the user | Load `references/cross-vault-consultation.md` before consulting it; return to the active branch. |
 | Register, update, list or remove related vaults; or a mapping discovers a candidate to register | Load `references/vault-catalog.md`; discovery requires confirmation before registration. |
@@ -50,9 +51,9 @@ Choose the next action from the existing knowledge, not from the number of pendi
 
 ## Execution Steps
 
-1. Load `../../../90-Meta/vault-resolution.md` and run `<cli> config resolve --vault "<candidate-root>"` using the installed binary; the candidate is the supplied path or the root three levels above this installed skill. Bind the resolved vault and configured source roots; a failed resolution blocks root-dependent work.
+1. Bind the vault through [use-vault-cli](../use-vault-cli/SKILL.md#bind-the-executable-and-vault), reusing the session's binding. Bind the resolved vault and configured source roots; a failed resolution blocks root-dependent work.
 2. Select one primary branch from the table. Load only its recipe and supporting references it explicitly requires.
-3. For documentation, load `references/evidence-extraction.md` for bounded main-flow scope, preservation and directed review. Before a source read or delegation, bind its checkout by configured remote identity. Before a technical write, load `../../../90-Meta/evidence-policy.md` and `../../../90-Meta/node-selection.md`.
+3. For documentation, load `references/repository-map.md`: start from the discovery facts, write with the checkable evidence format and pass `discover check` before review. Before a source read or delegation, bind its checkout by configured remote identity. Before a technical write, load `../../../90-Meta/evidence-policy.md` and `../../../90-Meta/node-selection.md`.
 4. After local-map acceptance, reconcile only external connections required by the task. Exhaust versioned evidence before requesting a missing live capability, so the request names the exact provider/project, cluster context or database target and read-only question. A discovered connection grants no access: use the configured executor or adapter to prove bounded read-only access against that target with existing authentication. Use workspace configuration only to bind a missing procedure; after missing setup becomes available, rerun the same probe and resume the pending connection without remapping the repository. Load `references/deployment-evidence.md` when that reconciliation or an explicit deployment audit needs current platform evidence. Publish reconciliation results through the ordinary single-unit or multi-unit recipe and `references/final-note-review.md`.
 5. Before declaring a system map complete, follow `references/mapping-completion.md`: reconcile the scoped cross-repository questions and align current visible coverage with publication outcomes.
 6. Report inspected evidence, changes, limitations, and observed checks. Stop when the selected recipe's completion criterion is met.

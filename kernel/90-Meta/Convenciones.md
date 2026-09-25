@@ -54,7 +54,7 @@ Operational areas are discovered from `60-Operacion/<Area>/<Area>.md` and consis
 
 Decision rules: update before duplicating; a service is not a flow; a business flow is not an operational procedure; a learning is not a technical production claim; runtime is not an integration; low-level tables/buckets stay as strings; ambiguity does not create a node; do not invent folder types locally.
 
-Skip types listed as disabled in `instance.yaml` `graph.enabled_types`.
+Skip types listed as disabled in `instance.yaml` `graph.enabled_types`. Local ignored stores (unpublished cases, plans, scratch code, discovery state) are listed in [[local-stores]].
 
 ## Lifecycle
 
@@ -187,7 +187,7 @@ An event is one message type on a shared topic, observed in subscription filters
 ```yaml
 ---
 tipo: evento
-nombre-raw: "<attribute value, e.g. saleTransactionConfirmed>"
+nombre-raw: "<attribute value, e.g. orderConfirmed>"
 sistema: "[[System]]"
 topico: "[[<carrier topic>]]"
 tags: []

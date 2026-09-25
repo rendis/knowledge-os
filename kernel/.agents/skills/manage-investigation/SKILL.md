@@ -13,7 +13,7 @@ Own documentary persistence and traceability, not the general inquiry method. An
 
 Always:
 
-1. Load `../../../90-Meta/vault-resolution.md` and bind `<VAULTCTL>` through [use-vault-cli](../use-vault-cli/SKILL.md), then run `<VAULTCTL> config resolve --vault "<candidate-root>"`. Bind one canonical `VAULT_ROOT`; use `VAULT_ROOT/investigations/` as the published root. The helper also resolves `.investigations/` and `.investigations-private/` beside it.
+1. Bind the vault through [use-vault-cli](../use-vault-cli/SKILL.md#bind-the-executable-and-vault), reusing the session's binding. Bind one canonical `VAULT_ROOT`; use `VAULT_ROOT/investigations/` as the published root. The helper also resolves `.investigations/` and `.investigations-private/` beside it.
 2. Require `investigations/` to be eligible for tracking. Require both `.investigations-private/` and `.investigations/` to be ignored and absent from `git ls-files` when they exist.
 3. Use the selected `<VAULTCTL> investigation` for Open, Load, List, Snapshot, Save, Save resources, Publish, Transition, Consolidate, Bind, Close, Retire, and validation; do not reproduce its discovery, locking, attribution, or recovery logic manually. `--root` is always `$VAULT_ROOT/investigations` even when the live case is unpublished.
 

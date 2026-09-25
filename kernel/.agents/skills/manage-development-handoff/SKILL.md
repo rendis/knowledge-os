@@ -13,7 +13,7 @@ For a disputed repository-state claim, apply [evidence-driven-analysis](../evide
 
 Bind `<vaultctl>` through [use-vault-cli](../use-vault-cli/SKILL.md) before the preflight.
 
-1. Load `../../../90-Meta/vault-resolution.md` and run `<vaultctl> config resolve --vault <vault-root>`. Bind `VAULT_ROOT` and source context only from one canonical `resolved` result.
+1. Bind the vault through [use-vault-cli](../use-vault-cli/SKILL.md#bind-the-executable-and-vault), reusing the session's binding. Bind `VAULT_ROOT` and source context only from one canonical `resolved` result.
 2. For every route that materializes or activates content, load [the input-bundle contract](references/input-bundle.md) and complete its intake protocol until every target is `exact-package`. Resolve `producer-required` through `manage-investigation` and continue this workflow with the exact directories it produced; stop `invalid-package` at the producer with its exact failure. Never inspect or change the source investigation or tracker. Validation and state updates use an exact repository remote and worktree path and do not require a package.
 3. Treat the producer's sufficiency result as scoped to the selected story and repository package. Never infer it from the investigation's `investigating`, `blocked`, or `closed` state, and never change or close the investigation because of a worktree lifecycle event.
 4. Resolve the development worktree root through the configuration API. If it is missing or unavailable, invoke `configure-workspace`; resume only after `<vaultctl> config worktree-root --vault <vault-root>` returns an existing configured directory.
