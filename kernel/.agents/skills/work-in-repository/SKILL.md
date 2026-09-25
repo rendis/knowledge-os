@@ -25,11 +25,9 @@ This loads context into the current conversation. It does not register skills na
 
 Repository instructions govern that repository's work; vault instructions govern vault records and workflow transitions. Keep higher-priority instructions and the user's authorized scope. Retain each instruction's owning root and subtree so switching repositories does not carry local rules into another target. Rebind on a target, branch, or worktree change; inspect newly applicable instructions when the affected paths change. After lost context, reload these bindings before mutation.
 
-## Existing development handoffs
+## Development handoffs
 
-If the target contains .knowledge-os-handoffs/ACTIVE.yaml, load the repository's managed handoff block and follow its preflight before implementation: select the task's exact entries, validate identity and revision, and respect state, scope and immutable inputs. Use [manage-development-handoff](../manage-development-handoff/SKILL.md) for validation and authorized lifecycle transitions. A missing or invalid managed block requires its authorized refresh; a repository task cannot bypass it.
-
-The agent implementing in this target owns the implementation role even when its conversation began in the vault. Record material deltas in the selected handoff's implementation-updates.md as required by the managed block. Keep case reconciliation with [reconcile-development-handoff](../reconcile-development-handoff/SKILL.md) and its case writer; implementation does not itself authorize case, tracker, or canonical knowledge writes. With no registry, follow the repository's ordinary workflow.
+When the target has `.handoff/`, follow the development-handoff section of its `AGENTS.md`: the task files define what to change and how to verify it, and definition changes, decisions, deviations, questions and verification results go to `.handoff/deltas.md`. A target prepared by an earlier version (`.knowledge-os-handoffs/ACTIVE.yaml`) follows the managed block it carries. Implementing does not authorize case, tracker or vault writes; reconciliation into the investigation belongs to [manage-development-handoff](../manage-development-handoff/SKILL.md). Without a handoff, follow the repository's ordinary workflow.
 
 ## Implement and verify
 

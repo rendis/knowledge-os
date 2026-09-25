@@ -46,8 +46,7 @@ Select one primary skill; an auxiliary skill supplies a method and the primary k
 - [manage-investigation](.agents/skills/manage-investigation/SKILL.md) — investigation cases, publication, absorption and retirement.
 - [manage-investigation-derived-learning](.agents/skills/manage-investigation-derived-learning/SKILL.md) — assess and publish `70-Aprendizajes/` notes.
 - [work-in-repository](.agents/skills/work-in-repository/SKILL.md) — implementation in a source repository from this session.
-- [manage-development-handoff](.agents/skills/manage-development-handoff/SKILL.md) — prepare and validate development handoffs in work-item worktrees.
-- [reconcile-development-handoff](.agents/skills/reconcile-development-handoff/SKILL.md) — pull one handoff's implementation evidence into its case, preserving its worktree-local lifecycle state.
+- [manage-development-handoff](.agents/skills/manage-development-handoff/SKILL.md) — prepare a repository for one atomic development task, read its progress, reconcile it into the investigation.
 - [manage-git-workflow](.agents/skills/manage-git-workflow/SKILL.md) — the cell's Git/GitHub policy notes and applying them.
 - [manage-operational-workflow](.agents/skills/manage-operational-workflow/SKILL.md) — audits, operational procedures and runs in `.operations/`.
 - [inspect-database](.agents/skills/inspect-database/SKILL.md) — database evidence through the target's configured runbook.

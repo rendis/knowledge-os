@@ -162,17 +162,6 @@ func TestPolicyUpdates(t *testing.T) {
 		})
 	}
 }
-func TestPolicyAssetsMatchSkill(t *testing.T) {
-	for _, name := range []string{"agents-managed-block.md", "start.md", updatesName} {
-		b, e := os.ReadFile(filepath.Join("..", "..", "kernel", ".agents", "skills", "manage-development-handoff", "assets", name))
-		if e != nil {
-			t.Fatal(e)
-		}
-		if !bytes.Equal(b, asset(name)) {
-			t.Fatalf("embedded asset drift: %s", name)
-		}
-	}
-}
 
 func TestPolicyTimestampISOForms(t *testing.T) {
 	for _, s := range []string{"2026-09-24T12:00:00Z", "20260924T120000+0000", "2026-09-24 12:00+00:00", "2026-W39-4T12:00:00Z", "2026W394T12:00:00Z", "2026-09-24_12:00:00,123+00:00", "2026-09-24☀12:00:00Z"} {

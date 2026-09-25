@@ -168,3 +168,14 @@ func TestIntroducedErrorsOnlyBlockNewDefects(t *testing.T) {
 		t.Fatalf("a new unsourced record blocks: %v", introduced)
 	}
 }
+
+func TestCheckGatesHandoffPackages(t *testing.T) {
+	v := vault(t)
+	p := ".investigations/20260925-100000-ordenes/investigation.md"
+	write(t, v, p, caseText(""))
+	write(t, v, ".investigations/20260925-100000-ordenes/handoffs/DH-001.md", "---\nhandoff: DH-001\ncase: 20260925-100000-ordenes\nrepository: https://github.com/acme/orders.git\nbase: main\nbranch: issue/x\n---\n\n# Tarea\n\n## Tarea\n\nHacer algo.\n\n## Cambios\n\n## Criterios de aceptación\n\n- Test.\n")
+	r, _ := Check(v, p)
+	if r.OK || !strings.Contains(issues(r, "error"), "handoffs/DH-001.md: section Cambios") {
+		t.Fatalf("an incomplete task package blocks the case: %+v", r.Issues)
+	}
+}

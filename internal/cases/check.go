@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 
+	"documentation-vault/internal/devhandoff"
 	"documentation-vault/internal/discover"
 )
 
@@ -244,6 +245,18 @@ func checkWith(vault, path string, ix vaultIndex) (Result, error) {
 				add(strict, "[["+n+"]]", fmt.Sprintf("a paragraph repeats %d%% of this note; reference it with [[%s]] and keep only what is new", c*100/len(sh), n))
 				break
 			}
+		}
+	}
+
+	// Task packages prepared for handoffs pass their own gate.
+	pkgs, _ := filepath.Glob(filepath.Join(dir, "handoffs", "DH-*.md"))
+	for _, pp := range pkgs {
+		_, issues, e := devhandoff.CheckPackage(pp)
+		if e != nil {
+			continue
+		}
+		for _, i := range issues {
+			add(i.Severity, "handoffs/"+filepath.Base(pp), i.Detail)
 		}
 	}
 

@@ -4,7 +4,7 @@ tags: [meta]
 
 # Auditoría documental del vault
 
-Este framework es la fuente de verdad para evidencia, scripts y gates del mapa de la célula, del dominio documental operacional y de los aprendizajes de ingeniería. El esquema y las relaciones viven en [[Convenciones]]; `map-ecosystem` mantiene el mapa, `manage-operational-workflow` ejecuta procedimientos con efectos externos, `generate-reports` genera reportes registrados, `reconcile-development-handoff` obtiene evidencia desde worktrees registrados y la reconcilia en la investigación, y `manage-investigation-derived-learning` mantiene enseñanzas acumulativas.
+Este framework es la fuente de verdad para evidencia, scripts y gates del mapa de la célula, del dominio documental operacional y de los aprendizajes de ingeniería. El esquema y las relaciones viven en [[Convenciones]]; `map-ecosystem` mantiene el mapa, `manage-operational-workflow` ejecuta procedimientos con efectos externos, `generate-reports` genera reportes registrados, `manage-development-handoff` prepara tareas atómicas por repositorio y reconcilia su avance en la investigación, y `manage-investigation-derived-learning` mantiene enseñanzas acumulativas.
 
 ## Principio Obsidian-native
 
@@ -50,7 +50,7 @@ Este gate decide si una investigación aporta una enseñanza versionable en `70-
 Una conclusión es `extractable` solo cuando cumple todas las condiciones aplicables:
 
 1. **Identidad reutilizable**: formula una pregunta o problema estable y un contexto material de aplicabilidad; no es una bitácora, resumen de sesión, obviedad ni detalle exclusivo de un caso.
-2. **Evidencia durable y reconsultable**: cada afirmación decisiva traza a fuentes inspeccionadas que otro agente autorizado puede revisitar, o a un método cuyo procedimiento, entradas y criterios están conservados en una fuente durable/versionada o pueden reejecutarse desde tooling versionado. Un expediente versionado bajo `investigations/` conserva procedencia y decisiones, pero su narrativa no prueba comportamiento productivo. Memoria y artefactos locales transitorios sirven solo como pistas; la misma limitación aplica a `.investigations/`, `.investigations-private/`, `.operations/`, `.knowledge-os-handoffs/` y `.plan/`.
+2. **Evidencia durable y reconsultable**: cada afirmación decisiva traza a fuentes inspeccionadas que otro agente autorizado puede revisitar, o a un método cuyo procedimiento, entradas y criterios están conservados en una fuente durable/versionada o pueden reejecutarse desde tooling versionado. Un expediente versionado bajo `investigations/` conserva procedencia y decisiones, pero su narrativa no prueba comportamiento productivo. Memoria y artefactos locales transitorios sirven solo como pistas; la misma limitación aplica a `.investigations/`, `.investigations-private/`, `.operations/`, worktree `.handoff/` stores y `.plan/`.
 3. **Comparación verificable**: identifica baseline, alternativas, entorno, escala o muestra/ventana, controles, métricas o criterios observables y exclusiones capaces de cambiar el resultado. Conserva resultados positivos, negativos y neutrales.
 4. **Conclusión sostenida**: la decisión y su justificación se derivan de los resultados sin ocultar contradicciones ni generalizar más allá de lo medido.
 5. **Límites explícitos**: declara cuándo aplica, cuándo no aplica, limitaciones aceptadas y eventos que obligan a revalidar.
@@ -70,7 +70,7 @@ Los tickets, correos y mensajes prueban el resultado de una ejecución, pero no 
 
 ## Evidencia de reconciliación de desarrollo
 
-`implementation-updates.md` conserva únicamente cómo mutó o se complementó la definición exportada: fuente, cambio, justificación/acuerdo, impacto, evidencia y análisis solo cuando existió. El repositorio persiste allí esas deltas y deja `ACTIVE.yaml` intacto; no invoca al vault ni envía un paquete de retorno. `reconcile-development-handoff` resuelve el worktree desde el registro `DH-NNN` de la investigación y contrasta el changelog con el baseline, la implementación, pruebas, rama remota/PR y work item actuales. Un cambio material no registrado bloquea la reconciliación; un changelog vacío nunca demuestra por sí solo que el alcance no cambió.
+`.handoff/deltas.md` conserva únicamente cómo cambió o se complementó la definición de la tarea: tipo, detalle y evidencia. El repositorio registra allí esas deltas y el avance vive en la rama (commits, pruebas, pull request); no escribe en el vault. `manage-development-handoff` lee el worktree con `handoff status` y reconcilia en la investigación los commits y deltas posteriores a la última marca `reconciled-through` del registro `DH-NNN`. Un cambio material sin delta bloquea la reconciliación; un archivo de deltas vacío nunca demuestra por sí solo que el alcance no cambió.
 
 La reconciliación consulta como máximo un salto de relaciones tipadas cuando el tracker las soporta para identificar work items directamente dependientes y entrega el contrato que cada uno necesita, su readiness y el estado exacto de repo/rama/PR. Rama local, ref remota, pull request, merge y despliegue son estados separados. Todo este material sigue siendo contexto futuro o no desplegado: actualizar el expediente no satisface el gate de realidad productiva ni autoriza una escritura técnica en el vault.
 
@@ -104,7 +104,7 @@ Select `<cli>` through `use-vault-cli` (`.agents/skills/use-vault-cli/SKILL.md`)
 | `<cli> discover run`, `discover check --note <note>` | Extract connection facts at an exact commit; gate a note: anchors resolve, identifiers are in the cited lines, every discovered connector and resource is addressed. | Facts are evidence pointers; the checks prove anchors and coverage, not the correctness of the prose. |
 | `<cli> sync start`, `review`, `verify`, `finish` | Publish knowledge on a `sync/` branch: review bound to the exact content by digest, gates versus the base, fast-forward merge. | A recorded review is the reviewer's verdict, not proof; remote publication follows the Git policy. |
 | `<cli> investigation new\|list\|check --vault "<vault_root>"` | Create a case from its type's template, find cases (retired included), gate a case: sourced evidence, resolving IDs and links, no copied vault text, no credential or local path. | `sync verify` runs `check` on changed cases (introduced errors block). The CLI does not judge whether evidence is sufficient; the independent review does. |
-| `<cli> handoff <command>` | Plan/prepare worktrees and handoff families; validate or update a selected handoff. | Preserve Git identity, reviewed plans and closure fingerprints; no tracker writes, code changes, commits or remote publication are implied. |
+| `<cli> handoff start\|status\|refresh --vault "<vault_root>"` | Prepare a worktree for a task package (preview, then `--apply`), read progress and deltas, refresh a changed task. | Never commits, pushes or fetches; the managed segment in `AGENTS.md` is identical in every repository. Legacy verbs remain for worktrees from earlier versions. |
 | `<cli> check visual`, `check visual-context` | Check visual structure and required context. | Browser rendering remains a separate skill responsibility; browser resources stay in the skill. |
 
 For deployment/configuration evidence, inspect the exact source files and relevant cross-repository references using the source context. Search hits identify inspection targets; they do not establish a deployment chain or verified dependency.
@@ -142,7 +142,7 @@ Consumer validation requires the installed native binary. Development dependenci
 
 La allowlist común de huérfanos esperados es `00-Home.md` y `README.md`: son entradas del vault, no fallas. `AGENTS.md` y cualquier `CLAUDE.md` propio de la celda quedan fuera del grafo documental. Scripts, plantillas y metadocumentos deben quedar enlazados desde este framework o desde otro índice.
 
-Los expedientes `investigations/`, los no publicados `.investigations/`, sus overlays y `local/` en `.investigations-private/`, las ejecuciones `.operations/` y los handoffs `.knowledge-os-handoffs/` quedan fuera del grafo técnico y sus gates. El versionamiento del expediente no lo convierte en una fuente paralela de verdad técnica.
+Los expedientes `investigations/`, los no publicados `.investigations/`, sus overlays y `local/` en `.investigations-private/`, las ejecuciones `.operations/` y los handoffs (`.handoff/` en cada worktree) quedan fuera del grafo técnico y sus gates. El versionamiento del expediente no lo convierte en una fuente paralela de verdad técnica.
 
 ## Criterio de cierre
 

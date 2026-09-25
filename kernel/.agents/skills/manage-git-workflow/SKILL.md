@@ -72,4 +72,4 @@ Execution is complete only when the requested result is observed and every addit
 
 This skill owns the specific Git/GitHub operational notes and their area-index links, as well as authorized repository operations. The MOC remains navigation; it never becomes the policy document. Policy rules come from the applicable normative authority and do not require implementation or production evidence. Technical mapping consumes the specific notes without rewriting them. Preserve the operational note format and canonical links when maintaining policy.
 
-Route persistent work-item worktree creation, attachment, materialization, and handoff state through `manage-development-handoff`. This skill may operate inside an existing repository or worktree, but it does not change `.knowledge-os-handoffs/` or investigation records.
+Route development-task worktree preparation through `manage-development-handoff`. This skill may operate inside an existing repository or worktree, but it does not change `.handoff/` or investigation records.

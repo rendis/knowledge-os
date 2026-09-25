@@ -78,6 +78,9 @@ func TestPythonReadsNativeFamily(t *testing.T) {
 	if err = exec.Command(python, "-c", "import ruamel.yaml").Run(); err != nil {
 		t.Skip("ruamel compatibility oracle unavailable")
 	}
+	if _, err = os.Stat(filepath.Join("..", "..", "kernel", ".agents", "skills", "manage-development-handoff", "scripts", "development-handoff.py")); err != nil {
+		t.Skip("Python oracle retired with the legacy handoff workflow")
+	}
 	o := familyFixture(t)
 	p, err := PlanFamily(o)
 	if err != nil {
