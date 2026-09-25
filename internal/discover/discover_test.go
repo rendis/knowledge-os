@@ -506,3 +506,37 @@ func TestClaimsAndCorrections(t *testing.T) {
 		t.Fatalf("corrections %v %s", e, b.String())
 	}
 }
+
+func TestShortNamesAreCheckedInTheProjectTheirFileDeclares(t *testing.T) {
+	dir := t.TempDir()
+	svc := gitRepo(t, filepath.Join(dir, "SVC-stock"), map[string]string{
+		"go.mod":         "module example.com/stock\n",
+		"k8s/prd/env-cl": "PROJECT_ID=x-app-prd\nSUB=stock-cl-sub\nTOPIC=catalog-topic\n",
+		"k8s/uat/env-cl": "PROJECT_ID=x-app-uat\nSUB=stock-cl-sub\nTOPIC=catalog-topic\n",
+	})
+	st := &store{Dependencies: map[string]judgment{}, ConfigKeys: map[string]judgment{}, ConfigValues: map[string]judgment{}}
+	s := scan(t, "SVC-stock", svc)
+	for _, e := range s.entries {
+		choice := map[string]string{"PROJECT_ID": "cloud_project_or_region", "SUB": "pubsub_subscription", "TOPIC": "pubsub_topic"}[e.Key]
+		st.ConfigKeys[keySignature(e)] = judgment{Choice: choice, Confidence: 0.95}
+		st.ConfigValues[entryID(e)] = judgment{Choice: choice, Confidence: 0.95}
+	}
+	snaps := []platformSnapshot{
+		{Project: "x-app-prd", Status: "ok", Subscriptions: []pubsubSubscription{{Name: "projects/x-app-prd/subscriptions/stock-cl-sub", Topic: "projects/other-sys-prd/topics/catalog-topic"}}},
+		{Project: "x-app-uat", Status: "ok"},
+		{Project: "other-sys-prd", Status: "ok", Topics: []string{"projects/other-sys-prd/topics/catalog-topic"}},
+	}
+	a := &assembly{scans: []*repoScan{s}, st: st, platform: buildPlatformIndex(snaps)}
+	f := a.facts()[0]
+	subjects := []string{}
+	for _, p := range f.Pending {
+		subjects = append(subjects, p.Subject)
+	}
+	joined := strings.Join(subjects, " | ")
+	if !strings.Contains(joined, "stock-cl-sub @ x-app-uat") {
+		t.Fatalf("a subscription present in prd but absent in the uat project its file declares is pending: %v", subjects)
+	}
+	if strings.Contains(joined, "catalog-topic @") {
+		t.Fatalf("a topic owned by another system's project is not missing from the consumer's project: %v", subjects)
+	}
+}
