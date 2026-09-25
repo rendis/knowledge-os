@@ -77,7 +77,10 @@ new instructions use only `.agents/bin/`.
 
 The release adds the size of six builds to each consumer repository. Git transfers
 binary updates with the kernel; this deliberately trades repository size for
-self-contained clones while no public artifact download channel exists.
+self-contained clones while no public artifact download channel exists. A team
+whose developers all have `git-lfs` can keep history small with
+`git lfs track ".agents/bin/vaultctl-*"` (committed `.gitattributes`); clones then
+download only the current builds. `update` does not manage `.gitattributes`.
 
 Search hashes eligible Markdown on each explicit retrieval call and updates
 only changed files in one SQLite transaction. The index is local, disposable,
