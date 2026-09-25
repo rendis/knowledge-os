@@ -11,9 +11,8 @@ from unittest.mock import patch
 DIST = Path(__file__).resolve().parents[2]
 META = DIST / "kernel/90-Meta"
 sys.path.insert(0, str(META))
-sys.path.insert(0, str(DIST / "evals/sync"))
+SOURCE_REPOSITORY = "FIX-source-service"
 from instance import dump_instance, load_instance
-from fixtures import NODE, SOURCE_CLAIM, SOURCE_REPOSITORY, make_repository_pair, package_artifacts
 
 
 def load(name, path):
@@ -37,7 +36,6 @@ class ReferenceBranchTests(unittest.TestCase):
         (cls.vault / "instance.yaml").write_text(dump_instance(instance))
         cls.inventory = load("branch_inventory", cls.vault / "90-Meta/vault-inventory.py")
         cls.audit = load("branch_audit", cls.vault / "90-Meta/audit-vault.py")
-        cls.manifest = load("branch_manifest", META / "git-change-manifest.py")
 
     @classmethod
     def tearDownClass(cls):
@@ -96,25 +94,6 @@ class ReferenceBranchTests(unittest.TestCase):
         with patch.object(tool, "load_notes", return_value=[note]), patch.object(tool, "load_acknowledgements", return_value=[acknowledgement]), patch.object(tool, "load_org", return_value=[remote]), patch.object(tool, "is_tracked_repository", return_value=True):
             result = tool.build_inventory(self.vault, "test", github)
         self.assertEqual(result[0]["status"], "acknowledged-no-change")
-
-    def test_package_uses_policy_and_still_rejects_a_moved_ref(self):
-        tool = self.manifest
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            source, _, _ = make_repository_pair(root)
-            artifacts = package_artifacts(root, source, SOURCE_REPOSITORY, claim_id=SOURCE_CLAIM, requested_nodes=(NODE,))
-            subprocess.run(["git", "-C", str(source), "branch", "release/stable"], check=True, capture_output=True)
-            result = tool.close_package(source, *artifacts, "refs/heads/release/stable", "2026-09-14", self.vault)
-            self.assertEqual(result["status"], "complete", result)
-            self.assertEqual(tool.validate_closed_package_value(result), [])
-            with self.assertRaises(tool.ContractError):
-                tool.close_package(source, *artifacts, "refs/heads/main", "2026-09-14", self.vault)
-            with self.assertRaises(tool.ContractError):
-                tool.close_package(source, *artifacts, "refs/heads/release/stable", "2026-09-14")
-            subprocess.run(["git", "-C", str(source), "branch", "-f", "release/stable", "HEAD~1"], check=True, capture_output=True)
-            with self.assertRaises(tool.ContractError) as failure:
-                tool.close_package(source, *artifacts, "refs/heads/release/stable", "2026-09-14", self.vault)
-            self.assertEqual(failure.exception.code, "package-source-stale")
 
 
 if __name__ == "__main__":

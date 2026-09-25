@@ -724,11 +724,9 @@ def cmd_adopt(args: argparse.Namespace) -> int:
         return 2
     conflicts = ownership_conflicts(dest, instance["adapters"], set())
     conflicts.extend(native_runtime.conflicts(dest, native_runtime.release(DIST), None))
-    overlays = dest / ".agents" / "overlays"
-    uncovered = [rel for rel in conflicts if not overlay_covers(overlays, dest, rel)]
-    if uncovered and not args.force:
-        print(json.dumps({"status": "ownership-conflict", "files": uncovered}, indent=2))
-        print("distribution-owned files differ; move cell logic to extensions or pass --force", file=sys.stderr)
+    if conflicts and not args.force:
+        print(json.dumps({"status": "ownership-conflict", "files": sorted(set(conflicts))}, indent=2))
+        print("distribution-owned files differ; move cell logic to cell-owned files or pass --force", file=sys.stderr)
         return 3
     copy_kernel(dest, instance["adapters"])
     ensure_gitignore_lines(dest)
@@ -736,22 +734,6 @@ def cmd_adopt(args: argparse.Namespace) -> int:
     write_lock(dest, instance["adapters"])
     print(json.dumps({"status": "adopted", "dest": str(dest), "cell": instance["cell"]}, indent=2))
     return 0
-
-
-def overlay_covers(overlays: Path, vault: Path, rel: str) -> bool:
-    """True when a local overlay exists for this managed relative path."""
-    parts = Path(rel).parts
-    if len(parts) >= 2:
-        if (overlays / parts[-2] / Path(rel).name).exists():
-            return True
-    elif (overlays / Path(rel).name).exists():
-        return True
-    target = vault / rel
-    if target.is_symlink():
-        linked = Path(os.readlink(target))
-        if not linked.is_absolute():
-            return overlay_covers(overlays, vault, linked.as_posix())
-    return False
 
 
 def ownership_conflicts(
@@ -880,13 +862,11 @@ def cmd_update(args: argparse.Namespace) -> int:
         return 3
     drifted.extend(native_runtime.conflicts(dest, native_runtime.release(DIST), lock.get("runtime_release")))
     drifted = sorted(set(drifted))
-    overlays = dest / ".agents" / "overlays"
     if drifted and not args.force:
-        uncovered = [rel for rel in drifted if not overlay_covers(overlays, dest, rel)]
-        if uncovered:
-            print(json.dumps({"status": "drift", "files": uncovered}, indent=2))
-            print("kernel files changed locally; add overlays or pass --force", file=sys.stderr)
-            return 3
+        # The lock records what the distribution installed; Git shows what changed locally.
+        print(json.dumps({"status": "drift", "files": drifted}, indent=2))
+        print("kernel files changed locally (see git diff); keep cell logic in cell-owned files, then pass --force to restore the distribution version", file=sys.stderr)
+        return 3
     try:
         preflight_kernel(dest, target_adapters)
         removed = remove_retired_managed_files(dest, retired)

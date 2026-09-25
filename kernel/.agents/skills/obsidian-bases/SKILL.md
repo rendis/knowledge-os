@@ -1,6 +1,6 @@
 ---
 name: obsidian-bases
-description: "Create or edit Obsidian `.base` views, filters and formulas. Use obsidian-cli when the task requires querying or verifying a view in the application."
+description: "Create or edit Obsidian `.base` views, filters and formulas; `vaultctl check bases` validates them."
 ---
 
 # Obsidian Bases

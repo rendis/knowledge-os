@@ -41,8 +41,7 @@ Select one primary skill; an auxiliary skill supplies a method and the primary k
 
 - [evidence-driven-analysis](.agents/skills/evidence-driven-analysis/SKILL.md) — analysis, diagnosis or audit without a specialized workflow.
 - [map-ecosystem](.agents/skills/map-ecosystem/SKILL.md) — questions about the vault, knowledge publication, related-vault catalog, mapping completion; orientation when bootstrap is incomplete.
-- [synchronize-ecosystem](.agents/skills/synchronize-ecosystem/SKILL.md) — inventory and repository map synchronization.
-- [scheduled-vault-refresh](.agents/skills/scheduled-vault-refresh/SKILL.md) — an authorized manual or scheduled mapping cycle with its publication path.
+- [synchronize-ecosystem](.agents/skills/synchronize-ecosystem/SKILL.md) — inventory, repository map synchronization and manual or scheduled refresh cycles; the publication path for every technical note.
 - [configure-workspace](.agents/skills/configure-workspace/SKILL.md) — sole writer of `.knowledge-os-config.yaml`; onboarding when repositories cannot be resolved.
 - [manage-investigation](.agents/skills/manage-investigation/SKILL.md) — investigation cases, publication, absorption and retirement.
 - [manage-investigation-derived-learning](.agents/skills/manage-investigation-derived-learning/SKILL.md) — assess and publish `70-Aprendizajes/` notes.

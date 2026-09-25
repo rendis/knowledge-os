@@ -11,11 +11,11 @@ import (
 	"documentation-vault/internal/check"
 	"documentation-vault/internal/config"
 	"documentation-vault/internal/discover"
+	"documentation-vault/internal/gitsync"
 	"documentation-vault/internal/handoff"
 	"documentation-vault/internal/inventory"
 	"documentation-vault/internal/investigation"
 	"documentation-vault/internal/retrieval"
-	"documentation-vault/internal/syncflow"
 )
 
 var version = "dev"
@@ -47,13 +47,7 @@ check obsidian-binding --vault PATH --vault-name NAME
 check map-closure --vault PATH --checkpoint FILE
 investigation open|load|list|snapshot|save|save-resources|publish|transition|close|bind|retire|consolidate|validate ...
 handoff inspect|plan-worktree|create-worktree|plan-handoff|prepare-handoff|plan|apply|validate|resolve-branch|set-state ...
-sync scan --vault PATH --repo NOTE [--source-repo PATH] [--query TEXT] [--max-hits N]
-sync build|build-new|init-analysis|close-package|gate-batch ...
-sync analysis finalize-analysis|check ...
-sync review freeze|check|publish|verify-published ...
-sync review-finalize ...
-sync correction prepare|check ...
-sync begin|checkpoint-package|seal-gate|status|validate-unit|review-unit|apply-unit|resume|close|abandon-empty ...
+sync start|status|review|verify|acknowledge|finish --vault PATH ...
 
 Search refreshes a private local SQLite index before querying. --cache PATH
 selects a cache outside the vault. Results are evidence pointers, not answers.
@@ -81,7 +75,7 @@ version`)
 	case "handoff":
 		return handoff.Run(args[1:], os.Stdout)
 	case "sync":
-		return syncflow.Run(args[1:], os.Stdout)
+		return gitsync.Run(args[1:], os.Stdout)
 	case "search", "index", "links", "overview":
 		return retrieval.Run(ctx, args[0], args[1:], os.Stdout)
 	default:

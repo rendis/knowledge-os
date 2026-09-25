@@ -23,5 +23,5 @@ Consumer vaults are created with `./install.sh init --dest <vault>`. Work here i
 
 - Cell identity and knowledge live only in `--dest`, never in this tree.
 - English for agent docs and skills in this repo. Note locale of a cell is chosen at init.
-- Overlays in a cell (`.agents/overlays/`) authorize `update` when kernel files drifted; they do not merge. `update` still copies the distribution kernel on top, then the overlay files remain beside it.
+- `update` refuses kernel files that changed locally (the lock records installed hashes; `git diff` shows the change) until `--force`; cell-specific logic lives in cell-owned files, never in managed ones.
 - `AGENTS.md` is the instruction file for this repo and installed cells. The installer removes its former `CLAUDE.md -> AGENTS.md` link during update while preserving a cell-owned `CLAUDE.md`.
