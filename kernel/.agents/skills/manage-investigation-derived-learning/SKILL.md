@@ -57,7 +57,7 @@ Continue only when `load` reports `visibility: published`.
 4. For `challenge`, preserve both sides and set `estado: cuestionado` until evidence supports a current conclusion. For `supersede`, mark the prior note `superado` and link it from the replacement through `supersede-a`.
 5. Do not mutate the source investigation. Return the observed outcome, action, target notes, and checks to `manage-investigation` if its owner needs to record `learning-outcome`.
 
-Absorption does not close or retire a case. Preserve `investigaciones-origen` as stable provenance after retirement; resolve historical IDs through the case helper. Decisive evidence must remain usable without a removed live case, private overlay or ignored operational run. The investigation owner's `references/knowledge-and-retirement.md` governs retirement, never this publisher.
+Absorption does not close or retire a case. Preserve `investigaciones-origen` as stable provenance after retirement; resolve historical IDs with `investigation list`. Decisive evidence must remain usable without a removed live case, private directory or ignored operational run. Retirement belongs to `manage-investigation`, never this publisher.
 
 **Complete when:** the canonical note contains the cumulative evidence and current bounded teaching, older evidence remains traceable, and no local case content was copied as unsupported proof.
 
