@@ -88,6 +88,14 @@ paths, headings, origin and lexical rank. Rank is not a probability or proof:
 open and verify the source before answering. No hooks, model services or
 automatic per-message injection are installed.
 
+`discover run` extracts connection facts from the cell's repositories: code imports and build
+manifests (language rules only), every configuration and IaC file parsed by format, typed once by
+stored judgments, and completed by read-only platform snapshots (`discover platform`). Judgments are
+answered by Jev when `TYPESAFE_API_KEY` is set, otherwise by the agent through `discover questions`
+and `discover answer`; the key is an optional accelerator. Judgments and snapshots are versioned in
+the cell under `90-Meta/discovery/`; facts, pending items and the comparison with notes are local
+under `.agents/state/discovery/`. See [use-vault-cli](kernel/.agents/skills/use-vault-cli/SKILL.md#discovery).
+
 Browser-specific skill resources remain with their skills. Legacy Python
 implementations retained in this distribution serve compatibility evals; the
 native retirement policy prevents installing them in consumer vaults.

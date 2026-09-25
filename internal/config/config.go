@@ -449,6 +449,15 @@ func Orientation(root string, m Object) Object {
 	}
 	return Object{"ready": len(issues) == 0, "reason": reason, "cell": m["cell"], "systems": names, "issues": issues, "start_here": []string{"00-Home.md", "instance.yaml", "10-Sistemas/"}, "evidence_profile": profile, "enabled_types": types, "pending_inventory": pending}
 }
+// DiscoveryAcceleration reports whether classification questions can be answered by Jev.
+// It is optional: without it the agent answers the same questions.
+func DiscoveryAcceleration() Object {
+	if strings.TrimSpace(os.Getenv("TYPESAFE_API_KEY")) != "" {
+		return Object{"jev": "configured"}
+	}
+	return Object{"jev": "not-configured", "hint": "Optional: set TYPESAFE_API_KEY so `discover run` answers classification questions automatically (fast, low cost). Without it the agent answers them; nothing is blocked."}
+}
+
 func emit(out io.Writer, v any) error {
 	e := json.NewEncoder(out)
 	e.SetIndent("", "  ")
