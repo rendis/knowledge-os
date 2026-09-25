@@ -364,6 +364,8 @@ func baseTree(vault, rev string) (string, func(), error) {
 	return dir, cleanup, nil
 }
 
+var analyzed = regexp.MustCompile(`(?m)^commit-analizado:.*$`)
+
 func verify(o opts) (map[string]any, error) {
 	res := map[string]any{"branch": current(o.vault), "base": o.base}
 	problems := []string{}
@@ -383,13 +385,26 @@ func verify(o opts) (map[string]any, error) {
 		if _, e := os.Stat(filepath.Join(o.vault, f)); e != nil {
 			continue
 		}
-		ok, _, e := discover.CheckNote(o.vault, f)
+		// The synced note (new, or with a new commit-analizado) passes every gate; a neighbour touched
+		// to re-anchor may keep pre-existing errors but must not add any.
+		var base []byte
+		if old, e := git(o.vault, "show", mb+":"+f); e == nil {
+			cur, _ := os.ReadFile(filepath.Join(o.vault, f))
+			if analyzed.FindString(old) == analyzed.FindString(string(cur)) {
+				base = []byte(old + "\n")
+			}
+		}
+		ok, introduced, preexisting, e := discover.CheckNoteIntroduced(o.vault, f, base)
 		if e != nil {
 			return nil, e
 		}
-		notes = append(notes, map[string]any{"note": f, "ok": ok})
+		entry := map[string]any{"note": f, "ok": ok, "synced": base == nil}
+		if preexisting > 0 {
+			entry["preexisting_errors"] = preexisting
+		}
+		notes = append(notes, entry)
 		if !ok {
-			problems = append(problems, "note gates failed: "+f+" (run `discover check --note "+f+"`)")
+			problems = append(problems, fmt.Sprintf("note gates failed: %s, %d error(s) (run `discover check --note %s`)", f, len(introduced), f))
 		}
 	}
 	res["note_gates"] = notes

@@ -137,7 +137,7 @@ def flow(a):
             branch = sh(["git", "-C", str(dst), "branch", "--show-current"], check=False)
             rec["branch"] = branch
             dirty = sh(["git", "-C", str(dst), "status", "--porcelain", "--", ".", ":!.agents/state"], check=False)
-            changed = sh(["git", "-C", str(dst), "diff", "--name-only", f"{base}...HEAD"], check=False).splitlines() if branch.startswith("sync/") else []
+            changed = sh(["git", "-c", "core.quotePath=false", "-C", str(dst), "diff", "--name-only", f"{base}...HEAD"], check=False).splitlines() if branch.startswith("sync/") else []
             rec["changed"], rec["uncommitted"] = changed, bool(dirty)
             gates = {}
             for note in [c for c in changed if c.startswith("20-Repos/") and c.endswith(".md")]:

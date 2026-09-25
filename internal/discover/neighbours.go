@@ -82,6 +82,9 @@ func StaleNeighbours(vault string, repoNotes []string) ([]string, error) {
 				if e != nil {
 					continue // G1 of that note reports unresolvable anchors
 				}
+				if _, e := gitOutput(path, "merge-base", "--is-ancestor", old, head); e != nil {
+					continue // cites a commit that is not older than the sync (e.g. a newer pinned version)
+				}
 				key := old + ":" + a.Path
 				hunks, ok := changedSince[key]
 				if !ok {
@@ -160,4 +163,49 @@ func minInt(a, b int) int {
 		return a
 	}
 	return b
+}
+
+// CheckNoteIntroduced gates a repository note. With base content (a neighbour touched without a new
+// commit-analizado) only errors absent from the base version fail; pre-existing debt is reported but does
+// not block re-anchoring. Without base content every error fails.
+func CheckNoteIntroduced(vault, note string, base []byte) (bool, []string, int, error) {
+	r, e := checkNote(vault, note, "", false)
+	if e != nil || r.OK {
+		return r.OK, nil, 0, e
+	}
+	keys := func(c noteCheck) map[string]bool {
+		out := map[string]bool{}
+		for _, i := range c.Issues {
+			if i.Severity == "error" {
+				out[i.Gate+"|"+i.Where+"|"+i.Detail] = true
+			}
+		}
+		return out
+	}
+	now := keys(r)
+	if base == nil {
+		return false, sortedKeys(now), 0, nil
+	}
+	dir := filepath.Join(vault, ".agents", "state", "discovery", "base-notes")
+	if e := os.MkdirAll(dir, 0o755); e != nil {
+		return false, nil, 0, e
+	}
+	tmp := filepath.Join(dir, filepath.Base(note))
+	if e := os.WriteFile(tmp, base, 0o644); e != nil {
+		return false, nil, 0, e
+	}
+	defer os.Remove(tmp)
+	rb, e := checkNote(vault, tmp, "", false)
+	if e != nil {
+		return false, nil, 0, e
+	}
+	before := keys(rb)
+	introduced := []string{}
+	for k := range now {
+		if !before[k] {
+			introduced = append(introduced, k)
+		}
+	}
+	sort.Strings(introduced)
+	return len(introduced) == 0, introduced, len(now) - len(introduced), nil
 }

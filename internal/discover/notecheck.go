@@ -241,6 +241,26 @@ func checkNote(vault, notePath, repoOverride string, semantic bool) (noteCheck, 
 		code string
 	}
 	ok := []verified{}
+	// A footnote may cite several files; an identifier it names needs to be in one of them, not in each.
+	siblings := map[string][]anchor{}
+	for _, a := range anchors {
+		if a.Footnote != "" {
+			siblings[a.Footnote] = append(siblings[a.Footnote], a)
+		}
+	}
+	inSibling := func(a anchor, tok string) bool {
+		for _, s := range siblings[a.Footnote] {
+			if s == a {
+				continue
+			}
+			if p := locate(s.Repo); p != "" && g.commit(p, s.Commit) {
+				if c, ok := g.file(p, s.Commit, s.Path); ok && (tokenPresent(tok, c) || tokenPresent(strings.TrimSuffix(tok, "()"), c)) {
+					return true
+				}
+			}
+		}
+		return false
+	}
 	for _, a := range anchors {
 		r.Anchors["total"]++
 		where := a.Path
@@ -299,6 +319,9 @@ func checkNote(vault, notePath, repoOverride string, semantic bool) (noteCheck, 
 			if tokenPresent(tok, content) || tokenPresent(strings.TrimSuffix(tok, "()"), content) {
 				r.Anchors["warnings"]++
 				add("G1-anchor", "warning", where, "`"+tok+"` is in the file but outside the cited lines")
+				continue
+			}
+			if inSibling(a, tok) {
 				continue
 			}
 			if strings.ContainsAny(tok, " {}(,=") {
