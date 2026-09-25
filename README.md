@@ -124,9 +124,9 @@ Personal customizations belong exclusively in `AGENTS.personal.md`; never edit t
 
 The managed router includes the evidence, review and initiative contract directly. Specialized investigation and publication procedures remain in skills. Project-local evidence investigator and reviewer definitions are installed for Codex, Claude Code and Cursor; their discovery and permission differences are documented in `90-Meta/specialists.md`. No hooks are installed.
 
-`update` refreshes only the consumer vault; it never traverses development worktrees. An existing worktree receives the current managed instruction block during its next authorized handoff mutation.
+`update` refreshes only the consumer vault; it never traverses development worktrees. A worktree receives the current managed development-handoff segment when `handoff start` next prepares it.
 
-Versions 0.5 through 0.7 use work-item bundle and handoff manifest schema 2. Jira-specific schema-1 packages or materialized families are not reinterpreted in place; configure their tracker and export a new schema-2 package. The legacy schema-1 `ACTIVE.yaml` pointer remains readable only as a registry wrapper around a current schema-2 family.
+Investigation cases and development handoffs of versions before 0.14 are not changed by the CLI: an earlier case stays readable and is recreated in the current format (then closed as superseded); an earlier handoff worktree is finished with the tools of its version or prepared again with `handoff start`.
 
 When adopting or upgrading a vault, a pre-existing file that becomes distribution-owned must already match the distribution or be explicitly replaced with `--force`. This prevents a newly managed runtime file from being overwritten silently.
 
@@ -143,8 +143,8 @@ never create a visible `plan/` directory inside a cell vault.
 Vault-local helper scripts without a selected investigation or workflow-defined
 working location go under a unique `.scratch/<task>/` directory in the cell
 vault. Init, adopt, and update ignore `.scratch/` in Git and Obsidian. When a
-task is later attached to an investigation, move the relevant local work or
-reviewed methods into that case under its record contract.
+task is later attached to an investigation, move working material to the case's
+private directory and attach a method that produced cited evidence to that record.
 
 ## Layout of this repo
 
@@ -182,7 +182,7 @@ Existing note names, relationships, investigations and handoff families are pres
 
 Cells may declare credential-free `database_targets` in `instance.yaml` when one database capability has several explicit destinations. Each target binds a system, environment, instance, database, schemas, optional evidence repositories, procedure basename and an optional local proxy-port key. The target identifies where evidence belongs; its procedure and adapter still establish read-only access.
 
-Version 0.6 adds optional capability bindings and transactional investigation commands without changing existing note or handoff schemas. `doctor --strict` is the opt-in installation integrity gate and also detects configured adapters awaiting installation or removal. Version 0.6.1 preserves configuration during updates and aligns investigation promotion with the selected evidence profile.
+Version 0.6 adds optional capability bindings without changing existing note schemas. `doctor --strict` is the opt-in installation integrity gate and also detects configured adapters awaiting installation or removal. Version 0.6.1 preserves configuration during updates and aligns investigation promotion with the selected evidence profile.
 
 For retired provider-pack migration and developer-owned integrations, see [adapters](adapters/README.md).
 

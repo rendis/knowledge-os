@@ -55,7 +55,7 @@ When the package changes in the case, `<CLI> handoff status` reports `package_ch
 
 ## Read progress
 
-`<CLI> handoff status --vault "<root>" [--worktree <path>]` is read-only: per worktree, its tasks with their state (`pending`, `blocked` by an unverified dependency, `in-progress`, `verified` by a verification delta), the commits of each task (by their `Handoff:` trailer), deltas, the next task, uncommitted changes, changed packages and the segment state; all worktrees under the root when `--worktree` is omitted. Worktrees prepared by earlier versions (`.knowledge-os-handoffs/`) are listed with their legacy store and their `implementation-updates.md` entries read as deltas; the legacy verbs keep working for them.
+`<CLI> handoff status --vault "<root>" [--worktree <path>]` is read-only: per worktree, its tasks with their state (`pending`, `blocked` by an unverified dependency, `in-progress`, `verified` by a verification delta), the commits of each task (by their `Handoff:` trailer), deltas, the next task, uncommitted changes, changed packages and the segment state; all worktrees under the root when `--worktree` is omitted.
 
 ## What comes back
 

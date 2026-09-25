@@ -27,7 +27,7 @@ Repository instructions govern that repository's work; vault instructions govern
 
 ## Development handoffs
 
-When the target has `.handoff/`, follow the development-handoff section of its `AGENTS.md`: the task files define what to change and how to verify it, and definition changes, decisions, deviations, questions and verification results go to `.handoff/deltas.md`. A target prepared by an earlier version (`.knowledge-os-handoffs/ACTIVE.yaml`) follows the managed block it carries. Implementing does not authorize case, tracker or vault writes; reconciliation into the investigation belongs to [manage-development-handoff](../manage-development-handoff/SKILL.md). Without a handoff, follow the repository's ordinary workflow.
+When the target has `.handoff/`, follow the development-handoff section of its `AGENTS.md`: the task files define what to change and how to verify it, and what the cell must know goes to `.handoff/deltas.md` as that section describes. Implementing does not authorize case, tracker or vault writes; reconciliation into the investigation belongs to [manage-development-handoff](../manage-development-handoff/SKILL.md). Without a handoff, follow the repository's ordinary workflow.
 
 ## Implement and verify
 

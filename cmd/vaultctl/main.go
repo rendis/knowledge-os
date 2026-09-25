@@ -14,9 +14,7 @@ import (
 	"documentation-vault/internal/devhandoff"
 	"documentation-vault/internal/discover"
 	"documentation-vault/internal/gitsync"
-	"documentation-vault/internal/handoff"
 	"documentation-vault/internal/inventory"
-	"documentation-vault/internal/investigation"
 	"documentation-vault/internal/retrieval"
 )
 
@@ -48,7 +46,7 @@ check visual-context FILE
 check obsidian-binding --vault PATH --vault-name NAME
 check map-closure --vault PATH --checkpoint FILE
 investigation new|list|check|add|state|absorb|close|reopen --vault PATH ...
-handoff start|status|refresh|reconcile --vault PATH ...   (legacy verbs remain for earlier worktrees)
+handoff start|status|refresh|reconcile --vault PATH ...
 sync start|status|review|verify|acknowledge|finish|pull --vault PATH ...
 
 Search refreshes a private local SQLite index before querying. --cache PATH
@@ -73,23 +71,13 @@ version`)
 	case "check":
 		return check.Run(args[1:], os.Stdout)
 	case "investigation":
-		// The case workflow takes --vault; the legacy transactional helper takes --root (or
-		// --case-dir) and stays until the earlier format is retired.
-		if !contains(args, "--root") && !contains(args, "--case-dir") {
-			return cases.Run(args[1:], os.Stdout)
-		}
-		return investigation.Run(args[1:], os.Stdout)
+		return cases.Run(args[1:], os.Stdout)
 	case "handoff":
-		// start/status/refresh prepare and read atomic task worktrees; the remaining verbs keep
-		// worktrees prepared by earlier versions working.
 		if len(args) > 1 && args[1] == "reconcile" {
 			// Reconciliation writes the development case, so the case package owns it.
 			return cases.Run(args[1:], os.Stdout)
 		}
-		if len(args) < 2 || args[1] == "--help" || args[1] == "-h" || args[1] == "start" || args[1] == "status" || args[1] == "refresh" {
-			return devhandoff.Run(args[1:], os.Stdout)
-		}
-		return handoff.Run(args[1:], os.Stdout)
+		return devhandoff.Run(args[1:], os.Stdout)
 	case "sync":
 		return gitsync.Run(args[1:], os.Stdout)
 	case "search", "index", "links", "overview":
@@ -97,13 +85,4 @@ version`)
 	default:
 		return fmt.Errorf("unknown command %q; use --help", args[0])
 	}
-}
-
-func contains(a []string, s string) bool {
-	for _, x := range a {
-		if x == s {
-			return true
-		}
-	}
-	return false
 }
