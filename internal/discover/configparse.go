@@ -24,6 +24,7 @@ type entry struct {
 	Value        string   `json:"value"`
 	Context      string   `json:"context,omitempty"`
 	Secret       bool     `json:"secret,omitempty"`
+	Credential   bool     `json:"credential,omitempty"` // a literal credential versioned in the source
 	Placeholders []string `json:"placeholders,omitempty"`
 }
 
@@ -272,7 +273,10 @@ func scanConfig(s *snapshot) ([]entry, int, error) {
 					}
 				}
 			}
-			if secret || credentialEntry(x.Key, x.Value) {
+			if credentialEntry(x.Key, x.Value) {
+				x.Credential = true
+			}
+			if secret || x.Credential {
 				x.Value, x.Secret = "<redacted>", true
 			}
 			out = append(out, x)

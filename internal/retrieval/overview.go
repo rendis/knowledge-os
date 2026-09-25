@@ -2,6 +2,7 @@ package retrieval
 
 import (
 	"documentation-vault/internal/config"
+	"documentation-vault/internal/discover"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -185,6 +186,9 @@ func writeSources(root string, out io.Writer) {
 		}
 		lines = append(lines, "Platform snapshots: "+strings.Join(names, ", ")+" (`90-Meta/discovery/platform/`).")
 	}
+	if obs, _ := filepath.Glob(filepath.Join(root, "90-Meta", "discovery", "platform", "observed", "*.json")); len(obs) > 0 {
+		lines = append(lines, fmt.Sprintf("Recorded observations: %d (`90-Meta/discovery/platform/observed/`), services read outside the built-in providers.", len(obs)))
+	}
 	if inst, e := config.LoadInstance(root); e == nil {
 		ids := func(key string, fields ...string) []string {
 			out := []string{}
@@ -202,6 +206,14 @@ func writeSources(root string, out io.Writer) {
 				}
 			}
 			return out
+		}
+		if clouds := config.PlatformProviders(inst); len(clouds) > 0 {
+			cov := discover.Coverage(clouds)
+			parts := []string{}
+			for _, c := range clouds {
+				parts = append(parts, c+" ("+strings.ReplaceAll(strings.Join(cov[c], ", "), "_", " ")+")")
+			}
+			lines = append(lines, "Clouds: "+strings.Join(parts, "; ")+" are captured by `discover platform`. That is the floor: any other service, cluster or host the evidence points to is inspected read-only with the tools in reach and recorded with `discover platform --record`.")
 		}
 		if dbs := ids("database_targets", "id"); len(dbs) > 0 {
 			lines = append(lines, "Databases: "+strings.Join(dbs, ", ")+" (`config database-target --target ID`).")
