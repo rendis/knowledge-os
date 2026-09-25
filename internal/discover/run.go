@@ -400,6 +400,11 @@ func capturePlatform(o options, out io.Writer) error {
 			return e
 		}
 		result[p] = s.Status
+		if s.Status != "ok" {
+			if b, e := os.ReadFile(snapshotPath(o.vault, p)); e == nil && strings.Contains(string(b), `"refresh_failed"`) {
+				result[p] = s.Status + " (previous snapshot kept)"
+			}
+		}
 	}
 	return emit(out, map[string]any{"captured": result, "stored_in": platformRel, "next": "vaultctl discover run --vault <VAULT>"})
 }
