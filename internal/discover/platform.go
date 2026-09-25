@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -66,11 +67,14 @@ var notEnabled = []string{"has not been used", "is disabled", "service_disabled"
 // leaves the others captured. The scope fails only when no kind could be read.
 func captureKinds(snap platformSnapshot, fns map[string]kindCapture, order []string) platformSnapshot {
 	snap.Kinds = map[string]string{}
-	first, anyOK := "", false
+	first, listed := "", false
+	size := func() int { return len(snap.Topics) + len(snap.Subscriptions) + len(snap.Resources) }
 	for i, k := range order {
+		before := size()
 		msg, e := fns[k](&snap)
 		if e == nil {
-			snap.Kinds[k], anyOK = "ok", true
+			snap.Kinds[k] = "ok"
+			listed = listed || size() > before
 			continue
 		}
 		status := snap.failed(msg).Status
@@ -91,7 +95,9 @@ func captureKinds(snap platformSnapshot, fns map[string]kindCapture, order []str
 			break
 		}
 	}
-	if anyOK {
+	// An empty listing proves access only when nothing failed: some CLIs answer an unreadable scope
+	// with an empty success.
+	if listed || first == "" && len(snap.Kinds) > 0 && !slices.ContainsFunc(order, func(k string) bool { return snap.Kinds[k] != "ok" && snap.Kinds[k] != "not-enabled" }) {
 		return snap.sorted()
 	}
 	if first == "" {
