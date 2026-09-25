@@ -22,6 +22,7 @@ func TestOverviewOneLinePerNote(t *testing.T) {
 	write("30-Flujos/long.md", "---\ntipo: flujo\n---\n# long\n\n"+strings.Repeat("a", 219)+"ó sin punto final y con más texto\n")
 	write("25-Topics/orders-out.md", "---\ntipo: topic\n---\n# orders-out\n\nTopic de órdenes. [^e1]\n")
 	write(".investigations/x/investigation.md", "hidden\n")
+	write("AGENTS.md", "# Router\n\nInstructions, not knowledge.\n")
 	write("90-Meta/Convenciones.md", "meta\n")
 	write(".agents/state/discovery/comparison.json", `[{"note":"20-Repos/orders.md","discrepancies":[{"field":"publica-en","target":"orders-legacy","discovered":["orders-out"]}]}]`)
 	var b bytes.Buffer
@@ -33,6 +34,9 @@ func TestOverviewOneLinePerNote(t *testing.T) {
 		if !strings.Contains(out, want) {
 			t.Fatalf("missing %q in\n%s", want, out)
 		}
+	}
+	if strings.Contains(out, "[[AGENTS]]") {
+		t.Fatal("root instruction files are not knowledge notes")
 	}
 	if strings.Contains(out, "Beyond the vault") {
 		t.Fatal("without reachable sources the overview adds no source section")

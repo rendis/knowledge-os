@@ -1,7 +1,0 @@
-I can show this in different ways, and the right visual depends on what you want to understand:
-
-1. The request path: Browser → Gateway → API → Worker → Storage.
-2. The architecture choice: synchronous versus queued processing, with timing and responsibility compared.
-3. Both: the request flow plus the synchronous/queued comparison.
-
-Which of these should the visual answer?

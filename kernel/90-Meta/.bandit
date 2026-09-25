@@ -1,3 +1,0 @@
-[bandit]
-recursive = true
-exclude = */.operations/*,*/.plan/*,*/.venv/*,*/__pycache__/*,*/dist/*,*/node_modules/*,*/output/*,*/venv/*,*/evals/*,*/tests/*,*/test_*.py

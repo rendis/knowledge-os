@@ -1,5 +1,0 @@
-# Direct dependencies for local and CI validation. Regenerate the lock with the
-# command recorded at the top of requirements-ci.txt.
-bandit==1.8.6
-ruff==0.16.7
-ruamel.yaml==0.19.1

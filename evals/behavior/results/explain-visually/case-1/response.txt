@@ -1,1 +1,0 @@
-Idempotency means an operation can be applied multiple times with the same input and produce the same resulting state as applying it once.
