@@ -71,7 +71,7 @@ Some judgments need semantic understanding (what a dependency talks to, what a c
 
 `discover report --vault "<root>" [--repo NAME]` returns the last summary or one repository's facts and comparison.
 
-`discover check --vault "<root>" --note <path> [--semantic]` gates a repository note or candidate (a candidate outside the vault is matched by its `aliases`): G1 source permalinks resolve at their commit and the backticked identifiers of each footnote are in the cited lines; G2 every connector category and resource group of the facts is cited or named; stale cited files since `commit-analizado`. `error` blocks publication; `pending` becomes `Verificaciones pendientes`; `review` goes to the reviewer. `--semantic` (Jev) flags cited sentences the code does not support; it is a review aid for atomic sentences, not a verdict.
+`discover check --vault "<root>" --note <path> [--semantic]` gates a repository note or candidate (a candidate outside the vault is matched by its `aliases`): G1 source permalinks resolve at their commit and the backticked identifiers of each footnote are in the cited lines; G2 every connector category and resource group of the facts is cited or named; G3 (`review`) a relation to a topic/event note that the repository's evidence does not name; stale cited files since `commit-analizado`. `error` blocks publication; `pending` becomes `Verificaciones pendientes`; `review` goes to the reviewer. `--semantic` (Jev) flags cited sentences the code does not support; it is a review aid for atomic sentences, not a verdict.
 
 ## Refresh and failures
 
