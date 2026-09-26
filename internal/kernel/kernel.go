@@ -175,9 +175,12 @@ type Plan struct {
 	To        string   `json:"to"`
 	Changes   []Change `json:"changes"`
 	Unchanged int      `json:"unchanged"`
-	// Conflicts are managed files changed in the vault since the lock recorded them, or files the
-	// distribution would now own that already exist with other content.
+	// Conflicts are managed files changed in the vault since the lock recorded them, or, on a first
+	// installation, files the distribution would own that already exist with other content.
 	Conflicts []string `json:"conflicts"`
+	// Foreign are cell files at a path a newer kernel now ships (a cell skill with a kernel skill's
+	// name): the lock never recorded them, so nothing is written, even with --force, until they move.
+	Foreign []string `json:"foreign,omitempty"`
 	// Unsafe are targets that are not regular files or sit under a symbolic link: nothing is written,
 	// even with --force, until they are moved explicitly.
 	Unsafe   []string `json:"unsafe,omitempty"`
@@ -220,6 +223,7 @@ func readRegular(p string) ([]byte, bool, error) {
 // gets its first installation: every existing file with other content is a conflict.
 func Preview(vault string) (Plan, error) {
 	lock, e := ReadLock(vault)
+	installed := e == nil
 	if os.IsNotExist(e) {
 		lock, e = Lock{KernelVersion: "none", Hashes: map[string]string{}}, nil
 	}
@@ -254,6 +258,8 @@ func Preview(vault string) (Plan, error) {
 			p.Changes = append(p.Changes, Change{rel, "add"})
 		case bytes.Equal(cur, src[rel]):
 			p.Unchanged++
+		case !owned && installed:
+			p.Foreign = append(p.Foreign, rel)
 		case owned && digest(cur) != prev, !owned:
 			p.Conflicts = append(p.Conflicts, rel)
 			p.Changes = append(p.Changes, Change{rel, "change"})
@@ -506,7 +512,9 @@ const Help = `kernel COMMAND --vault PATH
                              changes (with a diffstat; --diff adds the full diff) and writes nothing.
                              A managed file changed in the vault since it was installed is a conflict:
                              nothing is written until it is kept in a cell-owned file or --force
-                             restores the distribution version. Commit the result as one change.`
+                             restores the distribution version. A cell file the kernel never installed,
+                             at a path it now ships, is never replaced, even with --force: rename it.
+                             Commit the result as one change.`
 
 func Run(args []string, out io.Writer) error {
 	if len(args) == 0 || args[0] == "--help" || args[0] == "-h" {
@@ -533,7 +541,7 @@ func Run(args []string, out io.Writer) error {
 	if e != nil {
 		return e
 	}
-	res := map[string]any{"vault_kernel": p.From, "kos_kernel": p.To, "changes": len(p.Changes), "conflicts": p.Conflicts, "unsafe": p.Unsafe}
+	res := map[string]any{"vault_kernel": p.From, "kos_kernel": p.To, "changes": len(p.Changes), "conflicts": p.Conflicts, "unsafe": p.Unsafe, "foreign": p.Foreign}
 	switch args[0] {
 	case "status":
 		res["current"] = len(p.Changes) == 0 && p.From == p.To
@@ -559,6 +567,12 @@ func Run(args []string, out io.Writer) error {
 		res["next"] = "these targets are not regular files or sit under a symbolic link: move them explicitly, then run again"
 		_ = emit(out, res)
 		return errors.New("unsafe managed targets; nothing written")
+	}
+	if len(p.Foreign) > 0 {
+		res["status"] = "foreign"
+		res["next"] = "these cell files sit where the kernel now ships its own: rename or move them (a cell skill takes another name), then run again"
+		_ = emit(out, res)
+		return errors.New("cell files at kernel paths; nothing written")
 	}
 	if len(p.Conflicts) > 0 && !*force {
 		res["status"] = "conflict"

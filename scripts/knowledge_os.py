@@ -502,7 +502,8 @@ def cmd_init(args: argparse.Namespace) -> int:
     write_bootstrap(dest, instance)
     code, result = native_runtime.kernel(DIST, dest, *(["--force"] if args.force else []))
     if code != 0:
-        print(json.dumps({"status": "ownership-conflict", "files": result.get("conflicts", []), "error": result.get("error")}, indent=2))
+        files = (result.get("conflicts") or []) + (result.get("foreign") or [])
+        print(json.dumps({"status": "ownership-conflict", "files": files, "error": result.get("error")}, indent=2))
         return 3
     print(json.dumps({"status": "initialized", "dest": str(dest), "cell": instance["cell"],
                       "next": "Open the vault with your agent and ask it to finish onboarding (onboard-cell): it lists the "
@@ -570,6 +571,10 @@ def cmd_update(args: argparse.Namespace) -> int:
         # The lock records what the distribution installed; Git shows what changed locally.
         print(json.dumps({"status": "drift", "files": result.get("conflicts", [])}, indent=2))
         print("kernel files changed locally (see git diff); keep cell logic in cell-owned files, then pass --force to restore the distribution version", file=sys.stderr)
+        return 3
+    if result.get("status") == "foreign":
+        print(json.dumps({"status": "foreign", "files": result.get("foreign", [])}, indent=2))
+        print("cell files sit where the kernel now ships its own; rename or move them (a cell skill takes another name), then run again", file=sys.stderr)
         return 3
     if code != 0:
         print(json.dumps({"status": "invalid-lock", "error": result.get("error")}, indent=2))

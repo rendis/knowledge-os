@@ -79,6 +79,37 @@ func TestUpdateInstallsPreviewsAndProtectsLocalChanges(t *testing.T) {
 	}
 }
 
+func TestUpdateKeepsCellSkills(t *testing.T) {
+	v := install(t)
+	own := filepath.Join(v, ".agents", "skills", "cell-skill", "SKILL.md")
+	os.MkdirAll(filepath.Dir(own), 0o755)
+	os.WriteFile(own, []byte("cell skill\n"), 0o644)
+
+	// A cell file at a path the kernel now ships, which the lock never recorded, is never replaced.
+	shipped := ".agents/skills/use-vault-cli/SKILL.md"
+	lock, _ := ReadLock(v)
+	delete(lock.Hashes, shipped)
+	os.WriteFile(filepath.Join(v, LockName), []byte(lock.dump()), 0o644)
+	os.WriteFile(filepath.Join(v, filepath.FromSlash(shipped)), []byte("cell skill with a kernel name\n"), 0o644)
+	for _, flags := range [][]string{{}, {"--force"}} {
+		res, e := run(t, append([]string{"update", "--vault", v}, flags...)...)
+		if e == nil || res["status"] != "foreign" {
+			t.Fatalf("a cell file at a kernel path is refused %v: %v %v", flags, e, res)
+		}
+	}
+	if b, _ := os.ReadFile(filepath.Join(v, filepath.FromSlash(shipped))); string(b) != "cell skill with a kernel name\n" {
+		t.Fatal("the cell file is kept")
+	}
+
+	os.Remove(filepath.Join(v, filepath.FromSlash(shipped)))
+	if res, e := run(t, "update", "--vault", v, "--force"); e != nil || res["status"] != "updated" {
+		t.Fatalf("update after the cell file moved: %v %v", e, res)
+	}
+	if b, _ := os.ReadFile(own); string(b) != "cell skill\n" {
+		t.Fatal("a cell skill survives the update")
+	}
+}
+
 func TestSourcesIncludeSelectedAdaptersOnly(t *testing.T) {
 	plain, e := Sources(nil)
 	if e != nil {
