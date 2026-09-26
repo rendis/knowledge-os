@@ -629,6 +629,12 @@ func TestNoiseIsNotARuntimeResource(t *testing.T) {
 			t.Errorf("%s is not a resource group: %q", r.Name, g)
 		}
 	}
+	if resourceGroup(resource{Type: "http_endpoint", Name: "http://203.0.113.7.nip.io"}) != "" || !testConfig.MatchString("scripts/run-stock-e2e.sh") {
+		t.Error("a wildcard development host and an end-to-end script are not runtime")
+	}
+	if a, b := resourceGroup(resource{Type: "database_object", Name: "/cloudsql/p:us-east4:db"}), resourceGroup(resource{Type: "database_object", Name: "p:us-east4:db"}); a != b {
+		t.Errorf("a Cloud SQL socket path is its instance: %q %q", a, b)
+	}
 	if g := resourceGroup(resource{Type: "database_object", Name: "acme-ops01-prd:us-east4:ops-postgres-db"}); g == "" {
 		t.Error("a Cloud SQL instance is a resource group")
 	}

@@ -40,7 +40,7 @@ func init() {
 }
 
 var (
-	testConfig = regexp.MustCompile(`(?i)(^|/)(tests?|__tests__|mocks?|fixtures?|testdata|e2e)/|\.(test|spec|e2e)\.|(^|/)\.env\.test`)
+	testConfig = regexp.MustCompile(`(?i)(^|/)(tests?|__tests__|mocks?|fixtures?|testdata|e2e)/|\.(test|spec|e2e)\.|[-_.]e2e[-_.]|(^|/)\.env\.test`)
 	// Files that describe, template or tool around a deployment instead of being one: agent tooling and
 	// developer tools kept in the repository, documentation, examples and backups.
 	nonRuntime = regexp.MustCompile(`(?i)(^|/)\.(agents|claude|codex|cursor|windsurf)/|(^|/)(docs?|examples?|tools)/|\.(example|sample|template|tpl|bkp|bak|orig|old)$|(^|/)[^/]*\.(example|sample)\.[^/]+$|(^|/)example[^/]*\.(ya?ml|json|env)$`)

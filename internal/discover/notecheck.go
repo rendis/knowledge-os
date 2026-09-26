@@ -585,6 +585,7 @@ func resourceGroup(r resource) string {
 		}
 		return ""
 	case "database_object":
+		n = strings.TrimPrefix(n, "/cloudsql/") // the Cloud SQL socket path names the same instance
 		head := strings.SplitN(n, ".", 2)[0]
 		if loopback(n) || strings.HasPrefix(n, "-") || strings.ContainsAny(head, "$<>{}=") || imageRef.MatchString(head) {
 			return "" // a parameter, placeholder, key=value fragment or container image, not a database
@@ -603,6 +604,11 @@ var (
 
 // loopback hosts are local development endpoints by definition (RFC 6761 / RFC 5735).
 func loopback(h string) bool {
+	for _, dev := range []string{".nip.io", ".sslip.io", ".xip.io"} { // wildcard DNS for a bare IP, used in development
+		if strings.Contains(h, dev) {
+			return true
+		}
+	}
 	return strings.HasPrefix(h, "localhost") || strings.HasPrefix(h, "127.") || strings.HasPrefix(h, "0.0.0.0") || strings.Contains(h, "://localhost") || strings.Contains(h, "://127.")
 }
 
