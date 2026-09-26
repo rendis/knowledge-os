@@ -80,8 +80,8 @@ Click a flow to watch it step by step in [the flow guide](https://rendis.github.
 ## Quickstart
 
 ```bash
-# 1. Install kos once per machine (the repository is private: use an account that can read it)
-gh release download --repo rendis/knowledge-os --pattern install-kos.sh --output - | sh
+# 1. Install kos once per machine (macOS, Linux, WSL; Windows: see the installation guide)
+curl -fsSL https://github.com/rendis/knowledge-os/releases/latest/download/install-kos.sh | sh
 
 # 2. Create the cell's vault: kos asks who the cell is, where its code lives and where it runs
 kos init --vault ~/vaults/payments

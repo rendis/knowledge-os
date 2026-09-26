@@ -20,7 +20,7 @@ publish: release
 	git tag -f v$(VERSION)
 	GH_TOKEN=$$(gh auth token --user rendis) git -c credential.helper= -c 'credential.helper=!gh auth git-credential' push -q origin HEAD:main v$(VERSION)
 	GH_TOKEN=$$(gh auth token --user rendis) gh release create v$(VERSION) --repo rendis/knowledge-os --title v$(VERSION) \
-	  --notes "kos $(VERSION). Install: gh release download --repo rendis/knowledge-os --pattern install-kos.sh --output - | sh" \
+	  --notes "kos $(VERSION). Install: curl -fsSL https://github.com/rendis/knowledge-os/releases/latest/download/install-kos.sh | sh" \
 	  dist/kos-* dist/SHA256SUMS dist/install-kos.sh dist/install-kos.ps1 dist/VERSION dist/THIRD_PARTY_NOTICES.txt
 
 # Installer and packaging checks; run after `make release`.

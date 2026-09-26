@@ -1,11 +1,11 @@
 #!/bin/sh
 # Install or update kos, the knowledge OS CLI.
 #
-#   gh release download --repo rendis/knowledge-os --pattern install-kos.sh --output - | sh
+#   curl -fsSL https://github.com/rendis/knowledge-os/releases/latest/download/install-kos.sh | sh
 #   sh scripts/install-kos.sh --local     # build from a distribution checkout (requires Go)
 #
-# The repository is private: the release is read with the GitHub CLI and your login. With a public
-# repository or a mirror, curl works too.
+# The release is downloaded with curl; when that fails (a private fork in KOS_REPO), the GitHub CLI
+# and your login read it instead.
 #
 # Environment:
 #   KOS_REPO          owner/repo that publishes releases (default rendis/knowledge-os)
@@ -66,21 +66,22 @@ install_release() {
     say "downloading $asset from $base"
     curl -fsSL --retry 3 -o "$WORK_DIR/$asset" "$base/$asset" || fail "download failed: $base/$asset"
     curl -fsSL --retry 3 -o "$WORK_DIR/SHA256SUMS" "$base/SHA256SUMS" || fail "download failed: $base/SHA256SUMS"
-  elif command -v gh >/dev/null 2>&1; then
-    tag=""
-    [ "$VERSION" = "latest" ] || tag="v$VERSION"
-    say "downloading $asset from $REPO ${tag:-latest release}"
-    # shellcheck disable=SC2086
-    gh release download $tag --repo "$REPO" --pattern "$asset" --pattern SHA256SUMS --dir "$WORK_DIR" \
-      || fail "gh could not read $REPO: log in with an account that can read it (gh auth login / gh auth switch)"
   else
-    command -v curl >/dev/null 2>&1 || fail "install the GitHub CLI (gh) or curl"
     if [ "$VERSION" = "latest" ]; then base="https://github.com/$REPO/releases/latest/download"
     else base="https://github.com/$REPO/releases/download/v$VERSION"
     fi
     say "downloading $asset from $base"
-    curl -fsSL --retry 3 -o "$WORK_DIR/$asset" "$base/$asset" || fail "download failed (a private repository needs gh): $base/$asset"
-    curl -fsSL --retry 3 -o "$WORK_DIR/SHA256SUMS" "$base/SHA256SUMS" || fail "download failed: $base/SHA256SUMS"
+    if ! { command -v curl >/dev/null 2>&1 \
+        && curl -fsSL --retry 3 -o "$WORK_DIR/$asset" "$base/$asset" \
+        && curl -fsSL --retry 3 -o "$WORK_DIR/SHA256SUMS" "$base/SHA256SUMS"; }; then
+      command -v gh >/dev/null 2>&1 || fail "download failed: $base/$asset (a private repository needs the GitHub CLI)"
+      tag=""
+      [ "$VERSION" = "latest" ] || tag="v$VERSION"
+      say "retrying with the GitHub CLI"
+      # shellcheck disable=SC2086
+      gh release download $tag --repo "$REPO" --pattern "$asset" --pattern SHA256SUMS --dir "$WORK_DIR" --clobber \
+        || fail "gh could not read $REPO: log in with an account that can read it (gh auth login / gh auth switch)"
+    fi
   fi
   expected="$(awk -v name="$asset" '$2 == name {print $1}' "$WORK_DIR/SHA256SUMS")"
   [ -n "$expected" ] || fail "SHA256SUMS has no entry for $asset"
