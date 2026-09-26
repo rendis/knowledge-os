@@ -36,6 +36,36 @@ The vault is the map, not the boundary. When a note is missing or stale, the age
 | 5 | **Hand off** | Atomic tasks in a repository worktree for any harness, reconciled back into the case. | `kos handoff` |
 | 6 | **Publish** | A `sync/<slug>` branch with gates, a review bound to the exact content and a fast-forward finish. | `kos sync` |
 
+## See it run
+
+**Discover** — three repositories and a cloud project become connections, each with its evidence.
+
+<img src="docs/assets/demo-discover.gif" width="100%" alt="kos discover scans three repositories, records the agent's judgments, captures the gcp project read-only and reports a subscription backed by configuration and platform evidence.">
+
+**Ask** — before an answer is delivered, every resource it names is checked; an invented topic is caught.
+
+<img src="docs/assets/demo-claims.gif" width="100%" alt="kos discover claims flags refund-requested as a name no repository, snapshot or note knows.">
+
+<details>
+<summary><b>Investigate</b> — a claim without a source is refused</summary>
+<br>
+<img src="docs/assets/demo-investigation.gif" width="100%" alt="kos investigation refuses evidence without a source, accepts it with file@commit, and records a finding inferred from it.">
+</details>
+
+<details>
+<summary><b>Hand off</b> — a task goes to a worktree and comes back as graded evidence</summary>
+<br>
+<img src="docs/assets/demo-handoff.gif" width="100%" alt="kos handoff starts a worktree for a task package, reads its commits and deltas, and reconciles them into the case as demonstrated evidence.">
+</details>
+
+<details>
+<summary><b>Publish</b> — the gate stops an orphan note until it is linked</summary>
+<br>
+<img src="docs/assets/demo-sync.gif" width="100%" alt="kos sync refuses to finish while a new topic note is orphaned, then fast-forwards main once the note is linked and reviewed again.">
+</details>
+
+<sub>Recorded with the real <code>kos</code> against a synthetic cell (<a href="docs/demo/">docs/demo</a>); the cloud listing comes from a stubbed <code>gcloud</code>. Regenerate with <code>make demo</code>.</sub>
+
 ## Quickstart
 
 ```bash
@@ -73,12 +103,13 @@ This repository is the **distribution**, not a cell vault; agents working on it 
 | `adapters/` | Optional skills a cell selects (`reports`) |
 | `evals/` | Checks and benchmarks; never installed ([evals](evals/README.md)) |
 | `instance.schema.yaml`, `MANAGED_PATHS` | The `instance.yaml` contract and the update allowlist |
-| `docs/` | Guides, [decisions](docs/adr/) and the README images (`python3 -B scripts/render_readme_assets.py`) |
+| `docs/` | Guides, [decisions](docs/adr/) and the README images (`python3 -B scripts/render_readme_assets.py`); `docs/demo/` holds the synthetic cell and VHS tapes behind the recordings |
 
 ```bash
 make test            # go vet and go test
 make release         # cross-platform binaries (required before the installer tests)
 make test-installer
+make demo            # re-record the README GIFs (vhs and jq required)
 ```
 
 </details>
