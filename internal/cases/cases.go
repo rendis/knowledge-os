@@ -24,6 +24,7 @@ const Help = `investigation COMMAND --vault PATH [options]
 Every change to a case goes through these commands; each one is gated and logged, and a
 change that would introduce a gate error is refused. All output is JSON.
   new      --title TEXT --type understanding|development --objective TEXT [--source-ref REF]
+           [--id ID --date YYYY-MM-DD]   recreate an earlier case with its identity and opening date
            Open an unpublished case from the request (neutral, formalized) and report
            existing cases with a similar title.
   list     [--id ID]   Unpublished, published and retired cases.
@@ -307,6 +308,18 @@ func create(o options, out io.Writer) error {
 		}
 		id = fmt.Sprintf("%s-%s-%02d", now.Format("20060102-150405"), slug(o.title), n)
 	}
+	if o.id != "" {
+		// Recreating a case keeps its identity: the ID must be well formed and free in every store.
+		if !caseIDFormat.MatchString(o.id) {
+			return errors.New("--id must look like 20260717-162648-short-title")
+		}
+		for _, c := range existing {
+			if c.ID == o.id {
+				return fmt.Errorf("case %s already exists (%s): move the earlier version aside first", o.id, c.Visibility)
+			}
+		}
+		id = o.id
+	}
 	locale := noteLocale(o.vault)
 	dir := filepath.Join(o.vault, ".investigations", id)
 	if e := os.MkdirAll(dir, 0o755); e != nil {
@@ -322,6 +335,8 @@ func create(o options, out io.Writer) error {
 	return emit(out, map[string]any{"id": id, "path": rel, "type": o.kind, "similar_cases": similar,
 		"next": "record evidence, conclusions, questions and decisions with `investigation add --id " + id + "`; keep the current state with `investigation state`"})
 }
+
+var caseIDFormat = regexp.MustCompile(`^\d{8}-\d{6}-[a-z0-9][a-z0-9-]*$`)
 
 func contains(a []string, s string) bool {
 	for _, x := range a {

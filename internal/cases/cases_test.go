@@ -272,3 +272,22 @@ func TestCredentialReferencesAreNotCredentials(t *testing.T) {
 		}
 	}
 }
+
+func TestRecreatingACaseKeepsItsIdentity(t *testing.T) {
+	v := vault(t)
+	id := "20260717-162648-filtro-semanal"
+	res, e := run(t, "new", "--vault", v, "--id", id, "--date", "2026-07-17", "--title", "Filtro semanal", "--type", "understanding", "--objective", "Entender el cálculo semanal.")
+	if e != nil || res["id"] != id {
+		t.Fatalf("recreated with its id: %v %v", e, res)
+	}
+	b, _ := os.ReadFile(filepath.Join(v, ".investigations", id, "investigation.md"))
+	if !strings.Contains(string(b), "2026-07-17") {
+		t.Fatalf("the opening date is kept: %s", b)
+	}
+	if _, e := run(t, "new", "--vault", v, "--id", id, "--title", "Otro", "--type", "understanding", "--objective", "x"); e == nil {
+		t.Fatal("an existing id is refused")
+	}
+	if _, e := run(t, "new", "--vault", v, "--id", "../escape", "--title", "Otro", "--type", "understanding", "--objective", "x"); e == nil {
+		t.Fatal("a malformed id is refused")
+	}
+}

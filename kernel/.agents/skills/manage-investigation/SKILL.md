@@ -59,6 +59,8 @@ Story drafts: [export-contract](references/export-contract.md); sufficiency of a
 
 `<CLI> investigation list --vault "<root>" --id <id>` returns the path, visibility, status and the private directory. Read the current state first, then the records it cites; the log gives the sequence, and `git log -p investigations/<id>/` the history of a published case. Report status, what is known, what is missing and the next action; answer a narrow question about a case without changing it.
 
+A case that `investigation check` rejects because it predates the current format is **recreated**, not patched: copy it whole to `.investigations-private/<id>/earlier/`, remove it from its store (a published one on a sync branch), then `investigation new --id <id> --date <opened>` and record its content through `add` (with `--date` for each record's day). Every fact keeps its source; files the records rely on are attached with `--file`; scratch stays in the private directory. A published case is published again on that branch, with review.
+
 ## Close
 
 `<CLI> investigation close --id <id> --outcome completed|abandoned|superseded-by:<id> --reason "<why, and the limits that remain>"`. `completed` needs the evidence or conclusions that answer the objective; a merge, a deployment claim or a terminal handoff alone does not complete a case. `abandoned` keeps its unresolved questions. New material evidence reopens it with `reopen --reason`.
