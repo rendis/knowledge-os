@@ -573,6 +573,9 @@ func resourceGroup(r resource) string {
 			return ""
 		}
 		labels := strings.Split(m[1], ".")
+		if last := labels[len(labels)-1]; fileTLD[strings.ToLower(last)] || strings.Trim(last, "0123456789") == "" {
+			return "" // a file name or an address fragment, not a host
+		}
 		if len(labels) >= 2 {
 			domain := strings.Join(labels[len(labels)-2:], ".")
 			if domain == "example.com" || domain == "example.org" || strings.HasSuffix(m[1], ".local") || strings.HasSuffix(m[1], ".svc") || strings.Contains(m[1], ".svc.") {
@@ -583,8 +586,8 @@ func resourceGroup(r resource) string {
 		return ""
 	case "database_object":
 		head := strings.SplitN(n, ".", 2)[0]
-		if loopback(n) || strings.HasPrefix(n, "-") {
-			return ""
+		if loopback(n) || strings.HasPrefix(n, "-") || strings.ContainsAny(head, "$<>{}=") || imageRef.MatchString(head) {
+			return "" // a parameter, placeholder, key=value fragment or container image, not a database
 		}
 		return "database " + head
 	case "storage_bucket":
@@ -592,6 +595,11 @@ func resourceGroup(r resource) string {
 	}
 	return ""
 }
+
+var (
+	fileTLD  = map[string]bool{"xls": true, "xlsx": true, "csv": true, "pdf": true, "doc": true, "docx": true, "txt": true, "zip": true, "json": true, "xml": true, "png": true, "jpg": true}
+	imageRef = regexp.MustCompile(`^[a-z0-9][a-z0-9._/-]*:(latest|[0-9][A-Za-z0-9._-]*)$`)
+)
 
 // loopback hosts are local development endpoints by definition (RFC 6761 / RFC 5735).
 func loopback(h string) bool {

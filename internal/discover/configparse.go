@@ -41,6 +41,9 @@ func init() {
 
 var (
 	testConfig = regexp.MustCompile(`(?i)(^|/)(tests?|__tests__|mocks?|fixtures?|testdata|e2e)/|\.(test|spec|e2e)\.|(^|/)\.env\.test`)
+	// Files that describe, template or tool around a deployment instead of being one: agent tooling and
+	// developer tools kept in the repository, documentation, examples and backups.
+	nonRuntime = regexp.MustCompile(`(?i)(^|/)\.(agents|claude|codex|cursor|windsurf)/|(^|/)(docs?|examples?|tools)/|\.(example|sample|template|tpl|bkp|bak|orig|old)$|(^|/)[^/]*\.(example|sample)\.[^/]+$|(^|/)example[^/]*\.(ya?ml|json|env)$`)
 	secretFile = regexp.MustCompile(`(?i)secret|credential|\.pem$|\.key$`)
 	// A credential inside an ordinary configuration file: never judged, stored or sent anywhere.
 	credentialKey   = regexp.MustCompile(`(?i)(^|[_.\-])(pass(word|wd)?|pwd|secret|token|api[_\-]?key|apikey|private[_\-]?key|client[_\-]?secret|access[_\-]?key|account[_\-]?key|auth[_\-]?key|sas|signature|credentials?)($|[_.\-])`)
@@ -249,7 +252,7 @@ func scanConfig(s *snapshot) ([]entry, int, error) {
 	files := 0
 	for _, f := range s.files {
 		base := path.Base(f)
-		if nonConfigExt[strings.ToLower(path.Ext(f))] || testConfig.MatchString(f) || strings.Contains(f, "node_modules/") {
+		if nonConfigExt[strings.ToLower(path.Ext(f))] || testConfig.MatchString(f) || nonRuntime.MatchString(f) || strings.Contains(f, "node_modules/") {
 			continue
 		}
 		switch base {
