@@ -1,14 +1,14 @@
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/assets/hero-dark.svg">
-    <img src="docs/assets/hero-light.svg" width="100%" alt="knowledge-os: a question enters the vault, which follows the trail to repositories, cloud snapshots, databases and trackers; the answer comes back sourced and graded, and what was learned returns to the vault through a gated sync.">
+    <img src="docs/assets/hero-light.svg" width="100%" alt="knowledge-os: the agent follows the trail from the vault to the code, a cloud snapshot, a database and a tracker, and each claim of its answer comes back with its source and grade.">
   </picture>
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/agents-Claude_Code_·_Codex_·_Cursor-534AB7?style=flat-square" alt="Agents: Claude Code, Codex, Cursor">
-  <img src="https://img.shields.io/badge/kos-macOS_·_Linux_·_Windows-0F6E56?style=flat-square" alt="kos runs on macOS, Linux and Windows">
-  <img src="https://img.shields.io/badge/clouds-GCP_·_AWS_·_Azure-0F6E56?style=flat-square" alt="Clouds: GCP, AWS, Azure">
+  <img src="https://img.shields.io/badge/agents-Claude_Code_·_Codex_·_Cursor-3452F5?style=flat-square" alt="Agents: Claude Code, Codex, Cursor">
+  <img src="https://img.shields.io/badge/kos-macOS_·_Linux_·_Windows-1C2130?style=flat-square" alt="kos runs on macOS, Linux and Windows">
+  <img src="https://img.shields.io/badge/clouds-GCP_·_AWS_·_Azure-1C2130?style=flat-square" alt="Clouds: GCP, AWS, Azure">
   <img src="https://img.shields.io/badge/license-Apache_2.0-59636E?style=flat-square" alt="License: Apache 2.0">
 </p>
 
@@ -27,6 +27,15 @@ The vault is the map, not the boundary. When a note is missing or stale, the age
 
 ## How it works
 
+<p align="center">
+  <a href="https://rendis.github.io/knowledge-os/#onboard"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/flow-onboard-dark.svg"><img src="docs/assets/flow-onboard-light.svg" width="32%" alt="Onboard: kos is installed, the vault is created with its identity and kernel, and a first discovery starts the map."></picture></a>
+  <a href="https://rendis.github.io/knowledge-os/#discover"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/flow-discover-dark.svg"><img src="docs/assets/flow-discover-light.svg" width="32%" alt="Discover: facts from the code and the cloud are compared with the vault; one is missing from it."></picture></a>
+  <a href="https://rendis.github.io/knowledge-os/#ask"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/flow-ask-dark.svg"><img src="docs/assets/flow-ask-light.svg" width="32%" alt="Ask: the answer comes back with a source and a grade for each claim, approved by an independent review."></picture></a>
+  <a href="https://rendis.github.io/knowledge-os/#investigate"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/flow-investigate-dark.svg"><img src="docs/assets/flow-investigate-light.svg" width="32%" alt="Investigate: a finding backed by evidence is absorbed into the vault from a shared case."></picture></a>
+  <a href="https://rendis.github.io/knowledge-os/#handoff"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/flow-handoff-dark.svg"><img src="docs/assets/flow-handoff-light.svg" width="32%" alt="Hand off: commits and deltas from a worktree come back into the case as evidence."></picture></a>
+  <a href="https://rendis.github.io/knowledge-os/#sync"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/flow-sync-dark.svg"><img src="docs/assets/flow-sync-light.svg" width="32%" alt="Sync: reviewed notes join the vault and reach the team."></picture></a>
+</p>
+
 | | Step | What happens | With |
 |:-:|---|---|---|
 | 1 | **Onboard** | The cell says who it is, where its code lives and which clouds it runs on; `onboard-developer` sets up each machine once. | `kos init` |
@@ -34,9 +43,9 @@ The vault is the map, not the boundary. When a note is missing or stale, the age
 | 3 | **Ask** | The agent answers from inspected sources, grades each claim and checks the names it cites. | `kos discover claims` |
 | 4 | **Investigate** | One case per line of work, written only through the CLI and gated on every write. | `kos investigation` |
 | 5 | **Hand off** | Atomic tasks in a repository worktree for any harness, reconciled back into the case. | `kos handoff` |
-| 6 | **Publish** | A `sync/<slug>` branch with gates, a review bound to the exact content and a fast-forward finish. | `kos sync` |
+| 6 | **Sync** | A `sync/<slug>` branch with gates, a review bound to the exact content and a fast-forward finish. | `kos sync` |
 
-Open [`docs/flows/index.html`](docs/flows/index.html) in a browser to watch each flow animated step by step.
+Click a flow to watch it step by step in [the flow guide](https://rendis.github.io/knowledge-os/) (source in [`docs/flows/`](docs/flows/), published on every push to `main`). In a vault, the agent opens the matching flow when you ask how one works.
 
 ## See it run
 
@@ -61,7 +70,7 @@ Open [`docs/flows/index.html`](docs/flows/index.html) in a browser to watch each
 </details>
 
 <details>
-<summary><b>Publish</b> — the gate stops an orphan note until it is linked</summary>
+<summary><b>Sync</b> — the gate stops an orphan note until it is linked</summary>
 <br>
 <img src="docs/assets/demo-sync.gif" width="100%" alt="kos sync refuses to finish while a new topic note is orphaned, then fast-forwards main once the note is linked and reviewed again.">
 </details>
@@ -106,7 +115,7 @@ This repository is the **distribution**, not a cell vault; agents working on it 
 | `adapters/` | Optional skills a cell selects (`reports`) |
 | `evals/` | Checks and benchmarks; never installed ([evals](evals/README.md)) |
 | `instance.schema.yaml`, `MANAGED_PATHS` | The `instance.yaml` contract and the update allowlist |
-| `docs/` | Guides, [decisions](docs/adr/) and the README images (`python3 -B scripts/render_readme_assets.py`); `docs/demo/` holds the synthetic cell and VHS tapes behind the recordings; `docs/flows/` the animated flow guide (one script per flow in `docs/flows/flows/`) |
+| `docs/` | Guides, [decisions](docs/adr/) and the README images, rendered from the flow guide (`python3 -B scripts/render_readme_assets.py`, Chrome required); `docs/demo/` holds the synthetic cell and VHS tapes behind the recordings; `docs/flows/` the animated flow guide (one script per flow in `docs/flows/flows/`) |
 
 ```bash
 make test            # go vet and go test
