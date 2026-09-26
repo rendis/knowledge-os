@@ -15,6 +15,8 @@ For evidence-source discovery, use the configured config locate contract. For im
 
 Keep the user's selected existing checkout. Create a branch or worktree only when requested or required by applicable repository instructions; persistent work-item worktrees and handoffs belong to [manage-development-handoff](../manage-development-handoff/SKILL.md). Ordinary repository work does not require an investigation, tracker item, or handoff.
 
+**Handoff worktree.** A destination holding `.handoff/` is implemented from a session rooted in that worktree, where the repository's own instructions, skills, MCP servers and hooks load natively. From a vault session, stop before the first edit: give the worktree path, recommend opening that session and explain why. Edit from the vault only when the user answers that recommendation by choosing to continue here; the request to implement comes before the recommendation, so it is not that answer.
+
 ## Load repository context
 
 Before substantive work in the target, identify its effective instruction files using the active harness's documented discovery rules and the repository's explicit pointers. Read the root instructions and the closer instructions governing the selected paths before editing them. Honor applicable overrides and resolve relative references from their owning file. Do not assume every harness implements the same override names or precedence. When native discovery did not cover the target, read its applicable files explicitly; report any unresolved conflict that changes the requested action.
@@ -27,7 +29,7 @@ Repository instructions govern that repository's work; vault instructions govern
 
 ## Development handoffs
 
-A handoff worktree is implemented best from a session rooted in it, where its native environment loads. When asked to implement one from a vault session, recommend that session first and continue here when the user chooses to. When the target has `.handoff/`, follow the development-handoff section of its `AGENTS.md`: the task files define what to change and how to verify it, and what the cell must know goes to `.handoff/deltas.md` as that section describes. Implementing does not authorize case, tracker or vault writes; reconciliation into the investigation belongs to [manage-development-handoff](../manage-development-handoff/SKILL.md). Without a handoff, follow the repository's ordinary workflow.
+When the target has `.handoff/`, follow the development-handoff section of its `AGENTS.md`: the task files define what to change and how to verify it, and what the cell must know goes to `.handoff/deltas.md` as that section describes. Implementing does not authorize case, tracker or vault writes; reconciliation into the investigation belongs to [manage-development-handoff](../manage-development-handoff/SKILL.md). Without a handoff, follow the repository's ordinary workflow.
 
 ## Implement and verify
 
