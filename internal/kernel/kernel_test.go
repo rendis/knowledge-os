@@ -1,0 +1,97 @@
+package kernel
+
+import (
+	"bytes"
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+)
+
+func install(t *testing.T) string {
+	t.Helper()
+	v := t.TempDir()
+	os.WriteFile(filepath.Join(v, "instance.yaml"), []byte("version: 1\ncell:\n  name: C\n  purpose: p\nsystems:\n  - id: s\n    name: S\nadapters: []\n"), 0o644)
+	os.WriteFile(filepath.Join(v, "00-Home.md"), []byte("# Home\n"), 0o644)
+	os.WriteFile(filepath.Join(v, LockName), []byte("version: \"5\"\nkernel_version: \"0.0.1\"\ndistribution_revision: \"x\"\ndistribution_dirty: false\nadapters:\n  []\nmanaged_hashes:\n"), 0o644)
+	p, e := Preview(v)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if e := Apply(v, p); e != nil {
+		t.Fatal(e)
+	}
+	return v
+}
+
+func run(t *testing.T, args ...string) (map[string]any, error) {
+	var b bytes.Buffer
+	e := Run(args, &b)
+	m := map[string]any{}
+	_ = json.Unmarshal(b.Bytes(), &m)
+	return m, e
+}
+
+func TestUpdateInstallsPreviewsAndProtectsLocalChanges(t *testing.T) {
+	v := install(t)
+	lock, e := ReadLock(v)
+	if e != nil || lock.KernelVersion != Version() || lock.Hashes["AGENTS.md"] == "" {
+		t.Fatalf("lock after install: %v %+v", e, lock)
+	}
+	if target, _ := os.Readlink(filepath.Join(v, ".claude", "skills")); target != filepath.Join("..", ".agents", "skills") {
+		t.Fatalf(".claude/skills link: %q", target)
+	}
+	if b, _ := os.ReadFile(filepath.Join(v, ".gitignore")); !strings.Contains(string(b), "/.investigations/") {
+		t.Fatalf("local stores are ignored: %s", b)
+	}
+	if res, _ := run(t, "status", "--vault", v); res["current"] != true {
+		t.Fatalf("a fresh install is current: %v", res)
+	}
+
+	// A kernel file the distribution no longer ships (recorded in the lock) is retired; a changed one is listed.
+	os.WriteFile(filepath.Join(v, "90-Meta", "retired.md"), []byte("old\n"), 0o644)
+	lock.Hashes["90-Meta/retired.md"] = digest([]byte("old\n"))
+	lock.Hashes["AGENTS.md"] = digest([]byte("previous router\n"))
+	os.WriteFile(filepath.Join(v, "AGENTS.md"), []byte("previous router\n"), 0o644)
+	os.WriteFile(filepath.Join(v, LockName), []byte(lock.dump()), 0o644)
+	res, e := run(t, "update", "--vault", v, "--dry-run")
+	if e != nil || res["changes"] != float64(2) || !strings.Contains(res["diff"].(string), "AGENTS.md") {
+		t.Fatalf("dry run lists the change and the retirement: %v %v", e, res)
+	}
+	if b, _ := os.ReadFile(filepath.Join(v, "AGENTS.md")); string(b) != "previous router\n" {
+		t.Fatal("a dry run writes nothing")
+	}
+
+	// A managed file edited in the vault since installation blocks the update until --force.
+	os.WriteFile(filepath.Join(v, "90-Meta", "retired.md"), []byte("edited by the cell\n"), 0o644)
+	if res, e := run(t, "update", "--vault", v); e == nil || res["status"] != "conflict" {
+		t.Fatalf("local edits are protected: %v %v", e, res)
+	}
+	if res, e := run(t, "update", "--vault", v, "--force"); e != nil || res["status"] != "updated" {
+		t.Fatalf("--force restores the distribution: %v %v", e, res)
+	}
+	if _, e := os.Stat(filepath.Join(v, "90-Meta", "retired.md")); !os.IsNotExist(e) {
+		t.Fatal("the retired file is removed")
+	}
+	if res, _ := run(t, "status", "--vault", v); res["current"] != true {
+		t.Fatalf("current after update: %v", res)
+	}
+}
+
+func TestSourcesIncludeSelectedAdaptersOnly(t *testing.T) {
+	plain, e := Sources(nil)
+	if e != nil {
+		t.Fatal(e)
+	}
+	with, e := Sources([]string{"reports"})
+	if e != nil || len(with) <= len(plain) {
+		t.Fatalf("an adapter adds its skills: %v %d %d", e, len(plain), len(with))
+	}
+	if _, ok := plain[catalogPath]; ok {
+		t.Fatal("a cell's catalog is never payload")
+	}
+	if _, e := Sources([]string{"nope"}); e == nil {
+		t.Fatal("an unknown adapter is refused")
+	}
+}

@@ -1,123 +1,132 @@
 #!/usr/bin/env python3
-"""Execute the installed native runtime against disposable vaults.
+"""kos as a per-machine tool: the release, its installer, self-update and a vault without binaries.
 
-Requires `make release`; uses real release artifacts, never mocked executables.
+Requires `make release`; uses the real release artifacts, served from a local mirror.
 """
 from __future__ import annotations
 
+import functools
+import hashlib
+import http.server
 import json
 import os
 import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import unittest
 from pathlib import Path
 
 DIST = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(DIST / "scripts"))
-import native_runtime
+import native_runtime  # noqa: E402
 
 
-class NativeInstallationTests(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.tmp = tempfile.TemporaryDirectory()
-        cls.addClassCleanup(cls.tmp.cleanup)
-        cls.dist = Path(cls.tmp.name) / "distribution"
-        cls.dist.mkdir()
-        for name in ("scripts", "kernel", "adapters", "cmd", "internal"):
-            shutil.copytree(DIST / name, cls.dist / name, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
-        for name in ("install.sh", "VERSION", "MANAGED_PATHS", "instance.schema.yaml", "go.mod", "go.sum"):
-            shutil.copy2(DIST / name, cls.dist / name)
-        # All artifacts are checked by installer preflight, including non-host targets.
-        shutil.copytree(DIST / "dist", cls.dist / "dist", ignore=shutil.ignore_patterns("tests", "kos", "*.test"))
-        native_runtime.release(cls.dist)  # Fail with actionable build error, never skip coverage.
+def sha(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 
+
+class Mirror:
+    """A directory served over HTTP, standing in for a GitHub release."""
+
+    def __init__(self, root: Path):
+        handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=str(root))
+        handler.log_message = lambda *args: None
+        self.server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
+        threading.Thread(target=self.server.serve_forever, daemon=True).start()
+        self.url = f"http://127.0.0.1:{self.server.server_address[1]}"
+
+    def close(self):
+        self.server.shutdown()
+
+
+class ReleaseTests(unittest.TestCase):
+    def test_release_lists_every_platform_with_checksums(self):
+        value = native_runtime.release(DIST)
+        self.assertEqual(set(value["artifacts"]), native_runtime.TARGETS)
+        sums = dict(line.split()[::-1] for line in (DIST / "dist/SHA256SUMS").read_text().splitlines())
+        for item in value["artifacts"].values():
+            self.assertEqual(sums[item["file"]], sha(DIST / "dist" / item["file"]))
+        for name in ("install-kos.sh", "install-kos.ps1", "VERSION"):
+            self.assertTrue((DIST / "dist" / name).is_file(), name)
+
+    def test_stale_or_tampered_release_is_refused(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            copy = Path(tmp) / "distribution"
+            for name in ("scripts", "kernel", "adapters", "cmd", "internal"):
+                shutil.copytree(DIST / name, copy / name, ignore=shutil.ignore_patterns("__pycache__"))
+            for name in ("go.mod", "go.sum", "payload.go", "MANAGED_PATHS"):
+                shutil.copy2(DIST / name, copy / name)
+            shutil.copytree(DIST / "dist", copy / "dist", ignore=shutil.ignore_patterns("tests", "windows-*"))
+            native_runtime.binary(copy)
+            (copy / "kernel/AGENTS.md").write_text("changed kernel\n")
+            with self.assertRaisesRegex(RuntimeError, "stale"):
+                native_runtime.binary(copy)
+            shutil.copy2(DIST / "kernel/AGENTS.md", copy / "kernel/AGENTS.md")
+            host = copy / "dist" / native_runtime.release(copy)["artifacts"][native_runtime.target()]["file"]
+            host.write_bytes(b"tampered")
+            with self.assertRaisesRegex(RuntimeError, "missing or changed"):
+                native_runtime.binary(copy)
+
+
+class InstallerTests(unittest.TestCase):
     def setUp(self):
-        self.work = tempfile.TemporaryDirectory()
-        self.addCleanup(self.work.cleanup)
-        self.vault = Path(self.work.name) / "vault"
-        self.install("init", "--cell-name", "Native test", "--purpose", "Disposable native installation", "--system", "sample:Sample", "--yes")
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+        self.mirror_dir = self.root / "mirror"
+        shutil.copytree(DIST / "dist", self.mirror_dir, ignore=shutil.ignore_patterns("tests", "windows-*"))
+        self.mirror = Mirror(self.mirror_dir)
+        self.addCleanup(self.mirror.close)
+        self.bin = self.root / "bin"
+        self.env = {**os.environ, "KOS_DOWNLOAD_URL": self.mirror.url, "KOS_INSTALL_DIR": str(self.bin),
+                    "HOME": str(self.root), "XDG_CACHE_HOME": str(self.root / "cache"), "CI": ""}
+        self.env.pop("KOS_NO_UPDATE_CHECK", None)
 
-    def install(self, verb, *args, ok=True):
-        p = subprocess.run([sys.executable, "-B", str(self.dist / "scripts/knowledge_os.py"), verb, "--dest", str(self.vault), *args], capture_output=True, text=True)
-        if ok:
-            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
-        return p
+    def install(self) -> subprocess.CompletedProcess:
+        return subprocess.run(["sh", str(DIST / "scripts/install-kos.sh")], env=self.env, capture_output=True, text=True, timeout=60)
 
-    def cli(self, *args, ok=True):
-        p = subprocess.run([str(self.vault / native_runtime.local_paths(native_runtime.target())[0]), *args], capture_output=True, text=True)
-        if ok:
-            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
-        return p
+    def kos(self, *args: str, cwd: Path | None = None) -> subprocess.CompletedProcess:
+        return subprocess.run([str(self.bin / "kos"), *args], env=self.env, capture_output=True, text=True, cwd=cwd, timeout=60)
 
-    def test_installed_native_payload_and_config(self):
-        self.assertEqual(list(self.vault.rglob("*.py")), [])
-        self.assertEqual(list(self.vault.rglob("*.sh")), [])
-        self.assertTrue((self.vault / ".agents/skills/explain-visually/scripts/check_text_fit.cjs").is_file())
-        result = json.loads(self.cli("config", "resolve", "--vault", str(self.vault)).stdout)
-        self.assertEqual(result["status"], "resolved")
-        self.assertEqual(result["vault_root"], str(self.vault.resolve()))
-        for args in (("audit",), ("check", "links"), ("check", "bases")):
-            self.cli(*args, "--vault", str(self.vault))
-        doctor = json.loads(self.install("doctor").stdout)
-        self.assertEqual(doctor["native_runtime"]["status"], "ready")
-        self.assertEqual(doctor["lock_version"], "4")
-        self.assertNotIn('".bin/', (self.vault / ".knowledge-os.lock.yaml").read_text())
+    def test_install_verify_and_update_in_place(self):
+        installed = self.install()
+        self.assertEqual(installed.returncode, 0, installed.stderr)
+        version = json.loads(self.kos("version").stdout)
+        self.assertEqual(version["kos"], (DIST / "kernel/VERSION").read_text().strip())
+        self.assertNotIn("latest", version)
 
-    def test_search_refresh_new_edit_rename_delete(self):
-        note = self.vault / "50-Glosario" / "Lookup.md"
-        note.write_text("# Lookup\n\n## Example\n\nUniqueindexexample alpha.\n")
-        def cards():
-            return json.loads(self.cli("search", "--vault", str(self.vault), "--query", "Uniqueindexexample").stdout)["cards"]
-        found = cards()
-        self.assertTrue(any(c["path"] == "50-Glosario/Lookup.md" for c in found))
-        self.assertTrue(all("origin" in c and "section" in c and "excerpt" in c for c in found))
-        note.write_text("# Lookup\n\n## New section\n\nUniqueindexexample beta.\n")
-        self.assertTrue(any("beta" in c["excerpt"] for c in cards()))
-        renamed = note.with_name("Renamed.md")
-        note.rename(renamed)
-        self.assertTrue(any(c["path"] == "50-Glosario/Renamed.md" for c in cards()))
-        self.assertFalse(any(c["path"] == "50-Glosario/Lookup.md" for c in cards()))
-        renamed.unlink()
-        self.assertEqual(cards(), [])
+        (self.mirror_dir / "VERSION").write_text("99.0.0\n")
+        for cache in (self.root / "cache", self.root / "Library" / "Caches"):  # the daily check is cached
+            shutil.rmtree(cache, ignore_errors=True)
+        noticed = self.kos("config", "--help")
+        self.assertIn("kos 99.0.0 is available", noticed.stderr)
+        updated = self.kos("update")
+        self.assertEqual(updated.returncode, 0, updated.stderr)
+        self.assertEqual(json.loads(updated.stdout)["to"], "99.0.0")
 
-    def test_binary_drift_blocks_update_and_missing_binary_recovers(self):
-        binary = self.vault / native_runtime.local_paths(native_runtime.target())[0]
-        binary.write_bytes(b"user-modified")
-        before = binary.read_bytes()
-        result = self.install("update", ok=False)
-        self.assertEqual(result.returncode, 3, result.stdout + result.stderr)
-        self.assertEqual(binary.read_bytes(), before)
-        doctor = json.loads(self.install("doctor").stdout)
-        self.assertEqual(doctor["native_runtime"]["status"], "drift")
-        binary.unlink()
-        self.install("update")
-        self.cli("version")
+        sums = self.mirror_dir / "SHA256SUMS"
+        sums.write_text(sums.read_text().replace(sha(self.mirror_dir / native_runtime.filename(native_runtime.target())), "0" * 64))
+        refused = self.install()
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertIn("checksum mismatch", refused.stderr)
 
-    def test_retirement_preserves_local_changes_then_removes_unchanged(self):
-        # Recreate a previous portable lock's tracked runtime entry.
-        sys.path.insert(0, str(DIST / "scripts"))
-        import knowledge_os
-        old = self.vault / "90-Meta/removed-helper.py"  # a file an earlier release managed
-        retired = b"# helper no longer shipped\n"
-        old.write_bytes(retired)
-        lockpath = self.vault / ".knowledge-os.lock.yaml"
-        lock = knowledge_os.load_lock(lockpath)
-        lock["managed_hashes"]["90-Meta/removed-helper.py"] = native_runtime.sha256(old)
-        lockpath.write_text(knowledge_os.dump_lock(lock))
-        old.write_text("# local change\n")
-        result = self.install("update", ok=False)
-        self.assertEqual(result.returncode, 3, result.stdout + result.stderr)
-        self.assertEqual(old.read_text(), "# local change\n")
-        old.write_bytes(retired)
-        local = self.vault / "90-Meta/cell-owned.py"
-        local.write_text("# keep consumer tool\n")
-        self.install("update")
-        self.assertFalse(old.exists())
-        self.assertEqual(local.read_text(), "# keep consumer tool\n")
+    def test_vault_without_binaries_is_operated_from_its_directory(self):
+        self.assertEqual(self.install().returncode, 0)
+        vault = self.root / "vault"
+        init = subprocess.run(["sh", str(DIST / "install.sh"), "init", "--dest", str(vault), "--yes", "--cell-name", "C",
+                               "--purpose", "P", "--system", "Orders"], capture_output=True, text=True, timeout=120)
+        self.assertEqual(init.returncode, 0, init.stderr)
+        self.assertFalse((vault / ".agents" / "bin").exists())
+        env = {**self.env, "KOS_NO_UPDATE_CHECK": "1"}
+        status = subprocess.run([str(self.bin / "kos"), "kernel", "status"], env=env, cwd=vault / "10-Sistemas",
+                                capture_output=True, text=True, timeout=60)
+        self.assertEqual(status.returncode, 0, status.stderr)
+        self.assertTrue(json.loads(status.stdout)["current"])
+        audit = subprocess.run([str(self.bin / "kos"), "audit"], env=env, cwd=vault, capture_output=True, text=True, timeout=60)
+        self.assertEqual(audit.returncode, 0, audit.stderr)
 
 
 if __name__ == "__main__":
-    unittest.main()
+    unittest.main(verbosity=2)

@@ -12,8 +12,8 @@ Consumer vaults are created with `./install.sh init --dest <vault>`. Work here i
 
 ## Layers
 
-- **CLI** — `cmd/kos`, `internal/`, `tools/`. The native `kos` every cell runs; cells receive no Python.
-- **Installer** — `install.sh`, `scripts/`. Init / update / doctor / adopt. Update copies managed kernel paths and selected adapters, removes the files the lock recorded that the distribution no longer ships, and never overwrites a cell's `instance.yaml`, `00-Home.md`, or notes under `10/`–`70/`.
+- **CLI** — `cmd/kos`, `internal/`, `tools/`, `payload.go`. The `kos` every developer installs once per machine; it embeds the kernel and installs or updates it in a cell (`kos kernel update`). Cells receive no Python and no binaries.
+- **Installer** — `install.sh`, `scripts/`. Init / adopt / doctor write and check the cell's identity; the kernel itself is installed and updated by `kos kernel update` (from `make release`), which removes the files the lock recorded that the distribution no longer ships and never overwrites a cell's `instance.yaml`, `00-Home.md`, or notes under `10/`–`70/`. `scripts/install-kos.sh` installs kos on a machine.
 - **Kernel payload** — `kernel/`. Copied into every cell. `kernel/AGENTS.md` is the **cell** router (evidence contract, navigation, skills). Keep it thin; keep product names out.
 - **Adapters** — `adapters/`. Opt-in at init, or later by listing them in the cell's `instance.yaml` and running `update`. Ship engines and generic samples, not another team's recipes.
 - **Evals** — `evals/`. Never copied into a cell; see `evals/README.md`.

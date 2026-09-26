@@ -12,7 +12,19 @@ This repository is the **distribution**. A cell vault is a separate directory cr
 - **Investigations** (`investigation`): one case per line of work, written only through the CLI, gated on every write, and published, absorbed or retired on a sync branch.
 - **Development handoffs** (`handoff`): atomic task packages prepared in a repository worktree, with a managed `AGENTS.md` section that tells any harness how to work with them, and a deterministic reconciliation back into the case.
 
-## Install
+## Install kos
+
+`kos` is one executable per machine that serves every vault; vaults carry no binaries. The repository is private, so the release is read with the GitHub CLI and an account that can read it:
+
+```bash
+gh release download --repo rendis/knowledge-os --pattern install-kos.sh --output - | sh   # macOS, Linux, WSL
+kos version          # this kos, the kernel it carries, the vault's kernel, a newer release if any
+kos update           # replace this kos with the latest release (checksum verified)
+```
+
+Windows uses `install-kos.ps1` the same way; `sh scripts/install-kos.sh --local` builds from a checkout. When a newer kos exists, every command prints one `kos notice:` line on stderr, and the agent offers the update. `kos kernel status` and `kos kernel update --dry-run` show how a vault's kernel differs from the one kos carries; `kos kernel update` applies it (refusing kernel files edited in the vault until `--force`). A vault whose kernel is newer than kos refuses to publish until `kos update`.
+
+## Create a cell vault
 
 ```bash
 ./install.sh init --dest /path/to/cell-vault \
@@ -25,11 +37,11 @@ This repository is the **distribution**. A cell vault is a separate directory cr
 
 Onboarding has two levels. **The cell's**, once and shared: without flags, `init` asks who the cell is (name, purpose, systems), where its code is (GitHub organization, repository prefixes, the **reference branch order**: the branches tried in each repository, default `main` then `master`), the **clouds** it runs on (`gcp`, `aws`, `azure`, one or several), its issue trackers and the notes' language; the evidence profile and adapters keep their defaults unless passed as flags. The `onboard-cell` skill runs the same conversation with an agent, proposing answers from the organization's repositories, and ends with the first inventory and discovery. **Each developer's**, on their machine: when someone opens the vault for the first time, the `onboard-developer` skill runs `kos config detect` (clones of the cell's repositories, a worktree root, cloud logins, database ports), asks for one confirmation, records it and gives an access card. `--yes` tests unattended installation. A cancelled interactive input creates no vault. With no arguments, the script updates the current directory when it holds a lock and initializes it when empty; knowledge Markdown without a lock is refused. `adopt` installs the kernel into an existing vault without rewriting its notes.
 
-The lock (`.knowledge-os.lock.yaml`) is portable and committed with the cell. `update` refuses kernel files changed locally until `--force`, removes the managed files the distribution no longer ships (as recorded in the lock), and never rewrites cell-owned files.
+The installer writes the cell's identity and delegates the kernel itself to `kos kernel update`, the single implementation of installing and updating a kernel. The lock (`.knowledge-os.lock.yaml`) is portable and committed with the cell. An update refuses kernel files changed locally until `--force`, removes the managed files the distribution no longer ships (as recorded in the lock), and never rewrites cell-owned files.
 
 ## Native CLI
 
-`make release` builds `kos` for macOS, Linux and Windows on ARM64 and AMD64, with checksums, a runtime manifest and third-party notices under `dist/`. `init` and `update` copy all six binaries into the cell's versioned `.agents/bin/`, so a clone works without a compiler, Python or a download. Select the binary for the host through [use-vault-cli](kernel/.agents/skills/use-vault-cli/SKILL.md#bind-the-executable-and-vault); `kos --help` lists the commands:
+`make release` builds `kos` for macOS, Linux and Windows on ARM64 and AMD64 under `dist/`, with `SHA256SUMS`, the installer scripts, third-party notices and `release.json` (the source fingerprint the installer checks). Each binary embeds the kernel payload. `make publish` tags `v<version>` and publishes `dist/` as the GitHub release of `rendis/knowledge-os` with the `rendis` account. `kos --help` lists the commands:
 
 ```text
 overview · search · index · links · inventory · audit
@@ -39,15 +51,16 @@ check links|bases|visual|visual-context|obsidian-binding|map-closure
 investigation new|list|check|add|state|absorb|close|reopen
 handoff start|status|refresh|reconcile
 sync start|status|review|verify|acknowledge|finish|pull
+kernel status|update · version · update
 ```
 
 Discovery judgments are answered by Jev when `TYPESAFE_API_KEY` is set, otherwise by the agent through `discover questions` and `discover answer`. Search keeps a private local SQLite index outside the vault; results are pointers to open and verify, not answers. No hooks or model services are installed.
 
-A team whose developers all use `git-lfs` can keep history small with `git lfs track ".agents/bin/kos-*"`; `update` does not manage `.gitattributes`.
+Failures, unwanted behaviors and proposals come back through the `report-to-distribution` skill as sanitized issues (templates in `.github/ISSUE_TEMPLATE/`).
 
 ## Ownership in a cell
 
-The cell owns `instance.yaml`, `00-Home.md`, the root Bases, `90-Meta/Alcance.md`, notes under `10/`–`70/`, `investigations/`, the optional `90-Meta/vault-catalog.yaml` of related vaults, and a local, ignored `AGENTS.personal.md` for personal rules. The distribution owns the `AGENTS.md` router, the generic files under `90-Meta/`, the skills, the specialist definitions for Claude Code, Codex and Cursor, and `.agents/bin/`.
+The cell owns `instance.yaml`, `00-Home.md`, the root Bases, `90-Meta/Alcance.md`, notes under `10/`–`70/`, `investigations/`, the optional `90-Meta/vault-catalog.yaml` of related vaults, and a local, ignored `AGENTS.personal.md` for personal rules. The distribution owns the `AGENTS.md` router, the generic files under `90-Meta/`, the skills, and the specialist definitions for Claude Code, Codex and Cursor.
 
 Local, ignored stores (unpublished cases, private case material, operational runs, plans, scratch, discovery state and local configuration) are listed in [local-stores](kernel/90-Meta/local-stores.md). Handoff tasks live in each repository worktree's `.handoff/`, excluded from Git.
 
