@@ -313,9 +313,17 @@ func resolveLibraries(scans []*repoScan) {
 				} else if best != "" && via != "" {
 					// Inside a library only imported packages are expanded, so follow its own packages.
 					for id, dep := range pkgDeps(owner, strings.Trim(strings.TrimPrefix(r.Spec, best), "/"), stack) {
-						if into[id] == nil {
+						if d := into[id]; d == nil {
 							cp := *dep
+							cp.Files, cp.Paths = append([]string{}, dep.Files...), append([]string{}, dep.Paths...)
 							into[id] = &cp
+						} else {
+							for _, x := range dep.Files {
+								d.Files = appendUnique(d.Files, x)
+							}
+							for _, x := range dep.Paths {
+								d.Paths = appendUnique(d.Paths, x)
+							}
 						}
 					}
 					continue
@@ -333,11 +341,18 @@ func resolveLibraries(scans []*repoScan) {
 					into[lk] = d
 				}
 				d.Files = appendUnique(d.Files, file)
+				// Every file that imports the library carries what the library uses, so the result does not
+				// depend on which importing file the map iteration reaches first.
 				for id, dep := range pkgDeps(lib, sub, stack) {
-					if into[id] == nil {
+					if d := into[id]; d == nil {
 						cp := *dep
 						cp.Origin, cp.Via, cp.Files = "library", lib.in.Name, []string{file}
 						into[id] = &cp
+					} else if d.Origin == "library" {
+						d.Files = appendUnique(d.Files, file)
+						if lib.in.Name < d.Via {
+							d.Via = lib.in.Name
+						}
 					}
 				}
 				continue
