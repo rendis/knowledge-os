@@ -1,4 +1,4 @@
-# documentation-vault
+# knowledge-os
 
 A portable **knowledge OS** for a team or cell: an evidence-first vault kernel, agent skills, deterministic gates and a native CLI, installed into a cell's own vault without copying another team's domain knowledge. It works with Claude Code, Codex and Cursor alike.
 
@@ -23,13 +23,13 @@ This repository is the **distribution**. A cell vault is a separate directory cr
 ./install.sh adopt  --dest /path/to/existing-vault
 ```
 
-Onboarding has two levels. **The cell's**, once and shared: without flags, `init` asks who the cell is (name, purpose, systems), where its code is (GitHub organization, repository prefixes, the **reference branch order**: the branches tried in each repository, default `main` then `master`), the **clouds** it runs on (`gcp`, `aws`, `azure`, one or several), its issue trackers and the notes' language; the evidence profile and adapters keep their defaults unless passed as flags. The `onboard-cell` skill runs the same conversation with an agent, proposing answers from the organization's repositories, and ends with the first inventory and discovery. **Each developer's**, on their machine: when someone opens the vault for the first time, the `onboard-developer` skill runs `vaultctl config detect` (clones of the cell's repositories, a worktree root, cloud logins, database ports), asks for one confirmation, records it and gives an access card. `--yes` tests unattended installation. A cancelled interactive input creates no vault. With no arguments, the script updates the current directory when it holds a lock and initializes it when empty; knowledge Markdown without a lock is refused. `adopt` installs the kernel into an existing vault without rewriting its notes.
+Onboarding has two levels. **The cell's**, once and shared: without flags, `init` asks who the cell is (name, purpose, systems), where its code is (GitHub organization, repository prefixes, the **reference branch order**: the branches tried in each repository, default `main` then `master`), the **clouds** it runs on (`gcp`, `aws`, `azure`, one or several), its issue trackers and the notes' language; the evidence profile and adapters keep their defaults unless passed as flags. The `onboard-cell` skill runs the same conversation with an agent, proposing answers from the organization's repositories, and ends with the first inventory and discovery. **Each developer's**, on their machine: when someone opens the vault for the first time, the `onboard-developer` skill runs `kos config detect` (clones of the cell's repositories, a worktree root, cloud logins, database ports), asks for one confirmation, records it and gives an access card. `--yes` tests unattended installation. A cancelled interactive input creates no vault. With no arguments, the script updates the current directory when it holds a lock and initializes it when empty; knowledge Markdown without a lock is refused. `adopt` installs the kernel into an existing vault without rewriting its notes.
 
 The lock (`.knowledge-os.lock.yaml`) is portable and committed with the cell. `update` refuses kernel files changed locally until `--force`, removes the managed files the distribution no longer ships (as recorded in the lock), and never rewrites cell-owned files.
 
 ## Native CLI
 
-`make release` builds `vaultctl` for macOS, Linux and Windows on ARM64 and AMD64, with checksums, a runtime manifest and third-party notices under `dist/`. `init` and `update` copy all six binaries into the cell's versioned `.agents/bin/`, so a clone works without a compiler, Python or a download. Select the binary for the host through [use-vault-cli](kernel/.agents/skills/use-vault-cli/SKILL.md#bind-the-executable-and-vault); `vaultctl --help` lists the commands:
+`make release` builds `kos` for macOS, Linux and Windows on ARM64 and AMD64, with checksums, a runtime manifest and third-party notices under `dist/`. `init` and `update` copy all six binaries into the cell's versioned `.agents/bin/`, so a clone works without a compiler, Python or a download. Select the binary for the host through [use-vault-cli](kernel/.agents/skills/use-vault-cli/SKILL.md#bind-the-executable-and-vault); `kos --help` lists the commands:
 
 ```text
 overview · search · index · links · inventory · audit
@@ -43,7 +43,7 @@ sync start|status|review|verify|acknowledge|finish|pull
 
 Discovery judgments are answered by Jev when `TYPESAFE_API_KEY` is set, otherwise by the agent through `discover questions` and `discover answer`. Search keeps a private local SQLite index outside the vault; results are pointers to open and verify, not answers. No hooks or model services are installed.
 
-A team whose developers all use `git-lfs` can keep history small with `git lfs track ".agents/bin/vaultctl-*"`; `update` does not manage `.gitattributes`.
+A team whose developers all use `git-lfs` can keep history small with `git lfs track ".agents/bin/kos-*"`; `update` does not manage `.gitattributes`.
 
 ## Ownership in a cell
 
@@ -56,7 +56,7 @@ Local, ignored stores (unpublished cases, private case material, operational run
 | Path | Role |
 |---|---|
 | `install.sh`, `scripts/` | Installer (`knowledge_os.py`, with `instance.py` and `vault_catalog.py`), native runtime packaging, specialist rendering |
-| `cmd/`, `internal/`, `tools/` | The `vaultctl` CLI, its packages, release and platform-check tools |
+| `cmd/`, `internal/`, `tools/` | The `kos` CLI, its packages, release and platform-check tools |
 | `kernel/` | Files copied into every cell |
 | `adapters/` | Optional skills a cell selects (`reports`) |
 | `evals/` | Checks and benchmarks; never installed ([evals](evals/README.md)) |

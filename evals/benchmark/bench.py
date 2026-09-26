@@ -35,7 +35,7 @@ def sh(args, cwd=None, env=None, check=True):
 def cli(vault):
     arch = {"arm64": "arm64", "aarch64": "arm64"}.get(platform.machine(), "amd64")
     osname = {"Darwin": "darwin", "Linux": "linux", "Windows": "windows"}[platform.system()]
-    return str(pathlib.Path(vault) / ".agents" / "bin" / f"vaultctl-{osname}-{arch}{'.exe' if osname == 'windows' else ''}")
+    return str(pathlib.Path(vault) / ".agents" / "bin" / f"kos-{osname}-{arch}{'.exe' if osname == 'windows' else ''}")
 
 
 def sha256(path):

@@ -21,7 +21,7 @@ ROOT=$(CDPATH= python3 -c 'import os, sys; print(os.path.dirname(os.path.realpat
 # If this file is a curl-fetched stub without kernel/, clone a tagged cache here
 # in a later release. v1 requires the full distribution next to this script.
 if [ ! -d "$ROOT/kernel" ] || [ ! -f "$ROOT/VERSION" ]; then
-  echo "This installer must run from a documentation-vault checkout (kernel/ missing)." >&2
+  echo "This installer must run from a knowledge-os checkout (kernel/ missing)." >&2
   echo "Clone the distribution, then run: ./install.sh init --dest <vault>" >&2
   exit 2
 fi

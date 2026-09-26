@@ -7,15 +7,15 @@ import (
 	"os"
 	"os/signal"
 
-	"documentation-vault/internal/audit"
-	"documentation-vault/internal/cases"
-	"documentation-vault/internal/check"
-	"documentation-vault/internal/config"
-	"documentation-vault/internal/devhandoff"
-	"documentation-vault/internal/discover"
-	"documentation-vault/internal/gitsync"
-	"documentation-vault/internal/inventory"
-	"documentation-vault/internal/retrieval"
+	"knowledge-os/internal/audit"
+	"knowledge-os/internal/cases"
+	"knowledge-os/internal/check"
+	"knowledge-os/internal/config"
+	"knowledge-os/internal/devhandoff"
+	"knowledge-os/internal/discover"
+	"knowledge-os/internal/gitsync"
+	"knowledge-os/internal/inventory"
+	"knowledge-os/internal/retrieval"
 )
 
 var version = "dev"
@@ -30,7 +30,7 @@ func main() {
 }
 func run(ctx context.Context, args []string) error {
 	if len(args) == 0 || args[0] == "--help" || args[0] == "help" {
-		fmt.Println(`vaultctl — local vault operations
+		fmt.Println(`kos — local vault operations
 
 overview --vault PATH [--folder 20-Repos]   one line per knowledge note (Markdown)
 search --vault PATH --query TEXT [--limit 1..10] [--visibility all|public]

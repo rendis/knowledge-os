@@ -21,10 +21,10 @@ a fresh complete release and fail rather than skip when artifacts are stale.
 ## Linux via Colima / Docker
 
 ```sh
-docker build -t vaultctl-test-ubuntu:24.04 - < evals/cli/Dockerfile.ubuntu
-docker build -t vaultctl-test-fedora:44 - < evals/cli/Dockerfile.fedora
+docker build -t kos-test-ubuntu:24.04 - < evals/cli/Dockerfile.ubuntu
+docker build -t kos-test-fedora:44 - < evals/cli/Dockerfile.fedora
 GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go test -c -o dist/retrieval.test ./internal/retrieval
-docker run --rm --network none -v "$PWD/dist:/tests:ro" vaultctl-test-ubuntu:24.04 /tests/retrieval.test -test.v
+docker run --rm --network none -v "$PWD/dist:/tests:ro" kos-test-ubuntu:24.04 /tests/retrieval.test -test.v
 ```
 
 Repeat for Fedora and each internal package. Tests with repository fixtures
@@ -43,8 +43,8 @@ GOOS=windows GOARCH=arm64 CGO_ENABLED=0 go test -c -o dist/retrieval-tests.exe .
 GOOS=windows GOARCH=arm64 CGO_ENABLED=0 go build -o dist/platformcheck.exe ./tools/platformcheck
 ```
 
-Transfer these executables and `vaultctl-windows-arm64.exe` to a test directory
-in Windows; name the product executable `vaultctl.exe` next to
+Transfer these executables and `kos-windows-arm64.exe` to a test directory
+in Windows; name the product executable `kos.exe` next to
 `platformcheck.exe`. Launch the test executable without flags in PowerShell.
 For verbose Go test output quote `'-test.v'` to preserve the native argument.
 The platform runner launches the real CLI against synthetic temporary data,

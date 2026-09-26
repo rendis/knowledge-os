@@ -3,7 +3,7 @@
 
 Google Cloud: the Pub/Sub emulator and `gcloud` (image google-cloud-cli:emulators).
 AWS: moto and the AWS CLI (images motoserver/moto, amazon/aws-cli).
-The CLIs run in containers on a private network; `vaultctl` finds them on PATH as `gcloud` and `aws`,
+The CLIs run in containers on a private network; `kos` finds them on PATH as `gcloud` and `aws`,
 exactly as it finds a developer's installed CLIs. Azure has no emulator of its management API (ARM),
 so its provider is covered by the Go unit tests with the documented `az` output shapes.
 
@@ -63,8 +63,8 @@ class PlatformEmulatorTests(unittest.TestCase):
             path.write_text(f'#!/bin/sh\nexec {command} "$@"\n')
             path.chmod(0o755)
         cls.env = {**os.environ, "PATH": f"{cls.bin}{os.pathsep}{os.environ['PATH']}"}
-        cls.cli = cls.tmp / "vaultctl"
-        subprocess.run(["go", "build", "-o", str(cls.cli), "./cmd/vaultctl"], cwd=DIST, check=True)
+        cls.cli = cls.tmp / "kos"
+        subprocess.run(["go", "build", "-o", str(cls.cli), "./cmd/kos"], cwd=DIST, check=True)
         cls.wait_ready()
         cls.seed()
         cls.vault = cls.make_vault()
@@ -137,16 +137,16 @@ class PlatformEmulatorTests(unittest.TestCase):
                        check=True, capture_output=True)
         return vault
 
-    def vaultctl(self, *args):
+    def kos(self, *args):
         result = subprocess.run([str(self.cli), *args, "--vault", str(self.vault)], capture_output=True, text=True, env=self.env, timeout=600)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         return json.loads(result.stdout)
 
     def test_referenced_scopes_are_captured_and_wire_the_facts(self):
-        report = self.vaultctl("discover", "run", "--classify", "off")
+        report = self.kos("discover", "run", "--classify", "off")
         self.assertEqual(sorted(report["platform_scopes_referenced"]), [f"aws:{ACCOUNT}/{REGION}", f"gcp:{PROJECT}"])
 
-        captured = self.vaultctl("discover", "platform", "--referenced")["captured"]
+        captured = self.kos("discover", "platform", "--referenced")["captured"]
         self.assertEqual(captured[f"aws:{ACCOUNT}/{REGION}"], "ok")
         # The Pub/Sub emulator serves messaging only; the other Google services are recorded as unreadable.
         self.assertTrue(captured[f"gcp:{PROJECT}"].startswith("ok ("), captured)
@@ -154,15 +154,15 @@ class PlatformEmulatorTests(unittest.TestCase):
         self.assertLessEqual({f"aws-{ACCOUNT}-{REGION}.json", f"gcp-{PROJECT}.json"}, set(snapshots))
 
         # Without Jev the agent answers the judgments; here only the DynamoDB client matters.
-        questions = self.vaultctl("discover", "questions", "--kind", "dependency")["questions"]
+        questions = self.kos("discover", "questions", "--kind", "dependency")["questions"]
         answers = [{"id": q["id"], "choice": "document_db", "confidence": 1} for q in questions
                    if any("dynamodb" in path for path in q["state"].get("imported_paths", []))]
         self.assertTrue(answers, questions)
         answer_file = self.tmp / "answers.json"
         answer_file.write_text(json.dumps(answers))
-        self.vaultctl("discover", "answer", "--file", str(answer_file))
-        self.vaultctl("discover", "run", "--classify", "off")
-        facts = self.vaultctl("discover", "report", "--repo", "SVC-orders")["facts"]
+        self.kos("discover", "answer", "--file", str(answer_file))
+        self.kos("discover", "run", "--classify", "off")
+        facts = self.kos("discover", "report", "--repo", "SVC-orders")["facts"]
         resources = {r["name"].rsplit("/", 1)[-1]: r for r in facts["resources"]}
         gcp = resources["orders-cl-sub"]
         self.assertEqual((gcp["type"], gcp["direction"], gcp["topic"], gcp.get("events")),
@@ -187,7 +187,7 @@ class PlatformEmulatorTests(unittest.TestCase):
                       [{"name": e["name"], "role": e["role"]} for e in facts.get("events", [])])
 
     def test_credentials_of_another_account_are_recorded_as_denied(self):
-        captured = self.vaultctl("discover", "platform", "--provider", "aws", "--scope", f"210987654321/{REGION}")["captured"]
+        captured = self.kos("discover", "platform", "--provider", "aws", "--scope", f"210987654321/{REGION}")["captured"]
         self.assertEqual(captured, {f"aws:210987654321/{REGION}": "denied"})
         snap = json.loads((self.vault / f"90-Meta/discovery/platform/aws-210987654321-{REGION}.json").read_text())
         self.assertIn("belong to account", snap["detail"])

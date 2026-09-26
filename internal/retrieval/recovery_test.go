@@ -13,8 +13,8 @@ import (
 )
 
 func TestKilledWriter(t *testing.T) {
-	if os.Getenv("VAULTCTL_CRASH_HELPER") == "1" {
-		idx, err := Open(context.Background(), Options{Vault: os.Getenv("VAULTCTL_TEST_VAULT"), Cache: os.Getenv("VAULTCTL_TEST_CACHE")})
+	if os.Getenv("KOS_CRASH_HELPER") == "1" {
+		idx, err := Open(context.Background(), Options{Vault: os.Getenv("KOS_TEST_VAULT"), Cache: os.Getenv("KOS_TEST_CACHE")})
 		if err != nil {
 			panic(err)
 		}
@@ -37,7 +37,7 @@ func TestKilledWriter(t *testing.T) {
 	}
 	idx.Close()
 	cmd := exec.Command(os.Args[0], "-test.run=^TestKilledWriter$")
-	cmd.Env = append(os.Environ(), "VAULTCTL_CRASH_HELPER=1", "VAULTCTL_TEST_VAULT="+opt.Vault, "VAULTCTL_TEST_CACHE="+opt.Cache)
+	cmd.Env = append(os.Environ(), "KOS_CRASH_HELPER=1", "KOS_TEST_VAULT="+opt.Vault, "KOS_TEST_CACHE="+opt.Cache)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		t.Fatal(err)

@@ -1,4 +1,4 @@
-// Release builds are development tooling; consumers receive only vaultctl.
+// Release builds are development tooling; consumers receive only kos.
 package main
 
 import (
@@ -50,12 +50,12 @@ func build() error {
 		if len(parts) != 2 {
 			return fmt.Errorf("invalid target %s", target)
 		}
-		name := "vaultctl-" + parts[0] + "-" + parts[1]
+		name := "kos-" + parts[0] + "-" + parts[1]
 		if parts[0] == "windows" {
 			name += ".exe"
 		}
 		path := filepath.Join(*output, name)
-		cmd := exec.Command("go", "build", "-trimpath", "-ldflags=-s -w -X main.version="+strings.TrimSpace(string(version)), "-o", path, "./cmd/vaultctl")
+		cmd := exec.Command("go", "build", "-trimpath", "-ldflags=-s -w -X main.version="+strings.TrimSpace(string(version)), "-o", path, "./cmd/kos")
 		cmd.Env = append(os.Environ(), "CGO_ENABLED=0", "GOOS="+parts[0], "GOARCH="+parts[1])
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
@@ -120,7 +120,7 @@ func notices(output string, targets []string) error {
 	modules := map[string]module{}
 	for _, target := range targets {
 		parts := strings.Split(target, "/")
-		cmd := exec.Command("go", "list", "-deps", "-json", "./cmd/vaultctl")
+		cmd := exec.Command("go", "list", "-deps", "-json", "./cmd/kos")
 		cmd.Env = append(os.Environ(), "CGO_ENABLED=0", "GOOS="+parts[0], "GOARCH="+parts[1])
 		raw, err := cmd.Output()
 		if err != nil {

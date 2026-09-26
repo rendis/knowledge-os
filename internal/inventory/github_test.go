@@ -14,7 +14,7 @@ import (
 // The helper executable exercises real subprocess argv/env boundaries without
 // network access, stored credentials, shell syntax, or a gh installation.
 func TestMain(m *testing.M) {
-	if os.Getenv("VAULTCTL_INVENTORY_GH_HELPER") == "1" {
+	if os.Getenv("KOS_INVENTORY_GH_HELPER") == "1" {
 		fakeGH()
 		return
 	}
@@ -59,7 +59,7 @@ func fakeGH() {
 		}
 		ref := object{"name": "main", "target": object{"oid": "123456789abcdef0123456789abcdef0123456789"}}
 		if strings.Contains(query, "repository(owner:") {
-			if os.Getenv("VAULTCTL_INVENTORY_MISSING_REF") == "1" {
+			if os.Getenv("KOS_INVENTORY_MISSING_REF") == "1" {
 				ref = nil
 			}
 			emit(object{"data": object{"repository": object{"ref": ref}}})
@@ -89,7 +89,7 @@ func fakeGHPath(t *testing.T) {
 		t.Fatal(e)
 	}
 	t.Setenv("PATH", dir)
-	t.Setenv("VAULTCTL_INVENTORY_GH_HELPER", "1")
+	t.Setenv("KOS_INVENTORY_GH_HELPER", "1")
 	t.Setenv("GH_HOST", "enterprise.example.invalid")
 }
 func TestGitHubExplicitAccountOverridesAmbientAndPinsHost(t *testing.T) {
@@ -133,7 +133,7 @@ func TestReferenceBranchCannotOverwriteRepositoryIdentity(t *testing.T) {
 }
 func TestMissingExplicitReferenceNeverFallsBack(t *testing.T) {
 	fakeGHPath(t)
-	t.Setenv("VAULTCTL_INVENTORY_MISSING_REF", "1")
+	t.Setenv("KOS_INVENTORY_MISSING_REF", "1")
 	s := scope{prefixes: []string{"team-"}, instance: object{"sources": object{"reference_branches": object{"team-reader": "release/stable"}}}}
 	repos, e := remoteRepos(context.Background(), s, "example", github{token: "stored-token"})
 	if e != nil || len(repos) != 1 || repos[0]["branch"] != nil || repos[0]["sha"] != nil {

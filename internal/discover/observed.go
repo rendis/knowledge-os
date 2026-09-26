@@ -98,7 +98,7 @@ func recordObservation(o options, out io.Writer) error {
 	if e := os.WriteFile(p, append(out2, '\n'), 0o644); e != nil {
 		return e
 	}
-	return emit(out, map[string]any{"recorded": filepath.ToSlash(rel), "resources": len(ob.Resources), "next": "vaultctl discover run --vault <VAULT>; publish the file on a sync branch"})
+	return emit(out, map[string]any{"recorded": filepath.ToSlash(rel), "resources": len(ob.Resources), "next": "kos discover run --vault <VAULT>; publish the file on a sync branch"})
 }
 
 func loadObservations(vault string) ([]observation, error) {

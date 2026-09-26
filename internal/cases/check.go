@@ -9,8 +9,8 @@ import (
 	"sort"
 	"strings"
 
-	"documentation-vault/internal/devhandoff"
-	"documentation-vault/internal/discover"
+	"knowledge-os/internal/devhandoff"
+	"knowledge-os/internal/discover"
 )
 
 // Issue is one finding of the case gate: error blocks publication, warning is reported, review goes to

@@ -3,7 +3,7 @@ name: synchronize-ecosystem
 description: "Trigger: inventory, synchronize repository maps, or run a manual or scheduled vault refresh. Queries and single-note documentation belong to map-ecosystem."
 license: Apache-2.0
 metadata:
-  author: documentation-vault maintainers
+  author: knowledge-os maintainers
   version: "2.0"
 ---
 

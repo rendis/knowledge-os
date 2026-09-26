@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"documentation-vault/internal/config"
+	"knowledge-os/internal/config"
 )
 
 // fakeCLI answers provider commands from recorded outputs, keyed by the command line prefix.

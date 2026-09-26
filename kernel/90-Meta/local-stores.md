@@ -9,7 +9,7 @@ local to one checkout and ignored by Git.
 | `.investigations-private/<id>/` | What a case needs but never shares: sensitive notes and scratch (scripts, outputs, drafts) | `manage-investigation` |
 | `.operations/` | Operational runs | `manage-operational-workflow` |
 | `<worktree>/.handoff/` | Task copy and deltas of a development handoff, excluded from Git in each repository worktree | `manage-development-handoff` |
-| `.agents/state/discovery/` | Facts, questions, comparison and gaps of the last `discover run` | `vaultctl discover` |
+| `.agents/state/discovery/` | Facts, questions, comparison and gaps of the last `discover run` | `kos discover` |
 | `.plan/` | Local implementation plans (a visible `plan/` directory would become graph content) | any workflow |
 | `.scratch/<task>/` | Helper scripts or code with no selected investigation or workflow location | any workflow |
 | `.knowledge-os-config.yaml` | Machine paths and local capability settings | `onboard-developer` |

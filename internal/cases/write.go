@@ -13,8 +13,8 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"documentation-vault/internal/config"
-	"documentation-vault/internal/devhandoff"
+	"knowledge-os/internal/config"
+	"knowledge-os/internal/devhandoff"
 )
 
 // Every change to a case goes through these commands so that all cases keep one structure: the CLI

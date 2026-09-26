@@ -1,6 +1,6 @@
 ---
 name: obsidian-bases
-description: "Create or edit Obsidian `.base` views, filters and formulas; `vaultctl check bases` validates them."
+description: "Create or edit Obsidian `.base` views, filters and formulas; `kos check bases` validates them."
 ---
 
 # Obsidian Bases

@@ -12,7 +12,7 @@ import (
 	"strconv"
 	"strings"
 
-	"documentation-vault/internal/config"
+	"knowledge-os/internal/config"
 )
 
 // Note gates. G1: every source anchor resolves at its commit and the identifiers it names are in

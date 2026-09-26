@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"documentation-vault/internal/devhandoff"
+	"knowledge-os/internal/devhandoff"
 )
 
 func TestReconcileImportsHandoffProgressDeterministically(t *testing.T) {

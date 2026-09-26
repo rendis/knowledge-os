@@ -1,11 +1,11 @@
 ---
 name: use-vault-cli
-description: Operate the installed vaultctl CLI for vault resolution, retrieval and kernel checks, and interpret its results or failures. Read before the first CLI operation; workflow skills retain ownership of configuration and lifecycle changes.
+description: Operate the installed kos CLI for vault resolution, retrieval and kernel checks, and interpret its results or failures. Read before the first CLI operation; workflow skills retain ownership of configuration and lifecycle changes.
 ---
 
 # Use the vault CLI
 
-This is the shared operational reference for `vaultctl`. Keep the current primary workflow; use its procedure for mutations, reviews and recovery. Reuse this reference while it remains in context.
+This is the shared operational reference for `kos`. Keep the current primary workflow; use its procedure for mutations, reviews and recovery. Reuse this reference while it remains in context.
 
 ## Bind the executable and vault
 
@@ -15,15 +15,15 @@ Choose the executable once for the current execution host (inside a container or
 
 | Host | Filename under `.agents/bin/` |
 |---|---|
-| macOS ARM64 / AMD64 | `vaultctl-darwin-arm64` / `vaultctl-darwin-amd64` |
-| Linux ARM64 / AMD64 | `vaultctl-linux-arm64` / `vaultctl-linux-amd64` |
-| Windows ARM64 / AMD64 | `vaultctl-windows-arm64.exe` / `vaultctl-windows-amd64.exe` |
+| macOS ARM64 / AMD64 | `kos-darwin-arm64` / `kos-darwin-amd64` |
+| Linux ARM64 / AMD64 | `kos-linux-arm64` / `kos-linux-amd64` |
+| Windows ARM64 / AMD64 | `kos-windows-arm64.exe` / `kos-windows-amd64.exe` |
 
 Use observed harness environment information; when unknown, inspect `uname -sm` on macOS/Linux or `$env:PROCESSOR_ARCHITEW6432` (when set), otherwise `$env:PROCESSOR_ARCHITECTURE`, in Windows PowerShell. Map `aarch64` to `arm64` and `x86_64`/`AMD64` to `amd64`. Prefer the native build; report an unsupported platform rather than guessing. Re-select only when the execution host changes.
 
 An installed copy of this skill provides a candidate vault root three directories above its directory. A source repository or the current working directory is not automatically the vault. Bind the executable beneath that candidate before resolving the vault's identity.
 
-Throughout kernel instructions, `<CLI>`, `<cli>`, `<VAULTCTL>` and `<vaultctl>` denote this executable's quoted absolute path. In PowerShell, prefix the quoted path with `&`. Replace placeholders before execution. Shell examples using `$VAULTCTL` assume it has been assigned that exact path.
+Throughout kernel instructions, `<CLI>`, `<cli>`, `<CLI>` and `<CLI>` denote this executable's quoted absolute path. In PowerShell, prefix the quoted path with `&`. Replace placeholders before execution. Shell examples using `$CLI` assume it has been assigned that exact path.
 
 ```text
 <CLI> config resolve --vault "<candidate-path>"

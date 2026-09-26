@@ -23,7 +23,7 @@ INSTALL = DIST / "install.sh"
 
 def native_cli(vault: Path) -> str:
     arch = {"x86_64": "amd64", "aarch64": "arm64"}.get(platform.machine().lower(), platform.machine().lower())
-    return str(vault / ".agents/bin" / (f"vaultctl-{platform.system().lower()}-{arch}" + (".exe" if os.name == "nt" else "")))
+    return str(vault / ".agents/bin" / (f"kos-{platform.system().lower()}-{arch}" + (".exe" if os.name == "nt" else "")))
 
 def resolve_command(vault: Path) -> list[str]:
     return [native_cli(vault), "config", "resolve", "--vault", str(vault)]

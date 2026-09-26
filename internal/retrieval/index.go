@@ -115,7 +115,7 @@ func Open(ctx context.Context, opt Options) (*Index, error) {
 		if err != nil {
 			return nil, err
 		}
-		cache = filepath.Join(cache, "vaultctl")
+		cache = filepath.Join(cache, "kos")
 	}
 	cache, err = canonicalFuturePath(cache)
 	if err != nil {

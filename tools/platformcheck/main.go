@@ -28,7 +28,7 @@ type runner struct {
 }
 
 func main() {
-	cli := flag.String("cli", "", "CLI path; defaults to vaultctl beside this runner (vaultctl.exe on Windows)")
+	cli := flag.String("cli", "", "CLI path; defaults to kos beside this runner (kos.exe on Windows)")
 	flag.Parse()
 	if flag.NArg() != 0 {
 		fmt.Fprintln(os.Stderr, "usage: platformcheck [--cli PATH]")
@@ -40,7 +40,7 @@ func main() {
 			fmt.Fprintln(os.Stderr, "FAIL: cannot locate runner:", err)
 			os.Exit(1)
 		}
-		name := "vaultctl"
+		name := "kos"
 		if runtime.GOOS == "windows" {
 			name += ".exe"
 		}
@@ -63,7 +63,7 @@ func run(cli string) (err error) {
 	if !st.Mode().IsRegular() {
 		return errors.New("CLI path must be a regular executable")
 	}
-	workspace, err := os.MkdirTemp("", "vaultctl platform ñ ")
+	workspace, err := os.MkdirTemp("", "kos platform ñ ")
 	if err != nil {
 		return err
 	}

@@ -15,7 +15,7 @@ import (
 	"sync"
 	"time"
 
-	"documentation-vault/internal/config"
+	"knowledge-os/internal/config"
 )
 
 // Judgments that code cannot make are asked once, stored in the versioned cell vault and

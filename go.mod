@@ -1,4 +1,4 @@
-module documentation-vault
+module knowledge-os
 
 go 1.26.6
 

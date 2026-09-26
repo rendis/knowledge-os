@@ -31,7 +31,7 @@ tags: [operacion, operacion/procedimiento, operacion/area/devops]
 
 `owner` identifies the accountable role or team. `por-definir` is valid only while `estado: borrador`. `canales` names neutral capabilities; connector selection happens during execution.
 
-Resolve registered areas through `<VAULTCTL> config areas --vault "<VAULT_ROOT>"` and choose one owning area by the primary outcome and completion evidence. For a cross-system audit, prefer a registered audit area over an execution technology. The directory, `area`, and area tag must agree. Use `relacionado-con` for secondary area MOCs and keep one canonical note.
+Resolve registered areas through `<CLI> config areas --vault "<VAULT_ROOT>"` and choose one owning area by the primary outcome and completion evidence. For a cross-system audit, prefer a registered audit area over an execution technology. The directory, `area`, and area tag must agree. Use `relacionado-con` for secondary area MOCs and keep one canonical note.
 
 ## Classes
 

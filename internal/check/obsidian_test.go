@@ -13,15 +13,15 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	if os.Getenv("VAULTCTL_TEST_OBSIDIAN_HELPER") == "1" {
+	if os.Getenv("KOS_TEST_OBSIDIAN_HELPER") == "1" {
 		if len(os.Args) != 4 || os.Args[1] != "vault=Test vault" || os.Args[2] != "vault" || os.Args[3] != "info=path" {
 			os.Exit(23)
 		}
-		if os.Getenv("VAULTCTL_TEST_OBSIDIAN_SLEEP") == "1" {
+		if os.Getenv("KOS_TEST_OBSIDIAN_SLEEP") == "1" {
 			time.Sleep(time.Minute)
 		}
-		fmt.Print(os.Getenv("VAULTCTL_TEST_OBSIDIAN_OUTPUT"))
-		if os.Getenv("VAULTCTL_TEST_OBSIDIAN_FAIL") == "1" {
+		fmt.Print(os.Getenv("KOS_TEST_OBSIDIAN_OUTPUT"))
+		if os.Getenv("KOS_TEST_OBSIDIAN_FAIL") == "1" {
 			os.Exit(4)
 		}
 		os.Exit(0)
@@ -55,24 +55,24 @@ func mockObsidian(t *testing.T) {
 		t.Fatal(e)
 	}
 	t.Setenv("PATH", dir)
-	t.Setenv("VAULTCTL_TEST_OBSIDIAN_HELPER", "1")
+	t.Setenv("KOS_TEST_OBSIDIAN_HELPER", "1")
 }
 func TestObsidianBindingCLI(t *testing.T) {
 	mockObsidian(t)
 	root := t.TempDir()
-	t.Setenv("VAULTCTL_TEST_OBSIDIAN_OUTPUT", "startup log\n"+root+"\n")
+	t.Setenv("KOS_TEST_OBSIDIAN_OUTPUT", "startup log\n"+root+"\n")
 	r, e := Binding(context.Background(), root, " Test vault ")
 	if e != nil || !r.Pass {
 		t.Fatalf("%+v %v", r, e)
 	}
 	for _, output := range []string{"", "relative/path", t.TempDir(), strings.Repeat("x", 70000)} {
-		t.Setenv("VAULTCTL_TEST_OBSIDIAN_OUTPUT", output)
+		t.Setenv("KOS_TEST_OBSIDIAN_OUTPUT", output)
 		if _, e := Binding(context.Background(), root, "Test vault"); e == nil {
 			t.Errorf("accepted invalid output")
 		}
 	}
-	t.Setenv("VAULTCTL_TEST_OBSIDIAN_OUTPUT", root)
-	t.Setenv("VAULTCTL_TEST_OBSIDIAN_FAIL", "1")
+	t.Setenv("KOS_TEST_OBSIDIAN_OUTPUT", root)
+	t.Setenv("KOS_TEST_OBSIDIAN_FAIL", "1")
 	if _, e := Binding(context.Background(), root, "Test vault"); e == nil {
 		t.Fatal("accepted failed command")
 	}
@@ -80,7 +80,7 @@ func TestObsidianBindingCLI(t *testing.T) {
 func TestObsidianBindingDeadlineAndPreflight(t *testing.T) {
 	mockObsidian(t)
 	root := t.TempDir()
-	t.Setenv("VAULTCTL_TEST_OBSIDIAN_SLEEP", "1")
+	t.Setenv("KOS_TEST_OBSIDIAN_SLEEP", "1")
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
 	if _, e := Binding(ctx, root, "Test vault"); e == nil {

@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"documentation-vault/internal/config"
+	"knowledge-os/internal/config"
 )
 
 const Help = `handoff COMMAND --vault PATH [options]
