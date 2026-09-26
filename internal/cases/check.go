@@ -37,6 +37,7 @@ var (
 	fence          = regexp.MustCompile("(?ms)^```.*?^```")
 	heading2       = regexp.MustCompile(`(?m)^##\s+(.+?)\s*$`)
 	recordDef      = regexp.MustCompile("^\\s*(?:[-*+]\\s+|\\|\\s*|#{2,4}\\s+)?[*_`]*((?:AC|DH|CH|[EDQRSAF])-\\d{3,})\\b")
+	attachedPath   = regexp.MustCompile("`artifacts/[^`\\s]+`")
 	recordRef      = regexp.MustCompile(`\b((?:AC|DH|CH|[EDQRSAF])-\d{3,})\b`)
 	sourceRef      = regexp.MustCompile("\\]\\(|\\[\\[|https?://|`[^`\\s]*[/.][^`\\s]*`|@[0-9a-f]{7,}|\\b[0-9a-f]{7,40}\\b|#L\\d+|\\b(?:A|E|F)-\\d{3,}\\b|\\b[A-Z][A-Z0-9]{1,9}-\\d{2,}\\b|(?i)snapshot|(?i)\\bquery\\b|(?i)\\bconsulta\\b|(?i)\\b(?:solicitante|requester|usuario|user|reuni[oó]n|meeting)\\b[^\\n]*\\d{4}-\\d{2}-\\d{2}")
 	wikilink       = regexp.MustCompile(`\[\[([^\]|#]+)`)
@@ -208,7 +209,8 @@ func checkContent(vault, full, raw string, ix vaultIndex) Result {
 		}
 	}
 	dir := filepath.Dir(full)
-	for _, m := range recordRef.FindAllStringSubmatch(body, -1) {
+	// Names of attached files are paths, not references: `artifacts/E-012-A-001-summary.md`.
+	for _, m := range recordRef.FindAllStringSubmatch(attachedPath.ReplaceAllString(body, ""), -1) {
 		id := m[1]
 		if defs[id] || fileRecord(dir, id) {
 			continue

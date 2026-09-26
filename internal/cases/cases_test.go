@@ -294,3 +294,14 @@ func TestRecreatingACaseKeepsItsIdentity(t *testing.T) {
 		t.Fatal("a malformed id is refused")
 	}
 }
+
+func TestAttachedFileNamesAreNotReferences(t *testing.T) {
+	v := vault(t)
+	res, _ := run(t, "new", "--vault", v, "--title", "Resumen previo", "--type", "understanding", "--objective", "Conservar un resumen anterior.")
+	id := res["id"].(string)
+	named := filepath.Join(t.TempDir(), "A-001-resumen.md")
+	os.WriteFile(named, []byte("resumen anterior\n"), 0o644)
+	if _, e := run(t, "add", "--vault", v, "--id", id, "--kind", "evidence", "--text", "Resumen anterior del caso", "--source", "solicitante 2026-09-25", "--level", "demonstrated", "--file", named); e != nil {
+		t.Fatalf("a file whose name looks like a record ID is still attachable: %v", e)
+	}
+}
