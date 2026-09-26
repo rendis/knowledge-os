@@ -43,8 +43,8 @@ change that would introduce a gate error is refused. All output is JSON.
            requirement  --origin TEXT                       (development)
            handoff      --package handoffs/DH-NNN.md        (development)
            --file copies the file into artifacts/ named after the record, refusing credentials.
-           An ID-shaped token inside inline code (an earlier version's A-001 in backticks) is text,
-           not a reference.
+           An ID of a kind cases no longer define (an earlier version's A-001, S-004 or AC-002) is
+           text when written as inline code; current kinds are always checked references.
   state    --id ID --text TEXT   Rewrite the current state; it cites the records it summarizes.
   absorb   --id ID --finding F-NNN   Mark a finding for the vault as absorbed (published case,
            on the sync branch that changes its note).

@@ -96,6 +96,9 @@ func buildRecord(o options, c Case, text, loc string, files []file) (string, str
 		return "", "", nil, errors.New("--for-vault marks a finding")
 	}
 	id := nextID(text, k.prefix)
+	if o.as != "" && o.recKind == "handoff" {
+		return "", "", nil, errors.New("--as does not apply to a handoff: its ID is its package's")
+	}
 	if o.as != "" {
 		kept, e := keepID(o.as, id)
 		if e != nil {

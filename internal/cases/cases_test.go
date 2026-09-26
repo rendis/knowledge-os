@@ -358,6 +358,9 @@ func TestRecreationKeepsIDsAndDatesWithinTheCase(t *testing.T) {
 	if r, e := ev("--text", "El inventario de la versión anterior (`A-001`) lista los archivos."); e != nil {
 		t.Fatalf("inline code is not a reference: %v %v", r, e)
 	}
+	if _, e := ev("--text", "Ver `E-099` para el detalle."); e == nil {
+		t.Fatal("a current kind in inline code is still a checked reference")
+	}
 	b, _ := os.ReadFile(filepath.Join(v, res["path"].(string)))
 	if r, _ := Check(v, res["path"].(string)); !r.OK || !strings.Contains(string(b), "- 2026-01-10 — E-003 agregado") {
 		t.Fatalf("the case passes with a gap in its IDs and logs the recreated day: %+v\n%s", r, b)
