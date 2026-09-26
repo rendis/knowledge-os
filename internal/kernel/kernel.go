@@ -399,8 +399,8 @@ func claudeSkillsLink(vault string) error {
 	return os.Symlink(filepath.Join("..", ".agents", "skills"), link)
 }
 
-var ignored = []string{"/AGENTS.personal.md", "/.investigations/", "/.investigations-private/", "/.knowledge-os-config.yaml",
-	"/.knowledge-os-config.*.tmp", "/.agents/state/discovery/", "/.plan/", "/.scratch/", "/.venv/"}
+var ignored = []string{"/AGENTS.personal.md", "/.investigations/", "/.investigations-private/", "/.operations/",
+	"/.knowledge-os-config.yaml", "/.knowledge-os-config.*.tmp", "/.agents/state/discovery/", "/.plan/", "/.scratch/", "/.venv/"}
 
 // ensureIgnores keeps local stores out of Git and out of Obsidian's graph.
 func ensureIgnores(vault string) error {
