@@ -37,7 +37,7 @@ var (
 	fence          = regexp.MustCompile("(?ms)^```.*?^```")
 	heading2       = regexp.MustCompile(`(?m)^##\s+(.+?)\s*$`)
 	recordDef      = regexp.MustCompile("^\\s*(?:[-*+]\\s+|\\|\\s*|#{2,4}\\s+)?[*_`]*((?:AC|DH|CH|[EDQRSAF])-\\d{3,})\\b")
-	attachedPath   = regexp.MustCompile("`artifacts/[^`\\s]+`")
+	inlineCode     = regexp.MustCompile("`[^`\\n]+`")
 	recordRef      = regexp.MustCompile(`\b((?:AC|DH|CH|[EDQRSAF])-\d{3,})\b`)
 	sourceRef      = regexp.MustCompile("\\]\\(|\\[\\[|https?://|`[^`\\s]*[/.][^`\\s]*`|@[0-9a-f]{7,}|\\b[0-9a-f]{7,40}\\b|#L\\d+|\\b(?:A|E|F)-\\d{3,}\\b|\\b[A-Z][A-Z0-9]{1,9}-\\d{2,}\\b|(?i)snapshot|(?i)\\bquery\\b|(?i)\\bconsulta\\b|(?i)\\b(?:solicitante|requester|usuario|user|reuni[oó]n|meeting)\\b[^\\n]*\\d{4}-\\d{2}-\\d{2}")
 	wikilink       = regexp.MustCompile(`\[\[([^\]|#]+)`)
@@ -209,8 +209,9 @@ func checkContent(vault, full, raw string, ix vaultIndex) Result {
 		}
 	}
 	dir := filepath.Dir(full)
-	// Names of attached files are paths, not references: `artifacts/E-012-A-001-summary.md`.
-	for _, m := range recordRef.FindAllStringSubmatch(attachedPath.ReplaceAllString(body, ""), -1) {
+	// Inline code is text, not a reference: attached file names (`artifacts/E-012-A-001-summary.md`)
+	// and identifiers from outside the case (an earlier version's `A-001`).
+	for _, m := range recordRef.FindAllStringSubmatch(inlineCode.ReplaceAllString(body, ""), -1) {
 		id := m[1]
 		if defs[id] || fileRecord(dir, id) {
 			continue
@@ -290,7 +291,7 @@ func checkContent(vault, full, raw string, ix vaultIndex) Result {
 		key := strings.ToLower(appPrefix.ReplaceAllString(tok, ""))
 		if stem, ok := ix.knowledge[key]; ok && len(key) >= 8 && strings.ContainsAny(key, "-_") && !linked[key] && !named[key] {
 			named[key] = true
-			add("review", "[["+stem+"]]", "the case names "+tok+", which the vault documents: reference [["+stem+"]] where a record relies on it (after discover check shows it fresh) instead of restating it")
+			add("review", "[["+stem+"]]", "the case names "+tok+", which the vault documents: reference [["+stem+"]] where a record relies on it, once discover check shows it fresh and it describes the branch or revision the record relies on, instead of restating it")
 		}
 	}
 

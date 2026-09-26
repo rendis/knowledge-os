@@ -319,3 +319,47 @@ func TestSentenceClosesAfterABracket(t *testing.T) {
 		}
 	}
 }
+
+func TestRecreationKeepsIDsAndDatesWithinTheCase(t *testing.T) {
+	v := vault(t)
+	res, e := run(t, "new", "--vault", v, "--title", "Caso recreado", "--type", "understanding", "--objective", "Entender el flujo.",
+		"--id", "20260101-120000-caso-recreado", "--date", "2026-01-10")
+	if e != nil {
+		t.Fatal(e)
+	}
+	id := res["id"].(string)
+	ev := func(extra ...string) (map[string]any, error) {
+		return run(t, append([]string{"add", "--vault", v, "--id", id, "--kind", "evidence", "--text", "Un hecho.",
+			"--source", "solicitante, 2026-01-10", "--level", "demonstrated"}, extra...)...)
+	}
+	if r, e := ev("--date", "2026-01-09"); e == nil || !strings.Contains(e.Error(), "precedes the case's opening") {
+		t.Fatalf("a date before the opening is refused: %v %v", r, e)
+	}
+	if _, e := ev("--date", "2999-01-01"); e == nil {
+		t.Fatal("a future date is refused")
+	}
+	if r, e := ev("--date", "2026-01-10", "--as", "E-003"); e != nil || r["record"] != "E-003" {
+		t.Fatalf("a recreated record keeps its ID: %v %v", r, e)
+	}
+	if _, e := ev("--as", "E-002"); e == nil {
+		t.Fatal("a kept ID cannot go below the next free one")
+	}
+	if _, e := ev("--as", "F-009"); e == nil {
+		t.Fatal("a kept ID keeps its kind")
+	}
+	if r, _ := ev(); r["record"] != "E-004" {
+		t.Fatalf("numbering continues after a kept ID: %v", r)
+	}
+
+	// An identifier from outside the case is text when it is inline code.
+	if _, e := ev("--text", "El inventario de la versión anterior (A-001) lista los archivos."); e == nil {
+		t.Fatal("a bare A-001 is an undefined reference")
+	}
+	if r, e := ev("--text", "El inventario de la versión anterior (`A-001`) lista los archivos."); e != nil {
+		t.Fatalf("inline code is not a reference: %v %v", r, e)
+	}
+	b, _ := os.ReadFile(filepath.Join(v, res["path"].(string)))
+	if r, _ := Check(v, res["path"].(string)); !r.OK || !strings.Contains(string(b), "- 2026-01-10 — E-003 agregado") {
+		t.Fatalf("the case passes with a gap in its IDs and logs the recreated day: %+v\n%s", r, b)
+	}
+}

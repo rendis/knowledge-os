@@ -89,6 +89,39 @@ func definedRecords(text string) map[string]bool {
 	return out
 }
 
+// keepID accepts the ID a recreated record keeps: same kind as next, and not below it, so IDs stay
+// unique and ascending; the gaps of dropped records remain.
+func keepID(want, next string) (string, error) {
+	wp, wn, _ := strings.Cut(want, "-")
+	np, nn, _ := strings.Cut(next, "-")
+	w, e1 := strconv.Atoi(wn)
+	n, _ := strconv.Atoi(nn)
+	if e1 != nil || wp != np || len(wn) < 3 {
+		return "", fmt.Errorf("--as %s: expected an ID of this kind, like %s", want, next)
+	}
+	if w < n {
+		return "", fmt.Errorf("--as %s: the next free ID of this kind is %s; a kept ID cannot go below it", want, next)
+	}
+	return fmt.Sprintf("%s-%03d", wp, w), nil
+}
+
+// checkDate refuses a --date outside the case's life: it dates the log entry of a recreated record.
+func checkDate(o options, text string) error {
+	if o.date == "" {
+		return nil
+	}
+	if _, e := time.Parse("2006-01-02", o.date); e != nil {
+		return errors.New("--date must be YYYY-MM-DD")
+	}
+	if opened := frontmatter(text)["created"]; opened != "" && o.date < opened {
+		return fmt.Errorf("--date %s precedes the case's opening (%s): --date is the day a recreated record was first added; the date of the fact itself goes in its source", o.date, opened)
+	}
+	if o.date > time.Now().Format("2006-01-02") {
+		return fmt.Errorf("--date %s is in the future", o.date)
+	}
+	return nil
+}
+
 func nextID(text, prefix string) string {
 	max := 0
 	for id := range definedRecords(text) {
@@ -298,6 +331,9 @@ func mutate(o options, out io.Writer, change func(c Case, text, locale string) (
 		return e
 	}
 	prev := string(b)
+	if e := checkDate(o, prev); e != nil {
+		return e
+	}
 	locale := noteLocale(o.vault)
 	next, logParts, res, e := change(c, prev, locale)
 	if e != nil {
