@@ -10,6 +10,7 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"sync"
 
 	"knowledge-os/internal/config"
 )
@@ -193,8 +194,26 @@ func discoverRepositories(vault string, only map[string]bool) ([]repoInput, erro
 	return out, nil
 }
 
+// Within one process (a sync verify checks many notes) the same lookups repeat for every note: the
+// remote of each checkout, the library candidates and the scan of each library at a commit.
+var (
+	memoMu     sync.Mutex
+	remoteMemo = map[string]string{}
+	libMemo    = map[string][]libCandidate{}
+	scanMemo   = map[string]*repoScan{}
+)
+
 func gitRemoteOf(p string) string {
-	s, _ := gitOutput(p, "remote", "get-url", "origin")
+	memoMu.Lock()
+	s, ok := remoteMemo[p]
+	memoMu.Unlock()
+	if ok {
+		return s
+	}
+	s, _ = gitOutput(p, "remote", "get-url", "origin")
+	memoMu.Lock()
+	remoteMemo[p] = s
+	memoMu.Unlock()
 	return s
 }
 
@@ -1090,24 +1109,79 @@ func (a *assembly) platformScopes(names []string) []string {
 // given scans import, so a run limited to some repositories resolves company libraries exactly as a
 // full run does. The returned scans only feed resolveLibraries; they produce no facts.
 func libraryContext(vault string, scans []*repoScan) []*repoScan {
-	all, e := discoverRepositories(vault, nil)
-	if e != nil {
-		return nil
-	}
 	have := map[string]bool{}
 	for _, s := range scans {
 		have[s.in.Name] = true
 	}
-	type candidate struct {
-		in           repoInput
-		module, name string
+	cands := libraryCandidates(vault)
+	out := []*repoScan{}
+	queue := append([]*repoScan{}, scans...)
+	for len(queue) > 0 {
+		s := queue[0]
+		queue = queue[1:]
+		for _, refs := range s.code.Files {
+			for _, r := range refs {
+				for _, c := range cands {
+					if have[c.in.Name] {
+						continue
+					}
+					if c.module != "" && (r.Spec == c.module || strings.HasPrefix(r.Spec, c.module+"/")) || c.name != "" && r.Family == c.name {
+						have[c.in.Name] = true
+						if lib, e := scanLibrary(c.in); e == nil {
+							out = append(out, lib)
+							queue = append(queue, lib)
+						}
+					}
+				}
+			}
+		}
 	}
-	cands := []candidate{}
+	return out
+}
+
+type libCandidate struct {
+	in           repoInput
+	module, name string
+}
+
+// scanLibrary scans a library repository once per process and commit.
+func scanLibrary(in repoInput) (*repoScan, error) {
+	key := in.Path + "@" + in.Ref
+	memoMu.Lock()
+	s, ok := scanMemo[key]
+	memoMu.Unlock()
+	if ok {
+		return s, nil
+	}
+	s, e := scanRepository(in)
+	if e != nil {
+		return nil, e
+	}
+	memoMu.Lock()
+	scanMemo[key] = s
+	memoMu.Unlock()
+	return s, nil
+}
+
+// libraryCandidates lists the repositories that declare a Go module or an npm package name, once per
+// process and vault.
+func libraryCandidates(vault string) []libCandidate {
+	memoMu.Lock()
+	c, ok := libMemo[vault]
+	memoMu.Unlock()
+	if ok {
+		return c
+	}
+	all, e := discoverRepositories(vault, nil)
+	if e != nil {
+		return nil
+	}
+	cands := []libCandidate{}
 	for _, in := range all {
-		if have[in.Name] || in.RefErr != "" {
+		if in.RefErr != "" {
 			continue
 		}
-		c := candidate{in: in}
+		c := libCandidate{in: in}
 		if b, e := gitOutput(in.Path, "show", in.Ref+":go.mod"); e == nil {
 			if m := goModule.FindStringSubmatch(b); m != nil {
 				c.module = m[1]
@@ -1123,27 +1197,8 @@ func libraryContext(vault string, scans []*repoScan) []*repoScan {
 			cands = append(cands, c)
 		}
 	}
-	out := []*repoScan{}
-	queue := append([]*repoScan{}, scans...)
-	for len(queue) > 0 {
-		s := queue[0]
-		queue = queue[1:]
-		for _, refs := range s.code.Files {
-			for _, r := range refs {
-				for i, c := range cands {
-					if have[c.in.Name] {
-						continue
-					}
-					if c.module != "" && (r.Spec == c.module || strings.HasPrefix(r.Spec, c.module+"/")) || c.name != "" && r.Family == c.name {
-						have[c.in.Name] = true
-						if lib, e := scanRepository(cands[i].in); e == nil {
-							out = append(out, lib)
-							queue = append(queue, lib)
-						}
-					}
-				}
-			}
-		}
-	}
-	return out
+	memoMu.Lock()
+	libMemo[vault] = cands
+	memoMu.Unlock()
+	return cands
 }
