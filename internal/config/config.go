@@ -291,6 +291,12 @@ func validBranch(s string) bool {
 	}
 	return true
 }
+// CanonicalHTTPS returns a credential-free HTTPS URL in the form instance.yaml stores it.
+func CanonicalHTTPS(s string) (string, error) { return httpsURL(s) }
+
+// DefaultTypes are the graph types a cell enables unless it chooses otherwise.
+func DefaultTypes() []string { return append([]string{}, defaultTypes...) }
+
 func httpsURL(s string) (string, error) {
 	u, e := url.Parse(s)
 	if e != nil || u.Scheme != "https" || u.Hostname() == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" {

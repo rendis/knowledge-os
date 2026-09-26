@@ -1,6 +1,6 @@
 # Adapters
 
-Optional skill packs are selected through `install.sh init --adapter <name>` or the destination's `instance.yaml`, then installed by `update`.
+Optional skill packs are selected through `kos init --adapter <name>` or the destination's `instance.yaml`, then installed by `kos kernel update`.
 
 | Directory | Skills | When to enable |
 |---|---|---|

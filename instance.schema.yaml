@@ -1,4 +1,4 @@
-# Instance identity for a cell vault. Written once by install.sh init.
+# Instance identity for a cell vault. Written once by kos init.
 # Never overwritten by update. Agents read this before expanding the graph.
 
 version: 1
@@ -40,9 +40,6 @@ fields:
     type: string
     optional: true
   sources.repo_prefixes:
-    type: list
-    optional: true
-  sources.discovery_roots:
     type: list
     optional: true
   sources.reference_branch_order:

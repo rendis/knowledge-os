@@ -37,7 +37,7 @@ repo acme-notifier \
   k8s/prod/env 'ORDER_EVENTS_SUB=projects/acme-prd/subscriptions/notifier-order-events-sub\n'
 
 V="$DEMO/acme-vault"
-"$DIST/install.sh" init --dest "$V" --yes --cell-name "Acme Orders" \
+kos init --vault "$V" --yes --cell-name "Acme Orders" \
   --purpose "Order intake, payment and settlement." --system orders:Orders \
   --locale en --repo-prefix acme --platform gcp >/dev/null
 kos config --vault "$V" workspace-init --repository-root "$DEMO/repos" \

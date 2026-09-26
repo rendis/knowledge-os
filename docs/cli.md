@@ -3,6 +3,7 @@
 `kos --help` lists the commands:
 
 ```text
+init · adopt · doctor
 overview · search · index · links · inventory · audit
 discover run|questions|answer|platform|report|check|claims|corrections
 config status|resolve|workspace|locate|capability|bind|catalog|areas|operation|…

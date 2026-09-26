@@ -8,13 +8,11 @@ for ARM64 and AMD64; compilation alone does not prove execution on a target.
 ```sh
 go test -race ./...
 go vet ./...
-python3 -B evals/bootstrap/test_native_packaging.py
 python3 -B evals/bootstrap/test_native_installation.py
 python3 -B evals/bootstrap/test_bootstrap.py
-python3 -B scripts/test_instance.py
 ```
 
-Python belongs to this distribution's installer and its tests. It
+Python belongs to this distribution's evals and development scripts. It
 is not part of the installed native runtime. Native installation tests require
 a fresh complete release and fail rather than skip when artifacts are stale.
 

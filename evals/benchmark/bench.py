@@ -32,10 +32,11 @@ def sh(args, cwd=None, env=None, check=True):
     return r.stdout.strip()
 
 
-def cli(vault):
+def cli():
+    """The kos of the current release (make release): its kernel is the one under test."""
     arch = {"arm64": "arm64", "aarch64": "arm64"}.get(platform.machine(), "amd64")
     osname = {"Darwin": "darwin", "Linux": "linux", "Windows": "windows"}[platform.system()]
-    return str(pathlib.Path(vault) / ".agents" / "bin" / f"kos-{osname}-{arch}{'.exe' if osname == 'windows' else ''}")
+    return str(DIST / "dist" / f"kos-{osname}-{arch}{'.exe' if osname == 'windows' else ''}")
 
 
 def sha256(path):
@@ -94,10 +95,10 @@ def prepare(a):
         if v.get("overlay"):
             shutil.copytree(suite["_dir"] / v["overlay"], dst, dirs_exist_ok=True)
         shutil.copy(suite["_dir"] / v["config"], dst / ".knowledge-os-config.yaml")
-        sh([str(DIST / "install.sh"), "update", "--dest", str(dst)])
+        sh([cli(), "kernel", "update", "--vault", str(dst)])
         sh(["git", "-C", str(dst), "add", "-A"])
         sh(["git", "-C", str(dst), "commit", "-q", "--allow-empty", "-m", "chore(benchmark): fixture"], env=IDENTITY)
-        sh([cli(dst), "discover", "run", "--vault", str(dst), "--classify", "off"])
+        sh([cli(), "discover", "run", "--vault", str(dst), "--classify", "off"])
         facts = sorted((dst / ".agents/state/discovery/facts").glob("*.json"))
         fp["vaults"][key] = {"source_commit": v["commit"], "fixture": sh(["git", "-C", str(dst), "rev-parse", "--short=12", "HEAD"]),
                              "facts": hashlib.sha256(b"".join(sha256(f).encode() for f in facts)).hexdigest()[:16]}
@@ -142,7 +143,7 @@ def evaluate(dst, base, out_prefix, timeout):
     ev["uncommitted"] = bool(sh(["git", "-C", str(dst), "status", "--porcelain", "--", ".", ":!.agents/state"], check=False))
     ev["note_gates"], ev["stale_neighbours"], ev["structural_issues_introduced"] = [], [], []
     if on_branch:
-        v = subprocess.run([cli(dst), "sync", "verify", "--vault", str(dst)], capture_output=True, text=True).stdout
+        v = subprocess.run([cli(), "sync", "verify", "--vault", str(dst)], capture_output=True, text=True).stdout
         try:
             vj = json.loads(v[v.index("{", 1):] if v.startswith('{"error') else v)
             ev["note_gates"], ev["stale_neighbours"] = vj.get("note_gates", []), vj.get("stale_neighbours", [])
@@ -153,7 +154,7 @@ def evaluate(dst, base, out_prefix, timeout):
     ev["review"] = {"verdict": "none", "findings": []}
     if ev["changed"]:
         gates = {"note_gates": ev["note_gates"], "stale_neighbours": ev["stale_neighbours"], "structural_issues_introduced": ev["structural_issues_introduced"]}
-        prompt = REVIEW_PROMPT.format(branch=ev["branch"], base=base, cli=cli(dst), gates=json.dumps(gates, ensure_ascii=False))
+        prompt = REVIEW_PROMPT.format(branch=ev["branch"], base=base, cli=cli(), gates=json.dumps(gates, ensure_ascii=False))
         rv = runner.execute(REVIEWER["harness"], prompt, dst, REVIEWER["model"], REVIEWER["effort"], f"{out_prefix}.review.txt", timeout=timeout)
         m = re.search(r"\{.*\}", rv.get("answer", ""), re.S)
         try:

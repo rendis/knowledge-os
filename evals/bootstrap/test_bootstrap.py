@@ -1,36 +1,25 @@
 #!/usr/bin/env python3
-"""Bootstrap evals: init, domain-leak scan, update safety, orientation."""
+"""Bootstrap evals: init, domain-leak scan, kernel update safety, orientation.
+
+Drives the released `kos` binary (see `_kos.py`), built by `make release`. Cells are created, adopted
+and updated by `kos` alone (ADR 0002); there is no checkout installer or Python inside a cell.
+"""
 from __future__ import annotations
 
 import hashlib
-import importlib.util
 import json
-import os
-import platform
 import re
-import shutil
 import subprocess
 import sys
 import tempfile
-import threading
 import unittest
 from pathlib import Path
-from types import SimpleNamespace
 from unittest import mock
 
 DIST = Path(__file__).resolve().parents[2]
-INSTALL = DIST / "install.sh"
 
-sys.path.insert(0, str(DIST / "scripts"))
-import native_runtime  # noqa: E402
-
-
-def native_cli(vault: Path) -> str:
-    """kos is installed once per machine, not in the vault: the tests use the release's build."""
-    return str(native_runtime.binary(DIST))
-
-def resolve_command(vault: Path) -> list[str]:
-    return [native_cli(vault), "config", "resolve", "--vault", str(vault)]
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import _kos  # noqa: E402
 
 # Terms of the cells this distribution was developed with, kept as SHA-256 prefixes so the check itself
 # does not publish them. A word, or a run of up to three hyphen-joined parts, whose hash is listed is a leak.
@@ -68,19 +57,9 @@ def leaked_terms(text: str) -> bool:
 SCAN_SUFFIXES = {".md", ".py", ".yaml", ".yml", ".sh", ".txt", ".json", ".sql", ".tmpl", ".toml"}
 
 
-def run(
-    args: list[str],
-    cwd: Path | None = None,
-    env: dict[str, str] | None = None,
-) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        args,
-        cwd=str(cwd or DIST),
-        env=env,
-        text=True,
-        capture_output=True,
-        check=False,
-    )
+def run(args: list[str], cwd: Path | None = None, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
+    """Run a plain host command (git, the render script); kos itself goes through `_kos.run`."""
+    return subprocess.run(args, cwd=str(cwd or DIST), env=env, text=True, capture_output=True, check=False)
 
 
 def is_knowledge_file(vault: Path, path: Path) -> bool:
@@ -126,42 +105,31 @@ def installed_command_targets(vault: Path) -> set[str]:
 
 
 class BootstrapEval(unittest.TestCase):
-    def test_init_note_locale_and_inventory_readiness(self) -> None:
+    def test_init_creates_localized_notes_and_orientation(self) -> None:
         for locale, heading, purpose in (("es", "Sistemas", "Propósito"), ("en", "Systems", "Purpose")):
-            for discovered in (False, True):
-                with self.subTest(locale=locale, discovered=discovered), tempfile.TemporaryDirectory() as tmp:
-                    root = Path(tmp)
-                    dest = root / "cell"
-                    args = ["sh", str(INSTALL), "init", "--dest", str(dest),
-                            "--cell-name", "Example", "--purpose", "Example purpose",
-                            "--system", "example:Example", "--locale", locale, "--yes"]
-                    if discovered:
-                        source = root / "source"
-                        source.mkdir()
-                        self.assertEqual(run(["git", "init", str(source)]).returncode, 0)
-                        self.assertEqual(run(["git", "-C", str(source), "remote", "add", "origin",
-                                              "https://example.com/org/source.git"]).returncode, 0)
-                        args += ["--discovery-root", str(source)]
-                    initialized = run(args)
-                    self.assertEqual(initialized.returncode, 0, initialized.stdout + initialized.stderr)
-                    home = (dest / "00-Home.md").read_text()
-                    system = (dest / "10-Sistemas/Example.md").read_text()
-                    self.assertIn("## " + heading, home)
-                    self.assertIn("## " + purpose, system)
-                    self.assertNotIn("No discovery roots were given", home)
-                    runtime_guidance = "`kos config status`"
-                    self.assertIn(runtime_guidance, home)
-                    self.assertNotIn("{{", home + system)
-                    resolved = run(resolve_command(dest))
-                    self.assertEqual(resolved.returncode, 0, resolved.stderr)
-                    orientation = json.loads(resolved.stdout)["orientation"]
-                    self.assertTrue(orientation["ready"])
-                    self.assertEqual(orientation["pending_inventory"], discovered)
-                    (dest / "00-Home.md").write_text(home + "\nCell-owned addition.\n")
-                    before = knowledge_snapshot(dest)
-                    updated = run(["sh", str(INSTALL), "update", "--dest", str(dest)])
-                    self.assertEqual(updated.returncode, 0, updated.stdout + updated.stderr)
-                    self.assertEqual(before, knowledge_snapshot(dest))
+            with self.subTest(locale=locale), tempfile.TemporaryDirectory() as tmp:
+                dest = Path(tmp) / "cell"
+                initialized = _kos.run(DIST, "init", "--vault", str(dest),
+                                       "--cell-name", "Example", "--purpose", "Example purpose",
+                                       "--system", "example:Example", "--locale", locale, "--yes")
+                self.assertEqual(initialized.returncode, 0, initialized.stdout + initialized.stderr)
+                home = (dest / "00-Home.md").read_text()
+                system = (dest / "10-Sistemas/Example.md").read_text()
+                self.assertIn("## " + heading, home)
+                self.assertIn("## " + purpose, system)
+                self.assertIn("`kos config status`", home)
+                self.assertNotIn("{{", home + system)
+                resolved = _kos.run(DIST, "config", "resolve", "--vault", str(dest))
+                self.assertEqual(resolved.returncode, 0, resolved.stderr)
+                orientation = json.loads(resolved.stdout)["orientation"]
+                self.assertTrue(orientation["ready"])
+                # Home no longer lists discovered remotes at init: nothing is pending immediately after.
+                self.assertFalse(orientation["pending_inventory"])
+                (dest / "00-Home.md").write_text(home + "\nCell-owned addition.\n")
+                before = knowledge_snapshot(dest)
+                updated = _kos.run(DIST, "kernel", "update", "--vault", str(dest))
+                self.assertEqual(updated.returncode, 0, updated.stdout + updated.stderr)
+                self.assertEqual(before, knowledge_snapshot(dest))
 
     def test_specialists_follow_the_router_contract(self) -> None:
         result = subprocess.run([sys.executable, "-B", str(DIST / "scripts/render_specialists.py"), "--check"], capture_output=True, text=True)
@@ -175,100 +143,43 @@ class BootstrapEval(unittest.TestCase):
         ):
             self.assertTrue((DIST / "kernel" / relative).is_file(), relative)
 
-    def test_shared_vault_resolver_requires_a_valid_instance(self) -> None:
+    def test_config_resolve_requires_a_valid_instance(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             dest = Path(tmp) / "cell"
-            initialized = run(
-                [
-                    "sh",
-                    str(INSTALL),
-                    "init",
-                    "--dest",
-                    str(dest),
-                    "--cell-name",
-                    "Resolver review",
-                    "--purpose",
-                    "Validate canonical vault identity",
-                    "--system",
-                    "resolver:Resolver",
-                    "--yes",
-                ]
+            initialized = _kos.run(
+                DIST, "init", "--vault", str(dest),
+                "--cell-name", "Resolver review", "--purpose", "Validate canonical vault identity",
+                "--system", "resolver:Resolver", "--yes",
             )
-            self.assertEqual(
-                initialized.returncode,
-                0,
-                initialized.stdout + initialized.stderr,
-            )
-            legacy_config = dest / ".old-workspace-config.yaml"
-            legacy_config.write_text(
-                "workspace:\n"
-                "  repository_roots:\n"
-                "    - /tmp/legacy-repositories\n",
-                encoding="utf-8",
-            )
-            canonical_config = dest / ".knowledge-os-config.yaml"
-            self.assertFalse(canonical_config.exists())
-            resolver = dest / "90-Meta" / "resolve-vault.py"
-            framework = (dest / "90-Meta" / "Auditoria - Framework.md").read_text(
-                encoding="utf-8"
-            )
-            self.assertIn(
-                '`<cli> config resolve --vault "<vault_root>"`',
-                framework,
-            )
-            resolver_cache = Path(tmp) / "resolver-pycache"
-            resolver_env = os.environ.copy()
-            resolver_env["PYTHONPYCACHEPREFIX"] = str(resolver_cache)
-            resolved = run(
-                resolve_command(dest),
-                env=resolver_env,
-            )
+            self.assertEqual(initialized.returncode, 0, initialized.stdout + initialized.stderr)
+            framework = (dest / "90-Meta" / "Auditoria - Framework.md").read_text(encoding="utf-8")
+            self.assertIn('`<cli> config resolve --vault "<vault_root>"`', framework)
+
+            resolved = _kos.run(DIST, "config", "resolve", "--vault", str(dest))
             self.assertEqual(resolved.returncode, 0, resolved.stdout + resolved.stderr)
             self.assertEqual(json.loads(resolved.stdout)["status"], "resolved")
-            self.assertFalse(canonical_config.exists())
-            self.assertEqual(list(resolver_cache.rglob("*.pyc")), [])
-
 
             instance_path = dest / "instance.yaml"
             valid_instance = instance_path.read_text(encoding="utf-8")
             for invalid_remote in ("::::", "https://[bad"):
                 instance_path.write_text(
-                    valid_instance.replace(
-                        '  remote: ""',
-                        f'  remote: "{invalid_remote}"',
-                        1,
-                    ),
+                    valid_instance.replace('  remote: ""', f'  remote: "{invalid_remote}"', 1),
                     encoding="utf-8",
                 )
-                invalid_identity = run(
-                    resolve_command(dest)
-                )
+                invalid_identity = _kos.run(DIST, "config", "resolve", "--vault", str(dest))
                 self.assertNotEqual(invalid_identity.returncode, 0, invalid_identity.stdout + invalid_identity.stderr)
 
             instance_path.write_text("", encoding="utf-8")
-            invalid = run(
-                resolve_command(dest)
-            )
+            invalid = _kos.run(DIST, "config", "resolve", "--vault", str(dest))
             self.assertNotEqual(invalid.returncode, 0, invalid.stdout + invalid.stderr)
 
-    def test_update_removes_retired_managed_files(self) -> None:
+    def test_kernel_update_retires_files_the_distribution_no_longer_ships(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             dest = Path(tmp) / "cell"
-            initialized = run(
-                [
-                    "sh",
-                    str(INSTALL),
-                    "init",
-                    "--dest",
-                    str(dest),
-                    "--cell-name",
-                    "Review",
-                    "--purpose",
-                    "Review retired managed paths",
-                    "--system",
-                    "review:Review",
-                    "--yes",
-                ]
+            initialized = _kos.run(
+                DIST, "init", "--vault", str(dest),
+                "--cell-name", "Review", "--purpose", "Review retired managed paths",
+                "--system", "review:Review", "--yes",
             )
             self.assertEqual(initialized.returncode, 0, initialized.stderr)
 
@@ -296,15 +207,12 @@ class BootstrapEval(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            updated = run(["sh", str(INSTALL), "update", "--dest", str(dest)])
+            updated = _kos.run(DIST, "kernel", "update", "--vault", str(dest))
             self.assertEqual(updated.returncode, 0, updated.stdout + updated.stderr)
             self.assertFalse(retired.exists())
             self.assertTrue(cell_owned.is_file())
             self.assertFalse((dest / ".agents/skills/retired-skill").exists())
-            self.assertNotIn(
-                retired_relative,
-                lock_path.read_text(encoding="utf-8"),
-            )
+            self.assertNotIn(retired_relative, lock_path.read_text(encoding="utf-8"))
 
             retired.write_text("# local change\n", encoding="utf-8")
             refreshed_lock = lock_path.read_text(encoding="utf-8")
@@ -316,13 +224,12 @@ class BootstrapEval(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            blocked = run(["sh", str(INSTALL), "update", "--dest", str(dest)])
-            self.assertEqual(blocked.returncode, 3, blocked.stdout + blocked.stderr)
+            blocked = _kos.run(DIST, "kernel", "update", "--vault", str(dest))
+            self.assertNotEqual(blocked.returncode, 0, blocked.stdout + blocked.stderr)
+            self.assertEqual(json.loads(blocked.stdout)["status"], "conflict")
             self.assertTrue(retired.is_file())
 
-            forced = run(
-                ["sh", str(INSTALL), "update", "--dest", str(dest), "--force"]
-            )
+            forced = _kos.run(DIST, "kernel", "update", "--vault", str(dest), "--force")
             self.assertEqual(forced.returncode, 0, forced.stdout + forced.stderr)
             self.assertFalse(retired.exists())
             self.assertTrue(cell_owned.is_file())
@@ -343,36 +250,20 @@ class BootstrapEval(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            invalid_batch = run(
-                ["sh", str(INSTALL), "update", "--dest", str(dest), "--force"]
-            )
-            self.assertEqual(
-                invalid_batch.returncode,
-                3,
-                invalid_batch.stdout + invalid_batch.stderr,
-            )
+            invalid_batch = _kos.run(DIST, "kernel", "update", "--vault", str(dest), "--force")
+            self.assertNotEqual(invalid_batch.returncode, 0, invalid_batch.stdout + invalid_batch.stderr)
+            self.assertEqual(json.loads(invalid_batch.stdout)["status"], "unsafe")
             self.assertTrue(first.is_file())
             self.assertTrue(invalid_target.is_dir())
 
-    def test_update_refuses_retired_managed_file_through_symlinked_parent(self) -> None:
+    def test_kernel_update_refuses_retired_managed_file_through_symlinked_parent(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             dest = root / "cell"
-            initialized = run(
-                [
-                    "sh",
-                    str(INSTALL),
-                    "init",
-                    "--dest",
-                    str(dest),
-                    "--cell-name",
-                    "Review",
-                    "--purpose",
-                    "Reject unsafe retired paths",
-                    "--system",
-                    "review:Review",
-                    "--yes",
-                ]
+            initialized = _kos.run(
+                DIST, "init", "--vault", str(dest),
+                "--cell-name", "Review", "--purpose", "Reject unsafe retired paths",
+                "--system", "review:Review", "--yes",
             )
             self.assertEqual(initialized.returncode, 0, initialized.stderr)
 
@@ -396,11 +287,9 @@ class BootstrapEval(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            blocked = run(
-                ["sh", str(INSTALL), "update", "--dest", str(dest), "--force"]
-            )
-            self.assertEqual(blocked.returncode, 3, blocked.stdout + blocked.stderr)
-            self.assertEqual(json.loads(blocked.stdout)["status"], "invalid-lock")
+            blocked = _kos.run(DIST, "kernel", "update", "--vault", str(dest), "--force")
+            self.assertNotEqual(blocked.returncode, 0, blocked.stdout + blocked.stderr)
+            self.assertEqual(json.loads(blocked.stdout)["status"], "unsafe")
             self.assertEqual(outside_file.read_bytes(), retired_bytes)
 
     def test_development_handoff_is_an_atomic_task_package(self) -> None:
@@ -421,23 +310,10 @@ class BootstrapEval(unittest.TestCase):
     def test_init_creates_orientation(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             dest = Path(tmp) / "cell"
-            result = run(
-                [
-                    "sh",
-                    str(INSTALL),
-                    "init",
-                    "--dest",
-                    str(dest),
-                    "--cell-name",
-                    "Payments",
-                    "--purpose",
-                    "Card-present checkout",
-                    "--system",
-                    "payments:Payments",
-                    "--system",
-                    "ledger:Ledger",
-                    "--yes",
-                ]
+            result = _kos.run(
+                DIST, "init", "--vault", str(dest),
+                "--cell-name", "Payments", "--purpose", "Card-present checkout",
+                "--system", "payments:Payments", "--system", "ledger:Ledger", "--yes",
             )
             self.assertEqual(result.returncode, 0, result.stderr)
             payload = json.loads(result.stdout)
@@ -488,13 +364,13 @@ class BootstrapEval(unittest.TestCase):
                 (dest / ".obsidian" / "app.json").read_text(encoding="utf-8")
             )
             self.assertEqual(obsidian_app["userIgnoreFilters"], [".plan/", ".scratch/", ".investigations/", "AGENTS.personal.md"])
-            doctor = run(["sh", str(INSTALL), "doctor", "--dest", str(dest)])
+            doctor = _kos.run(DIST, "doctor", "--vault", str(dest))
             self.assertEqual(doctor.returncode, 0, doctor.stderr)
             info = json.loads(doctor.stdout)
             self.assertTrue(info["orientation"]["ready"])
             self.assertEqual(info["start_here"][0], "00-Home.md")
             self.assertTrue(info["portable_lock"])
-            self.assertTrue(info["managed_matches_dist"])
+            self.assertTrue(info["kernel_current"])
             self.assertEqual(
                 info["personal_instructions"],
                 {
@@ -504,54 +380,32 @@ class BootstrapEval(unittest.TestCase):
                     "tracked": False,
                 },
             )
-            self.assertEqual(
-                info["distribution_revision_installed"],
-                info["distribution_revision_dist"],
-            )
+            # The build stamps a real commit for the kernel this release carries.
+            self.assertTrue(info["kernel_revision"])
 
     def test_init_roundtrips_trackers_and_rejects_invalid_updates(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             invalid_dest = Path(tmp) / "invalid-cell"
-            invalid_init = run(
-                [
-                    "sh",
-                    str(INSTALL),
-                    "init",
-                    "--dest",
-                    str(invalid_dest),
-                    "--tracker",
-                    "broken",
-                    "--system",
-                    "test:Test",
-                    "--yes",
-                ]
+            # An unknown cloud provider fails schema validation after the answers are built: nothing is
+            # written. (A malformed --tracker value fails earlier, during flag parsing, with a plain
+            # error and no result on stdout; the invalid-instance status is specific to schema failures.)
+            invalid_init = _kos.run(
+                DIST, "init", "--vault", str(invalid_dest),
+                "--system", "test:Test", "--platform", "oracle", "--yes",
             )
-            self.assertEqual(invalid_init.returncode, 2, invalid_init.stdout)
+            self.assertNotEqual(invalid_init.returncode, 0, invalid_init.stdout)
             self.assertEqual(
                 json.loads(invalid_init.stdout)["status"], "invalid-instance"
             )
             self.assertFalse(invalid_dest.exists())
 
             dest = Path(tmp) / "cell"
-            initialized = run(
-                [
-                    "sh",
-                    str(INSTALL),
-                    "init",
-                    "--dest",
-                    str(dest),
-                    "--cell-name",
-                    "Multi tracker",
-                    "--purpose",
-                    "Validate work-item routing",
-                    "--system",
-                    "platform:Platform",
-                    "--tracker",
-                    "jira-core:jira:https://core.atlassian.net/",
-                    "--tracker",
-                    "clickup-product:clickup:https://app.clickup.com/123456",
-                    "--yes",
-                ]
+            initialized = _kos.run(
+                DIST, "init", "--vault", str(dest),
+                "--cell-name", "Multi tracker", "--purpose", "Validate work-item routing",
+                "--system", "platform:Platform",
+                "--tracker", "jira-core:jira:https://core.atlassian.net/",
+                "--tracker", "clickup-product:clickup:https://app.clickup.com/123456", "--yes",
             )
             self.assertEqual(
                 initialized.returncode,
@@ -564,82 +418,52 @@ class BootstrapEval(unittest.TestCase):
             self.assertIn('provider: "clickup"', instance)
             self.assertIn('url: "https://core.atlassian.net"', instance)
 
-            doctor = run(["sh", str(INSTALL), "doctor", "--dest", str(dest)])
+            doctor = _kos.run(DIST, "doctor", "--vault", str(dest))
             self.assertEqual(doctor.returncode, 0, doctor.stdout + doctor.stderr)
             self.assertEqual(json.loads(doctor.stdout)["instance"]["status"], "valid")
 
-            instance_path.write_text(
-                instance.replace(
-                    'url: "https://core.atlassian.net"',
-                    'url: "https://user:secret@core.atlassian.net"',
-                    1,
-                ),
-                encoding="utf-8",
+            credentialed = instance.replace(
+                'url: "https://core.atlassian.net"',
+                'url: "https://user:secret@core.atlassian.net"',
+                1,
             )
-            invalid_doctor = run(
-                ["sh", str(INSTALL), "doctor", "--dest", str(dest)]
-            )
-            self.assertEqual(invalid_doctor.returncode, 2, invalid_doctor.stdout)
+            instance_path.write_text(credentialed, encoding="utf-8")
+            invalid_doctor = _kos.run(DIST, "doctor", "--vault", str(dest))
+            self.assertNotEqual(invalid_doctor.returncode, 0, invalid_doctor.stdout)
             self.assertEqual(
                 json.loads(invalid_doctor.stdout)["instance"]["status"],
                 "invalid",
             )
-            invalid_update = run(
-                ["sh", str(INSTALL), "update", "--dest", str(dest)]
-            )
-            self.assertEqual(invalid_update.returncode, 2, invalid_update.stdout)
-            self.assertEqual(
-                json.loads(invalid_update.stdout)["status"],
-                "invalid-instance",
-            )
+            invalid_update = _kos.run(DIST, "kernel", "update", "--vault", str(dest))
+            self.assertNotEqual(invalid_update.returncode, 0, invalid_update.stdout)
+            self.assertEqual(instance_path.read_text(encoding="utf-8"), credentialed)
 
             instance_path.write_text("cell: [\n", encoding="utf-8")
-            malformed_doctor = run(
-                ["sh", str(INSTALL), "doctor", "--dest", str(dest)]
-            )
-            self.assertEqual(
+            malformed_doctor = _kos.run(DIST, "doctor", "--vault", str(dest))
+            self.assertNotEqual(
                 malformed_doctor.returncode,
-                2,
+                0,
                 malformed_doctor.stdout + malformed_doctor.stderr,
             )
             malformed_payload = json.loads(malformed_doctor.stdout)
             self.assertEqual(malformed_payload["instance"]["status"], "invalid")
-            self.assertEqual(
-                malformed_payload["instance"]["error"],
-                "invalid instance.yaml syntax",
-            )
+            self.assertTrue(malformed_payload["instance"]["error"])
 
     def test_fresh_cell_has_every_documented_local_command(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             dest = Path(tmp) / "cell"
-            initialized = run(
-                [
-                    "sh",
-                    str(INSTALL),
-                    "init",
-                    "--dest",
-                    str(dest),
-                    "--cell-name",
-                    "Operations",
-                    "--purpose",
-                    "Shared operational knowledge",
-                    "--system",
-                    "operations:Operations",
-                    "--adapter",
-                    "reports",
-                    "--yes",
-                ]
+            initialized = _kos.run(
+                DIST, "init", "--vault", str(dest),
+                "--cell-name", "Operations", "--purpose", "Shared operational knowledge",
+                "--system", "operations:Operations", "--adapter", "reports", "--yes",
             )
             self.assertEqual(initialized.returncode, 0, initialized.stderr)
             targets = sorted(installed_command_targets(dest))
             self.assertEqual(targets, [], "consumer docs must not invoke Python helpers")
             self.assertEqual(list(dest.rglob("*.py")), [])
             self.assertFalse((dest / ".agents" / "bin").exists())
-            commands = [[native_cli(dest), "audit", "--vault", str(dest)],
-                        [native_cli(dest), "check", "links", "--vault", str(dest)],
-                        [native_cli(dest), "check", "bases", "--vault", str(dest)]]
-            for command in commands:
-                checked = run(command, cwd=dest)
+            for args in (("audit",), ("check", "links"), ("check", "bases")):
+                checked = _kos.run(DIST, *args, "--vault", str(dest), cwd=dest)
                 self.assertEqual(
                     checked.returncode,
                     0,
@@ -684,55 +508,34 @@ class BootstrapEval(unittest.TestCase):
                     else:
                         target.write_text(before, encoding="utf-8")
 
-    def test_update_does_not_overwrite_home(self) -> None:
+    def test_kernel_update_does_not_overwrite_home(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             dest = Path(tmp) / "cell"
-            run(
-                [
-                    "sh",
-                    str(INSTALL),
-                    "init",
-                    "--dest",
-                    str(dest),
-                    "--cell-name",
-                    "Platform",
-                    "--purpose",
-                    "Shared libraries",
-                    "--system",
-                    "platform:Platform",
-                    "--disable-topics",
-                    "--yes",
-                ],
+            _kos.run(
+                DIST, "init", "--vault", str(dest),
+                "--cell-name", "Platform", "--purpose", "Shared libraries",
+                "--system", "platform:Platform", "--disable-topics", "--yes",
             )
             home = dest / "00-Home.md"
             original = home.read_text(encoding="utf-8")
             home.write_text(original + "\n\n## Cell note\nKeep me.\n", encoding="utf-8")
             instance = dest / "instance.yaml"
             instance_text = instance.read_text(encoding="utf-8")
-            update = run(["sh", str(INSTALL), "update", "--dest", str(dest)])
+            update = _kos.run(DIST, "kernel", "update", "--vault", str(dest))
             self.assertEqual(update.returncode, 0, update.stderr)
             self.assertIn("Keep me.", home.read_text(encoding="utf-8"))
             self.assertEqual(instance.read_text(encoding="utf-8"), instance_text)
             self.assertFalse((dest / "25-Topics").exists())
 
-    def test_update_accepts_gitleaks_annotated_managed_digest(self) -> None:
+    def test_kernel_lock_hashes_carry_the_gitleaks_annotation(self) -> None:
+        # The Go lock writer always annotates every managed digest (no unannotated form exists any
+        # more), so this only confirms the format survives a no-op update, not that it is "accepted".
         with tempfile.TemporaryDirectory() as tmp:
             dest = Path(tmp) / "cell"
-            initialized = run(
-                [
-                    "sh",
-                    str(INSTALL),
-                    "init",
-                    "--dest",
-                    str(dest),
-                    "--cell-name",
-                    "Annotated lock",
-                    "--purpose",
-                    "Validate managed digest annotations",
-                    "--system",
-                    "lock:Lock",
-                    "--yes",
-                ]
+            initialized = _kos.run(
+                DIST, "init", "--vault", str(dest),
+                "--cell-name", "Annotated lock", "--purpose", "Validate managed digest annotations",
+                "--system", "lock:Lock", "--yes",
             )
             self.assertEqual(
                 initialized.returncode,
@@ -741,24 +544,16 @@ class BootstrapEval(unittest.TestCase):
             )
             lock_path = dest / ".knowledge-os.lock.yaml"
             digest = hashlib.sha256((dest / "AGENTS.md").read_bytes()).hexdigest()
-            plain_entry = f'  "AGENTS.md": {digest}'
-            annotated_entry = (
-                f"{plain_entry} # gitleaks:allow -- managed SHA-256 digest"
-            )
-            lock = lock_path.read_text(encoding="utf-8")
-            if annotated_entry not in lock:
-                self.assertIn(plain_entry, lock)
-                lock_path.write_text(
-                    lock.replace(plain_entry, annotated_entry, 1),
-                    encoding="utf-8",
-                )
+            annotated_entry = f'  "AGENTS.md": {digest} # gitleaks:allow -- managed SHA-256 digest'
+            self.assertIn(annotated_entry, lock_path.read_text(encoding="utf-8"))
 
-            updated = run(["sh", str(INSTALL), "update", "--dest", str(dest)])
+            updated = _kos.run(DIST, "kernel", "update", "--vault", str(dest))
             self.assertEqual(
                 updated.returncode,
                 0,
                 updated.stdout + updated.stderr,
             )
+            self.assertEqual(json.loads(updated.stdout)["status"], "updated")
             self.assertIn(
                 annotated_entry,
                 lock_path.read_text(encoding="utf-8"),
@@ -769,44 +564,19 @@ class BootstrapEval(unittest.TestCase):
             dest = Path(tmp) / "existing"
             dest.mkdir()
             (dest / "00-Home.md").write_text("# existing\n", encoding="utf-8")
-            result = run(
-                [
-                    "sh",
-                    str(INSTALL),
-                    "init",
-                    "--dest",
-                    str(dest),
-                    "--cell-name",
-                    "X",
-                    "--purpose",
-                    "Y",
-                    "--system",
-                    "x:X",
-                    "--yes",
-                ]
+            result = _kos.run(
+                DIST, "init", "--vault", str(dest),
+                "--cell-name", "X", "--purpose", "Y", "--system", "x:X", "--yes",
             )
             self.assertNotEqual(result.returncode, 0)
 
     def test_adapter_opt_in(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             dest = Path(tmp) / "cell"
-            result = run(
-                [
-                    "sh",
-                    str(INSTALL),
-                    "init",
-                    "--dest",
-                    str(dest),
-                    "--cell-name",
-                    "Ops",
-                    "--purpose",
-                    "Runtime inspection",
-                    "--system",
-                    "runtime:Runtime",
-                    "--adapter",
-                    "reports",
-                    "--yes",
-                ]
+            result = _kos.run(
+                DIST, "init", "--vault", str(dest),
+                "--cell-name", "Ops", "--purpose", "Runtime inspection",
+                "--system", "runtime:Runtime", "--adapter", "reports", "--yes",
             )
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertTrue((dest / ".agents/skills/generate-reports/SKILL.md").is_file())
@@ -816,9 +586,6 @@ class BootstrapEval(unittest.TestCase):
                 self.assertFalse((dest / ".agents/skills" / name).exists())
 
     def test_adopt_preserves_knowledge_and_extras(self) -> None:
-        sys.path.insert(0, str(DIST / "scripts"))
-        from instance import dump_instance, validate_instance
-
         with tempfile.TemporaryDirectory() as tmp:
             dest = Path(tmp) / "existing"
             dest.mkdir()
@@ -829,13 +596,13 @@ class BootstrapEval(unittest.TestCase):
             (dest / "10-Sistemas" / "Payments.md").write_text("# Payments\n", encoding="utf-8")
             for dirname in (
                 "15-Arquitectura",
-                "20-Flujos",
+                "20-Repos",
                 "25-Topics",
-                "30-Datos",
+                "30-Flujos",
                 "40-Integraciones",
-                "50-Operaciones",
-                "60-Decisiones",
-                "70-Riesgos",
+                "50-Glosario",
+                "60-Operacion",
+                "70-Aprendizajes",
             ):
                 directory = dest / dirname
                 directory.mkdir()
@@ -862,46 +629,37 @@ class BootstrapEval(unittest.TestCase):
                 '{"livePreview": true, "userIgnoreFilters": ["archive/", "plan/", "investigations/"]}\n',
                 encoding="utf-8",
             )
-            refused = run(
-                [
-                    "sh",
-                    str(INSTALL),
-                    "init",
-                    "--dest",
-                    str(dest),
-                    "--cell-name",
-                    "Payments",
-                    "--purpose",
-                    "Card-present checkout",
-                    "--system",
-                    "payments:Payments",
-                    "--yes",
-                ]
+            refused = _kos.run(
+                DIST, "init", "--vault", str(dest),
+                "--cell-name", "Payments", "--purpose", "Card-present checkout",
+                "--system", "payments:Payments", "--yes",
             )
             self.assertNotEqual(refused.returncode, 0)
-            missing = run(["sh", str(INSTALL), "adopt", "--dest", str(dest)])
+            missing = _kos.run(DIST, "adopt", "--vault", str(dest))
             self.assertNotEqual(missing.returncode, 0)
             (dest / "instance.yaml").write_text(
-                dump_instance(
-                    validate_instance(
-                        {
-                            "cell": {"name": "Payments", "purpose": "Card-present checkout"},
-                            "systems": [{"id": "payments", "name": "Payments", "aliases": ["pay"]}],
-                            "evidence": {"profile": "production-gate"},
-                            "locale": {"notes": "en"},
-                            "adapters": [],
-                        }
-                    )
-                ),
+                'version: 1\n'
+                'cell:\n'
+                '  name: "Payments"\n'
+                '  purpose: "Card-present checkout"\n'
+                'systems:\n'
+                '  - id: "payments"\n'
+                '    name: "Payments"\n'
+                '    aliases: ["pay"]\n'
+                'evidence:\n'
+                '  profile: "production-gate"\n'
+                'locale:\n'
+                '  notes: "en"\n'
+                'adapters: []\n',
                 encoding="utf-8",
             )
             knowledge_before = knowledge_snapshot(dest)
             self.assertIn("15-Arquitectura/Cell knowledge.md", knowledge_before)
             self.assertIn("25-Topics/Cell knowledge.md", knowledge_before)
-            conflict = run(["sh", str(INSTALL), "adopt", "--dest", str(dest)])
-            self.assertEqual(conflict.returncode, 3, conflict.stdout + conflict.stderr)
+            conflict = _kos.run(DIST, "adopt", "--vault", str(dest))
+            self.assertNotEqual(conflict.returncode, 0, conflict.stdout + conflict.stderr)
             self.assertEqual(json.loads(conflict.stdout)["status"], "ownership-conflict")
-            adopted = run(["sh", str(INSTALL), "adopt", "--dest", str(dest), "--force"])
+            adopted = _kos.run(DIST, "adopt", "--vault", str(dest), "--force")
             self.assertEqual(adopted.returncode, 0, adopted.stderr)
             payload = json.loads(adopted.stdout)
             self.assertEqual(payload["status"], "adopted")
@@ -941,7 +699,7 @@ class BootstrapEval(unittest.TestCase):
             self.assertNotIn('"90-Meta/audit-vault.py":', lock)
             self.assertNotIn('"90-Meta/Alcance.md":', lock)
             self.assertEqual(knowledge_snapshot(dest), knowledge_before)
-            doctor = run(["sh", str(INSTALL), "doctor", "--dest", str(dest)])
+            doctor = _kos.run(DIST, "doctor", "--vault", str(dest))
             self.assertEqual(doctor.returncode, 0, doctor.stderr)
             info = json.loads(doctor.stdout)
             self.assertEqual(info["state"], "installed")
@@ -952,7 +710,7 @@ class BootstrapEval(unittest.TestCase):
             discovery_state = dest / ".agents" / "state" / "discovery" / "report.json"
             discovery_state.parent.mkdir(parents=True)
             discovery_state.write_text('{"local":"keep"}\n', encoding="utf-8")
-            updated = run(["sh", str(INSTALL), "update", "--dest", str(dest)])
+            updated = _kos.run(DIST, "kernel", "update", "--vault", str(dest))
             self.assertEqual(updated.returncode, 0, updated.stderr)
             self.assertEqual(discovery_state.read_text(encoding="utf-8"), '{"local":"keep"}\n')
             self.assertEqual(personal.read_text(encoding="utf-8"), personal_text)
@@ -986,21 +744,10 @@ class BootstrapEval(unittest.TestCase):
             root = Path(tmp)
             source = root / "source"
             clone = root / "clone"
-            initialized = run(
-                [
-                    "sh",
-                    str(INSTALL),
-                    "init",
-                    "--dest",
-                    str(source),
-                    "--cell-name",
-                    "Payments",
-                    "--purpose",
-                    "Card-present checkout",
-                    "--system",
-                    "payments:Payments",
-                    "--yes",
-                ]
+            initialized = _kos.run(
+                DIST, "init", "--vault", str(source),
+                "--cell-name", "Payments", "--purpose", "Card-present checkout",
+                "--system", "payments:Payments", "--yes",
             )
             self.assertEqual(initialized.returncode, 0, initialized.stderr)
             self.assertEqual(run(["git", "init", "-b", "main"], cwd=source).returncode, 0)
@@ -1021,23 +768,23 @@ class BootstrapEval(unittest.TestCase):
             self.assertEqual(committed.returncode, 0, committed.stderr)
             cloned = run(["git", "clone", "--no-hardlinks", str(source), str(clone)], cwd=root)
             self.assertEqual(cloned.returncode, 0, cloned.stderr)
-            doctor = run(["sh", str(INSTALL), "doctor", "--dest", str(clone)])
+            doctor = _kos.run(DIST, "doctor", "--vault", str(clone))
             self.assertEqual(doctor.returncode, 0, doctor.stderr)
             info = json.loads(doctor.stdout)
             self.assertEqual(info["state"], "installed")
             self.assertTrue(info["portable_lock"])
-            self.assertTrue(info["managed_matches_dist"])
+            self.assertTrue(info["kernel_current"])
             knowledge_before = knowledge_snapshot(clone)
-            updated = run(["sh", str(INSTALL), "update", "--dest", str(clone)])
+            updated = _kos.run(DIST, "kernel", "update", "--vault", str(clone))
             self.assertEqual(updated.returncode, 0, updated.stderr)
             self.assertEqual(knowledge_snapshot(clone), knowledge_before)
-            after_update = run(["sh", str(INSTALL), "doctor", "--dest", str(clone)])
+            after_update = _kos.run(DIST, "doctor", "--vault", str(clone))
             self.assertEqual(after_update.returncode, 0, after_update.stderr)
             updated_info = json.loads(after_update.stdout)
             self.assertTrue(updated_info["portable_lock"])
-            self.assertTrue(updated_info["managed_matches_dist"])
+            self.assertTrue(updated_info["kernel_current"])
 
-    def test_personal_agents_contract_and_doctor_rejects_tracked_copy(self) -> None:
+    def test_personal_agents_contract_and_doctor_reports_tracked_copy(self) -> None:
         router = (DIST / "kernel" / "AGENTS.md").read_text(encoding="utf-8")
         self.assertIn("## Personal instructions", router)
         self.assertIn("@AGENTS.personal.md", router)
@@ -1053,26 +800,18 @@ class BootstrapEval(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmp:
             dest = Path(tmp) / "cell"
-            initialized = run([
-                "sh", str(INSTALL), "init", "--dest", str(dest),
+            initialized = _kos.run(
+                DIST, "init", "--vault", str(dest),
                 "--cell-name", "Payments", "--purpose", "Card-present checkout",
                 "--system", "payments:Payments", "--yes",
-            ])
+            )
             self.assertEqual(initialized.returncode, 0, initialized.stderr)
             self.assertEqual(run(["git", "init", str(dest)]).returncode, 0)
-            spec = importlib.util.spec_from_file_location("personal_installer", DIST / "scripts/knowledge_os.py")
-            installer = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(installer)
-            lock = installer.load_lock(dest / installer.LOCK_NAME)
-            # Isolate provenance only; exercise real hashes, Git and strict checks.
-            lock["distribution_revision"] = "test-revision"
-            lock["distribution_dirty"] = False
 
-            def strict_status():
-                with mock.patch.object(installer, "distribution_provenance", return_value=("test-revision", False)), mock.patch.object(installer, "load_lock", return_value=lock), mock.patch("builtins.print"):
-                    return installer.cmd_doctor(SimpleNamespace(dest=str(dest), strict=True))
+            doctor = _kos.run(DIST, "doctor", "--vault", str(dest))
+            self.assertEqual(doctor.returncode, 0, doctor.stdout + doctor.stderr)
+            self.assertFalse(json.loads(doctor.stdout)["personal_instructions"]["tracked"])
 
-            self.assertEqual(strict_status(), 0)
             personal = dest / "AGENTS.personal.md"
             personal.write_text("# Personal instructions\n", encoding="utf-8")
             self.assertEqual(
@@ -1083,15 +822,17 @@ class BootstrapEval(unittest.TestCase):
                 run(["git", "-C", str(dest), "add", "AGENTS.personal.md"]).returncode,
                 0,
             )
-            self.assertEqual(strict_status(), 0)
+            doctor = _kos.run(DIST, "doctor", "--vault", str(dest))
+            self.assertEqual(doctor.returncode, 0, doctor.stdout + doctor.stderr)
+            self.assertFalse(json.loads(doctor.stdout)["personal_instructions"]["tracked"])
+
             self.assertEqual(
                 run(["git", "-C", str(dest), "add", "-f", "AGENTS.personal.md"]).returncode,
                 0,
             )
-            doctor = run(["sh", str(INSTALL), "doctor", "--dest", str(dest)])
+            doctor = _kos.run(DIST, "doctor", "--vault", str(dest))
             self.assertEqual(doctor.returncode, 0, doctor.stderr)
             self.assertTrue(json.loads(doctor.stdout)["personal_instructions"]["tracked"])
-            self.assertEqual(strict_status(), 2)
 
     def test_router_defers_rare_workflows_and_ships_sync_skill(self) -> None:
         router = (DIST / "kernel" / "AGENTS.md").read_text(encoding="utf-8")

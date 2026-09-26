@@ -9,7 +9,7 @@ agent response, and these final checks:
 git diff --no-index /path/to/distribution/kernel/AGENTS.md AGENTS.md
 git check-ignore AGENTS.personal.md
 git ls-files --error-unmatch AGENTS.personal.md
-/path/to/distribution/install.sh doctor --dest /path/to/vault
+kos doctor --vault /path/to/vault
 ```
 
 The first comparison must be empty. `check-ignore` must succeed. `ls-files`
@@ -34,5 +34,5 @@ skill and personal file before each trial and compare their bytes afterward.
 Use harmless formatting conflicts, not evidence or authorization exceptions.
 Record actual tool calls and outputs for every session; expected behavior alone
 is not a trial result. Static text checks
-and installer tests are supporting evidence only; a finite set of trials does
+and installation tests are supporting evidence only; a finite set of trials does
 not establish universal agent behavior.

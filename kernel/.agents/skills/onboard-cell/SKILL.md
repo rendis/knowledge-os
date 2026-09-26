@@ -27,8 +27,8 @@ Issue tracker URLs; database targets (system, environment, instance, database, a
 
 ## 4. Install
 
-- **New vault**, from the distribution checkout: `./install.sh init --dest "<vault>" --yes --cell-name "…" --purpose "…" --system "Name" … --github-org … --repo-prefix … --reference-branch … --platform … [--tracker URL] --locale …`.
-- **Existing notes without the kernel:** `./install.sh adopt --dest "<vault>"`.
+- **New vault:** `<CLI> init --vault "<vault>" --yes --cell-name "…" --purpose "…" --system "Name" … --github-org … --repo-prefix … --reference-branch … --platform … [--tracker URL] --locale …`.
+- **Existing notes without the kernel:** `<CLI> adopt --vault "<vault>"`.
 - **An installed vault:** change `instance.yaml` on a sync branch ([synchronize-ecosystem](../synchronize-ecosystem/SKILL.md)) and check it with `<CLI> config status`.
 
 Then onboard yourself on this machine ([onboard-developer](../onboard-developer/SKILL.md)).

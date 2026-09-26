@@ -29,7 +29,7 @@ The vault is the map, not the boundary. When a note is missing or stale, the age
 
 | | Step | What happens | With |
 |:-:|---|---|---|
-| 1 | **Onboard** | The cell says who it is, where its code lives and which clouds it runs on; `onboard-developer` sets up each machine once. | `install.sh init` |
+| 1 | **Onboard** | The cell says who it is, where its code lives and which clouds it runs on; `onboard-developer` sets up each machine once. | `kos init` |
 | 2 | **Discover** | Connections extracted from repositories and read-only cloud snapshots; note gates catch stale citations. | `kos discover` |
 | 3 | **Ask** | The agent answers from inspected sources, grades each claim and checks the names it cites. | `kos discover claims` |
 | 4 | **Investigate** | One case per line of work, written only through the CLI and gated on every write. | `kos investigation` |
@@ -72,12 +72,13 @@ The vault is the map, not the boundary. When a note is missing or stale, the age
 # 1. Install kos once per machine (the repository is private: use an account that can read it)
 gh release download --repo rendis/knowledge-os --pattern install-kos.sh --output - | sh
 
-# 2. Create the cell's vault from a checkout of this repository
-gh repo clone rendis/knowledge-os && cd knowledge-os
-./install.sh init --dest ~/vaults/payments
+# 2. Create the cell's vault: kos asks who the cell is, where its code lives and where it runs
+kos init --vault ~/vaults/payments
 
 # 3. Open the vault with Claude Code, Codex or Cursor: onboard-developer sets up your machine
 ```
+
+<img src="docs/assets/demo-onboard.gif" width="100%" alt="kos init asks for the cell's name, purpose, systems, GitHub organization, repository prefixes, reference branches, clouds, trackers and language, creates the vault, and kos doctor reports it installed and current.">
 
 More: [installation and updates](docs/installation.md) · [the kos CLI](docs/cli.md) · [decisions](docs/adr/)
 
@@ -97,8 +98,8 @@ This repository is the **distribution**, not a cell vault; agents working on it 
 
 | Path | Role |
 |---|---|
-| `install.sh`, `scripts/` | Installer (`knowledge_os.py`, with `instance.py` and `vault_catalog.py`), native runtime packaging, specialist and README asset rendering |
-| `cmd/`, `internal/`, `tools/` | The `kos` CLI, its packages, release and platform-check tools |
+| `cmd/`, `internal/`, `tools/` | The `kos` CLI (cells are created in `internal/cell`), its packages, release and platform-check tools |
+| `scripts/` | The machine installers (`install-kos.sh`, `install-kos.ps1`), specialist and README asset rendering |
 | `kernel/` | Files copied into every cell |
 | `adapters/` | Optional skills a cell selects (`reports`) |
 | `evals/` | Checks and benchmarks; never installed ([evals](evals/README.md)) |
@@ -107,7 +108,7 @@ This repository is the **distribution**, not a cell vault; agents working on it 
 
 ```bash
 make test            # go vet and go test
-make release         # cross-platform binaries (required before the installer tests)
+make release         # cross-platform binaries (required before the installation tests)
 make test-installer
 make demo            # re-record the README GIFs (vhs and jq required)
 ```
