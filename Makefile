@@ -25,7 +25,6 @@ publish: release
 
 # Installer and packaging checks; run after `make release`.
 test-installer:
-	python3 -B scripts/test_instance.py
 	python3 -B evals/bootstrap/test_bootstrap.py
 	python3 -B evals/bootstrap/test_integrity.py
 	python3 -B evals/bootstrap/test_interactive_onboarding.py < /dev/null

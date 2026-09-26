@@ -1,7 +1,9 @@
-"""Development-side access to the kos binary that `make release` builds.
+"""Locate and run the released `kos` binary; shared by the bootstrap evals.
 
-The installer delegates every kernel installation to `kos kernel update`, so a vault is written by one
-implementation. The release must match the current source: the kernel it embeds is the one installed.
+Per ADR 0002 the checkout installer is retired: a cell is created, adopted and updated by the `kos`
+binary alone. These evals drive `dist/kos-<os>-<arch>`, built by `make release` (see `tools/release`),
+instead of a Python installer. Cells receive no Python and no binaries; `kos` is installed once per
+machine (`scripts/install-kos.sh`).
 """
 from __future__ import annotations
 
@@ -57,6 +59,8 @@ def source_fingerprint(dist: Path) -> str:
 
 
 def release(dist: Path) -> dict:
+    """dist/release.json, written by `make release`; refused when the source changed since, so the
+    evals never drive a kos whose kernel is not the one in this tree."""
     path = dist / "dist" / "release.json"
     if not path.is_file() or path.is_symlink():
         raise RuntimeError("kos release missing: run make release")
@@ -69,7 +73,7 @@ def release(dist: Path) -> dict:
 
 
 def binary(dist: Path) -> Path:
-    """The release's kos for this host, verified against its checksum."""
+    """The release's kos for this host, verified against the checksum release.json records for it."""
     value = release(dist)
     selected = target()
     item = (value.get("artifacts") or {}).get(selected) or {}
@@ -79,15 +83,11 @@ def binary(dist: Path) -> Path:
     return path
 
 
-def kernel(dist: Path, dest: Path, *flags: str) -> tuple[int, dict]:
-    """Run `kos kernel update` on dest and return its exit code and JSON result."""
-    env = {**os.environ, "KOS_NO_UPDATE_CHECK": "1"}
-    result = subprocess.run([str(binary(dist)), "kernel", "update", "--vault", str(dest), *flags],
-                            capture_output=True, text=True, env=env, check=False)
-    try:
-        payload = json.loads(result.stdout) if result.stdout.strip() else {}
-    except json.JSONDecodeError:
-        payload = {}
-    if result.returncode != 0 and not payload:
-        payload = {"status": "error", "error": (result.stderr or result.stdout).strip()}
-    return result.returncode, payload
+def run(dist: Path, *args: str, cwd: Path | None = None, input: str | None = None,
+        env: dict[str, str] | None = None, timeout: float | None = 60) -> subprocess.CompletedProcess[str]:
+    """Run the released kos, with the daily update check disabled so tests are deterministic."""
+    merged = {**os.environ, "KOS_NO_UPDATE_CHECK": "1"}
+    if env:
+        merged.update(env)
+    return subprocess.run([str(binary(dist)), *args], cwd=str(cwd) if cwd else None, input=input,
+                          text=True, capture_output=True, env=merged, timeout=timeout, check=False)

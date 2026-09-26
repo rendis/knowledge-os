@@ -15,15 +15,15 @@ Windows uses `install-kos.ps1` the same way; `sh scripts/install-kos.sh --local`
 ## Create a cell vault
 
 ```bash
-./install.sh init --dest /path/to/cell-vault \
+kos init --vault ~/vaults/payments                  # asks what the flags leave out
+kos init --vault ~/vaults/payments --yes \
   --cell-name "Payments" --purpose "Card-present checkout and settlement" \
-  --system payments:Payments --yes
-./install.sh update --dest /path/to/cell-vault
-./install.sh doctor --dest /path/to/cell-vault [--strict]
-./install.sh adopt  --dest /path/to/existing-vault
+  --system payments:Payments --platform gcp --locale en
+kos adopt  --vault /path/to/existing-vault          # existing notes, no kernel yet
+kos doctor --vault ~/vaults/payments [--strict]     # read-only health
 ```
 
-`install.sh` runs from a checkout of this repository. With no arguments, it updates the current directory when it holds a lock and initializes it when empty; knowledge Markdown without a lock is refused. `adopt` installs the kernel into an existing vault without rewriting its notes. `--yes` tests unattended installation. A cancelled interactive input creates no vault.
+`--vault` defaults to the current directory. Questions go to stderr and stdout stays JSON, as in every `kos` command; `kos init --help` lists the flags. Nothing is written until every answer is in and valid, and a cancelled question creates no vault. `init` refuses a directory that already holds a vault (`--force` re-initializes) or knowledge without a kernel lock (use `adopt`, which installs the kernel without rewriting Home or the notes). `--yes` asks nothing: it needs `--system` and takes the defaults for the rest.
 
 ## Onboarding
 
@@ -34,7 +34,7 @@ Onboarding has two levels.
 
 ## Kernel updates
 
-The installer writes the cell's identity and delegates the kernel itself to `kos kernel update`, the single implementation of installing and updating a kernel. The lock (`.knowledge-os.lock.yaml`) is portable and committed with the cell.
+`kos init` and `kos adopt` write the kernel through `kos kernel update`, the single implementation of installing and updating a kernel. The lock (`.knowledge-os.lock.yaml`) is portable and committed with the cell.
 
 - `kos kernel status` and `kos kernel update --dry-run` show how a vault's kernel differs from the one kos carries; `kos kernel update` applies it.
 - An update refuses kernel files changed locally until `--force`, removes the managed files the distribution no longer ships (as recorded in the lock), and never rewrites cell-owned files.

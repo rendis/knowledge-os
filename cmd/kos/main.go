@@ -14,6 +14,7 @@ import (
 
 	"knowledge-os/internal/audit"
 	"knowledge-os/internal/cases"
+	"knowledge-os/internal/cell"
 	"knowledge-os/internal/check"
 	"knowledge-os/internal/config"
 	"knowledge-os/internal/devhandoff"
@@ -39,6 +40,9 @@ func main() {
 
 const help = `kos — the knowledge OS of a team: evidence-first vault operations
 
+init --vault PATH [answers]   create a cell vault (asks what the flags leave out; init --help)
+adopt --vault PATH [--force]  install the kernel into existing notes
+doctor --vault PATH [--strict] read-only health of a vault
 overview --vault PATH [--folder 20-Repos]   one line per knowledge note (Markdown)
 search --vault PATH --query TEXT [--limit 1..10] [--visibility all|public]
 index --vault PATH [--rebuild]
@@ -90,6 +94,12 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 		return emit(stdout, res)
 	case "vaults":
 		return vaults.Run(args[1:], stdout)
+	case "init", "adopt":
+		// The vault does not exist yet, or holds no kernel: --vault defaults to the current directory.
+		if e := notices(args, stderr); e != nil {
+			return e
+		}
+		return cell.Run(ctx, args, os.Stdin, stdout, stderr)
 	}
 	if all(args) {
 		res, e := vaults.UpdateAll(kernel.Options{DryRun: has(args, "--dry-run")}, has(args, "--commit"))
@@ -128,6 +138,8 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 		return gitsync.Run(args[1:], stdout)
 	case "kernel":
 		return kernel.Run(args[1:], stdout)
+	case "doctor":
+		return cell.Run(ctx, args, os.Stdin, stdout, stderr)
 	case "search", "index", "links", "overview":
 		return retrieval.Run(ctx, args[0], args[1:], stdout)
 	default:
@@ -175,7 +187,7 @@ func listAfterUpdate(res map[string]any, self string) {
 // vaultAt is where a command takes --vault: after the command, or after its verb.
 func vaultAt(args []string) int {
 	switch args[0] {
-	case "overview", "search", "index", "links", "inventory", "audit":
+	case "overview", "search", "index", "links", "inventory", "audit", "doctor":
 		return 1
 	case "discover", "config", "investigation", "handoff", "sync", "kernel":
 		if len(args) > 1 {

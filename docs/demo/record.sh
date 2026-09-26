@@ -5,7 +5,7 @@ set -eu
 HERE=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 export DEMO="${DEMO:-${TMPDIR:-/tmp}/kos-demo}" BASH_SILENCE_DEPRECATION_WARNING=1
 cd "$HERE"
-[ $# -gt 0 ] || set -- discover claims investigation handoff sync
+[ $# -gt 0 ] || set -- onboard discover claims investigation handoff sync
 for tape in "$@"; do
   sh ./setup.sh "$DEMO"
   vhs -q "$tape.tape"

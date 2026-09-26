@@ -1,6 +1,6 @@
 # Bootstrap evals
 
-Installer checks; not installed into a cell. Run them with `make test-installer` after `make release`
+Installation checks of `kos init`, `adopt`, `doctor` and `kernel update`; not installed into a cell. Run them with `make test-installer` after `make release`
 (native installation tests fail rather than skip when the release is stale).
 
 `criteria.md` states the bars the harness enforces. The behavior trials below need a fresh agent in a

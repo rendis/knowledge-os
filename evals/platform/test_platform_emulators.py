@@ -130,7 +130,7 @@ class PlatformEmulatorTests(unittest.TestCase):
         git("add", "-A")
         git("commit", "-qm", "init")
         vault = cls.tmp / "vault"
-        sh("sh", str(DIST / "install.sh"), "init", "--dest", str(vault), "--yes", "--cell-name", "Orders",
+        sh(str(cls.cli), "init", "--vault", str(vault), "--yes", "--cell-name", "Orders",
            "--purpose", "Order processing.", "--system", "orders:Orders", "--repo-prefix", "SVC-",
            "--platform", "gcp", "--platform", "aws")
         subprocess.run([str(cls.cli), "config", "--vault", str(vault), "workspace-init", "--repository-root", str(sources)],
