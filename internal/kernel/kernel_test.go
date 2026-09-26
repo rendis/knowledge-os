@@ -42,7 +42,7 @@ func TestUpdateInstallsPreviewsAndProtectsLocalChanges(t *testing.T) {
 	if target, _ := os.Readlink(filepath.Join(v, ".claude", "skills")); target != filepath.Join("..", ".agents", "skills") {
 		t.Fatalf(".claude/skills link: %q", target)
 	}
-	if b, _ := os.ReadFile(filepath.Join(v, ".gitignore")); !strings.Contains(string(b), "/.investigations/") {
+	if b, _ := os.ReadFile(filepath.Join(v, ".gitignore")); !strings.Contains(string(b), "/.investigations/") || !strings.Contains(string(b), "/.operations/") {
 		t.Fatalf("local stores are ignored: %s", b)
 	}
 	if res, _ := run(t, "status", "--vault", v); res["current"] != true {
