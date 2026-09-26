@@ -501,7 +501,9 @@ func (s *Sources) Callees(ownerRepo string, f Function, n int) []Callee {
 	}
 	src := maskRawStrings(strings.Split(content, "\n"), f.Path)
 	own := definedName(f.Name)
-	seen := map[string]bool{own: true}
+	// Its own name is skipped only when called bare (recursion): s.useCase.Handle( from a Handle
+	// reaches another type's method, often the one that matters.
+	seen := map[string]bool{}
 	out := []Callee{}
 	for k := f.Start + 1; k <= min(f.End, len(src)) && len(out) < n; k++ {
 		if comment(src[k-1]) {
@@ -512,8 +514,20 @@ func (s *Sources) Callees(ownerRepo string, f Function, n int) []Callee {
 			if seen[name] || callWord[name] || controlWord[name] || len(name) < 3 {
 				continue
 			}
+			if name == own && !strings.Contains(src[k-1], "."+name+"(") {
+				continue
+			}
 			seen[name] = true
 			defs, _ := s.definition(ownerRepo, name, "", 150, false)
+			if name == own {
+				kept := defs[:0]
+				for _, d := range defs {
+					if !(d.Path == f.Path && d.Start == f.Start) {
+						kept = append(kept, d)
+					}
+				}
+				defs = kept
+			}
 			if len(defs) == 0 {
 				continue
 			}
@@ -576,9 +590,15 @@ func akin(defs []Function, caller string) []Function {
 	}
 	kept := []Function{}
 	for _, d := range defs {
-		base := normName(strings.TrimSuffix(filepath.Base(d.Path), filepath.Ext(d.Path)))
-		if len(base) >= 6 && (strings.Contains(base, pkg) || strings.Contains(pkg, base)) {
-			kept = append(kept, d)
+		// The file name or a directory of the definition names the caller's package:
+		// service/transaction_confirmed.go, saletransactionsconfirmed/service/service.go.
+		parts := strings.Split(filepath.ToSlash(strings.TrimSuffix(d.Path, filepath.Ext(d.Path))), "/")
+		for _, part := range parts {
+			base := normName(part)
+			if len(base) >= 6 && (strings.Contains(base, pkg) || strings.Contains(pkg, base)) {
+				kept = append(kept, d)
+				break
+			}
 		}
 	}
 	if len(kept) == 0 {
@@ -639,4 +659,50 @@ func withoutComment(line string) string {
 		}
 	}
 	return line
+}
+
+var (
+	classDecl  = regexp.MustCompile(`^\s*(?:export\s+)?(?:default\s+)?(?:public\s+|abstract\s+|final\s+|sealed\s+|data\s+|open\s+)*(?:class|struct|object)\s+([A-Z]\w*)`)
+	goReceiver = regexp.MustCompile(`^\s*func\s*\(\s*\w*\s*\*?\s*([A-Z]?\w+)(?:\[[^\]]*\])?\s*\)`)
+)
+
+// Registrations: for a method nothing calls by name (a framework does: an interceptor, a handler, a
+// listener), the class or receiver type it belongs to and the lines outside its own file that use
+// that type: where it is provided, registered or constructed.
+func (s *Sources) Registrations(ownerRepo string, f Function, n int) (string, []Hit) {
+	if f.src == nil || f.Start == 0 {
+		return "", nil
+	}
+	class := ""
+	if m := goReceiver.FindStringSubmatch(f.src[f.Start-1]); m != nil {
+		class = m[1]
+	}
+	for k := f.Start - 1; k >= 1 && class == ""; k-- {
+		if m := classDecl.FindStringSubmatch(f.src[k-1]); m != nil && leading(f.src[k-1]) < leading(f.src[f.Start-1]) {
+			class = m[1]
+		}
+	}
+	if class == "" {
+		return "", nil
+	}
+	pattern := regexp.QuoteMeta(class)
+	if strings.HasSuffix(f.Path, ".go") {
+		pattern += "|New" + regexp.QuoteMeta(class) // Go constructs through NewT more often than T{}
+	}
+	hits, _, _, err := s.Search(ownerRepo, pattern, "", false, false, true)
+	if err != nil {
+		return class, nil
+	}
+	out := []Hit{}
+	for _, h := range hits {
+		t := strings.TrimSpace(h.Text)
+		if h.Path == f.Path || !codeFile(h.Path) || comment(t) || importLine.MatchString(t) || classDecl.MatchString(t) || interfaceMethod.MatchString(t) {
+			continue
+		}
+		out = append(out, h)
+		if len(out) == n {
+			break
+		}
+	}
+	return class, out
 }
