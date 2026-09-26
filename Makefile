@@ -1,4 +1,4 @@
-.PHONY: build test test-race release publish test-installer test-platform
+.PHONY: build test test-race release publish test-installer test-platform demo
 
 build:
 	CGO_ENABLED=0 go build -trimpath -o dist/kos ./cmd/kos
@@ -35,3 +35,7 @@ test-installer:
 # Platform providers against local emulators with the clouds' real CLIs (Docker required).
 test-platform:
 	python3 -B evals/platform/test_platform_emulators.py
+
+# README recordings from a synthetic demo cell (vhs and jq required).
+demo: release
+	sh docs/demo/record.sh

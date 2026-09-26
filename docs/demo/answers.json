@@ -1,0 +1,3 @@
+[{"id": "go:cloud.google.com/go/pubsub", "choice": "messaging", "confidence": 0.98},
+ {"id": "order_events_sub||", "choice": "message_subscription", "confidence": 0.95},
+ {"id": "order_events_topic||", "choice": "message_topic", "confidence": 0.95}]
