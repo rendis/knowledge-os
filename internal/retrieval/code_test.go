@@ -123,9 +123,9 @@ func TestExitLinesCheckTheNote(t *testing.T) {
 	out := exitLines(f, []byte(note), "origin/main", 8)
 	for _, want := range []string{
 		"L10 returns true — under L9",
-		"note L5 (dupli",
+		"only words shared with note L5 (dupli",
 		"L14 returns true — under L12 `} catch (e) {` — note L7 cites L12-L16",
-		"L20 returns false — under L18 `} catch (e) {` — ✗ (save, rollb)",
+		"L20 returns false — under L18 `} catch (e) {` — ✗ ('Error save data')",
 		"L22 pass on the error",
 		"its result at src/l.ts:5: true → `m.ack()`, false → `m.nack()`",
 	} {
@@ -172,5 +172,44 @@ func TestCodeFollowsAURLSettingToItsRoute(t *testing.T) {
 	}
 	if !strings.Contains(out, "`AUTH_URL` calls …/auth/validate, declared in: SVC-auth src/controllers/auth/router.ts:2") || strings.Contains(out, "client.ts") {
 		t.Fatalf("a URL setting is followed to the route that declares it:\n%s", out)
+	}
+}
+
+func TestUnreadSettingsCommentedConstantsAndRegistrations(t *testing.T) {
+	opt, write := fixture(t)
+	repos := t.TempDir()
+	repo := filepath.Join(repos, "SVC-web")
+	for p, c := range map[string]string{
+		"src/auth.interceptor.ts": "export class AuthInterceptor {\n  intercept(req: Req) {\n    return next(req)\n  }\n}\n",
+		"src/app.module.ts":       "providers: [{ provide: HTTP_INTERCEPTORS, useClass: AuthInterceptor }]\n",
+		"src/events.ts":           "export const KD_ACKED = \"kdAcknowledged\"\n// publish(KD_ACKED)\n",
+		"src/env.ts":              "// { name: 'TOKEN_TTL', mandatory: true },\nexport const port = 80\n",
+		"k8s/prod/env.config":     "TOKEN_TTL=24h\n",
+	} {
+		_ = os.MkdirAll(filepath.Dir(filepath.Join(repo, p)), 0o755)
+		if e := os.WriteFile(filepath.Join(repo, p), []byte(c), 0o644); e != nil {
+			t.Fatal(e)
+		}
+	}
+	for _, args := range [][]string{{"init", "-q", "-b", "main"}, {"add", "-A"}, {"-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "-m", "init"}} {
+		if b, e := exec.Command("git", append([]string{"-C", repo}, args...)...).CombinedOutput(); e != nil {
+			t.Fatalf("git %v: %s", args, b)
+		}
+	}
+	write("instance.yaml", "version: 1\ncell:\n  name: \"C\"\n  purpose: \"p\"\nsystems:\n  - id: \"s\"\n    name: \"S\"\nsources:\n  repo_prefixes: [\"SVC\"]\n")
+	write(".knowledge-os-config.yaml", "version: 1\nworkspace:\n  repository_roots:\n    - \""+repos+"\"\n")
+	out, err := runCode(t, opt, CodeOptions{Repo: "SVC-web", Func: "intercept"})
+	if err != nil || !strings.Contains(out, "Its type AuthInterceptor is used at (a framework may call it through these): src/app.module.ts:1") {
+		t.Fatalf("a method called by a framework shows where its class is registered: %v\n%s", err, out)
+	}
+	src := discover.NewSources(opt.Vault)
+	if got := constUse(src, "SVC-web", "KD_ACKED", discover.Hit{Path: "src/events.ts", Line: 1}); got != "— declared, used only in comments (events.ts:2)" {
+		t.Fatalf("a constant used only in comments: %q", got)
+	}
+	var b bytes.Buffer
+	r := &sourceRenderer{src: src, code: true, codeLeft: 10000}
+	r.writeCode(&packWriter{w: &b, budget: 10000}, "SVC-web", []string{"TOKEN_TTL"}, map[string]bool{})
+	if !strings.Contains(b.String(), "✗ no code reads `TOKEN_TTL`") {
+		t.Fatalf("a setting only configuration names:\n%s", b.String())
 	}
 }

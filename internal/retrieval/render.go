@@ -329,6 +329,19 @@ func (r *sourceRenderer) writeCode(out *packWriter, repo string, names []string,
 			parts = append(parts, fmt.Sprintf("%s:%d%s `%s`", h.Path, h.Line, in, trimRunes(strings.ReplaceAll(h.Text, "`", "'"), 110)))
 		}
 		line := "- `" + n + "` — " + strings.Join(parts, " · ")
+		// A setting configuration gives a value that no code names: configured, not read by that name.
+		if settingName.MatchString(n) && settingName.FindString(n) == n {
+			read := false
+			for _, h := range all[n] {
+				if discover.CodeFile(h.Path) && !commentLine(h.Text) {
+					read = true
+					break
+				}
+			}
+			if !read {
+				line += "\n  ✗ no code reads `" + n + "` at " + ref + ": configuration sets it, nothing uses it by that name (a note calling it configurable describes a setting with no effect)"
+			}
+		}
 		if v := configValues(n, all[n]); v != "" {
 			line += "\n  values: " + v
 			// One URL setting per pack is followed to the route that answers it.
@@ -439,20 +452,41 @@ func commonDir(paths []string) string {
 // writeMatchingCode shows the functions of the repository at its reference branch that hold the
 // most of the question's words: the code that answers "what happens when", not only the note's words.
 // The first one lists its exits, each checked against the note in raw.
-func (r *sourceRenderer) writeMatchingCode(out *packWriter, repo string, terms []askTerm, prefer map[string][][2]int, raw []byte) []string {
+func (r *sourceRenderer) writeMatchingCode(out *packWriter, repo string, terms []askTerm, prefer map[string][][2]int, raw []byte, ids []string) []string {
 	if !r.code {
 		return nil
 	}
 	settings, seen := []string{}, map[string]bool{}
 	words := []string{}
 	for _, t := range terms {
-		if len(t.phrase) == 0 && runeLen(t.stem) >= 4 {
+		// A word in a third of the notes (proces*, sale) finds every handler: it does not choose one.
+		if len(t.phrase) == 0 && runeLen(t.stem) >= 4 && !t.common {
 			words = append(words, t.stem)
 		}
 	}
-	fns, ref := r.src.Functions(repo, words, 2, 80, prefer)
+	for _, id := range ids {
+		if runeLen(id) >= 6 {
+			words = append(words, id)
+		}
+	}
+	all, ref := r.src.Functions(repo, words, 4, 80, prefer)
+	fns := []discover.Function{}
+	for _, f := range all {
+		// A constructor or an initializer holds the question's words in its fields, not its logic.
+		if n := discover.DefinedName(f.Name); n == "constructor" || n == "__init__" || n == "init" || n == "New" {
+			continue
+		}
+		if len(fns) < 2 {
+			fns = append(fns, f)
+		}
+	}
+	// Twins: the same name holding the same words (a sale and a gift card handler, a confirmed and a
+	// reprocessed service). Neither is picked for the reader: both are shown whole, with their exits.
+	twin := len(fns) > 1 && discover.DefinedName(fns[0].Name) != "" && discover.DefinedName(fns[0].Name) == discover.DefinedName(fns[1].Name) && len(fns[0].Words) == len(fns[1].Words)
 	for k, f := range fns {
-		if k > 0 {
+		if k == 1 && twin {
+			fmt.Fprintf(out, "\nTwin of the function above: another %s holding the same words, in %s; which one the question means is read from the paths.\n", discover.DefinedName(f.Name), f.Path)
+		} else if k > 0 {
 			// the second function gets fewer lines: it is context, the first is the answer
 			lines := strings.Split(f.Code, "\n")
 			if len(lines) > 16 {
@@ -466,7 +500,7 @@ func (r *sourceRenderer) writeMatchingCode(out *packWriter, repo string, terms [
 		head := fmt.Sprintf("\nCode matching %s in %s at %s — %s#L%d-L%d:\n```%s\n", strings.Join(f.Words, ", "), repo, ref, f.Path, f.From, f.To, lang)
 		code := strings.Split(f.Code, "\n")
 		exits, below := "", ""
-		if k == 0 && f.Name != "" {
+		if (k == 0 || twin) && f.Name != "" {
 			// Where it leaves its main path, and whether the note says so; then what the functions
 			// it calls do with an error, which decides its paths as much as its own lines.
 			exits = exitLines(f, raw, ref, 8)
@@ -481,7 +515,7 @@ func (r *sourceRenderer) writeMatchingCode(out *packWriter, repo string, terms [
 			tail += fmt.Sprintf("Also matching in this function: L%s (`git -C <checkout> show %s:%s`).\n", strings.Join(firstN(ls, 12), ","), ref, f.Path)
 		}
 		if len(f.Callers) == 0 && f.Name != "" {
-			tail += "Called from: nowhere in this repository's code at " + ref + " (tests left out).\n"
+			tail += "Called from: nowhere by name in this repository's code at " + ref + " (tests left out).\n" + registrations(r.src, repo, f)
 		}
 		if len(f.Callers) > 0 {
 			cs := []string{}
@@ -515,9 +549,15 @@ func (r *sourceRenderer) writeMatchingCode(out *packWriter, repo string, terms [
 			}
 			// What goes first when room is short: the callers, then the calls below, then exits
 			// beyond the first four; the function's first line and its exits stay.
+			// The calls below (a swallowed error, a retry that skips work) outrank the exits beyond
+			// the first four: they are what the function's own lines cannot show.
 			c := fit(exits + below + tail)
 			if c == "" || strings.Count(c, "\n") < 10 {
 				tail = ""
+				c = fit(exits + below)
+			}
+			if (c == "" || strings.Count(c, "\n") < 10) && f.Name != "" {
+				exits = exitLines(f, raw, ref, 4)
 				c = fit(exits + below)
 			}
 			if c == "" || strings.Count(c, "\n") < 10 {
@@ -540,7 +580,7 @@ func (r *sourceRenderer) writeMatchingCode(out *packWriter, repo string, terms [
 		r.codeLeft -= runeLen(text)
 		fmt.Fprint(out, text)
 		// The settings this code reads (MAX_RETRIES): their values per environment come next.
-		for _, w := range settingName.FindAllString(f.Code, -1) {
+		for _, w := range settingsIn(f.Code) {
 			if !seen[w] {
 				seen[w] = true
 				settings = append(settings, w)
@@ -952,12 +992,20 @@ func exitLines(f discover.Function, raw []byte, ref string, limit int) string {
 			case cite > 0 && (spanLines(span) <= 30 || at == 0):
 				r.text += fmt.Sprintf(" — note L%d cites %s", cite, span)
 			case at > 0:
-				r.text += fmt.Sprintf(" — note L%d (%s)", at, strings.Join(shared, ", "))
+				r.text += fmt.Sprintf(" — only words shared with note L%d (%s)", at, strings.Join(shared, ", "))
 			case words == "":
 				r.text += " — ✗"
 				r.missing = true
 			default:
-				r.text += " — ✗ (" + words + ")"
+				// The message it logs is what a reader searches for; word stems only when it logs none.
+				label := words
+				for _, n := range e.Names {
+					if strings.Contains(n, " ") {
+						label = "'" + trimRunes(n, 60) + "'"
+						break
+					}
+				}
+				r.text += " — ✗ (" + label + ")"
 				r.missing = true
 			}
 		}
@@ -970,7 +1018,7 @@ func exitLines(f discover.Function, raw []byte, ref string, limit int) string {
 	}
 	head := fmt.Sprintf("Exits of %s (the whole function, L%d-L%d at %s", discover.DefinedName(f.Name), f.Start, f.End, ref)
 	if lines != nil {
-		head += "; note Ln cites = the paragraph whose source covers the line · note Ln (words) = the line sharing the path's words · ✗ = neither"
+		head += "; note Ln cites = the paragraph whose source covers the line · only words shared = a weak link, the note may not describe this path · ✗ = neither"
 	}
 	out := []string{head + "):"}
 	for _, r := range rows {
@@ -981,6 +1029,10 @@ func exitLines(f discover.Function, raw []byte, ref string, limit int) string {
 	}
 	if len(passed) > 0 {
 		out = append(out, "- L"+strings.Join(firstN(passed, 10), ",L")+" pass on the error of the call before them")
+	}
+	// A retry after a partial write that a duplicate check turns into a silent success.
+	for _, h := range f.Hazards() {
+		out = append(out, "- on redelivery: "+h.String())
 	}
 	// A caller that branches on the result says what each return value leads to.
 	name := discover.DefinedName(f.Name)
@@ -1198,8 +1250,14 @@ func belowLine(src *discover.Sources, repo string, f discover.Function) string {
 					notable = append(notable, fmt.Sprintf("%s at L%d", e.Kind, e.Line))
 				}
 			}
+			for _, h := range d.Hazards() {
+				notable = append(notable, fmt.Sprintf("on redelivery can leave at L%d without %s", h.Early, strings.Join(h.Skipped, ", ")))
+			}
 			for _, via := range src.Callees(repo, d, 12) {
 				for _, vd := range via.Defs {
+					for _, h := range vd.Hazards() {
+						notable = append(notable, fmt.Sprintf("calls %s, which on redelivery can leave at L%d without %s", via.Name, h.Early, strings.Join(h.Skipped, ", ")))
+					}
 					for e := range ends {
 						switch {
 						case via.Name == e:
@@ -1239,21 +1297,38 @@ func eventTypes(src *discover.Sources, repo, topic string) string {
 	if err != nil {
 		return ""
 	}
-	seen, rows := map[string]bool{}, []string{}
+	// Every site of each literal: the same type declared by a sale and a gift card handler is two.
+	sites, order := map[string][]discover.Hit{}, []string{}
 	for _, h := range hits {
 		if !discover.CodeFile(h.Path) {
 			continue
 		}
-		m := eventTypeLiteral.FindStringSubmatch(h.Text)
-		if m == nil || seen[m[1]] {
-			continue
+		if m := eventTypeLiteral.FindStringSubmatch(h.Text); m != nil {
+			if sites[m[1]] == nil {
+				order = append(order, m[1])
+			}
+			sites[m[1]] = append(sites[m[1]], h)
 		}
-		seen[m[1]] = true
-		row := fmt.Sprintf("`%s` (%s:%d", m[1], h.Path, h.Line)
-		if in[h] != "" {
-			row += " in " + in[h]
+	}
+	rows := []string{}
+	for _, lit := range order {
+		h := sites[lit][0]
+		at := []string{}
+		for _, x := range sites[lit] {
+			a := fmt.Sprintf("%s:%d", x.Path, x.Line)
+			if in[x] != "" {
+				a += " in " + in[x]
+			}
+			at = append(at, a)
 		}
-		rows = append(rows, row+")")
+		row := fmt.Sprintf("`%s` (%s)", lit, strings.Join(firstN(at, 4), "; "))
+		// A constant that holds the type: used by code, or only in comments (a publish commented out).
+		if d := declaredConst.FindStringSubmatch(h.Text); d != nil && !strings.EqualFold(d[1], "eventType") {
+			if note := constUse(src, repo, d[1], h); note != "" {
+				row += " " + note
+			}
+		}
+		rows = append(rows, row)
 	}
 	stems := []string{}
 	for _, w := range regexp.MustCompile(`[a-z]+`).FindAllString(strings.ToLower(topic[strings.LastIndex(topic, ".")+1:]), -1) {
@@ -1301,9 +1376,28 @@ func uniqueStrings(xs []string) []string {
 
 // writeConsumed: the subscriptions a repository reads, from the discovery facts, with what the
 // platform snapshots say of each (topic, filter, dead letter, delivery): where its failures go.
-func writeConsumed(out io.Writer, subs []discover.WiringSubscription) {
+func writeConsumed(out io.Writer, subs []discover.WiringSubscription, terms []askTerm) {
 	if len(subs) == 0 {
 		return
+	}
+	// Many: those the question's words name, the rest counted.
+	if len(subs) > 6 {
+		named := []discover.WiringSubscription{}
+		for _, s := range subs {
+			f := fold(s.Name + " " + s.Topic + " " + s.Filter)
+			for _, t := range terms {
+				if !t.common && t.in(f) {
+					named = append(named, s)
+					break
+				}
+			}
+		}
+		if len(named) > 0 && len(named) < len(subs) {
+			rest := len(subs) - len(named)
+			writeConsumed(out, named, nil)
+			fmt.Fprintf(out, "  (+%d other subscriptions it consumes, not named by the question: `kos ask` with their names)\n", rest)
+			return
+		}
 	}
 	consumedOrder(subs)
 	rows := []string{}
@@ -1368,4 +1462,76 @@ var consumedOrder = func(subs []discover.WiringSubscription) {
 		return 1
 	}
 	sort.SliceStable(subs, func(a, b int) bool { return rank(subs[a]) < rank(subs[b]) })
+}
+
+var declaredConst = regexp.MustCompile(`^\s*(?:(?:export|public|private|static|final|const|var|let|val)\s+)*(?:\w+\s+)?([A-Za-z_]\w*)\s*:?=\s*["']`)
+
+// constUse says when a constant is never used in code beyond its declaration: "— declared, used
+// only in comments (L90)" or "— declared, never used".
+func constUse(src *discover.Sources, repo, name string, decl discover.Hit) string {
+	hits, _, _, err := src.Search(repo, regexp.QuoteMeta(name), "", false, false, true)
+	if err != nil {
+		return ""
+	}
+	commented := []string{}
+	for _, h := range hits {
+		if h.Path == decl.Path && h.Line == decl.Line {
+			continue
+		}
+		t := strings.TrimSpace(h.Text)
+		if strings.HasPrefix(t, "//") || strings.HasPrefix(t, "#") || strings.HasPrefix(t, "*") || strings.HasPrefix(t, "/*") {
+			commented = append(commented, fmt.Sprintf("%s:%d", filepath.Base(h.Path), h.Line))
+			continue
+		}
+		return "" // used by code
+	}
+	if len(commented) > 0 {
+		return "— declared, used only in comments (" + strings.Join(firstN(commented, 3), ", ") + ")"
+	}
+	return "— declared, never used"
+}
+
+func commentLine(t string) bool {
+	t = strings.TrimSpace(t)
+	return strings.HasPrefix(t, "//") || strings.HasPrefix(t, "#") || strings.HasPrefix(t, "*") || strings.HasPrefix(t, "/*")
+}
+
+var (
+	qualifier      = regexp.MustCompile(`([A-Za-z_$][\w$]*)\.$`)
+	configHolder   = regexp.MustCompile(`(?i)env|conf|setting|propert|option|param|secret|vars?$`)
+	numberedPrefix = regexp.MustCompile(`^\s*\d+│ ?`)
+	shortLiteral   = regexp.MustCompile(`"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|` + "`[^`]*`")
+)
+
+// settingsIn returns the setting names (MAX_RETRIES) code reads, outside its string literals: a
+// query's ARRAY_AGG or ORDER_BY inside a SQL string is no setting.
+func settingsIn(code string) []string {
+	out, seen, raw := []string{}, map[string]bool{}, false
+	for _, l := range strings.Split(code, "\n") {
+		l = numberedPrefix.ReplaceAllString(l, "")
+		if raw {
+			k := strings.Index(l, "`")
+			if k < 0 {
+				continue
+			}
+			l, raw = l[k+1:], false
+		}
+		l = shortLiteral.ReplaceAllString(l, `""`)
+		if strings.Count(l, "`")%2 == 1 {
+			l, raw = l[:strings.Index(l, "`")], true
+		}
+		for _, loc := range settingName.FindAllStringIndex(l, -1) {
+			w := l[loc[0]:loc[1]]
+			// A constant of a library (oracledb.BIND_OUT, http.StatusOK) is no setting; one read from
+			// the environment or a config object (process.env.X, this.envs.X, Config.X) is.
+			if q := qualifier.FindStringSubmatch(l[:loc[0]]); q != nil && !configHolder.MatchString(q[1]) {
+				continue
+			}
+			if !seen[w] {
+				seen[w] = true
+				out = append(out, w)
+			}
+		}
+	}
+	return out
 }

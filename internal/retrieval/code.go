@@ -411,7 +411,7 @@ func writeFunc(out *packWriter, src *discover.Sources, repo string, o CodeOption
 		}
 		// The settings the function reads, with the values configuration gives them.
 		settings, seen := []string{}, map[string]bool{}
-		for _, s := range settingName.FindAllString(d.Code, -1) {
+		for _, s := range settingsIn(d.Code) {
 			if !seen[s] {
 				seen[s] = true
 				settings = append(settings, s)
@@ -441,7 +441,7 @@ func writeFunc(out *packWriter, src *discover.Sources, repo string, o CodeOption
 				vals = append(vals, strings.Join(firstN(unset, 6), ", ")+": no value in this repository's configuration (set at deploy time, or not at all)")
 			}
 			if len(vals) > 0 {
-				fmt.Fprintf(out, "\nSettings it reads: %s\n", strings.Join(firstN(vals, 8), " · "))
+				fmt.Fprintf(out, "\nSettings it reads (values as the repository's configuration files version them, not as deployed): %s\n", strings.Join(firstN(vals, 8), " · "))
 			}
 			// A setting holding a URL: which repository of the vault declares that route.
 			for _, st := range settings {
@@ -451,7 +451,8 @@ func writeFunc(out *packWriter, src *discover.Sources, repo string, o CodeOption
 			}
 		}
 		if len(d.Callers) == 0 {
-			fmt.Fprintln(out, "\nCalled from: nowhere in this repository's code at this branch (tests left out).")
+			fmt.Fprintln(out, "\nCalled from: nowhere by name in this repository's code at this branch (tests left out).")
+			fmt.Fprint(out, registrations(src, repo, d))
 			continue
 		}
 		// Definitions sharing a name share their callers as far as a text search can tell.
@@ -702,3 +703,20 @@ func routeServers(src *discover.Sources, repo, setting string, hits []discover.H
 }
 
 var apiDefinition = regexp.MustCompile(`(?i)(openapi|swagger|governance|api[\w\-]*)\.(ya?ml|json)$`)
+
+// registrations: for a function nothing calls by name, where its class is provided, registered or
+// constructed, so "nowhere" does not hide a framework call (an interceptor, a handler).
+func registrations(src *discover.Sources, repo string, f discover.Function) string {
+	class, hits := src.Registrations(repo, f, 6)
+	if class == "" {
+		return ""
+	}
+	if len(hits) == 0 {
+		return fmt.Sprintf("Its type %s is not named outside its own file either.\n", class)
+	}
+	rows := []string{}
+	for _, h := range hits {
+		rows = append(rows, fmt.Sprintf("%s:%d `%s`", h.Path, h.Line, trimRunes(strings.ReplaceAll(h.Text, "`", "'"), 90)))
+	}
+	return fmt.Sprintf("Its type %s is used at (a framework may call it through these): %s\n", class, strings.Join(rows, " · "))
+}

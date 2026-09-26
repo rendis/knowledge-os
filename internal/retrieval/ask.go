@@ -411,7 +411,7 @@ func (i *Index) writeAskNote(ctx context.Context, out *packWriter, n *askNote, n
 		if s, ok := discover.RepositoryNoteState(i.Root, n.path); ok {
 			writeRepoState(s, out)
 			if !n.minor {
-				writeConsumed(out, discover.RepoSubscriptions(i.Root, s.Repo))
+				writeConsumed(out, discover.RepoSubscriptions(i.Root, s.Repo), terms)
 			}
 			repo, commit = s.Repo, s.Commit
 		}
@@ -572,7 +572,16 @@ func (i *Index) writeAskNote(ctx context.Context, out *packWriter, n *askNote, n
 				}
 			}
 		}
-		settings = render.writeMatchingCode(out, repo, terms, prefer, raw)
+		// The identifiers the best paragraphs name (BUSINESS_ID_IS_DUPLICATED, FindByBusinessId) find
+		// the code of the mechanism they describe better than the question's plain words.
+		ids := []string{}
+		for k, b := range blocks {
+			if k == 3 {
+				break
+			}
+			ids = append(ids, codeNames(b.p.text, 4, map[string]bool{})...)
+		}
+		settings = render.writeMatchingCode(out, repo, terms, prefer, raw, ids)
 		if text := render.processExits(repo, raw); text != "" && runeLen(text) < out.left()-600 {
 			fmt.Fprint(out, text)
 		}
