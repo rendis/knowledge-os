@@ -309,10 +309,10 @@ func TestAttachedFileNamesAreNotReferences(t *testing.T) {
 func TestSentenceClosesAfterABracket(t *testing.T) {
 	for in, want := range map[string]string{
 		"Refactorizar el flujo (OPS-1)": "Refactorizar el flujo (OPS-1).",
-		"Ver la nota (E-001.)":           "Ver la nota (E-001.)",
-		"Listo.":                         "Listo.",
-		"Ubicaciones:":                   "Ubicaciones:",
-		"¿Qué falta?":                    "¿Qué falta?",
+		"Ver la nota (E-001.)":          "Ver la nota (E-001.)",
+		"Listo.":                        "Listo.",
+		"Ubicaciones:":                  "Ubicaciones:",
+		"¿Qué falta?":                   "¿Qué falta?",
 	} {
 		if got := sentence(in); got != want {
 			t.Errorf("sentence(%q) = %q, want %q", in, got, want)

@@ -54,7 +54,7 @@ def leaked_terms(text: str) -> bool:
                 if hashlib.sha256("-".join(parts[i:j]).encode()).hexdigest()[:16] in FORBIDDEN_HASHES:
                     return True
     return False
-SCAN_SUFFIXES = {".md", ".py", ".yaml", ".yml", ".sh", ".txt", ".json", ".sql", ".tmpl", ".toml"}
+SCAN_SUFFIXES = {".md", ".py", ".go", ".js", ".html", ".yaml", ".yml", ".sh", ".txt", ".json", ".sql", ".tmpl", ".toml", ".tape"}
 
 
 def run(args: list[str], cwd: Path | None = None, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
