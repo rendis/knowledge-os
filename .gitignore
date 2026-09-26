@@ -7,7 +7,6 @@
 /.knowledge-os-config.yaml
 /.knowledge-os-config.*.tmp
 .knowledge-os.lock.yaml
-/plan/
 /output/
 .atl/
 dist/
