@@ -21,9 +21,13 @@ from unittest import mock
 DIST = Path(__file__).resolve().parents[2]
 INSTALL = DIST / "install.sh"
 
+sys.path.insert(0, str(DIST / "scripts"))
+import native_runtime  # noqa: E402
+
+
 def native_cli(vault: Path) -> str:
-    arch = {"x86_64": "amd64", "aarch64": "arm64"}.get(platform.machine().lower(), platform.machine().lower())
-    return str(vault / ".agents/bin" / (f"kos-{platform.system().lower()}-{arch}" + (".exe" if os.name == "nt" else "")))
+    """kos is installed once per machine, not in the vault: the tests use the release's build."""
+    return str(native_runtime.binary(DIST))
 
 def resolve_command(vault: Path) -> list[str]:
     return [native_cli(vault), "config", "resolve", "--vault", str(vault)]
@@ -145,10 +149,7 @@ class BootstrapEval(unittest.TestCase):
                     self.assertIn("## " + heading, home)
                     self.assertIn("## " + purpose, system)
                     self.assertNotIn("No discovery roots were given", home)
-                    runtime_guidance = (
-                        "ejecutable de tu plataforma en `.agents/bin/`"
-                        if locale == "es" else "platform executable in `.agents/bin/`"
-                    )
+                    runtime_guidance = "`kos config status`"
                     self.assertIn(runtime_guidance, home)
                     self.assertNotIn("{{", home + system)
                     resolved = run(resolve_command(dest))
@@ -464,7 +465,7 @@ class BootstrapEval(unittest.TestCase):
             ):
                 self.assertTrue((dest / "90-Meta" / shared).is_file(), shared)
             lock = (dest / ".knowledge-os.lock.yaml").read_text(encoding="utf-8")
-            self.assertIn('version: "4"', lock)
+            self.assertIn('version: "5"', lock)
             self.assertIn('distribution_revision: "', lock)
             self.assertIn("distribution_dirty:", lock)
             self.assertIn('"AGENTS.md":', lock)
@@ -633,7 +634,7 @@ class BootstrapEval(unittest.TestCase):
             targets = sorted(installed_command_targets(dest))
             self.assertEqual(targets, [], "consumer docs must not invoke Python helpers")
             self.assertEqual(list(dest.rglob("*.py")), [])
-            self.assertTrue(Path(native_cli(dest)).is_file())
+            self.assertFalse((dest / ".agents" / "bin").exists())
             commands = [[native_cli(dest), "audit", "--vault", str(dest)],
                         [native_cli(dest), "check", "links", "--vault", str(dest)],
                         [native_cli(dest), "check", "bases", "--vault", str(dest)]]
@@ -934,7 +935,7 @@ class BootstrapEval(unittest.TestCase):
                 ["archive/", ".plan/", ".scratch/", ".investigations/", "AGENTS.personal.md"],
             )
             lock = (dest / ".knowledge-os.lock.yaml").read_text(encoding="utf-8")
-            self.assertIn('version: "4"', lock)
+            self.assertIn('version: "5"', lock)
             self.assertIn('"AGENTS.md":', lock)
             self.assertNotIn("cell-local-tool", lock)
             self.assertNotIn('"90-Meta/audit-vault.py":', lock)

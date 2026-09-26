@@ -170,29 +170,6 @@ def distribution_hashes(adapters: list[str]) -> dict[str, str]:
     return {rel: sha256_file(path) for rel, path in managed_sources(adapters).items()}
 
 
-def dump_lock(data: dict[str, Any]) -> str:
-    lines = [
-        f'version: "{data["version"]}"',
-        f'kernel_version: "{data["kernel_version"]}"',
-        f'distribution_revision: "{data["distribution_revision"]}"',
-        f'distribution_dirty: {str(bool(data["distribution_dirty"])).lower()}',
-        "adapters:",
-    ]
-    adapters = data.get("adapters") or []
-    if adapters:
-        for item in adapters:
-            lines.append(f"  - {item}")
-    else:
-        lines.append("  []")
-    if data.get("runtime_release") is not None:
-        lines.append("runtime_release: " + json.dumps(data["runtime_release"], sort_keys=True, separators=(",", ":")))
-    lines.append("managed_hashes:")
-    for rel, digest in sorted((data.get("managed_hashes") or {}).items()):
-        lines.append(f'  "{rel}": {digest} {MANAGED_HASH_COMMENT}')
-    lines.append("")
-    return "\n".join(lines)
-
-
 def load_lock(path: Path) -> dict[str, Any]:
     version = ""
     kernel_version = ""
@@ -213,7 +190,6 @@ def load_lock(path: Path) -> dict[str, Any]:
         elif line.startswith("distribution_dirty:"):
             distribution_dirty = line.split(":", 1)[1].strip().casefold() == "true"
         elif line.startswith("runtime_release:"):
-            runtime_release = native_runtime.descriptor(json.loads(line.split(":", 1)[1].strip()))
             section = ""
         elif line.startswith("adapters:"):
             section = "adapters"
@@ -239,103 +215,6 @@ def load_lock(path: Path) -> dict[str, Any]:
     }
 
 
-def preflight_kernel(dest: Path, adapters: list[str], extra_paths: list[str] | None = None) -> None:
-    native_runtime.preflight(dest, native_runtime.release(DIST))
-    sources = managed_sources(adapters)
-    extra = [".claude/skills", "Arquitectura.base", "Auditoria.base",
-             "Operacion.base", "Repos.base", ".gitignore", ".obsidian/app.json", LOCK_NAME]
-    for rel in [*sources, *extra, *(extra_paths or [])]:
-        relative = Path(rel)
-        if relative.is_absolute() or ".." in relative.parts:
-            raise RuntimeError(f"unsafe managed path: {rel}")
-        parent = dest
-        for part in relative.parts[:-1]:
-            parent /= part
-            if parent.is_symlink() or (parent.exists() and not parent.is_dir()):
-                raise RuntimeError(f"managed path has an unsafe parent: {rel}")
-        target = dest / relative
-        if target.exists() and not target.is_symlink() and not target.is_file():
-            raise RuntimeError(f"managed target collision; move it explicitly before retrying: {rel}")
-        if target.is_symlink() and rel not in sources and rel != ".claude/skills":
-            raise RuntimeError(f"local write target is a symlink: {rel}")
-        if rel in sources:
-            source = sources[rel]
-            if source.is_symlink() or any(parent.is_symlink() for parent in source.parents if parent != DIST and DIST in parent.parents):
-                raise RuntimeError(f"managed source must be a regular file: {rel}")
-    skills = dest / ".claude/skills"
-    if skills.exists() and not skills.is_symlink():
-        raise RuntimeError(".claude/skills must be moved explicitly before installation")
-
-
-def copy_kernel(dest: Path, adapters: list[str]) -> None:
-    preflight_kernel(dest, adapters)
-    kernel = DIST / "kernel"
-    for rel, source in managed_sources(adapters).items():
-        target = dest / rel
-        target.parent.mkdir(parents=True, exist_ok=True)
-        if target.is_symlink():
-            target.unlink()
-        elif target.exists() and not target.is_file():
-            raise RuntimeError(f"managed target is not a file: {rel}")
-        shutil.copy2(source, target)
-    native_runtime.install(DIST, dest, native_runtime.release(DIST))
-    for name in ("Arquitectura.base", "Auditoria.base", "Operacion.base", "Repos.base"):
-        target = dest / name
-        if not target.is_file():
-            shutil.copy2(kernel / name, target)
-    claude_skills = dest / ".claude" / "skills"
-    claude_skills.parent.mkdir(parents=True, exist_ok=True)
-    if claude_skills.exists() or claude_skills.is_symlink():
-        claude_skills.unlink()
-    os.symlink(os.path.join("..", ".agents", "skills"), claude_skills)
-
-
-def _copytree(src: Path, dst: Path) -> None:
-    if dst.exists():
-        shutil.rmtree(dst)
-    shutil.copytree(src, dst, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
-
-
-def ensure_gitignore_lines(dest: Path) -> None:
-    required = (
-        f"/{PERSONAL_AGENTS}",
-        "/.investigations/",
-        "/.investigations-private/",
-        "/.knowledge-os-config.yaml",
-        "/.knowledge-os-config.*.tmp",
-        "/.agents/state/discovery/",
-        "/.plan/",
-        "/.scratch/",
-        "/.venv/",
-    )
-    path = dest / ".gitignore"
-    lines = path.read_text(encoding="utf-8").splitlines() if path.is_file() else []
-    portable_lines = [
-        line
-        for line in lines
-        if line.strip()
-        not in {
-            ".knowledge-os.lock.yaml",
-            "/.knowledge-os.lock.yaml",
-            "plan/",
-            "/plan/",
-        }
-    ]
-    changed = not path.is_file() or portable_lines != lines
-    lines = portable_lines
-    for item in required:
-        if item not in lines:
-            lines.append(item)
-            changed = True
-    portable = ["!/.agents/bin/"] + ["!/" + name for name in sorted(native_runtime.bundle_hashes(native_runtime.release(DIST)))]
-    # Place exceptions last so pre-existing *.exe or bin rules cannot hide the bundle.
-    updated = [line for line in lines if line not in portable] + portable
-    changed = changed or updated != lines
-    lines = updated
-    if changed:
-        path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
-
-
 def personal_agents_ignored(dest: Path) -> bool:
     """Return whether Git or the portable root rule ignores the personal router."""
     checked = subprocess.run(
@@ -350,40 +229,6 @@ def personal_agents_ignored(dest: Path) -> bool:
         return False
     rules = {line.strip() for line in gitignore.read_text(encoding="utf-8").splitlines()}
     return f"/{PERSONAL_AGENTS}" in rules or PERSONAL_AGENTS in rules
-
-
-def ensure_obsidian_ignore_filters(dest: Path) -> None:
-    path = dest / ".obsidian" / "app.json"
-    payload: dict[str, object] = {}
-    if path.is_file():
-        loaded = json.loads(path.read_text(encoding="utf-8"))
-        if not isinstance(loaded, dict):
-            raise ValueError(f"{path} must contain a JSON object")
-        payload = loaded
-    raw_filters = payload.get("userIgnoreFilters", [])
-    if not isinstance(raw_filters, list) or not all(
-        isinstance(item, str) for item in raw_filters
-    ):
-        raise ValueError(f"{path} userIgnoreFilters must be a list of strings")
-    filters = [
-        item
-        for item in raw_filters
-        if item not in {"plan/", "/plan/", "investigations/", "/investigations/"}
-    ]
-    if ".plan/" not in filters:
-        filters.append(".plan/")
-    if ".scratch/" not in filters:
-        filters.append(".scratch/")
-    if ".investigations/" not in filters:
-        filters.append(".investigations/")
-    if PERSONAL_AGENTS not in filters:
-        filters.append(PERSONAL_AGENTS)
-    payload["userIgnoreFilters"] = filters
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        json.dumps(payload, indent=2, ensure_ascii=False) + "\n",
-        encoding="utf-8",
-    )
 
 
 def seed_skeleton(dest: Path, enabled_types: list[str] | None = None) -> None:
@@ -418,9 +263,9 @@ def pending_inventory(instance: dict[str, Any]) -> str:
         if spanish else "Check the current local configuration from the vault root with "
     )
     guidance += (
-        "el ejecutable de tu plataforma en `.agents/bin/` y `config status --vault .`; consulta `.agents/skills/use-vault-cli/SKILL.md`.\n"
+        "`kos config status` (instala `kos` si falta, ver el router); consulta `.agents/skills/use-vault-cli/SKILL.md`.\n"
         if spanish else
-        "the platform executable in `.agents/bin/` with `config status --vault .`; see `.agents/skills/use-vault-cli/SKILL.md`.\n"
+        "`kos config status` (install `kos` when missing, see the router); see `.agents/skills/use-vault-cli/SKILL.md`.\n"
     )
     if not roots:
         return guidance
@@ -517,24 +362,6 @@ def write_bootstrap(dest: Path, instance: dict[str, Any]) -> None:
         ),
         encoding="utf-8",
     )
-
-
-def write_lock(dest: Path, adapters: list[str]) -> None:
-    revision, dirty = distribution_provenance()
-    runtime_release = native_runtime.release(DIST)
-    dirty = dirty or runtime_release["source_dirty"] or runtime_release["source_revision"] != revision
-    payload = {
-        "version": "4",
-        "kernel_version": dist_version(),
-        "distribution_revision": revision,
-        "distribution_dirty": dirty,
-        "adapters": adapters,
-        "managed_hashes": tree_hashes(dest, adapters),
-        "runtime_release": runtime_release,
-    }
-    path = dest / LOCK_NAME
-    path.write_text(dump_lock(payload), encoding="utf-8")
-    path.chmod(0o644)
 
 
 def dest_state(dest: Path) -> str:
@@ -669,23 +496,14 @@ def cmd_init(args: argparse.Namespace) -> int:
             )
         )
         return 2
-    bootstrap_paths = ["instance.yaml", "00-Home.md", "30-Flujos/Flujos.md",
-                       "60-Operacion/Operacion.md", "70-Aprendizajes/Aprendizajes.md"]
-    bootstrap_paths.extend(f"{child.name}/.gitkeep" for child in (DIST / "kernel").iterdir() if child.is_dir() and child.name[:2].isdigit())
-    for item in instance["systems"]:
-        bootstrap_paths.extend([f"10-Sistemas/{item['name']}.md", f"20-Repos/{item['id']}/.gitkeep"])
-    runtime_conflicts = native_runtime.conflicts(dest, native_runtime.release(DIST), None)
-    if runtime_conflicts and not args.force:
-        print(json.dumps({"status": "ownership-conflict", "files": runtime_conflicts}))
-        return 3
-    preflight_kernel(dest, instance["adapters"], bootstrap_paths)
+    native_runtime.binary(DIST)  # refuse a stale release before writing anything
     dest.mkdir(parents=True, exist_ok=True)
     seed_skeleton(dest, instance["graph"]["enabled_types"])
-    copy_kernel(dest, instance["adapters"])
     write_bootstrap(dest, instance)
-    ensure_gitignore_lines(dest)
-    ensure_obsidian_ignore_filters(dest)
-    write_lock(dest, instance["adapters"])
+    code, result = native_runtime.kernel(DIST, dest, *(["--force"] if args.force else []))
+    if code != 0:
+        print(json.dumps({"status": "ownership-conflict", "files": result.get("conflicts", []), "error": result.get("error")}, indent=2))
+        return 3
     print(json.dumps({"status": "initialized", "dest": str(dest), "cell": instance["cell"],
                       "next": "Open the vault with your agent and ask it to finish onboarding (onboard-cell): it lists the "
                               "repositories, runs the first discovery and reports what the vault can answer. Each teammate "
@@ -721,182 +539,44 @@ def cmd_adopt(args: argparse.Namespace) -> int:
     except InstanceError as error:
         print(str(error), file=sys.stderr)
         return 2
-    conflicts = ownership_conflicts(dest, instance["adapters"], set())
-    conflicts.extend(native_runtime.conflicts(dest, native_runtime.release(DIST), None))
-    if conflicts and not args.force:
-        print(json.dumps({"status": "ownership-conflict", "files": sorted(set(conflicts))}, indent=2))
+    code, preview = native_runtime.kernel(DIST, dest, "--dry-run")
+    if code != 0:
+        print(json.dumps({"status": "error", "error": preview.get("error")}, indent=2))
+        return 3
+    if preview.get("conflicts") and not args.force:
+        print(json.dumps({"status": "ownership-conflict", "files": preview["conflicts"]}, indent=2))
         print("distribution-owned files differ; move cell logic to cell-owned files or pass --force", file=sys.stderr)
         return 3
-    copy_kernel(dest, instance["adapters"])
-    ensure_gitignore_lines(dest)
-    ensure_obsidian_ignore_filters(dest)
-    write_lock(dest, instance["adapters"])
+    code, result = native_runtime.kernel(DIST, dest, *(["--force"] if args.force else []))
+    if code != 0:
+        print(json.dumps({"status": "error", "error": result.get("error"), "files": result.get("conflicts")}, indent=2))
+        return 3
     print(json.dumps({"status": "adopted", "dest": str(dest), "cell": instance["cell"]}, indent=2))
     return 0
 
 
-def ownership_conflicts(
-    dest: Path,
-    adapters: list[str],
-    previously_owned: set[str],
-) -> list[str]:
-    conflicts: list[str] = []
-    for rel, source in managed_sources(adapters).items():
-        if rel in previously_owned:
-            continue
-        target = dest / rel
-        if target.is_symlink() or (
-            target.exists()
-            and (
-                not target.is_file()
-                or sha256_file(target) != sha256_file(source)
-            )
-        ):
-            conflicts.append(rel)
-    return conflicts
-
-
-def managed_lock_target(dest: Path, rel: str) -> Path:
-    relative = Path(rel)
-    allowed = any(
-        rel == entry
-        if not entry.endswith("/")
-        else rel.startswith(entry) and rel != entry
-        for entry in managed_paths()
-    )
-    if (
-        not rel
-        or "\\" in rel
-        or relative.is_absolute()
-        or any(part in {".", ".."} for part in relative.parts)
-        or relative.as_posix() != rel
-        or not allowed
-    ):
-        raise RuntimeError(f"lock contains an unsafe managed path: {rel}")
-    parent = dest
-    for part in relative.parts[:-1]:
-        parent /= part
-        if parent.is_symlink():
-            raise RuntimeError(f"managed path has a symlinked parent: {rel}")
-        if parent.exists() and not parent.is_dir():
-            raise RuntimeError(f"managed path has a non-directory parent: {rel}")
-    return dest / relative
-
-
-def retired_managed_conflicts(
-    dest: Path,
-    retired: list[str],
-    previous_hashes: dict[str, str],
-) -> list[str]:
-    conflicts: list[str] = []
-    for rel in retired:
-        target = managed_lock_target(dest, rel)
-        if not target.exists() and not target.is_symlink():
-            continue
-        if (
-            target.is_symlink()
-            or not target.is_file()
-            or sha256_file(target) != previous_hashes[rel]
-        ):
-            conflicts.append(rel)
-    return conflicts
-
-
-def remove_retired_managed_files(dest: Path, retired: list[str]) -> list[str]:
-    targets = [(rel, managed_lock_target(dest, rel)) for rel in retired]
-    for rel, target in targets:
-        if not target.exists() and not target.is_symlink():
-            continue
-        if not target.is_symlink() and not target.is_file():
-            raise RuntimeError(f"retired managed target is not a file: {rel}")
-    removed: list[str] = []
-    for rel, target in targets:
-        if not target.exists() and not target.is_symlink():
-            continue
-        target.unlink()
-        removed.append(rel)
-        # Remove directories the retirement left empty (a retired skill leaves no empty folder).
-        parent = target.parent
-        while parent != dest and dest in parent.parents and parent.is_dir() and not any(parent.iterdir()):
-            parent.rmdir()
-            parent = parent.parent
-    return removed
-
-
 def cmd_update(args: argparse.Namespace) -> int:
     dest = Path(args.dest).expanduser().resolve()
-    lock_path = dest / LOCK_NAME
-    if not lock_path.is_file():
+    if not (dest / LOCK_NAME).is_file():
         print("no lock file; run init or doctor", file=sys.stderr)
         return 2
-    lock = load_lock(lock_path)
     try:
-        instance = load_instance(dest / "instance.yaml")
+        load_instance(dest / "instance.yaml")
     except InstanceError as error:
-        print(
-            json.dumps(
-                {"status": "invalid-instance", "error": str(error)},
-                indent=2,
-            )
-        )
+        print(json.dumps({"status": "invalid-instance", "error": str(error)}, indent=2))
         return 2
-    target_adapters = instance["adapters"]
-    target_sources = managed_sources(target_adapters)
-    previous_hashes = lock["managed_hashes"]
-    retired = sorted(set(previous_hashes) - set(target_sources))
-    current = tree_hashes(dest, target_adapters)
-    owned = set(target_sources)
-    drifted = [
-        rel
-        for rel, digest in previous_hashes.items()
-        if rel in owned and current.get(rel) != digest
-    ]
-    drifted.extend(
-        ownership_conflicts(dest, target_adapters, set(previous_hashes))
-    )
-    try:
-        drifted.extend(retired_managed_conflicts(dest, retired, previous_hashes))
-    except RuntimeError as error:
-        print(
-            json.dumps(
-                {"status": "invalid-lock", "error": str(error)},
-                indent=2,
-            )
-        )
-        return 3
-    drifted.extend(native_runtime.conflicts(dest, native_runtime.release(DIST), lock.get("runtime_release")))
-    drifted = sorted(set(drifted))
-    if drifted and not args.force:
+    code, result = native_runtime.kernel(DIST, dest, *(["--force"] if args.force else []))
+    if result.get("status") == "conflict":
         # The lock records what the distribution installed; Git shows what changed locally.
-        print(json.dumps({"status": "drift", "files": drifted}, indent=2))
+        print(json.dumps({"status": "drift", "files": result.get("conflicts", [])}, indent=2))
         print("kernel files changed locally (see git diff); keep cell logic in cell-owned files, then pass --force to restore the distribution version", file=sys.stderr)
         return 3
-    try:
-        preflight_kernel(dest, target_adapters)
-        removed = remove_retired_managed_files(dest, retired)
-    except RuntimeError as error:
-        print(
-            json.dumps(
-                {"status": "invalid-lock", "error": str(error)},
-                indent=2,
-            )
-        )
+    if code != 0:
+        print(json.dumps({"status": "invalid-lock", "error": result.get("error")}, indent=2))
         return 3
-    copy_kernel(dest, target_adapters)
-    ensure_gitignore_lines(dest)
-    ensure_obsidian_ignore_filters(dest)
-    write_lock(dest, target_adapters)
-    print(
-        json.dumps(
-            {
-                "status": "updated",
-                "dest": str(dest),
-                "kernel_version": dist_version(),
-                "retired_managed_files": removed,
-            },
-            indent=2,
-        )
-    )
+    removed = [item["path"] for item in result.get("files", []) if item.get("action") == "remove"]
+    print(json.dumps({"status": "updated", "dest": str(dest), "kernel_version": result.get("kos_kernel"),
+                      "retired_managed_files": removed}, indent=2))
     return 0
 
 
@@ -950,8 +630,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         payload["kernel_version_installed"] = lock.get("kernel_version")
         payload["kernel_version_dist"] = dist_version()
         payload["lock_version"] = lock.get("version")
-        payload["portable_lock"] = lock.get("version") == "4"
-        payload["native_runtime"] = native_runtime.status(dest, native_runtime.release(DIST), lock.get("runtime_release"))
+        payload["portable_lock"] = lock.get("version") == "5"
         revision, dirty = distribution_provenance()
         payload["distribution_revision_installed"] = lock.get("distribution_revision")
         payload["distribution_dirty_installed"] = lock.get("distribution_dirty")
@@ -994,8 +673,6 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         or payload.get("drift") or payload.get("topology_drift")
         or payload.get("adapter_configuration_drift")
         or not payload.get("managed_matches_dist")
-        or payload.get("native_runtime", {}).get("status") != "ready"
-        or not payload["native_runtime"].get("release_matches_dist")
         or not payload["personal_instructions"]["ignored"]
         or payload["personal_instructions"]["tracked"]
     ):

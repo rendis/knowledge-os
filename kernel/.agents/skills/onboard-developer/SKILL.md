@@ -7,7 +7,7 @@ description: "Trigger: `config status` reports `workspace: uninitialized` (a per
 
 Each person brings their own machine: where the cell's repositories are cloned, where development worktrees go, which clouds they are logged in to, which local ports reach the databases. That lives in the ignored `.knowledge-os-config.yaml`, written only through `<CLI> config`. The cell's shared setup (systems, sources, clouds, database targets) belongs to [onboard-cell](../onboard-cell/SKILL.md).
 
-**Propose, then confirm.** The machine answers most questions; the user confirms once. Bind `<CLI>` and the vault root through [use-vault-cli](../use-vault-cli/SKILL.md#bind-the-executable-and-vault) first.
+**Propose, then confirm.** The machine answers most questions; the user confirms once. Bind `<CLI>` and the vault root through [use-vault-cli](../use-vault-cli/SKILL.md#bind-the-executable-and-vault) first; when `kos` is not installed yet, installing it (with approval) is the first step of this onboarding.
 
 ## 1. Detect
 
@@ -46,6 +46,7 @@ Done when `config status` shows `workspace: initialized`.
 
 Run `detect` again and give the card in a few lines, one mark per line:
 
+- kos: version, current or the update it needs (`kos version`)
 - repositories: N found under `<root>`
 - worktrees: `<dir>`
 - each cloud: account, or its login command

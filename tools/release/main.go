@@ -41,9 +41,19 @@ func build() error {
 	}
 	artifacts := map[string]map[string]string{}
 	// An interrupted or failed build must not leave an older release descriptor usable.
-	if err = os.Remove(filepath.Join(*output, "runtime-manifest.json")); err != nil && !os.IsNotExist(err) {
+	if err = os.Remove(filepath.Join(*output, "release.json")); err != nil && !os.IsNotExist(err) {
 		return err
 	}
+	revision, err := exec.Command("git", "rev-parse", "HEAD").Output()
+	if err != nil {
+		return err
+	}
+	dirty, err := exec.Command("git", "status", "--porcelain", "--untracked-files=no").Output()
+	if err != nil {
+		return err
+	}
+	stamp := fmt.Sprintf("-s -w -X main.version=%s -X knowledge-os/internal/kernel.Revision=%s -X knowledge-os/internal/kernel.Dirty=%t",
+		strings.TrimSpace(string(version)), strings.TrimSpace(string(revision)), len(bytes.TrimSpace(dirty)) > 0)
 	var sums []string
 	for _, target := range strings.Split(*targets, ",") {
 		parts := strings.Split(target, "/")
@@ -55,7 +65,7 @@ func build() error {
 			name += ".exe"
 		}
 		path := filepath.Join(*output, name)
-		cmd := exec.Command("go", "build", "-trimpath", "-ldflags=-s -w -X main.version="+strings.TrimSpace(string(version)), "-o", path, "./cmd/kos")
+		cmd := exec.Command("go", "build", "-trimpath", "-ldflags="+stamp, "-o", path, "./cmd/kos")
 		cmd.Env = append(os.Environ(), "CGO_ENABLED=0", "GOOS="+parts[0], "GOARCH="+parts[1])
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
@@ -89,12 +99,17 @@ func build() error {
 		return err
 	}
 	noticeHash := sha256.Sum256(noticesBytes)
-	revision, err := exec.Command("git", "rev-parse", "HEAD").Output()
-	if err != nil {
-		return err
+	// The installer scripts and the version ship with the binaries: a mirror of dist/ is a release.
+	for _, script := range []string{"install-kos.sh", "install-kos.ps1"} {
+		b, e := os.ReadFile(filepath.Join("scripts", script))
+		if e != nil {
+			return e
+		}
+		if e := os.WriteFile(filepath.Join(*output, script), b, 0755); e != nil {
+			return e
+		}
 	}
-	dirty, err := exec.Command("git", "status", "--porcelain", "--untracked-files=all").Output()
-	if err != nil {
+	if err = os.WriteFile(filepath.Join(*output, "VERSION"), version, 0644); err != nil {
 		return err
 	}
 	finalFingerprint, err := sourceFingerprint(".")
@@ -109,7 +124,7 @@ func build() error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(*output, "runtime-manifest.json"), append(encoded, '\n'), 0644)
+	return os.WriteFile(filepath.Join(*output, "release.json"), append(encoded, '\n'), 0644)
 }
 func notices(output string, targets []string) error {
 	type module struct {
@@ -184,8 +199,8 @@ func notices(output string, targets []string) error {
 }
 
 func sourceFingerprint(root string) (string, error) {
-	files := []string{"go.mod", "go.sum"}
-	for _, base := range []string{"cmd", "internal"} {
+	files := []string{"go.mod", "go.sum", "payload.go", "MANAGED_PATHS"}
+	for _, base := range []string{"cmd", "internal", "kernel", "adapters"} {
 		if err := filepath.WalkDir(filepath.Join(root, base), func(path string, d fs.DirEntry, walkErr error) error {
 			if walkErr != nil {
 				return walkErr

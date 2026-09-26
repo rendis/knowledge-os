@@ -9,21 +9,15 @@ This is the shared operational reference for `kos`. Keep the current primary wor
 
 ## Bind the executable and vault
 
-Each vault carries the same generic CLI builds in its versioned `.agents/bin/` directory. The executable reads that vault's configuration and Markdown through explicit root arguments; no central registration or per-vault compilation is needed. A clone includes all six builds.
+`kos` is installed once per machine (usually `~/.local/bin/kos`) and serves every vault; the vault carries no executable. Check it with `kos version`: it reports this kos, the kernel it carries, the vault's kernel and a newer release when there is one. Throughout kernel instructions `<CLI>` means `kos` (or its absolute path when it is not on `PATH`; in PowerShell prefix a quoted path with `&`).
 
-Choose the executable once for the current execution host (inside a container or remote shell, use that environment's platform):
+**When `kos` is not installed**, tell the user and offer two paths:
+- Install it, with their explicit approval: `gh release download --repo rendis/knowledge-os --pattern install-kos.sh --output - | sh` (macOS, Linux, WSL; Windows: the same with `install-kos.ps1`). It needs the GitHub CLI logged in with an account that can read that repository; nothing else is installed.
+- Continue without it: notes, sources and platforms can still be read, but no gate runs (`discover check`, `claims`, `investigation check`, `sync verify`), so every statement is unverified and nothing is published or written to a case. Say so in the answer.
 
-| Host | Filename under `.agents/bin/` |
-|---|---|
-| macOS ARM64 / AMD64 | `kos-darwin-arm64` / `kos-darwin-amd64` |
-| Linux ARM64 / AMD64 | `kos-linux-arm64` / `kos-linux-amd64` |
-| Windows ARM64 / AMD64 | `kos-windows-arm64.exe` / `kos-windows-amd64.exe` |
+**Notices** arrive on stderr as `kos notice: …` lines; stdout stays JSON. A newer kos: tell the user and, with their approval, run `kos update`. The vault's kernel older than kos: offer `kos kernel update --vault "<root>" --dry-run`, show what changes, and apply it on approval as one commit. The vault's kernel newer than kos: `kos update` first; publishing gates refuse to run until then.
 
-Use observed harness environment information; when unknown, inspect `uname -sm` on macOS/Linux or `$env:PROCESSOR_ARCHITEW6432` (when set), otherwise `$env:PROCESSOR_ARCHITECTURE`, in Windows PowerShell. Map `aarch64` to `arm64` and `x86_64`/`AMD64` to `amd64`. Prefer the native build; report an unsupported platform rather than guessing. Re-select only when the execution host changes.
-
-An installed copy of this skill provides a candidate vault root three directories above its directory. A source repository or the current working directory is not automatically the vault. Bind the executable beneath that candidate before resolving the vault's identity.
-
-Throughout kernel instructions, `<CLI>`, `<cli>`, `<CLI>` and `<CLI>` denote this executable's quoted absolute path. In PowerShell, prefix the quoted path with `&`. Replace placeholders before execution. Shell examples using `$CLI` assume it has been assigned that exact path.
+An installed copy of this skill provides a candidate vault root three directories above its directory. A source repository or the current working directory is not automatically the vault. `--vault` defaults to `KOS_VAULT` or the vault that contains the working directory; pass it explicitly from anywhere else.
 
 ```text
 <CLI> config resolve --vault "<candidate-path>"

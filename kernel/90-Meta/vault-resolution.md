@@ -25,7 +25,7 @@ Never identify the vault by directory basename alone. The local folder and Obsid
 
 ## Resolution
 
-Select `<CLI>` through `use-vault-cli` (the executable-selection section in `.agents/skills/use-vault-cli/SKILL.md`) before resolution; it defines platform selection and shell invocation. For a skill installed at `<vault>/.agents/skills/<skill>`, its `../../..` directory supplies a candidate root; validate it before binding identity. A source checkout is not automatically the documentation vault.
+Bind `<CLI>` (`kos`) through `use-vault-cli` (its binding section in `.agents/skills/use-vault-cli/SKILL.md`) before resolution; it defines installation and shell invocation. For a skill installed at `<vault>/.agents/skills/<skill>`, its `../../..` directory supplies a candidate root; validate it before binding identity. A source checkout is not automatically the documentation vault.
 
 ```text
 <CLI> config resolve --vault "<EXPLICIT_PATH>"

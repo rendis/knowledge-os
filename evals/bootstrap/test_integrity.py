@@ -12,6 +12,24 @@ ROOT = Path(__file__).resolve().parents[2]
 spec = importlib.util.spec_from_file_location('installer_integrity', ROOT / 'scripts/knowledge_os.py')
 installer = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(installer)
+import native_runtime  # noqa: E402  (scripts/ is on the path once the installer loaded)
+
+
+def reproducible(dest: Path, dirty: bool = False) -> None:
+    """Pretend the lock came from a clean distribution commit."""
+    path = dest / installer.LOCK_NAME
+    lines = []
+    for line in path.read_text().splitlines():
+        if line.startswith('distribution_revision:'):
+            line = 'distribution_revision: "' + 'a' * 40 + '"'
+        elif line.startswith('distribution_dirty:'):
+            line = 'distribution_dirty: ' + ('true' if dirty else 'false')
+        lines.append(line)
+    path.write_text('\n'.join(lines) + '\n')
+
+
+def instance(dest: Path) -> None:
+    (dest / 'instance.yaml').write_text('version: 1\ncell:\n  name: T\n  purpose: T\nsystems:\n  - id: t\n    name: T\nadapters: []\n')
 
 class IntegrityTests(unittest.TestCase):
     def test_strict_doctor_detects_adapter_configuration_pending_update(self):
@@ -25,9 +43,7 @@ class IntegrityTests(unittest.TestCase):
                             '--system', 'test:Test', '--yes'], check=True, capture_output=True)
             args = SimpleNamespace(dest=tmp, strict=True)
             def doctor():
-                lock = installer.load_lock(dest / installer.LOCK_NAME)
-                lock.update(distribution_revision='a' * 40, distribution_dirty=False)
-                (dest / installer.LOCK_NAME).write_text(installer.dump_lock(lock))
+                reproducible(dest)
                 with patch.object(installer, 'distribution_provenance', return_value=('a' * 40, False)), contextlib.redirect_stdout(io.StringIO()):
                     return installer.cmd_doctor(args)
             self.assertEqual(doctor(), 0)
@@ -48,8 +64,9 @@ class IntegrityTests(unittest.TestCase):
             dest = Path(tmp)
             (dest / '.claude/skills').mkdir(parents=True)
             (dest / '.claude/skills/custom').write_text('mine')
-            with self.assertRaises(RuntimeError):
-                installer.copy_kernel(dest, [])
+            instance(dest)
+            code, result = native_runtime.kernel(ROOT, dest)
+            self.assertNotEqual(code, 0, result)
             self.assertFalse((dest / 'AGENTS.md').exists())
             self.assertEqual((dest / '.claude/skills/custom').read_text(), 'mine')
 
@@ -60,8 +77,9 @@ class IntegrityTests(unittest.TestCase):
             outside = Path(tmp) / 'outside'
             outside.mkdir()
             (dest / '90-Meta').symlink_to(outside, target_is_directory=True)
-            with self.assertRaises(RuntimeError):
-                installer.copy_kernel(dest, [])
+            instance(dest)
+            code, result = native_runtime.kernel(ROOT, dest)
+            self.assertNotEqual(code, 0, result)
             self.assertFalse((dest / 'AGENTS.md').exists())
             self.assertEqual(list(outside.iterdir()), [])
 
@@ -79,9 +97,7 @@ class IntegrityTests(unittest.TestCase):
             subprocess.run(['python3', '-B', str(ROOT / 'scripts/knowledge_os.py'),
                             'init', '--dest', tmp, '--cell-name', 'Test', '--purpose', 'Test',
                             '--system', 'test:Test', '--yes'], check=True, capture_output=True)
-            lock = installer.load_lock(dest / installer.LOCK_NAME)
-            lock.update(distribution_revision='a' * 40, distribution_dirty=False)
-            (dest / installer.LOCK_NAME).write_text(installer.dump_lock(lock))
+            reproducible(dest)
             args = SimpleNamespace(dest=tmp, strict=True)
             with patch.object(installer, 'distribution_provenance', return_value=('a' * 40, False)), contextlib.redirect_stdout(io.StringIO()):
                 self.assertEqual(installer.cmd_doctor(args), 0)
@@ -94,8 +110,7 @@ class IntegrityTests(unittest.TestCase):
                 (dest / '.claude/skills').unlink()
                 self.assertEqual(installer.cmd_doctor(args), 2)
                 (dest / '.claude/skills').symlink_to('../.agents/skills')
-                lock['distribution_dirty'] = True
-                (dest / installer.LOCK_NAME).write_text(installer.dump_lock(lock))
+                reproducible(dest, dirty=True)
                 self.assertEqual(installer.cmd_doctor(args), 2)
 
     def test_ignored_shipped_file_marks_distribution_dirty(self):
