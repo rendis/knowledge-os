@@ -26,7 +26,7 @@ Load @AGENTS.personal.md from the vault root when present, before classifying re
 
 ## Navigate the vault
 
-Read [use-vault-cli](.agents/skills/use-vault-cli/SKILL.md) before the first CLI operation; it binds `<CLI>` and the vault root once per session. When `<CLI> config status --vault "<root>"` reports `workspace: uninitialized`, this person has not been onboarded: offer [onboard-developer](.agents/skills/onboard-developer/SKILL.md) before work that needs sources; answers from the notes do not wait.
+Read [use-vault-cli](.agents/skills/use-vault-cli/SKILL.md) before the first CLI operation; it binds `<CLI>` (`kos`, installed once per machine) and the vault root once per session, and says what to do when `kos` is missing or prints a notice. When `<CLI> config status --vault "<root>"` reports `workspace: uninitialized`, this person has not been onboarded: offer [onboard-developer](.agents/skills/onboard-developer/SKILL.md) before work that needs sources; answers from the notes do not wait.
 
 1. `<CLI> overview --vault "<root>"` lists every knowledge note in one line (type, relations, first sentence). Choose the notes to open from it.
 2. Open identified notes directly. Use `search` for a term the overview does not reveal and `links` for a known note's relationships. Before an answer relies on a repository note, run `<CLI> discover check --vault "<root>" --note <path>`: it reports stale cited files and relations the repository's evidence does not support (G3); treat those as unverified until the source confirms them.
@@ -52,6 +52,7 @@ Select one primary skill; an auxiliary skill supplies a method and the primary k
 - [manage-operational-workflow](.agents/skills/manage-operational-workflow/SKILL.md) — audits, operational procedures and runs in `.operations/`.
 - [inspect-database](.agents/skills/inspect-database/SKILL.md) — database evidence through the target's configured runbook.
 - [explain-visually](.agents/skills/explain-visually/SKILL.md) — auxiliary diagrams and visual explanations.
+- [report-to-distribution](.agents/skills/report-to-distribution/SKILL.md) — `kos` fails, the user dislikes how something behaves, or wants to improve or change the kernel: a sanitized issue or proposal to the distribution, offered as soon as it happens.
 - [obsidian-markdown](.agents/skills/obsidian-markdown/SKILL.md) — Obsidian note syntax; [obsidian-bases](.agents/skills/obsidian-bases/SKILL.md) — `.base` views.
 - Adapters listed in `instance.yaml` `adapters`, e.g. [generate-reports](.agents/skills/generate-reports/SKILL.md).
 
@@ -77,4 +78,4 @@ Stay with the current agent unless a subtask is bounded, independently checkable
 
 ## Distribution changes
 
-The kernel and skills are managed dependencies. When a task needs to change them, diagnose, present the change and its impact, and wait for approval; with approval, prepare a PR to the distribution repository within the authorized scope. Continue independent vault work meanwhile.
+The kernel and skills are managed: they change in the distribution, never in the vault (`kos kernel update` refuses or restores local edits). A failure, an unwanted behavior or an improvement goes through [report-to-distribution](.agents/skills/report-to-distribution/SKILL.md); a preference of one person goes to `AGENTS.personal.md`. Continue independent vault work meanwhile.
