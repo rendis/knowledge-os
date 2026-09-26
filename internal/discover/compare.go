@@ -194,6 +194,18 @@ func compareNotes(vault string, facts []repoFacts) ([]comparison, error) {
 					Detail: "the note declares this relation but no configuration, IaC, code literal or platform wiring of this repository names it"})
 			}
 		}
+		// A resource the note links (a topic note anywhere in its text) or names is documented even when
+		// no relation field declares it, for example code the note describes as inactive.
+		text := ""
+		if b, e := os.ReadFile(filepath.Join(vault, filepath.FromSlash(f.Note))); e == nil {
+			text = strings.ToLower(string(b))
+			for _, m := range wikilink.FindAllStringSubmatch(string(b), -1) {
+				target := strings.TrimSpace(m[1])
+				if tn, ok := notes[target]; ok && tn.folder == "25-Topics" {
+					documented = append(documented, tn.names(target)...)
+				}
+			}
+		}
 		groups := map[string][]string{}
 		for _, r := range f.Resources {
 			if len(f.Languages) == 0 {
@@ -202,7 +214,7 @@ func compareNotes(vault string, facts []repoFacts) ([]comparison, error) {
 			if !isMessaging(r.Type) {
 				continue
 			}
-			matched := false
+			matched := mentions(text, r.Name)
 			for _, d := range documented {
 				matched = matched || nameMatch(d, r.Name) || (r.Topic != "" && nameMatch(d, r.Topic))
 			}
@@ -259,11 +271,19 @@ func cellGaps(vault string, facts []repoFacts) ([]map[string]any, error) {
 	}
 	groups := map[string]*group{}
 	for _, f := range facts {
+		// A resource its repository's note names is addressed there (a test-only subscription, a
+		// configured name the code never reads); it does not need a topic note of its own.
+		noteText := ""
+		if f.Note != "" {
+			if b, e := os.ReadFile(filepath.Join(vault, filepath.FromSlash(f.Note))); e == nil {
+				noteText = strings.ToLower(string(b))
+			}
+		}
 		for _, r := range f.Resources {
 			if !isMessaging(r.Type) {
 				continue
 			}
-			covered := false
+			covered := mentions(noteText, r.Name)
 			for _, d := range names {
 				covered = covered || nameMatch(d, r.Name) || r.Topic != "" && nameMatch(d, r.Topic)
 			}
@@ -294,4 +314,26 @@ func uniqueSorted(xs []string, n int) []string {
 		m[normalizeResource(x)] = true
 	}
 	return firstN(m, n)
+}
+
+var bracedName = regexp.MustCompile(`[a-z0-9._/-]*\{[^}\s]+\}[a-z0-9._/-]*`)
+
+// mentions reports whether a note's lower-cased text names a resource, literally or through a braced
+// form such as acme-orders-{cl|co|pe}-inbound or acme-orders-{cl,pe}-inbound.
+func mentions(text, name string) bool {
+	name = strings.ToLower(name)
+	if text == "" || name == "" {
+		return false
+	}
+	if strings.Contains(text, name) {
+		return true
+	}
+	for _, b := range bracedName.FindAllString(text, -1) {
+		for _, v := range expandBraces(strings.ReplaceAll(b, ",", "|")) {
+			if v == name {
+				return true
+			}
+		}
+	}
+	return false
 }
