@@ -51,8 +51,10 @@ check links|bases|obsidian-binding|map-closure
 investigation new|list|check|add|state|absorb|close|reopen
 handoff start|status|refresh|reconcile
 sync start|status|review|verify|acknowledge|finish|pull
-kernel status|update · version · update
+kernel status|update [--all] · vaults · version · update
 ```
+
+Every vault a `kos` command works on is remembered on the machine (`kos vaults`; `scan DIR` finds the rest). The list is checked at each recorded path whenever it is shown: a vault that moved, disappeared or now holds another cell is reported with its fix, never updated. After `kos update`, the list shows the vaults whose kernel is older than the new one; `kos kernel update --all --dry-run` previews them and `--commit` updates and commits each on its current branch, skipping the ones already current (a teammate's pushed update arrives by pull).
 
 Discovery judgments are answered by Jev when `TYPESAFE_API_KEY` is set, otherwise by the agent through `discover questions` and `discover answer`. Search keeps a private local SQLite index outside the vault; results are pointers to open and verify, not answers. No hooks or model services are installed.
 
