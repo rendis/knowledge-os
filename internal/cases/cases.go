@@ -32,6 +32,9 @@ change that would introduce a gate error is refused. All output is JSON.
            links, no credential or local path, no paragraph copied from a vault note, handoff
            packages complete and citing defined requirements.
   add      --id ID --kind KIND --text TEXT [fields] [--resolves Q-NNN] [--supersedes ID]
+           [--date YYYY-MM-DD] [--as ID]   when recreating a case: the day the record was first
+           added (from the opening day to today; a fact's own date goes in its source) and the ID
+           it keeps (above the highest of its kind; gaps allowed)
            evidence     --source SRC --level demonstrated|observed [--limits TEXT] [--file PATH...]
            finding      --level demonstrated|inferred --from E-NNN,... | --level unresolved --missing TEXT
                         [--for-vault [[note]]] [--file PATH...]
@@ -40,6 +43,8 @@ change that would introduce a gate error is refused. All output is JSON.
            requirement  --origin TEXT                       (development)
            handoff      --package handoffs/DH-NNN.md        (development)
            --file copies the file into artifacts/ named after the record, refusing credentials.
+           An ID-shaped token inside inline code (an earlier version's A-001 in backticks) is text,
+           not a reference.
   state    --id ID --text TEXT   Rewrite the current state; it cites the records it summarizes.
   absorb   --id ID --finding F-NNN   Mark a finding for the vault as absorbed (published case,
            on the sync branch that changes its note).
@@ -59,7 +64,7 @@ var (
 type options struct {
 	vault, title, kind, sourceRef, id, objective, date                 string
 	recKind, text, source, level, limits, from, missing, resolveBy, by string
-	origin, pkg, forVault, finding, resolves, supersedes               string
+	origin, pkg, forVault, finding, resolves, supersedes, as           string
 	outcome, reason, worktree                                          string
 	files                                                              []string
 	apply, dryRun                                                      bool
@@ -78,7 +83,7 @@ func Run(args []string, out io.Writer) error {
 		"--source": &o.source, "--level": &o.level, "--limits": &o.limits, "--from": &o.from, "--missing": &o.missing,
 		"--resolve-by": &o.resolveBy, "--by": &o.by, "--origin": &o.origin, "--package": &o.pkg, "--for-vault": &o.forVault,
 		"--finding": &o.finding, "--resolves": &o.resolves, "--supersedes": &o.supersedes, "--outcome": &o.outcome,
-		"--reason": &o.reason, "--worktree": &o.worktree}
+		"--reason": &o.reason, "--worktree": &o.worktree, "--as": &o.as}
 	for i := 1; i < len(args); i++ {
 		if args[i] == "--apply" {
 			o.apply = true
