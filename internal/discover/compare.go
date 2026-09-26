@@ -18,11 +18,6 @@ var edgeFields = []string{"gatillado-por", "publica-en", "consume-de", "lee-de",
 var wikilink = regexp.MustCompile(`\[\[([^\]|#]+)`)
 var fmLine = regexp.MustCompile(`(?m)^([\w-]+):\s*(.*)$`)
 
-type noteEdge struct {
-	Field, Target, Folder, Type string
-	Names                       []string
-}
-
 type comparison struct {
 	Repo          string        `json:"repo"`
 	Note          string        `json:"note"`

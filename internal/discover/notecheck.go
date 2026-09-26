@@ -678,9 +678,3 @@ func runCheck(o options, out io.Writer, semantic bool) error {
 	}
 	return nil
 }
-
-// CheckNote runs the note gates for one note or candidate and reports whether it passed.
-func CheckNote(vault, note string) (bool, any, error) {
-	r, e := checkNote(vault, note, "", false)
-	return r.OK, r, e
-}

@@ -7,7 +7,7 @@ init · adopt · doctor
 inventory · audit
 discover run|questions|answer|platform|report|check|corrections
 config status|resolve|workspace|locate|capability|bind|catalog|areas|operation|…
-check links|bases|obsidian-binding|map-closure
+check links|bases|obsidian-binding
 investigation new|list|check|add|state|absorb|close|reopen
 handoff start|status|refresh|reconcile
 sync start|status|review|verify|acknowledge|finish|pull
@@ -18,7 +18,7 @@ kernel status|update [--all] · vaults · version · update
 
 Reading and searching notes, code and snapshots is left to the agent's own tools; kos builds the map and checks it.
 
-- **Discovery** (`discover`): connection facts extracted deterministically from repositories (imports, manifests, configuration and IaC), typed by stored judgments and completed by read-only platform snapshots of the cell's clouds (Google Cloud, AWS and Azure: messaging, databases, storage and warehouse, each read with its own CLI and the developer's login). What the providers do not read, the agent inspects with the tools in reach and records (`discover platform --record`). Note gates (`discover check`) verify anchors, coverage and stale citations; `discover claims` checks a draft answer's resource names.
+- **Discovery** (`discover`): connection facts extracted deterministically from repositories (imports, manifests, configuration and IaC), typed by stored judgments and completed by read-only platform snapshots of the cell's clouds (Google Cloud, AWS and Azure: messaging, databases, storage and warehouse, each read with its own CLI and the developer's login). What the providers do not read, the agent inspects with the tools in reach and records (`discover platform --record`). Note gates (`discover check`) verify anchors, coverage and stale citations.
 - **Investigations** (`investigation`): one case per line of work, written only through the CLI, gated on every write, and published, absorbed or retired on a sync branch.
 - **Development handoffs** (`handoff`): atomic task packages prepared in a repository worktree, with a managed `AGENTS.md` section that tells any harness how to work with them, and a deterministic reconciliation back into the case.
 - **Publication through Git** (`sync`): knowledge changes on a `sync/<slug>` branch, with gates, a review bound to the exact content and a fast-forward finish.
