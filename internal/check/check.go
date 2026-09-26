@@ -24,9 +24,6 @@ func Run(args []string, out io.Writer) error {
 	if len(args) > 0 && args[0] == "obsidian-binding" {
 		return runBinding(args[1:], out)
 	}
-	if len(args) > 0 && (args[0] == "visual" || args[0] == "visual-context") {
-		return runVisual(args, out)
-	}
 	root, op := ".", ""
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
@@ -257,58 +254,4 @@ func Links(root string) (LinkResult, error) {
 		sort.Strings(v)
 	}
 	return r, nil
-}
-
-func runVisual(args []string, out io.Writer) error {
-	op := args[0]
-	kind, path := "diagram", ""
-	temporal := false
-	for i := 1; i < len(args); i++ {
-		switch args[i] {
-		case "--kind":
-			i++
-			if i >= len(args) {
-				return errors.New("--kind requires diagram or spatial")
-			}
-			kind = args[i]
-		case "--temporal":
-			temporal = true
-		default:
-			if strings.HasPrefix(args[i], "-") || path != "" {
-				return fmt.Errorf("unknown visual argument %q", args[i])
-			}
-			path = args[i]
-		}
-	}
-	if path == "" {
-		return errors.New("visual check requires artifact path")
-	}
-	if kind != "diagram" && kind != "spatial" {
-		return errors.New("kind must be diagram or spatial")
-	}
-	if op == "visual-context" {
-		if temporal || kind != "diagram" {
-			return errors.New("visual-context does not accept geometry options")
-		}
-		r := VisualContext(path)
-		if e := json.NewEncoder(out).Encode(r); e != nil {
-			return e
-		}
-		if !r.Pass {
-			return ErrIssues
-		}
-		return nil
-	}
-	body, e := read(path)
-	if e != nil {
-		return e
-	}
-	r := Visual(body, kind, temporal)
-	if e = json.NewEncoder(out).Encode(r); e != nil {
-		return e
-	}
-	if !r.Pass {
-		return ErrIssues
-	}
-	return nil
 }

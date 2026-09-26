@@ -6,8 +6,6 @@ require (
 	github.com/gofrs/flock v0.12.1
 	github.com/yuin/goldmark v1.7.16
 	go.yaml.in/yaml/v3 v3.0.4
-	golang.org/x/net v0.56.0
-	golang.org/x/text v0.38.0
 	modernc.org/sqlite v1.59.0
 )
 

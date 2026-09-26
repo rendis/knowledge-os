@@ -10,7 +10,6 @@ questions, fixtures and results stay outside this repository.
 | `regression/` | The runner and judge the benchmark uses; also a before/after check of a kernel change on a cell's questions | [regression](regression/README.md) |
 | `platform/` | Platform providers with the clouds' real CLIs against local emulators: Pub/Sub emulator with `gcloud`, moto with the AWS CLI (SNS, SQS, DynamoDB, RDS, S3); referenced scopes, capture per service, wiring, links to configuration and code, and denied accounts. Google data services are checked against real projects by hand; they have no management emulator. Azure has no emulator of its management API and is covered by the Go tests | `make test-platform` (Docker) |
 | `discovery/` | `discover run` against installed cells (stored judgments only) | [results](discovery/results.md) |
-| `behavior/` | `explain-visually` assets: pinned icons and browser-side scripts | [behavior](behavior/README.md) |
 | `cli/` | Running the native binary on other Linux distributions and Windows | [cli](cli/README.md) |
 
 Go unit tests (`make test`) cover the CLI itself: discovery, gates, sync, cases, handoffs, retrieval and

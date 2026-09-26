@@ -47,7 +47,7 @@ The installer writes the cell's identity and delegates the kernel itself to `kos
 overview · search · index · links · inventory · audit
 discover run|questions|answer|platform|report|check|claims|corrections
 config status|resolve|workspace|locate|capability|bind|catalog|areas|operation|…
-check links|bases|visual|visual-context|obsidian-binding|map-closure
+check links|bases|obsidian-binding|map-closure
 investigation new|list|check|add|state|absorb|close|reopen
 handoff start|status|refresh|reconcile
 sync start|status|review|verify|acknowledge|finish|pull

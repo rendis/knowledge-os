@@ -46,8 +46,6 @@ discover run|questions|answer|platform|report|check|claims|corrections --vault P
 config status|detect|resolve|workspace|locate|capability|bind|catalog|areas|operation ...
 check links|bases --vault PATH
 audit --vault PATH
-check visual FILE [--kind diagram|spatial] [--temporal]
-check visual-context FILE
 check obsidian-binding --vault PATH --vault-name NAME
 check map-closure --vault PATH --checkpoint FILE
 investigation new|list|check|add|state|absorb|close|reopen --vault PATH ...

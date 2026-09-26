@@ -135,3 +135,16 @@ func runBinding(args []string, out io.Writer) error {
 	}
 	return e
 }
+
+// resolved is the absolute path with symbolic links followed when the path exists.
+func resolved(path string) string {
+	abs, e := filepath.Abs(path)
+	if e != nil {
+		return filepath.Clean(path)
+	}
+	real, e := filepath.EvalSymlinks(abs)
+	if e == nil {
+		return real
+	}
+	return abs
+}
