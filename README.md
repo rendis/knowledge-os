@@ -36,6 +36,8 @@ The vault is the map, not the boundary. When a note is missing or stale, the age
 | 5 | **Hand off** | Atomic tasks in a repository worktree for any harness, reconciled back into the case. | `kos handoff` |
 | 6 | **Publish** | A `sync/<slug>` branch with gates, a review bound to the exact content and a fast-forward finish. | `kos sync` |
 
+Open [`docs/flows/index.html`](docs/flows/index.html) in a browser to watch each flow animated step by step.
+
 ## See it run
 
 **Discover** — three repositories and a cloud project become connections, each with its evidence.
@@ -104,7 +106,7 @@ This repository is the **distribution**, not a cell vault; agents working on it 
 | `adapters/` | Optional skills a cell selects (`reports`) |
 | `evals/` | Checks and benchmarks; never installed ([evals](evals/README.md)) |
 | `instance.schema.yaml`, `MANAGED_PATHS` | The `instance.yaml` contract and the update allowlist |
-| `docs/` | Guides, [decisions](docs/adr/) and the README images (`python3 -B scripts/render_readme_assets.py`); `docs/demo/` holds the synthetic cell and VHS tapes behind the recordings |
+| `docs/` | Guides, [decisions](docs/adr/) and the README images (`python3 -B scripts/render_readme_assets.py`); `docs/demo/` holds the synthetic cell and VHS tapes behind the recordings; `docs/flows/` the animated flow guide (one script per flow in `docs/flows/flows/`) |
 
 ```bash
 make test            # go vet and go test
