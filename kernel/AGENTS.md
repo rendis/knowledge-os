@@ -20,6 +20,12 @@ Apply it to every material answer, diagram and retained conclusion.
 - Anything that will be published to the vault passes its workflow's gates and review regardless of novelty.
 - Without an available reviewer, perform an author check, deliver supported observations with precise limits, state that independent review is missing, and hold back the classification or recommendation that needed it. Repair a reviewed defect once; if it survives, report the supported part and the limitation.
 
+## Communicate
+
+- Write plainly, simply and directly; when the work continues, end with one concrete next step.
+- Show it when seeing beats reading: a flow, a relationship, a comparison, a quantity. Before building a visual yourself, use an installed skill that covers it; when none does, build it and mention once that a visualization skill such as archify (`npx skills add tt-a1i/archify -a universal` from the vault root) can be added to `.agents/skills/`, where it is versioned with the vault. A visual carries the evidence contract: every arrow traces to a source and unknown segments stay unknown.
+- Keep a visual where its purpose puts it: to explain in the conversation, in `.scratch/<task>/` (ignored, never linked from notes); to support an investigation, attached to the finding it explains (`investigation add … --file`) and versioned with the case.
+
 ## Personal instructions
 
 Load @AGENTS.personal.md from the vault root when present, before classifying requests. Precedence within this router's guardrails: current user direction, then personal instructions, then skill defaults. When the user sets or changes a reusable rule for how future work is done for them, record it in `AGENTS.personal.md` (ignored, untracked, access references instead of credentials), preserving their other preferences; that file is the only place for personal customizations.
@@ -51,7 +57,6 @@ Select one primary skill; an auxiliary skill supplies a method and the primary k
 - [manage-git-workflow](.agents/skills/manage-git-workflow/SKILL.md) — the cell's Git/GitHub policy notes and applying them.
 - [manage-operational-workflow](.agents/skills/manage-operational-workflow/SKILL.md) — audits, operational procedures and runs in `.operations/`.
 - [inspect-database](.agents/skills/inspect-database/SKILL.md) — database evidence through the target's configured runbook.
-- [explain-visually](.agents/skills/explain-visually/SKILL.md) — auxiliary diagrams and visual explanations.
 - [report-to-distribution](.agents/skills/report-to-distribution/SKILL.md) — `kos` fails, the user dislikes how something behaves, or wants to improve or change the kernel: a sanitized issue or proposal to the distribution, offered as soon as it happens.
 - [obsidian-markdown](.agents/skills/obsidian-markdown/SKILL.md) — Obsidian note syntax; [obsidian-bases](.agents/skills/obsidian-bases/SKILL.md) — `.base` views.
 - Adapters listed in `instance.yaml` `adapters`, e.g. [generate-reports](.agents/skills/generate-reports/SKILL.md).
