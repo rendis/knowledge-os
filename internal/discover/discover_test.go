@@ -579,3 +579,25 @@ func TestPartialRunKeepsOtherRepositoriesFacts(t *testing.T) {
 		t.Fatalf("a repository no longer tracked is left out: %+v", all)
 	}
 }
+
+func TestLibraryDependenciesListEveryImportingFile(t *testing.T) {
+	dir := t.TempDir()
+	lib := gitRepo(t, filepath.Join(dir, "LIB-common"), map[string]string{
+		"go.mod":           "module example.com/common\n",
+		"publisher/pub.go": "package publisher\nimport \"cloud.google.com/go/pubsub\"\n",
+	})
+	svc := gitRepo(t, filepath.Join(dir, "SVC-orders"), map[string]string{
+		"go.mod":        "module example.com/orders\n\nrequire example.com/common v0.1.0\n",
+		"cmd/main.go":   "package main\nimport \"example.com/common/publisher\"\n",
+		"cmd/worker.go": "package main\nimport \"example.com/common/publisher\"\n",
+		"cmd/other.go":  "package main\nimport \"example.com/common/publisher\"\n",
+	})
+	for i := 0; i < 20; i++ { // map iteration order changes between runs
+		s := scan(t, "SVC-orders", svc)
+		resolveLibraries([]*repoScan{s, scan(t, "LIB-common", lib)})
+		d := s.deps["go:cloud.google.com/go/pubsub"]
+		if d == nil || strings.Join(d.Files, ",") != "cmd/main.go,cmd/other.go,cmd/worker.go" {
+			t.Fatalf("a library dependency is evidenced by every file that imports the library: %+v", d)
+		}
+	}
+}
