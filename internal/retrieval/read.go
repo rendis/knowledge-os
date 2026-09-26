@@ -12,7 +12,7 @@ import (
 )
 
 // ReadBudget is `read`'s default size: a section with its sources, well under a harness's limit.
-const ReadBudget = 16000
+const ReadBudget = 24000
 
 // ReadOptions select what `read` returns from a note.
 type ReadOptions struct {
@@ -167,7 +167,7 @@ func (i *Index) Read(ctx context.Context, name string, o ReadOptions, w io.Write
 		fmt.Fprintf(out, "\n… continues at L%d (`--lines %d-%d`, or `--budget 60000` for the rest in one read).\n", end+1, end+1, to)
 	}
 	// Paragraphs first: the cited lines get at most a quarter of what remains.
-	render := &sourceRenderer{src: discover.NewSources(i.Root), code: o.Code, codeLeft: out.left() / 4, perText: 60, brief: o.Brief}
+	render := &sourceRenderer{src: discover.NewSources(i.Root), code: o.Code, codeLeft: out.left() / 4, perText: 200, brief: o.Brief}
 	render.writeCited(out, body.String(), defs, map[string]bool{}, repo, commit)
 	return nil
 }

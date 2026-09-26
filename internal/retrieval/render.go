@@ -69,6 +69,7 @@ type sourceRenderer struct {
 	perText  int  // footnotes resolved per text; the rest are listed by id
 	brief    bool // one line of source marks instead of the footnotes
 	covered  map[string]bool
+	routed   bool // a URL setting was followed to its route already
 }
 
 // writeCited writes the footnotes cited in body, resolved from defs (the note's footnote definitions),
@@ -81,8 +82,12 @@ func (r *sourceRenderer) writeCited(out *packWriter, body string, defs map[strin
 		}
 		return
 	}
-	lines := []string{}
+	lines, files := []string{}, []citation{}
 	for _, c := range cites {
+		if c.mark == "✓ file" {
+			files = append(files, c) // a whole unchanged file: one line for all of them below
+			continue
+		}
 		lines = append(lines, c.line)
 		if !r.code {
 			continue
@@ -91,6 +96,20 @@ func (r *sourceRenderer) writeCited(out *packWriter, body string, defs map[strin
 			r.codeLeft -= runeLen(code)
 			lines = append(lines, code)
 		}
+	}
+	switch {
+	case len(files) == 1:
+		lines = append(lines, files[0].line)
+	case len(files) > 1:
+		ps := []string{}
+		for _, c := range files {
+			p := c.def
+			if as := discover.Anchors(c.def); len(as) > 0 {
+				p = as[0].Path
+			}
+			ps = append(ps, "[^"+c.id+"] "+p)
+		}
+		lines = append(lines, "- ✓ file, unchanged whole files (no lines cited): "+strings.Join(ps, " · "))
 	}
 	if len(more) > 0 {
 		lines = append(lines, alsoCited(more))
@@ -128,6 +147,9 @@ func (r *sourceRenderer) cited(body string, defs map[string]string, seen map[str
 }
 
 func alsoCited(ids []string) string {
+	if len(ids) > 5 {
+		return fmt.Sprintf("- %d more sources not resolved for the budget (%s …): `kos read --note NAME --lines` of this paragraph alone resolves them", len(ids), strings.Join(ids[:3], " "))
+	}
 	return "- also cited: " + strings.Join(ids, " ") + " (`kos read --note NAME --lines FROM-TO` resolves them)"
 }
 
@@ -309,6 +331,13 @@ func (r *sourceRenderer) writeCode(out *packWriter, repo string, names []string,
 		line := "- `" + n + "` — " + strings.Join(parts, " · ")
 		if v := configValues(n, all[n]); v != "" {
 			line += "\n  values: " + v
+			// One URL setting per pack is followed to the route that answers it.
+			if !r.routed && urlValue.MatchString(v) {
+				r.routed = true
+				if route := routeServers(r.src, repo, n, all[n]); route != "" {
+					line += "\n  " + strings.TrimSuffix(route, "\n")
+				}
+			}
 		}
 		lines = append(lines, line)
 	}
@@ -359,7 +388,11 @@ func configValues(name string, hits []discover.Hit) string {
 		for _, p := range byValue[v] {
 			ps = append(ps, strings.TrimPrefix(p, prefix))
 		}
-		parts = append(parts, fmt.Sprintf("%s in %s", trimRunes(v, 60), compactPaths(ps)))
+		limit := 60
+		if urlValue.MatchString(v) {
+			limit = 160 // a URL is read to its path: that is where a call goes
+		}
+		parts = append(parts, fmt.Sprintf("%s in %s", trimRunes(v, limit), compactPaths(ps)))
 	}
 	return strings.Join(firstN(parts, 8), "; ")
 }
@@ -405,7 +438,8 @@ func commonDir(paths []string) string {
 
 // writeMatchingCode shows the functions of the repository at its reference branch that hold the
 // most of the question's words: the code that answers "what happens when", not only the note's words.
-func (r *sourceRenderer) writeMatchingCode(out *packWriter, repo string, terms []askTerm, prefer map[string]bool) []string {
+// The first one lists its exits, each checked against the note in raw.
+func (r *sourceRenderer) writeMatchingCode(out *packWriter, repo string, terms []askTerm, prefer map[string][][2]int, raw []byte) []string {
 	if !r.code {
 		return nil
 	}
@@ -425,20 +459,29 @@ func (r *sourceRenderer) writeMatchingCode(out *packWriter, repo string, terms [
 				f.Code = strings.Join(append(lines[:16], "    │ …"), "\n")
 			}
 		}
-		if len(f.Words) < 2 && len(words) > 1 && !prefer[f.Path] {
+		if _, cited := prefer[f.Path]; len(f.Words) < 2 && len(words) > 1 && !cited {
 			continue // one common word in an uncited function says nothing about the question
 		}
 		lang := strings.TrimPrefix(filepath.Ext(f.Path), ".")
-		text := fmt.Sprintf("\nCode matching %s in %s at %s — %s#L%d-L%d:\n```%s\n%s\n```\n", strings.Join(f.Words, ", "), repo, ref, f.Path, f.From, f.To, lang, f.Code)
+		head := fmt.Sprintf("\nCode matching %s in %s at %s — %s#L%d-L%d:\n```%s\n", strings.Join(f.Words, ", "), repo, ref, f.Path, f.From, f.To, lang)
+		code := strings.Split(f.Code, "\n")
+		exits, below := "", ""
+		if k == 0 && f.Name != "" {
+			// Where it leaves its main path, and whether the note says so; then what the functions
+			// it calls do with an error, which decides its paths as much as its own lines.
+			exits = exitLines(f, raw, ref, 8)
+			below = belowLine(r.src, repo, f)
+		}
+		tail := ""
 		if len(f.Outside) > 0 {
 			ls := []string{}
 			for _, l := range f.Outside {
 				ls = append(ls, fmt.Sprint(l))
 			}
-			text += fmt.Sprintf("Also matching in this function: L%s (`git -C <checkout> show %s:%s`).\n", strings.Join(firstN(ls, 12), ","), ref, f.Path)
+			tail += fmt.Sprintf("Also matching in this function: L%s (`git -C <checkout> show %s:%s`).\n", strings.Join(firstN(ls, 12), ","), ref, f.Path)
 		}
 		if len(f.Callers) == 0 && f.Name != "" {
-			text += "Called from: nowhere in this repository's code at " + ref + " (tests left out).\n"
+			tail += "Called from: nowhere in this repository's code at " + ref + " (tests left out).\n"
 		}
 		if len(f.Callers) > 0 {
 			cs := []string{}
@@ -449,18 +492,50 @@ func (r *sourceRenderer) writeMatchingCode(out *packWriter, repo string, terms [
 				}
 				cs = append(cs, fmt.Sprintf("%s:%d%s `%s`", c.Path, c.Line, in, trimRunes(strings.ReplaceAll(c.Text, "`", "'"), 90)))
 			}
-			text += "Called from: " + strings.Join(cs, " · ") + " (`kos code --repo " + repo + " --func NAME` shows a function with what its callers do with the result)\n"
-		}
-		if room := min(r.codeLeft, out.left()-300); runeLen(text) > room {
-			// Too long for what remains: its first lines rather than nothing, when enough fit.
-			lines := strings.Split(text, "\n")
-			for len(lines) > 14 && runeLen(strings.Join(lines, "\n"))+80 > room {
-				lines = lines[:len(lines)-1]
+			tail += "Called from: " + strings.Join(cs, " · ") + " (`kos code --repo " + repo + " --func NAME` shows a function with what its callers do with the result)\n"
+			if f.Rivals > 0 {
+				tail += fmt.Sprintf("%s has %d other definitions in this repository: a call through an interface or a variable may reach any of them.\n", discover.DefinedName(f.Name), f.Rivals)
 			}
-			if len(lines) <= 14 {
+		}
+		room := min(r.codeLeft, out.left()-300)
+		text := head + f.Code + "\n```\n" + exits + below + tail
+		if runeLen(text) > room {
+			// Too long for what remains: its first lines rather than nothing, keeping the exits,
+			// which sum up the whole function; the callers go before the code gets too short.
+			// The blocks holding the most of the question's words are kept, not the first lines.
+			cut := fmt.Sprintf("    │ … fewer lines for the budget: `kos code --repo %s --func %s` has it whole\n```\n", repo, discover.DefinedName(f.Name))
+			fit := func(extra string) string {
+				for span := len(code) - 1; span >= 4; span-- {
+					c := f.Within(span)
+					if runeLen(head+c+"\n"+cut+extra) <= room {
+						return c
+					}
+				}
+				return ""
+			}
+			// What goes first when room is short: the callers, then the calls below, then exits
+			// beyond the first four; the function's first line and its exits stay.
+			c := fit(exits + below + tail)
+			if c == "" || strings.Count(c, "\n") < 10 {
+				tail = ""
+				c = fit(exits + below)
+			}
+			if c == "" || strings.Count(c, "\n") < 10 {
+				below = ""
+				c = fit(exits)
+			}
+			if c == "" && exits != "" {
+				c = code[0]
+				if runeLen(head+c+"\n"+cut+exits) > room {
+					exits = exitLines(f, raw, ref, 4)
+				}
+				if runeLen(head+c+"\n"+cut+exits) > room {
+					return settings
+				}
+			} else if c == "" {
 				return settings
 			}
-			text = strings.Join(lines, "\n") + fmt.Sprintf("\n    │ … cut for the budget: `kos code --repo %s --func %s`\n```\n", repo, discover.DefinedName(f.Name))
+			text = head + c + "\n" + cut + exits + below + tail
 		}
 		r.codeLeft -= runeLen(text)
 		fmt.Fprint(out, text)
@@ -627,6 +702,20 @@ func writeWiring(w discover.Wiring, src *discover.Sources, out io.Writer, terms 
 		for _, role := range order {
 			fmt.Fprintf(out, "%s: %s\n", strings.ToUpper(role[:1])+role[1:], strings.Join(firstN(roles[role], 8), "; "))
 		}
+		// The event types each publisher's code writes: which of them go to this topic is read at
+		// the lines given, not assumed.
+		if src != nil {
+			seen := map[string]bool{}
+			for _, r := range w.Repos {
+				if seen[r.Repo] || r.Via != "" || strings.HasSuffix(r.File, ".tf") {
+					continue
+				}
+				seen[r.Repo] = true
+				if types := eventTypes(src, r.Repo, w.Topic); types != "" {
+					fmt.Fprintf(out, "Event types in %s's code (which reach this topic is read at the lines given): %s\n", r.Repo, types)
+				}
+			}
+		}
 	}
 	if len(w.Subscriptions) > 0 {
 		// Those the question's words name (an event type, a consumer) first, then production.
@@ -658,7 +747,7 @@ func writeWiring(w discover.Wiring, src *discover.Sources, out io.Writer, terms 
 				defer fmt.Fprintf(out, "(+%d other subscriptions on it that the question does not name: `kos read --note NAME` lists them)\n", others)
 			}
 		}
-		parts := []string{}
+		parts, delivery := []string{}, false
 		for _, s := range subs {
 			p := s.Name + " @" + s.Scope
 			if s.Filter != "" {
@@ -672,21 +761,48 @@ func writeWiring(w discover.Wiring, src *discover.Sources, out io.Writer, terms 
 			} else {
 				p += " no dead letter"
 			}
+			if s.Delivery != "" {
+				p += " (" + s.Delivery + ")"
+				delivery = true
+			}
 			if len(s.ConfiguredBy) > 0 {
 				p += " ← " + strings.Join(s.ConfiguredBy, ", ")
 			}
-			parts = append(parts, trimRunes(p, 220))
+			parts = append(parts, trimRunes(p, 300))
 		}
-		fmt.Fprintf(out, "Subscriptions on it (platform snapshots, those the question names first; retry policy and ack deadline are not captured): %s\n", strings.Join(firstN(parts, 8), "; "))
+		note := "those the question names first"
+		if !delivery {
+			note += "; ack deadline and redelivery are not in these snapshots: `kos discover platform` captures them again"
+		}
+		fmt.Fprintf(out, "Subscriptions on it (platform snapshots, %s): %s\n", note, strings.Join(firstN(parts, 8), "; "))
 	} else if len(w.Scopes) > 0 {
 		counts := []string{}
 		for _, sc := range w.Scopes {
 			counts = append(counts, fmt.Sprintf("%s (%d subscriptions, %s)", sc.Scope, sc.Subscriptions, sc.Captured))
 		}
-		fmt.Fprintf(out, "Subscriptions on it: none among those captured in %s. A subscription created in a project that was not captured does not show here; confirm with `%s`.\n", strings.Join(firstN(counts, 6), ", "), w.Confirm)
+		// Every snapshot is accounted for: those that list subscriptions (none on this topic),
+		// those that list none (unknown) and those whose capture failed.
+		total := len(w.Scopes) + len(w.NoSubs) + len(w.Failed)
+		fmt.Fprintf(out, "Subscriptions on it: none in the %d of %d captured scopes that list subscriptions: %s. A subscription created in a project that was not captured does not show here; confirm with `%s`.\n", len(w.Scopes), total, strings.Join(firstN(counts, 6), ", "), w.Confirm)
+	}
+	// The consumer question answered in one line: who reads it, from the snapshots and the code.
+	consumers := 0
+	for _, r := range w.Repos {
+		if r.Via != "" {
+			consumers++
+		}
+	}
+	if len(w.Subscriptions) == 0 && consumers == 0 && len(w.Scopes) > 0 {
+		fmt.Fprintf(out, "Consumers: none found — no subscription in the %d scopes that list them, and no repository's configuration names a subscription to it (a consumer in an uncaptured project, or reading the name under another key, would not show).\n", len(w.Scopes))
+	}
+	if len(w.PresentIn) > 0 {
+		fmt.Fprintf(out, "The topic itself is listed in: %s.\n", strings.Join(firstN(w.PresentIn, 8), ", "))
 	}
 	if len(w.NoSubs) > 0 {
 		fmt.Fprintf(out, "Scopes captured without any subscription listed (their subscriptions are unknown, not absent): %s.\n", strings.Join(firstN(w.NoSubs, 8), ", "))
+	}
+	if len(w.Failed) > 0 {
+		fmt.Fprintf(out, "Scopes whose capture failed (nothing known): %s.\n", strings.Join(firstN(w.Failed, 8), ", "))
 	}
 	if len(w.Similar) > 0 {
 		fmt.Fprintf(out, "Not to confuse with: %s (other topics with the same last segment).\n", strings.Join(firstN(w.Similar, 6), ", "))
@@ -793,4 +909,463 @@ func trimRunes(s string, n int) string {
 		return string(r[:n]) + "…"
 	}
 	return s
+}
+
+// exitLines lists where a function leaves its main path, each with the note line that names it
+// when raw is a note: the paths a note leaves out are the ones its ✓ cannot vouch for.
+func exitLines(f discover.Function, raw []byte, ref string, limit int) string {
+	if len(f.Exits) == 0 {
+		return ""
+	}
+	var lines, rawLines []string
+	if raw != nil {
+		lines = strings.Split(fold(string(raw)), "\n")
+		rawLines = strings.Split(string(raw), "\n")
+	}
+	type row struct {
+		text    string
+		missing bool
+	}
+	rows, passed := []row{}, []string{}
+	for _, e := range f.Exits {
+		if e.Propagates() {
+			passed = append(passed, fmt.Sprint(e.Line))
+			continue
+		}
+		r := row{text: fmt.Sprintf("- L%d %s", e.Line, e.Kind)}
+		if !strings.HasPrefix(e.Kind, "returns") && !strings.HasPrefix(e.Kind, "reaches") || e.Kind == "returns an error" {
+			r.text += " `" + trimRunes(strings.ReplaceAll(e.Text, "`", "'"), 90) + "`"
+		}
+		if e.When != "" {
+			r.text += fmt.Sprintf(" — under L%d `%s`", e.At, trimRunes(strings.ReplaceAll(e.When, "`", "'"), 80))
+		}
+		if lines != nil {
+			// The paragraph whose source covers the exit's line describes it best; failing that,
+			// a line sharing two of its words, one of them rare in the note.
+			cite, span := citingParagraph(rawLines, f.Path, e.Line)
+			at, shared := noteLineSharing(lines, e.Names)
+			pw := pathWords(e.Names)
+			words := strings.Join(pw[:min(4, len(pw))], ", ")
+			// A link covering a few lines describes them; one covering a whole function says
+			// less than a line that shares the path's words.
+			switch {
+			case cite > 0 && (spanLines(span) <= 30 || at == 0):
+				r.text += fmt.Sprintf(" — note L%d cites %s", cite, span)
+			case at > 0:
+				r.text += fmt.Sprintf(" — note L%d (%s)", at, strings.Join(shared, ", "))
+			case words == "":
+				r.text += " — ✗"
+				r.missing = true
+			default:
+				r.text += " — ✗ (" + words + ")"
+				r.missing = true
+			}
+		}
+		rows = append(rows, r)
+	}
+	if len(rows) > limit {
+		// The paths the note leaves out first: they are what the reader cannot get elsewhere.
+		sort.SliceStable(rows, func(a, b int) bool { return rows[a].missing && !rows[b].missing })
+		rows = rows[:limit]
+	}
+	head := fmt.Sprintf("Exits of %s (the whole function, L%d-L%d at %s", discover.DefinedName(f.Name), f.Start, f.End, ref)
+	if lines != nil {
+		head += "; note Ln cites = the paragraph whose source covers the line · note Ln (words) = the line sharing the path's words · ✗ = neither"
+	}
+	out := []string{head + "):"}
+	for _, r := range rows {
+		out = append(out, r.text)
+	}
+	if more := len(f.Exits) - len(passed) - len(rows); more > 0 {
+		out = append(out, fmt.Sprintf("- … %d more", more))
+	}
+	if len(passed) > 0 {
+		out = append(out, "- L"+strings.Join(firstN(passed, 10), ",L")+" pass on the error of the call before them")
+	}
+	// A caller that branches on the result says what each return value leads to.
+	name := discover.DefinedName(f.Name)
+	for _, c := range f.Callers {
+		if m := regexp.MustCompile(`\b` + regexp.QuoteMeta(name) + `\(.*\)\s*\?\s*(.+?)\s*:\s*(.+?)\s*;?$`).FindStringSubmatch(c.Text); m != nil {
+			out = append(out, fmt.Sprintf("- its result at %s:%d: true → `%s`, false → `%s`", c.Path, c.Line, trimRunes(m[1], 50), trimRunes(m[2], 50)))
+		}
+	}
+	return strings.Join(out, "\n") + "\n"
+}
+
+// noteLineSharing is the note line (1-based) that shares the most of an exit's words, and those
+// words; 0 when no line shares two of them (or its only one). Words compare by their first five
+// letters, so validating meets validación and duplicate meets duplicado.
+func noteLineSharing(lines []string, names []string) (int, []string) {
+	words := pathWords(names)
+	if len(words) == 0 {
+		return 0, nil
+	}
+	need := min(2, len(words))
+	lineWords := make([]map[string]bool, len(lines))
+	df := map[string]int{}
+	for k, l := range lines {
+		lineWords[k] = map[string]bool{}
+		for _, w := range pathWords([]string{l}) {
+			lineWords[k][w] = true
+			df[w]++
+		}
+	}
+	// A word on more than a few lines (the repository's domain: order, sale) says little alone.
+	rare := max(3, len(lines)/25)
+	best, bestWords := 0, []string(nil)
+	for k := range lines {
+		shared, specific := []string{}, false
+		for _, w := range words {
+			if lineWords[k][w] {
+				shared = append(shared, w)
+				specific = specific || df[w] <= rare
+			}
+		}
+		if len(shared) >= need && specific && len(shared) > len(bestWords) {
+			best, bestWords = k+1, shared
+		}
+	}
+	return best, bestWords
+}
+
+// pathWords splits names and messages into words (camelCase, snake_case, prose), folded and cut
+// to five letters; status codes and exit, ack, nack, panic stay whole.
+func pathWords(names []string) []string {
+	out, seen := []string{}, map[string]bool{}
+	for _, n := range names {
+		n = camelBreak.ReplaceAllString(n, "$1 $2")
+		for _, w := range regexp.MustCompile(`[\pL\pN]+`).FindAllString(fold(n), -1) {
+			switch {
+			case statusCode.MatchString(w), w == "ack" || w == "nack" || w == "exit" || w == "panic":
+			case runeLen(w) < 4 || pathStop[w]:
+				continue
+			default:
+				w = string([]rune(w)[:min(5, runeLen(w))])
+				if logWord[w] {
+					continue // Errorln, Warnf, Println: how it logs, not what
+				}
+			}
+			if !seen[w] {
+				seen[w] = true
+				out = append(out, w)
+			}
+		}
+	}
+	return out
+}
+
+var logWord = map[string]bool{"error": true, "warnl": true, "warnf": true, "warni": true, "infol": true, "infof": true, "debug": true, "print": true, "fatal": true, "logge": true, "conso": true, "sprin": true}
+
+var (
+	camelBreak = regexp.MustCompile(`([a-z0-9])([A-Z])`)
+	statusCode = regexp.MustCompile(`^[45]\d\d$`)
+	pathStop   = map[string]bool{}
+)
+
+func init() {
+	for _, w := range strings.Fields(`error errors this that true false null undefined return const await async catch
+		throw with from when then else function message string number boolean string status response request
+		logger level info warn debug timestamp date new promise void self none nil data json stringify log isostring
+		each foreach empty isempty length size list item items value values result results get set`) {
+		pathStop[w] = true
+	}
+}
+
+// processExits lists where the repository ends its own process, each checked against the note:
+// an exit the note does not name is a path its ✓ cannot vouch for. Exits while starting (main, init,
+// loading configuration) only say the process does not start, and are grouped apart.
+func (r *sourceRenderer) processExits(repo string, raw []byte) string {
+	if !r.code {
+		return ""
+	}
+	hits, ref := r.src.ProcessExits(repo)
+	running, starting, count := []discover.Hit{}, []string{}, map[string]int{}
+	for _, h := range hits {
+		if startupFunc.MatchString(h.In) || startupFile.MatchString(h.Path) && h.In == "" {
+			// Grouped by function: loadProperties ×5 (internal/infra/config/property/properties.go:85)
+			key := h.In
+			if key == "" {
+				key = filepath.Base(h.Path)
+			}
+			if count[key] == 0 {
+				starting = append(starting, key+"\x00"+fmt.Sprintf("%s:%d", h.Path, h.Line))
+			}
+			count[key]++
+			continue
+		}
+		running = append(running, h)
+	}
+	for k, v := range starting {
+		key, at, _ := strings.Cut(v, "\x00")
+		starting[k] = fmt.Sprintf("%s (%s)", key, at)
+		if count[key] > 1 {
+			starting[k] = fmt.Sprintf("%s ×%d (%s)", key, count[key], at)
+		}
+	}
+	if len(running) == 0 && len(starting) == 0 {
+		return ""
+	}
+	text := fmt.Sprintf("\nProcess exits in %s at %s (tests left out", repo, ref)
+	if len(running) > 8 {
+		text += fmt.Sprintf("): %d lines end the running process (`kos code --repo %s --grep 'process\\.exit|os\\.Exit|log\\.Fatal|sys\\.exit'`)", len(running), repo)
+	} else if len(running) > 0 {
+		lines := strings.Split(fold(string(raw)), "\n")
+		rows := []string{}
+		for _, h := range running {
+			row := fmt.Sprintf("%s:%d", h.Path, h.Line)
+			if h.In != "" {
+				row += " in " + h.In
+			}
+			row += " `" + trimRunes(strings.ReplaceAll(h.Text, "`", "'"), 70) + "`"
+			call := fold(strings.SplitN(discover.ExitCall(h.Text), "(", 2)[0])
+			at := 0
+			for k, l := range lines {
+				if strings.Contains(l, call) && (h.In == "" || strings.Contains(l, fold(h.In))) {
+					at = k + 1
+					break
+				}
+			}
+			if at > 0 {
+				row += fmt.Sprintf(" — note L%d", at)
+			} else {
+				row += " — ✗"
+			}
+			rows = append(rows, row)
+		}
+		text += "; ✗ = no line of this note names the call with its function): " + strings.Join(rows, " · ")
+	} else {
+		text += ")"
+	}
+	if len(starting) > 0 {
+		sep := ". "
+		if len(running) == 0 {
+			sep = ": "
+		}
+		text += fmt.Sprintf("%sonly while starting: %s", sep, strings.Join(firstN(starting, 4), " · "))
+		if len(starting) > 4 {
+			text += fmt.Sprintf(" +%d", len(starting)-4)
+		}
+	}
+	return text + "\n"
+}
+
+var (
+	startupFunc = regexp.MustCompile(`(?i)^(main|init|setup\w*|bootstrap\w*|start(up)?|run|load\w*|read(config|env|properties)\w*|must\w*|new(config|app|server)\w*|configure\w*)$`)
+	startupFile = regexp.MustCompile(`(^|/)(main\.go|index\.[jt]s|server\.[jt]s|app\.[jt]s|main\.py|__main__\.py)$|(^|/)cmd/`)
+)
+
+// citingParagraph is the first body line of the note that cites, through a footnote, a range of
+// path holding line; with the range. A footnote definition cited by no body line counts itself.
+func citingParagraph(rawLines []string, path string, line int) (int, string) {
+	def := regexp.MustCompile(`^\[\^([^\]]+)\]:`)
+	for k, l := range rawLines {
+		m := def.FindStringSubmatch(l)
+		if m == nil {
+			continue
+		}
+		for _, a := range discover.Anchors(l) {
+			if a.Path != path || a.From == 0 || line < a.From || line > max(a.To, a.From) {
+				continue
+			}
+			span := fmt.Sprintf("L%d-L%d", a.From, max(a.To, a.From))
+			ref := "[^" + m[1] + "]"
+			for j, body := range rawLines {
+				if j != k && strings.Contains(body, ref) && !def.MatchString(body) {
+					return j + 1, span
+				}
+			}
+			return k + 1, span
+		}
+	}
+	return 0, ""
+}
+
+// belowLine names the repository's functions f calls that swallow an error, throw or end the
+// process: `saveData` (oracle.ts:94) catches and continues at L139.
+func belowLine(src *discover.Sources, repo string, f discover.Function) string {
+	// Functions that end the process, so a call two levels down that reaches one shows too.
+	ends := processEnders(src, repo)
+	rows := []string{}
+	for _, c := range src.Callees(repo, f, 12) {
+		if len(c.Defs) > 2 {
+			continue // an interface method or a common name: which one runs is not known here
+		}
+		for _, d := range c.Defs {
+			notable := []string{}
+			for _, e := range d.Exits {
+				switch {
+				case strings.HasPrefix(e.Kind, "catches"), strings.HasPrefix(e.Kind, "continues after"), e.Kind == "exits the process", e.Kind == "throws", e.Kind == "panics":
+					notable = append(notable, fmt.Sprintf("%s at L%d", e.Kind, e.Line))
+				}
+			}
+			for _, via := range src.Callees(repo, d, 12) {
+				for _, vd := range via.Defs {
+					for e := range ends {
+						switch {
+						case via.Name == e:
+							notable = append(notable, fmt.Sprintf("calls %s, which ends the process", e))
+						case strings.Contains(vd.Code, e+"("):
+							notable = append(notable, fmt.Sprintf("reaches a process exit through %s → %s", via.Name, e))
+						}
+					}
+				}
+			}
+			if len(notable) > 0 {
+				rows = append(rows, fmt.Sprintf("`%s` (%s:%d, called at L%d) %s", c.Name, d.Path, d.Start, c.Line, strings.Join(firstN(uniqueStrings(notable), 3), ", ")))
+			}
+		}
+	}
+	if len(rows) == 0 {
+		return ""
+	}
+	return "Below it: " + strings.Join(firstN(rows, 5), " · ") + " (`kos code --repo " + repo + " --func NAME --down` lists every call with its exits)\n"
+}
+
+// spanLines is how many lines an "L12-L40" range covers.
+func spanLines(span string) int {
+	var from, to int
+	if _, e := fmt.Sscanf(span, "L%d-L%d", &from, &to); e != nil {
+		return 0
+	}
+	return to - from + 1
+}
+
+var eventTypeLiteral = regexp.MustCompile(`(?i)event_?type\w*["']?\s*:?=?\s*["']([A-Za-z][\w.\-]+)["']`)
+
+// eventTypes lists the event type literals a repository's code writes, each at its first line.
+// Those sharing the topic's words (transaction-acked: transactionAcknowledged) come first.
+func eventTypes(src *discover.Sources, repo, topic string) string {
+	hits, in, _, err := src.Search(repo, `[Ee]vent_?[Tt]ype[A-Za-z0-9_]*["']?[[:space:]]*:?=?[[:space:]]*["'][A-Za-z]`, "", false, false, false)
+	if err != nil {
+		return ""
+	}
+	seen, rows := map[string]bool{}, []string{}
+	for _, h := range hits {
+		if !discover.CodeFile(h.Path) {
+			continue
+		}
+		m := eventTypeLiteral.FindStringSubmatch(h.Text)
+		if m == nil || seen[m[1]] {
+			continue
+		}
+		seen[m[1]] = true
+		row := fmt.Sprintf("`%s` (%s:%d", m[1], h.Path, h.Line)
+		if in[h] != "" {
+			row += " in " + in[h]
+		}
+		rows = append(rows, row+")")
+	}
+	stems := []string{}
+	for _, w := range regexp.MustCompile(`[a-z]+`).FindAllString(strings.ToLower(topic[strings.LastIndex(topic, ".")+1:]), -1) {
+		if len(w) >= 3 {
+			stems = append(stems, w[:3])
+		}
+	}
+	score := func(row string) int {
+		n, lit := 0, strings.ToLower(row[:strings.Index(row, " (")])
+		for _, st := range stems {
+			if strings.Contains(lit, st) {
+				n++
+			}
+		}
+		return n
+	}
+	sort.SliceStable(rows, func(a, b int) bool { return score(rows[a]) > score(rows[b]) })
+	// When some share the topic's words, those; the rest likely go to other topics and are counted.
+	if len(rows) > 0 && score(rows[0]) > 0 {
+		k := 0
+		for k < len(rows) && score(rows[k]) == score(rows[0]) {
+			k++
+		}
+		if k < len(rows) {
+			others := []string{}
+			for _, r := range rows[k:] {
+				others = append(others, r[:strings.Index(r, " (")])
+			}
+			return strings.Join(firstN(rows[:k], 8), " · ") + "; not named like this topic, likely for others: " + strings.Join(firstN(others, 8), ", ")
+		}
+	}
+	return strings.Join(firstN(rows, 8), " · ")
+}
+
+func uniqueStrings(xs []string) []string {
+	seen, out := map[string]bool{}, []string{}
+	for _, x := range xs {
+		if !seen[x] {
+			seen[x] = true
+			out = append(out, x)
+		}
+	}
+	return out
+}
+
+// writeConsumed: the subscriptions a repository reads, from the discovery facts, with what the
+// platform snapshots say of each (topic, filter, dead letter, delivery): where its failures go.
+func writeConsumed(out io.Writer, subs []discover.WiringSubscription) {
+	if len(subs) == 0 {
+		return
+	}
+	consumedOrder(subs)
+	rows := []string{}
+	for _, s := range subs {
+		row := s.Name
+		if s.Scope != "" {
+			row += " @" + s.Scope
+		}
+		if s.Topic != "" {
+			row += " ← " + s.Topic
+		}
+		if s.Filter != "" {
+			row += " filter " + s.Filter
+		}
+		switch {
+		case s.Scope == "":
+			row += " (in no captured snapshot)"
+		case s.DeadLetter != "":
+			row += " dead letter " + s.DeadLetter
+		default:
+			row += " no dead letter"
+		}
+		if s.Delivery != "" {
+			row += " (" + s.Delivery + ")"
+		}
+		rows = append(rows, trimRunes(row, 260))
+	}
+	fmt.Fprintf(out, "Consumes (discovery facts + platform snapshots): %s\n", strings.Join(firstN(rows, 6), "; "))
+}
+
+// processEnders names the functions of a repository that end the running process.
+func processEnders(src *discover.Sources, repo string) map[string]bool {
+	hits, _ := src.ProcessExits(repo)
+	ends := map[string]bool{}
+	for _, h := range hits {
+		if h.In != "" && !startupFunc.MatchString(h.In) {
+			ends[h.In] = true
+		}
+	}
+	return ends
+}
+
+// endsThrough says whether a function calls one that ends the process: "calls closePool, which ends
+// the process".
+func endsThrough(f discover.Function, ends map[string]bool) string {
+	for e := range ends {
+		if discover.DefinedName(f.Name) != e && strings.Contains(f.Code, e+"(") {
+			return "calls " + e + ", which ends the process"
+		}
+	}
+	return ""
+}
+
+var consumedOrder = func(subs []discover.WiringSubscription) {
+	rank := func(s discover.WiringSubscription) int {
+		switch {
+		case s.Scope == "":
+			return 3
+		case strings.Contains(s.Scope, "prod") || strings.Contains(s.Scope, "prd"):
+			return 0
+		}
+		return 1
+	}
+	sort.SliceStable(subs, func(a, b int) bool { return rank(subs[a]) < rank(subs[b]) })
 }
