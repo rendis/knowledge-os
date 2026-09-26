@@ -307,6 +307,20 @@ func safePath(vault, rel string) error {
 }
 
 // Apply writes the plan: managed files, retired files removed, the local ignore rules and the lock.
+// bases are the root Bases a cell starts with; Apply writes the missing ones and never changes the others.
+var bases = []string{"Arquitectura.base", "Auditoria.base", "Operacion.base", "Repos.base"}
+
+// Written lists every path Apply may write for p: the plan's files, the starting Bases, the Claude
+// skills link, the ignore rules, Obsidian's app settings and the lock.
+func Written(p Plan) []string {
+	out := []string{LockName, ".gitignore", ".claude/skills", ".obsidian/app.json"}
+	out = append(out, bases...)
+	for _, c := range p.Changes {
+		out = append(out, c.Path)
+	}
+	return out
+}
+
 func Apply(vault string, p Plan) error {
 	for _, c := range p.Changes {
 		target := filepath.Join(vault, filepath.FromSlash(c.Path))
@@ -325,7 +339,7 @@ func Apply(vault string, p Plan) error {
 			return e
 		}
 	}
-	for _, base := range []string{"Arquitectura.base", "Auditoria.base", "Operacion.base", "Repos.base"} {
+	for _, base := range bases {
 		if _, e := os.Stat(filepath.Join(vault, base)); os.IsNotExist(e) {
 			b, _ := fs.ReadFile(knowledgeos.Payload, "kernel/"+base)
 			if e := writeFile(filepath.Join(vault, base), b); e != nil {
@@ -514,7 +528,13 @@ const Help = `kernel COMMAND --vault PATH
                              nothing is written until it is kept in a cell-owned file or --force
                              restores the distribution version. A cell file the kernel never installed,
                              at a path it now ships, is never replaced, even with --force: rename it.
-                             Commit the result as one change.`
+                             Commit the result as one change.
+  update --all [--dry-run] [--commit]
+                             every vault this machine remembers (kos vaults) whose kernel is older:
+                             current, newer and not-found vaults are listed and left alone; a refusal
+                             never uses --force and does not stop the others. --commit commits only
+                             what the update wrote, on the current branch, and refuses a vault with
+                             pending tracked changes or on a sync/ branch.`
 
 func Run(args []string, out io.Writer) error {
 	if len(args) == 0 || args[0] == "--help" || args[0] == "-h" {
@@ -537,55 +557,84 @@ func Run(args []string, out io.Writer) error {
 	if e != nil {
 		return e
 	}
-	p, e := Preview(root)
-	if e != nil {
-		return e
-	}
-	res := map[string]any{"vault_kernel": p.From, "kos_kernel": p.To, "changes": len(p.Changes), "conflicts": p.Conflicts, "unsafe": p.Unsafe, "foreign": p.Foreign}
 	switch args[0] {
 	case "status":
-		res["current"] = len(p.Changes) == 0 && p.From == p.To
-		if !res["current"].(bool) {
-			res["next"] = "kos kernel update --vault \"" + root + "\" --dry-run"
+		res, e := Status(root)
+		if e != nil {
+			return e
 		}
 		return emit(out, res)
 	case "update":
+		res, e := Update(root, Options{DryRun: *dry, Diff: *full, Force: *force})
+		if res != nil {
+			_ = emit(out, res)
+		}
+		return e
 	default:
 		return fmt.Errorf("unknown kernel command %q", args[0])
 	}
+}
+
+func summary(p Plan) map[string]any {
+	return map[string]any{"vault_kernel": p.From, "kos_kernel": p.To, "changes": len(p.Changes), "conflicts": p.Conflicts, "unsafe": p.Unsafe, "foreign": p.Foreign}
+}
+
+// Status compares the vault's kernel with the one kos carries.
+func Status(root string) (map[string]any, error) {
+	p, e := Preview(root)
+	if e != nil {
+		return nil, e
+	}
+	res := summary(p)
+	res["current"] = len(p.Changes) == 0 && p.From == p.To
+	if !res["current"].(bool) {
+		res["next"] = "kos kernel update --vault \"" + root + "\" --dry-run"
+	}
+	return res, nil
+}
+
+// Options select how Update runs.
+type Options struct{ DryRun, Diff, Force bool }
+
+// Update brings the vault's kernel to the one kos carries. It returns the result to report even when it
+// refuses (status conflict, foreign or unsafe) together with the error.
+func Update(root string, o Options) (map[string]any, error) {
+	p, e := Preview(root)
+	if e != nil {
+		return nil, e
+	}
+	res := summary(p)
 	res["files"] = p.Changes
 	res["unchanged"] = p.Unchanged
-	if *dry {
-		if d, e := diff(root, p, !*full); e == nil {
+	if o.DryRun {
+		if d, e := diff(root, p, !o.Diff); e == nil {
 			res["diff"] = d
 		}
 		res["next"] = "kos kernel update --vault \"" + root + "\""
-		return emit(out, res)
+		return res, nil
 	}
 	if len(p.Unsafe) > 0 {
-		res["status"], res["unsafe"] = "unsafe", p.Unsafe
+		res["status"] = "unsafe"
 		res["next"] = "these targets are not regular files or sit under a symbolic link: move them explicitly, then run again"
-		_ = emit(out, res)
-		return errors.New("unsafe managed targets; nothing written")
+		return res, errors.New("unsafe managed targets; nothing written")
 	}
 	if len(p.Foreign) > 0 {
 		res["status"] = "foreign"
 		res["next"] = "these cell files sit where the kernel now ships its own: rename or move them (a cell skill takes another name), then run again"
-		_ = emit(out, res)
-		return errors.New("cell files at kernel paths; nothing written")
+		return res, errors.New("cell files at kernel paths; nothing written")
 	}
-	if len(p.Conflicts) > 0 && !*force {
+	if len(p.Conflicts) > 0 && !o.Force {
 		res["status"] = "conflict"
 		res["next"] = "these managed files changed in the vault (git diff shows how): keep cell logic in cell-owned files, then run again, or pass --force to restore the distribution version"
-		_ = emit(out, res)
-		return errors.New("kernel files changed locally; nothing written")
+		return res, errors.New("kernel files changed locally; nothing written")
 	}
 	if e := Apply(root, p); e != nil {
-		return e
+		return nil, e
 	}
 	res["status"] = "updated"
+	res["written"] = Written(p)
 	res["next"] = "review git diff and commit the kernel update as one change"
-	return emit(out, res)
+	return res, nil
 }
 
 func emit(out io.Writer, v any) error {

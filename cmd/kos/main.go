@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"os/signal"
 	"path/filepath"
 
@@ -22,6 +23,7 @@ import (
 	"knowledge-os/internal/kernel"
 	"knowledge-os/internal/release"
 	"knowledge-os/internal/retrieval"
+	"knowledge-os/internal/vaults"
 )
 
 var version = "dev"
@@ -52,8 +54,11 @@ investigation new|list|check|add|state|absorb|close|reopen --vault PATH ...
 handoff start|status|refresh|reconcile --vault PATH ...
 sync start|status|review|verify|acknowledge|finish|pull --vault PATH ...
 kernel status|update [--dry-run] [--diff] [--force] --vault PATH
+kernel update --all [--dry-run] [--commit]   every remembered vault with an older kernel
+vaults [list] | add PATH | remove PATH | scan DIR [--depth N]   the vaults this machine knows
 version [--vault PATH]     this kos, the kernel it carries, the vault's kernel, the latest release
-update [--version X]       install the latest (or a given) kos release in place of this one
+update [--version X]       install the latest (or a given) kos release in place of this one, then
+                           list the remembered vaults and the ones its kernel would update
 
 --vault defaults to KOS_VAULT, else the vault that contains the current directory. Notices (a newer
 kos, a vault kernel older or newer than this kos) go to stderr, one line each; stdout stays JSON.
@@ -81,11 +86,24 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 		if e != nil {
 			return e
 		}
+		listAfterUpdate(res, self)
 		return emit(stdout, res)
+	case "vaults":
+		return vaults.Run(args[1:], stdout)
+	}
+	if all(args) {
+		res, e := vaults.UpdateAll(kernel.Options{DryRun: has(args, "--dry-run")}, has(args, "--commit"))
+		if res != nil {
+			_ = emit(stdout, res)
+		}
+		return e
 	}
 	args = withVault(args)
 	if e := notices(args, stderr); e != nil {
 		return e
+	}
+	if root, vk := vaultKernel(args); vk != "" {
+		vaults.Register(root)
 	}
 	switch args[0] {
 	case "inventory":
@@ -114,6 +132,43 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 		return retrieval.Run(ctx, args[0], args[1:], stdout)
 	default:
 		return fmt.Errorf("unknown command %q; use --help", args[0])
+	}
+}
+
+func has(args []string, flag string) bool {
+	for _, a := range args {
+		if a == flag {
+			return true
+		}
+	}
+	return false
+}
+
+// all is `kernel update --all`: every remembered vault instead of one.
+func all(args []string) bool {
+	return len(args) > 1 && args[0] == "kernel" && args[1] == "update" && has(args, "--all")
+}
+
+// listAfterUpdate adds the remembered vaults, checked by the kos now installed (its kernel is the one
+// that counts), and the step they call for.
+func listAfterUpdate(res map[string]any, self string) {
+	bin := self
+	if p, ok := res["path"].(string); ok && res["status"] == "updated" {
+		bin = p
+	}
+	cmd := exec.Command(bin, "vaults")
+	cmd.Env = append(os.Environ(), "KOS_NO_UPDATE_CHECK=1")
+	out, e := cmd.Output()
+	var list map[string]any
+	if e != nil || json.Unmarshal(out, &list) != nil {
+		res["next"] = "run `kos vaults` to see which vaults carry an older kernel"
+		return
+	}
+	res["vaults"] = list["vaults"]
+	if next, ok := list["next"].(string); ok {
+		res["next"] = next
+	} else {
+		delete(res, "next")
 	}
 }
 
@@ -207,7 +262,7 @@ func gated(args []string) bool {
 
 func notices(args []string, stderr io.Writer) error {
 	if latest := release.Newer(version); latest != "" {
-		fmt.Fprintf(stderr, "kos notice: kos %s is available (this is %s); tell the user and, with their approval, run `kos update`\n", latest, version)
+		fmt.Fprintf(stderr, "kos notice: kos %s is available (this is %s); tell the user and, with their approval, run `kos update`: it lists the vaults whose kernel it would update\n", latest, version)
 	}
 	root, vk := vaultKernel(args)
 	if vk == "" || args[0] == "kernel" {
