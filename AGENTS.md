@@ -2,7 +2,7 @@
 
 This checkout is the **installable template**, not a cell knowledge vault. Do not map systems, write `10/`–`70/` notes, or treat `kernel/AGENTS.md` as this repo's router.
 
-Consumer vaults are created with `./install.sh init --dest <vault>`. Work here is the CLI, packaging, kernel payload, adapters, and evals. `CONTEXT.md` defines the terms.
+Consumer vaults are created with `./install.sh init --dest <vault>`. Work here is the CLI, packaging, kernel payload, adapters, and evals.
 
 ## Before changing anything
 
