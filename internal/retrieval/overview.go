@@ -22,6 +22,7 @@ var (
 	ovField    = regexp.MustCompile(`(?m)^([\w-]+):\s*(.*)$`)
 	ovLink     = regexp.MustCompile(`\[\[([^\]|#]+)`)
 	ovSentence = regexp.MustCompile(`^(.{20,220}?[.!?])(\s|$)`)
+	ovComment  = regexp.MustCompile(`(?s)<!--.*?-->`)
 	ovNoise    = regexp.MustCompile("\\[\\^[^\\]]+\\]|\\[\\[([^\\]|#]+)(?:\\|[^\\]]*)?\\]\\]|`")
 )
 
@@ -41,7 +42,11 @@ func overviewLine(stem string, raw []byte) string {
 	}
 	fields := map[string]string{}
 	for _, m := range ovField.FindAllStringSubmatch(fm, -1) {
-		fields[m[1]] = strings.TrimSpace(m[2])
+		v := m[2]
+		if k := strings.Index(v, " #"); k >= 0 && !strings.HasPrefix(strings.TrimSpace(v), "\"") {
+			v = v[:k] // a YAML comment, not the value
+		}
+		fields[m[1]] = strings.TrimSpace(v)
 	}
 	parts := []string{"[[" + stem + "]]"}
 	if tipo := strings.Trim(fields["tipo"], `"'`); tipo != "" {
@@ -61,12 +66,20 @@ func overviewLine(stem string, raw []byte) string {
 		}
 	}
 	summary := ""
-	for _, para := range strings.Split(body, "\n\n") {
+	for _, para := range strings.Split(ovComment.ReplaceAllString(body, ""), "\n\n") {
 		p := strings.TrimSpace(para)
-		if p == "" || strings.HasPrefix(p, "#") || strings.HasPrefix(p, "|") || strings.HasPrefix(p, "```") || strings.HasPrefix(p, "[^") || strings.HasPrefix(p, ">") || strings.HasPrefix(p, "-") {
+		if p == "" || strings.HasPrefix(p, "#") || strings.HasPrefix(p, "|") || strings.HasPrefix(p, "```") || strings.HasPrefix(p, "[^") || strings.HasPrefix(p, ">") {
 			continue
 		}
-		p = ovNoise.ReplaceAllString(strings.Join(strings.Fields(p), " "), "$1")
+		// A purpose written as bullets starts with its first bullet; a list of bare links is an index, not prose.
+		bullet := strings.HasPrefix(p, "- ") || strings.HasPrefix(p, "* ")
+		if bullet {
+			p = strings.TrimSpace(strings.SplitN(p[2:], "\n", 2)[0])
+		}
+		p = strings.TrimSpace(ovNoise.ReplaceAllString(strings.Join(strings.Fields(p), " "), "$1"))
+		if bullet && len(strings.Fields(p)) < 4 {
+			continue
+		}
 		if m := ovSentence.FindStringSubmatch(p); m != nil {
 			summary = m[1]
 		} else if r := []rune(p); len(r) > 220 {
