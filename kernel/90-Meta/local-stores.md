@@ -15,7 +15,7 @@ local to one checkout and ignored by Git.
 | `.knowledge-os-config.yaml` | Machine paths and local capability settings | `onboard-developer` |
 
 `investigations/` is versioned and searchable but outside the technical graph traversal and note audit;
-`links` still returns investigation pointers, and `sync verify` gates changed cases with `investigation check`.
+`sync verify` gates changed cases with `investigation check`.
 
 When temporary work in `.scratch/<task>/` later belongs to an investigation, move it to the case's
 private directory; a file that is the source or method of a result a record cites is attached to that

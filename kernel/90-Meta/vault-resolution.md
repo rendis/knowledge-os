@@ -92,7 +92,7 @@ obsidian "vault=<obsidian_vault>" unresolved
 obsidian "vault=<obsidian_vault>" orphans
 ```
 
-Use the native CLI for bounded indexed retrieval: `<CLI> ask --vault "<VAULT_ROOT>" --query "<terms>"` for a question (every note holding the terms, their lines and whether their sources still hold), `<CLI> search --vault "<VAULT_ROOT>" --query "<terms>"` for a term. Read the lines it gives in each note that bears on the claim. Obsidian CLI can additionally inspect canonical resolution, backlinks, unresolved links and orphans. Use the host's safe filesystem editing mechanism for versioned Markdown and skill files so Git can review the exact diff. Pass the resolved `VAULT_ROOT` explicitly to CLI operations.
+Search and read the notes with the host's own tools. Obsidian CLI can additionally inspect canonical resolution, backlinks, unresolved links and orphans. Use the host's safe filesystem editing mechanism for versioned Markdown and skill files so Git can review the exact diff. Pass the resolved `VAULT_ROOT` explicitly to CLI operations.
 
 Never issue an Obsidian command without the explicit `"vault=<obsidian_vault>"` argument; the implicit target is the most recently focused vault and is not safe evidence.
 

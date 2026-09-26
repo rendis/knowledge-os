@@ -4,8 +4,8 @@
 
 ```text
 init · adopt · doctor
-ask · read · code · overview · search · index · links · inventory · audit
-discover run|questions|answer|platform|report|check|claims|corrections
+inventory · audit
+discover run|questions|answer|platform|report|check|corrections
 config status|resolve|workspace|locate|capability|bind|catalog|areas|operation|…
 check links|bases|obsidian-binding|map-closure
 investigation new|list|check|add|state|absorb|close|reopen
@@ -16,13 +16,14 @@ kernel status|update [--all] · vaults · version · update
 
 ## What each area does
 
-- **Retrieval** (`ask`, `read`, `code`, `overview`, `search`, `links`): `ask` answers the agent's first need in one bounded call — where every term occurs across the notes, the notes a question names or matches with their relevant passages, each passage's sources checked against the reference branch with the cited code, each repository note's checkout and freshness, the related notes, the cases and the sources beyond the vault. `read` returns a section or line range with its sources checked the same way; `code` reads a repository at its reference branch (a function with its callers, a file, or a search whose absence states its scope). `overview`, `search` and `links` reach what those do not.
+Reading and searching notes, code and snapshots is left to the agent's own tools; kos builds the map and checks it.
+
 - **Discovery** (`discover`): connection facts extracted deterministically from repositories (imports, manifests, configuration and IaC), typed by stored judgments and completed by read-only platform snapshots of the cell's clouds (Google Cloud, AWS and Azure: messaging, databases, storage and warehouse, each read with its own CLI and the developer's login). What the providers do not read, the agent inspects with the tools in reach and records (`discover platform --record`). Note gates (`discover check`) verify anchors, coverage and stale citations; `discover claims` checks a draft answer's resource names.
 - **Investigations** (`investigation`): one case per line of work, written only through the CLI, gated on every write, and published, absorbed or retired on a sync branch.
 - **Development handoffs** (`handoff`): atomic task packages prepared in a repository worktree, with a managed `AGENTS.md` section that tells any harness how to work with them, and a deterministic reconciliation back into the case.
 - **Publication through Git** (`sync`): knowledge changes on a `sync/<slug>` branch, with gates, a review bound to the exact content and a fast-forward finish.
 
-Discovery judgments are answered by Jev when `TYPESAFE_API_KEY` is set, otherwise by the agent through `discover questions` and `discover answer`. Search keeps a private local SQLite index outside the vault; results are pointers to open and verify, not answers. No hooks or model services are installed.
+Discovery judgments are answered by Jev when `TYPESAFE_API_KEY` is set, otherwise by the agent through `discover questions` and `discover answer`.
 
 Failures, unwanted behaviors and proposals come back through the `report-to-distribution` skill as sanitized issues (templates in `.github/ISSUE_TEMPLATE/`).
 

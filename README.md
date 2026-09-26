@@ -40,7 +40,7 @@ The vault is the map, not the boundary. When a note is missing or stale, the age
 |:-:|---|---|---|
 | 1 | **Onboard** | The cell says who it is, where its code lives and which clouds it runs on; `onboard-developer` sets up each machine once. | `kos init` |
 | 2 | **Discover** | Connections extracted from repositories and read-only cloud snapshots; note gates catch stale citations. | `kos discover` |
-| 3 | **Ask** | The agent answers from inspected sources, grades each claim and checks the names it cites. | `kos discover claims` |
+| 3 | **Ask** | The agent answers from inspected sources with its own tools, grades each claim and checks the names it cites. | `kos discover check` |
 | 4 | **Investigate** | One case per line of work, written only through the CLI and gated on every write. | `kos investigation` |
 | 5 | **Hand off** | Atomic tasks in a repository worktree for any harness, reconciled back into the case. | `kos handoff` |
 | 6 | **Sync** | A `sync/<slug>` branch with gates, a review bound to the exact content and a fast-forward finish. | `kos sync` |
@@ -52,10 +52,6 @@ Click a flow to watch it step by step in [the flow guide](https://rendis.github.
 **Discover** — three repositories and a cloud project become connections, each with its evidence.
 
 <img src="docs/assets/demo-discover.gif" width="100%" alt="kos discover scans three repositories, records the agent's judgments, captures the gcp project read-only and reports a subscription backed by configuration and platform evidence.">
-
-**Ask** — before an answer is delivered, every resource it names is checked; an invented topic is caught.
-
-<img src="docs/assets/demo-claims.gif" width="100%" alt="kos discover claims flags refund-requested as a name no repository, snapshot or note knows.">
 
 <details>
 <summary><b>Investigate</b> — a claim without a source is refused</summary>

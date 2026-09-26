@@ -23,7 +23,6 @@ import (
 	"knowledge-os/internal/inventory"
 	"knowledge-os/internal/kernel"
 	"knowledge-os/internal/release"
-	"knowledge-os/internal/retrieval"
 	"knowledge-os/internal/vaults"
 )
 
@@ -43,18 +42,8 @@ const help = `kos — the knowledge OS of a team: evidence-first vault operation
 init --vault PATH [answers]   create a cell vault (asks what the flags leave out; init --help)
 adopt --vault PATH [--force]  install the kernel into existing notes
 doctor --vault PATH [--strict] read-only health of a vault
-ask --vault PATH --query TERMS [--budget CHARS]
-                           every note holding the terms, their lines and source state (Markdown)
-read --vault PATH --note NAME [--section TEXT | --lines FROM-TO] [--match TERMS] [--brief] [--budget CHARS]
-                           a note, section or range with its sources checked (Markdown)
-code --vault PATH --repo NAME|all (--grep REGEX [-i] [--tests] | --show PATH[:FROM-TO] | --func NAME [--up N]) [--path GLOB]
-                           a repository at its reference branch: search, file, function and callers
-overview --vault PATH [--folder 20-Repos]   one line per knowledge note (Markdown)
-search --vault PATH --query TEXT [--limit 1..10] [--visibility all|public]
-index --vault PATH [--rebuild]
-links --vault PATH --node BASENAME
 inventory --vault PATH [--repo NAME] [--github-user LOGIN]
-discover run|questions|answer|platform|report|check|claims|corrections --vault PATH ...
+discover run|questions|answer|platform|report|check|corrections --vault PATH ...
 config status|detect|resolve|workspace|locate|capability|bind|catalog|areas|operation ...
 check links|bases --vault PATH
 audit --vault PATH
@@ -71,8 +60,7 @@ update [--version X]       install the latest (or a given) kos release in place 
                            list the remembered vaults and the ones its kernel would update
 
 --vault defaults to KOS_VAULT, else the vault that contains the current directory. Notices (a newer
-kos, a vault kernel older or newer than this kos) go to stderr, one line each; stdout stays JSON.
-Search keeps a private local SQLite index outside the vault; results are pointers, not answers.`
+kos, a vault kernel older or newer than this kos) go to stderr, one line each; stdout stays JSON.`
 
 func run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	if len(args) == 0 || args[0] == "--help" || args[0] == "help" || args[0] == "-h" {
@@ -146,8 +134,6 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 		return kernel.Run(args[1:], stdout)
 	case "doctor":
 		return cell.Run(ctx, args, os.Stdin, stdout, stderr)
-	case "search", "index", "links", "overview", "ask", "read", "code":
-		return retrieval.Run(ctx, args[0], args[1:], stdout)
 	default:
 		return fmt.Errorf("unknown command %q; use --help", args[0])
 	}
@@ -193,7 +179,7 @@ func listAfterUpdate(res map[string]any, self string) {
 // vaultAt is where a command takes --vault: after the command, or after its verb.
 func vaultAt(args []string) int {
 	switch args[0] {
-	case "overview", "ask", "read", "code", "search", "index", "links", "inventory", "audit", "doctor":
+	case "inventory", "audit", "doctor":
 		return 1
 	case "discover", "config", "investigation", "handoff", "sync", "kernel":
 		if len(args) > 1 {

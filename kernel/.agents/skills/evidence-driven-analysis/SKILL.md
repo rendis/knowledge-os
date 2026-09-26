@@ -5,7 +5,7 @@ description: Method for answers that one decisive source cannot settle — diagn
 
 # Evidence-driven analysis
 
-The router's evidence contract applies to every answer: bind, inspect the source, grade each conclusion, check the draft with `discover claims`, and send new conclusions to independent review. This method adds what an uncertain answer needs beyond that: checks that **discriminate** between explanations, so the answer rests on evidence that could have refuted it.
+The router's evidence contract applies to every answer: bind, inspect the source, grade each conclusion, confirm every resource the draft names, and send new conclusions to independent review. This method adds what an uncertain answer needs beyond that: checks that **discriminate** between explanations, so the answer rests on evidence that could have refuted it.
 
 ## Method
 

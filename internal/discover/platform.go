@@ -143,17 +143,6 @@ func ProviderNames() []string {
 	return out
 }
 
-// Coverage returns, for each given provider, the dependency categories whose platform service it reads.
-func Coverage(names []string) map[string][]string {
-	out := map[string][]string{}
-	for _, n := range names {
-		if p := providers[n]; p != nil {
-			out[n] = p.kinds()
-		}
-	}
-	return out
-}
-
 // runCLI runs a provider's own command-line tool, so the developer's existing login and permissions
 // apply. Tests replace it.
 var runCLI = func(name string, args ...string) ([]byte, string, error) {
