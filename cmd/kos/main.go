@@ -48,7 +48,6 @@ config status|detect|resolve|workspace|locate|capability|bind|catalog|areas|oper
 check links|bases --vault PATH
 audit --vault PATH
 check obsidian-binding --vault PATH --vault-name NAME
-check map-closure --vault PATH --checkpoint FILE
 investigation new|list|check|add|state|absorb|close|reopen --vault PATH ...
 handoff start|status|refresh|reconcile --vault PATH ...
 sync start|status|review|verify|acknowledge|finish|pull --vault PATH ...
@@ -186,7 +185,7 @@ func vaultAt(args []string) int {
 			return 2
 		}
 	case "check":
-		if len(args) > 1 && (args[1] == "links" || args[1] == "bases" || args[1] == "obsidian-binding" || args[1] == "map-closure") {
+		if len(args) > 1 && (args[1] == "links" || args[1] == "bases" || args[1] == "obsidian-binding") {
 			return 2
 		}
 	}

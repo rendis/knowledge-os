@@ -200,22 +200,6 @@ func blocking(issues []Issue) error {
 	return nil
 }
 
-// PackageTemplate is the skeleton an investigation writes to <case>/handoffs/DH-NNN.md.
-func PackageTemplate(locale string) string {
-	names := func(i int) string {
-		if locale == "en" {
-			return sections[i].names[1]
-		}
-		return sections[i].names[0]
-	}
-	var b strings.Builder
-	b.WriteString("---\nhandoff: DH-001\ncase: <case id>\nrepository: <git remote of the repository>\nbase: <base branch, e.g. main>\nbranch: issue/<short-slug>\n---\n\n# <Task in one line>\n")
-	for i := range sections {
-		b.WriteString("\n## " + names(i) + "\n\n")
-	}
-	return b.String()
-}
-
 func relOrAbs(base, p string) string {
 	if r, e := filepath.Rel(base, p); e == nil && !strings.HasPrefix(r, "..") {
 		return filepath.ToSlash(r)

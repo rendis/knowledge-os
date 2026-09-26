@@ -23,7 +23,7 @@
   </picture>
 </p>
 
-The vault is the map, not the boundary. When a note is missing or stale, the agent follows the trail to the repositories at their reference branch, the cloud snapshots, databases and trackers the cell configured. Answers that name resources are checked with `kos discover claims`; new conclusions get independent review.
+The vault is the map, not the boundary. When a note is missing or stale, the agent follows the trail to the repositories at their reference branch, the cloud snapshots, databases and trackers the cell configured. Every resource an answer names is confirmed in the notes, discovery facts or cloud snapshots; new conclusions get independent review.
 
 ## How it works
 
