@@ -33,7 +33,7 @@ func TestVaultDefaultsToTheEnclosingDirectory(t *testing.T) {
 		t.Fatalf("--vault is inserted after the verb: %v", got)
 	}
 	t.Setenv("KOS_VAULT", "/elsewhere")
-	if got := withVault([]string{"overview"}); got[2] != "/elsewhere" {
+	if got := withVault([]string{"audit"}); got[2] != "/elsewhere" {
 		t.Fatalf("KOS_VAULT wins: %v", got)
 	}
 	if got := withVault([]string{"sync", "status", "--vault", "/given"}); len(got) != 4 {

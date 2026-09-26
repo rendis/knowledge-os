@@ -34,7 +34,7 @@ const Help = `discover COMMAND --vault PATH [options]
              when the cell configures one (platform.providers). --referenced uses the
              scopes of the configured providers named by configuration in the last run.
              The providers are a floor: --record stores what the agent read elsewhere
-             (any service, cluster or host) with its command, so facts and claims use it.
+             (any service, cluster or host) with its command, so facts use it.
   report     [--repo NAME]   Last run summary, or one repository's facts.
   check      --note PATH [--note PATH ...] [--repo NAME] [--semantic]
              Gates for a repository note: G1 source anchors resolve at their commit and
@@ -43,8 +43,6 @@ const Help = `discover COMMAND --vault PATH [options]
              --semantic asks Jev whether each cited sentence is supported (review aid).
              A candidate outside the vault is matched to its repository by its aliases.
   corrections  Note relations the last run could not support, as correction tasks.
-  claims     --file DRAFT|-   Check a draft answer before delivery: resource names that no
-             fact, platform snapshot or note knows, and relations discovery contradicts.
 Facts and questions are local (.agents/state/discovery). Judgments and platform snapshots
 are versioned under 90-Meta/discovery/. All output is JSON.`
 
@@ -211,8 +209,6 @@ func Run(args []string, out io.Writer) error {
 		return runCheck(o, out, o.semantic)
 	case "corrections":
 		return listCorrections(o, out)
-	case "claims":
-		return runClaims(o, out)
 	}
 	return fmt.Errorf("unknown discover command %q", cmd)
 }

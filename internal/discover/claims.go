@@ -320,27 +320,6 @@ func checkClaims(vault, text string) (map[string]any, error) {
 	return res, nil
 }
 
-func runClaims(o options, out io.Writer) error {
-	if o.file == "" {
-		return errors.New("--file is required (a draft answer, or - for standard input)")
-	}
-	var b []byte
-	var e error
-	if o.file == "-" {
-		b, e = io.ReadAll(io.LimitReader(os.Stdin, 4_000_000))
-	} else {
-		b, e = os.ReadFile(o.file)
-	}
-	if e != nil {
-		return e
-	}
-	r, e := checkClaims(o.vault, string(b))
-	if e != nil {
-		return e
-	}
-	return emit(out, r)
-}
-
 // ContradictedRelations returns the note relations discovery could not support that a text mentions,
 // as name/detail pairs. It is empty when no discovery comparison exists yet.
 func ContradictedRelations(vault, text string) [][2]string {
