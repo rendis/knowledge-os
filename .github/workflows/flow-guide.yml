@@ -1,0 +1,33 @@
+# Publishes the animated flow guide (docs/flows) to GitHub Pages. Vault routers link to it, so a change
+# here reaches every cell without a kernel update.
+name: flow-guide
+
+on:
+  push:
+    branches: [main]
+    paths: ["docs/flows/**", ".github/workflows/flow-guide.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: flow-guide
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs/flows
+      - id: deployment
+        uses: actions/deploy-pages@v4
