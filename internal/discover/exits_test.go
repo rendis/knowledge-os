@@ -147,3 +147,60 @@ func TestWithinKeepsTheMatchingBlocks(t *testing.T) {
 		t.Fatalf("within keeps the first line and the matching block:\n%s", got)
 	}
 }
+
+func TestHazardOfARetryAfterAPartialWrite(t *testing.T) {
+	src := strings.Split(`func Handle(o Order) error {
+	found, err := repo.FindByID(o.ID)
+	if err != nil {
+		return err
+	}
+	if found != nil {
+		return nil
+	}
+	for _, r := range o.Receipts {
+		if err := repo.SaveReceipt(r); err != nil {
+			return err
+		}
+	}
+	if err := repo.SaveOrder(o); err != nil {
+		return err
+	}
+	return bus.Notify(o)
+}`, "\n")
+	end := functionEnd(src, 1, "h.go")
+	f := Function{Path: "h.go", Start: 1, End: end, Exits: exitsIn(src, 1, end, "h.go"), src: src}
+	hs := f.Hazards()
+	if len(hs) != 1 {
+		t.Fatalf("hazards %+v", hs)
+	}
+	got := hs[0].String()
+	if !strings.Contains(got, "after the write at L10 (SaveReceipt)") || !strings.Contains(got, "the check at L2 (FindByID)") || !strings.Contains(got, "leave at L7") || !strings.Contains(got, "without L14 SaveOrder, L17 Notify") {
+		t.Fatalf("hazard: %s", got)
+	}
+	// A lookup that guards nothing written later is no hazard.
+	plain := strings.Split("func Get(id string) *X {\n\tx := cache.Get(id)\n\tif x != nil {\n\t\treturn x\n\t}\n\treturn nil\n}", "\n")
+	g := Function{Path: "g.go", Start: 1, End: 7, Exits: exitsIn(plain, 1, 7, "g.go"), src: plain}
+	if len(g.Hazards()) != 0 {
+		t.Fatalf("no hazard in a getter: %+v", g.Hazards())
+	}
+}
+
+func TestHazardNeedsALookupThroughAnObject(t *testing.T) {
+	src := strings.Split(`func Process(m Msg) bool {
+	if checkIfHealthcheck(m.Flow) {
+		return true
+	}
+	if err := db.SaveA(m); err != nil {
+		return false
+	}
+	if err := db.SaveB(m); err != nil {
+		return false
+	}
+	return true
+}`, "\n")
+	end := functionEnd(src, 1, "p.go")
+	f := Function{Path: "p.go", Start: 1, End: end, Exits: exitsIn(src, 1, end, "p.go"), src: src}
+	if hs := f.Hazards(); len(hs) != 0 {
+		t.Fatalf("a helper that inspects the message is no duplicate check: %+v", hs)
+	}
+}

@@ -579,6 +579,11 @@ func (s *Sources) Functions(ownerRepo string, words []string, n, span int, prefe
 		if ca, cb := cited[list[a]], cited[list[b]]; ca != cb {
 			return ca
 		}
+		// The path naming the question's words (transactionconfirmed, not giftcardactivation): the
+		// domain the question is about, before counting words the code shares with it.
+		if pa, pb := pathScore(list[a].f.Path, words), pathScore(list[b].f.Path, words); pa != pb {
+			return pa > pb
+		}
 		_, pa := prefer[list[a].f.Path]
 		if _, pb := prefer[list[b].f.Path]; pa != pb {
 			return pa
@@ -586,10 +591,7 @@ func (s *Sources) Functions(ownerRepo string, words []string, n, span int, prefe
 		if len(list[a].words) != len(list[b].words) {
 			return len(list[a].words) > len(list[b].words)
 		}
-		// Twin functions (sale and gift card handlers alike): the one whose path the question names.
-		if pa, pb := pathScore(list[a].f.Path, words), pathScore(list[b].f.Path, words); pa != pb {
-			return pa > pb
-		}
+
 		if len(list[a].lines) != len(list[b].lines) {
 			return len(list[a].lines) > len(list[b].lines)
 		}
@@ -957,7 +959,7 @@ func (s *Sources) definition(ownerRepo, name, glob string, span int, withCallers
 		if to < end {
 			numbered = append(numbered, fmt.Sprintf("    │ … %d more lines to L%d", end-to, end))
 		}
-		f := Function{Path: parts[1], Name: strings.TrimSpace(parts[3]), From: line, To: end, Start: line, End: end, Code: strings.Join(numbered, "\n"), Exits: exitsIn(src, line, end, parts[1])}
+		f := Function{Path: parts[1], Name: strings.TrimSpace(parts[3]), From: line, To: end, Start: line, End: end, Code: strings.Join(numbered, "\n"), Exits: exitsIn(src, line, end, parts[1]), src: src}
 		if withCallers {
 			f.Callers, f.Rivals = s.callersRivals(r, name, parts[1], 80)
 		}
