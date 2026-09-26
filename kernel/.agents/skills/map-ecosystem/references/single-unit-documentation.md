@@ -32,7 +32,7 @@ A non-repository target skips inventory and clones: inspect only the sources tha
 2. Write the complete note with the fields and sections its contract requires. For repositories: purpose, triggers, inputs/outputs, rules, data, infrastructure, countries and relationships with evidence, compact runtime/environment information for its connectors, and under `Limitaciones y desconocimientos` one `Verificaciones pendientes` item per partial or unresolved connection with its exact check and close condition.
 3. For a source re-analysis update `commit-analizado`, `fecha-analisis`, `rama-analizada` and `ultima-auditoria` together. When the delta needs no durable change, record `sync acknowledge --decision no-documentation-change` instead.
 4. Propagate contract changes to every affected node (topics, events, flows, glossary, navigation); asynchronous topology goes producer → topic/event → consumer.
-5. Express absence as “no observado en fuentes estáticas revisadas”; use `#por-confirmar` only when the limit affects business understanding.
+5. Express absence, in the note's locale, as not observed in the reviewed static sources; use `#por-confirmar` only when the limit affects business understanding.
 
 Operational notes use the closed `tipo: operacional` contract, stay `borrador` while organization-specific content is unverified, and update `ultima-verificacion` only after checking the platform or owner; one `.operations/` run never becomes the procedure.
 

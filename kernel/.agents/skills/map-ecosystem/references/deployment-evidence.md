@@ -27,7 +27,7 @@ event or manual input
 → manifest, overlay, or values source
 ```
 
-Apply the deployment table contract from **Infraestructura y scheduling** in `90-Meta/Convenciones.md`. Keep multiple deployables in separate rows. Use `no observado en fuentes estáticas revisadas` for a missing field after following every versioned indirection, and `#por-confirmar` only when the gap affects understanding of the runtime or production baseline.
+Apply the **Deployment matrix** contract in `90-Meta/Convenciones.md` (the matrix goes under the note's `Infraestructura y scheduling` section). Keep multiple deployables in separate rows. Use `no observado en fuentes estáticas revisadas` for a missing field after following every versioned indirection, and `#por-confirmar` only when the gap affects understanding of the runtime or production baseline.
 
 ## Interpretation rules
 

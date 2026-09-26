@@ -10,7 +10,7 @@ developer would ask it. Answers, usage and duration are stored per question for 
 import argparse, concurrent.futures as cf, json, os, pathlib, subprocess, tempfile, time
 
 HERE = pathlib.Path(__file__).parent
-SUFFIX = "\n\n(Consulta de solo lectura: no modifiques archivos ni ejecutes acciones con efectos.)"
+SUFFIX = "\n\n(Read-only question: do not modify files or run actions with effects.)"
 DEFAULTS = {"claude": ("opus", "medium"), "codex": ("gpt-5.5", "medium"), "cursor": ("", "")}
 
 

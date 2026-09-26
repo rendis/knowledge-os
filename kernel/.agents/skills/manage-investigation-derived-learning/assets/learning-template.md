@@ -2,7 +2,7 @@
 tipo: aprendizaje
 estado: <vigente|cuestionado>
 resultado: <cambio-adoptado|baseline-conservado|alternativa-descartada|hallazgo-metodologico>
-aplica-a: ["[[nodo-canónico]]"]
+aplica-a: ["[[canonical-node]]"]
 dimensiones: [<dimension>]
 investigaciones-origen: [<investigation-id>]
 fecha-conclusion: <YYYY-MM-DD>
@@ -11,59 +11,59 @@ supersede-a: []
 tags: [aprendizaje, aprendizaje/<dimension>]
 ---
 
-# Aprendizaje - <problema o decisión>
+# Aprendizaje - <problem or decision>
 
 ## Resumen
 
-<Conclusión actual y su límite principal.>
+<Current conclusion and its main limit.>
 
 ## Pregunta y contexto
 
-<Pregunta estable, entorno, escala, versiones, restricciones y exclusiones materiales.>
+<Stable question, environment, scale, versions, constraints and material exclusions.>
 
 ## Baseline y alternativas
 
-<Baseline observado y alternativas comparadas.>
+<Observed baseline and the alternatives compared.>
 
 ## Método
 
-<Diseño de prueba u observación reproducible, muestra/ventana, controles y criterios.>
+<Reproducible test or observation design, sample/window, controls and criteria.>
 
 ## Evidencia acumulada
 
-### EV-001 — <descripción breve>
+### EV-001 — <short description>
 
 - Investigación: `<investigation-id>`
-- Fuentes durables: <referencias exactas>
-- Contexto y exclusiones: <condiciones>
-- Método y medidas: <métricas o criterios observables>
-- Resultado: <positivo, negativo o neutral>
-- Aporte a la conclusión: <cómo cambia o sostiene la enseñanza>
+- Fuentes durables: <exact references>
+- Contexto y exclusiones: <conditions>
+- Método y medidas: <observable metrics or criteria>
+- Resultado: <positive, negative or neutral>
+- Aporte a la conclusión: <how it changes or supports the teaching>
 
 ## Decisión y justificación
 
-<Decisión vigente y vínculo lógico con la evidencia.>
+<Current decision and its logical link to the evidence.>
 
 ## Enseñanza reutilizable
 
-<Qué debe evaluar un agente futuro antes de reutilizar o descartar esta solución.>
+<What a future agent must assess before reusing or discarding this solution.>
 
 ## Cuándo aplica
 
-<Condiciones verificadas de aplicabilidad.>
+<Verified conditions of applicability.>
 
 ## Cuándo no aplica
 
-<Condiciones materiales que invalidan o hacen incierta la conclusión.>
+<Material conditions that invalidate the conclusion or make it uncertain.>
 
 ## Implementación y despliegue
 
-<Implementación y evidencia productiva, o razón explícita por la que un nuevo despliegue no aplica.>
+<Implementation and production evidence, or the explicit reason a new deployment does not apply.>
 
 ## Limitaciones y revalidación
 
-<Brechas aceptadas y eventos que obligan a revalidar.>
+<Accepted gaps and the events that require revalidation.>
 
 ## Trazabilidad
 
-<Investigaciones, historias, commits/PR, despliegues, pruebas y referencias durables no sensibles.>
+<Investigations, stories, commits/PRs, deployments, tests and durable non-sensitive references.>

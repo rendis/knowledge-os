@@ -1,57 +1,57 @@
 ---
 id: ""
-procedimiento: ""
-procedimiento-verificado: ""
-estado: draft
-creado: ""
-actualizado: ""
+procedure: ""
+procedure-verified: ""
+status: draft
+created: ""
+updated: ""
 ---
 
-# Operación
+# Operation
 
-## Resultado esperado
+## Expected result
 
-## Anclas de identidad
+## Identity anchors
 
-- Solicitante:
-- Destino:
-- Fuente:
+- Requester:
+- Target:
+- Source:
 
-## Entradas
+## Inputs
 
-- Rama y límite de efectos:
-- Revisión del procedimiento:
-- Ambiente y destinos:
-- Período, zona horaria y filtros (si aplica):
+- Branch and effect boundary:
+- Procedure revision:
+- Environment and targets:
+- Period, timezone and filters (when they apply):
 
-## Plan y autorización
+## Plan and authorization
 
-- Alcance autorizado:
-- Autorizado por:
-- Fecha:
+- Authorized scope:
+- Authorized by:
+- Date:
 
-## Pasos
+## Steps
 
-| ID | Estado | Acción | Destino | Evidencia o identificador | Última actualización |
+| ID | Status | Action | Target | Evidence or identifier | Last update |
 |---|---|---|---|---|---|
 
-## Evidencia de finalización
+## Completion evidence
 
-Para efectos externos:
+For external effects:
 
-- Artefactos creados: identificador estable, fuente autoritativa y resultado de la lectura posterior.
-- Referencias requeridas: identificador, relación prevista y resultado de existencia y acceso.
-- Método de comprobación de acceso:
+- Created artifacts: stable identifier, authoritative source and result of the later read.
+- Required references: identifier, intended relation and result of the existence and access check.
+- Access check method:
 
-Para auditorías de solo lectura, sustituir lo anterior por:
+For read-only audits, replace the above with:
 
-| Pregunta | Hallazgo | Evidencia: confirmed / inferred / unknown | Fuente e identificadores | Momento observado / momento del evento | Cobertura y límites |
+| Question | Finding | Evidence: confirmed / inferred / unknown | Source and identifiers | Observed time / event time | Coverage and limits |
 |---|---|---|---|---|---|
 
-- Resultado del proceso auditado:
-- Consultas/scripts y revisiones:
-- Informes locales y retención aplicable:
+- Result of the audited process:
+- Queries/scripts and revisions:
+- Local reports and applicable retention:
 
-## Bloqueos y próxima acción segura
+## Blockers and next safe action
 
-## Historial
+## History
