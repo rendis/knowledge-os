@@ -610,3 +610,29 @@ func TestLibraryDependenciesListEveryImportingFile(t *testing.T) {
 		}
 	}
 }
+
+func TestNoiseIsNotARuntimeResource(t *testing.T) {
+	for _, f := range []string{".agents/skills/x/run.sh", "docs/setup.env", "tools/sql-evolve/bench.py", ".env.example", ".gitlab-ci.yml.bkp", "example.yml", "config/app.sample.yaml"} {
+		if !nonRuntime.MatchString(f) {
+			t.Errorf("%s is not runtime configuration", f)
+		}
+	}
+	for _, f := range []string{"kustomization/production/env-configmap", "resources/properties.yml", "src/environments/environment.prod.ts"} {
+		if nonRuntime.MatchString(f) {
+			t.Errorf("%s is runtime configuration", f)
+		}
+	}
+	noise := []resource{{Type: "database_object", Name: "$1"}, {Type: "database_object", Name: "<name>"}, {Type: "database_object", Name: "postgres_db=postgres"},
+		{Type: "database_object", Name: "postgres:13-alpine"}, {Type: "http_endpoint", Name: "https://mydocument.xls"}, {Type: "http_endpoint", Name: "http://10.20.25"}}
+	for _, r := range noise {
+		if g := resourceGroup(r); g != "" {
+			t.Errorf("%s is not a resource group: %q", r.Name, g)
+		}
+	}
+	if g := resourceGroup(resource{Type: "database_object", Name: "acme-ops01-prd:us-east4:ops-postgres-db"}); g == "" {
+		t.Error("a Cloud SQL instance is a resource group")
+	}
+	if g := resourceGroup(resource{Type: "http_endpoint", Name: "https://api.example.net/v1"}); g != "http example.net" {
+		t.Errorf("an external host is a resource group: %q", g)
+	}
+}
