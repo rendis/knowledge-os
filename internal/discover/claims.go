@@ -209,11 +209,43 @@ func isKnown(known map[string]bool, name string) bool {
 		}
 	}
 	for k := range known {
-		if len(k) >= 6 && (nameMatch(k, n) || nameMatch(n, k)) {
+		if len(k) >= 6 && variantOf(k, n) {
 			return true
 		}
 	}
 	return false
+}
+
+// qualifiers tell variants of one resource apart: environment, delivery kind or resource type.
+// Two-letter tokens (country codes) and numbers qualify too.
+var qualifiers = map[string]bool{"prd": true, "prod": true, "pro": true, "dev": true, "uat": true, "stg": true, "stage": true,
+	"staging": true, "test": true, "tst": true, "sbx": true, "sandbox": true, "int": true, "pre": true, "preprod": true,
+	"sub": true, "subs": true, "subscription": true, "topic": true, "queue": true, "dlq": true, "dlt": true, "deadletter": true}
+
+func qualifier(t string) bool {
+	return len(t) <= 2 || qualifiers[t] || strings.Trim(t, "0123456789") == ""
+}
+
+// variantOf reports whether a drafted name is a known name up to qualifiers (orders-cl-inbound-sub for
+// orders-inbound). Unlike nameMatch, which lets a note's logical name absorb any extra token, a draft
+// that adds a meaningful token (refund-orders-inbound) names something no evidence knows.
+func variantOf(known, drafted string) bool {
+	k, d := tokens(normalizeResource(known)), tokens(normalizeResource(drafted))
+	shared := false
+	for t := range d {
+		switch {
+		case k[t]:
+			shared = shared || !qualifier(t)
+		case !qualifier(t):
+			return false
+		}
+	}
+	for t := range k {
+		if !d[t] && !qualifier(t) {
+			return false
+		}
+	}
+	return shared
 }
 
 type claimFlag struct {

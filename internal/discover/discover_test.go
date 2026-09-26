@@ -496,12 +496,21 @@ func TestClaimsAndCorrections(t *testing.T) {
 	write(t, vault, "25-Topics/stock-topic.md", "---\ntipo: topic\nnombre-raw: \"stock-inbound-{cl|pe}\"\n---\n# stock\n")
 	write(t, vault, "90-Meta/discovery/platform/gcp-p-prd.json", `{"provider":"gcp","scope":"p-prd","status":"ok","topics":["projects/p-prd/topics/audit-events"],"subscriptions":[]}`)
 	draft := "El servicio consume `orders-cl-inbound-sub` del topic `orders-inbound`, y audita en `audit-events` y `stock-inbound-pe`.\n\n" +
-		"Según [[orders]], también lo dispara `legacy-orders-topic`.\n\nPublica además en `invented-orders-topic`; ver `cmd/main.go` y `pubsub.NewClient` con `GCP_PROJECT_ID`.\n"
+		"Según [[orders]], también lo dispara `legacy-orders-topic`.\n\nPublica además en `invented-orders-topic`; ver `cmd/main.go` y `pubsub.NewClient` con `GCP_PROJECT_ID`.\n" +
+		"Los reembolsos llegan por `refund-orders-inbound` y `refund-orders-cl-inbound-sub`; el topic de producción es `orders-inbound-prd`.\n"
 	r, e := checkClaims(vault, draft)
 	if e != nil {
 		t.Fatal(e)
 	}
 	unknown := fmt.Sprint(r["unknown_names"])
+	for _, invented := range []string{"refund-orders-inbound", "refund-orders-cl-inbound-sub"} {
+		if !strings.Contains(unknown, invented) {
+			t.Fatalf("a known name plus a meaningful token is not known: %s missing from %v", invented, r)
+		}
+	}
+	if strings.Contains(unknown, "orders-inbound-prd") {
+		t.Fatalf("an environment variant of a known name is known: %v", r)
+	}
 	if r["ok"] != false || !strings.Contains(unknown, "invented-orders-topic") || strings.Contains(unknown, "stock-inbound-pe") || strings.Contains(unknown, "main.go") || strings.Contains(unknown, "GCP_PROJECT_ID") {
 		t.Fatalf("only names no evidence knows are flagged: %v", r)
 	}
