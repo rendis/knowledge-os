@@ -234,6 +234,7 @@ type runReport struct {
 	CredentialsInSources []map[string]string `json:"credentials_in_sources,omitempty"`
 	Pending              map[string]int      `json:"pending_items"`
 	Comparison           map[string]int      `json:"comparison"`
+	Skipped              []string            `json:"skipped,omitempty"`
 	Duration             string              `json:"duration"`
 }
 
@@ -249,12 +250,17 @@ func runDiscovery(o options, out io.Writer) error {
 	}
 	scans := []*repoScan{}
 	failed := []string{}
+	skipped := []string{} // checkouts without a commit are not sources yet
 	for _, in := range inputs {
 		if c := noteCommit(o.vault, in.Note); o.at == "note" && c != "" {
 			in.Ref, in.RefNote, in.RefErr = c, "", ""
 		}
 		if in.RefErr != "" {
 			failed = append(failed, in.Name+": "+in.RefErr)
+			continue
+		}
+		if out, _ := gitOutput(in.Path, "rev-list", "--all", "--max-count=1"); strings.TrimSpace(out) == "" {
+			skipped = append(skipped, in.Name+": no commits yet")
 			continue
 		}
 		s, e := scanRepository(in)
@@ -339,7 +345,7 @@ func runDiscovery(o options, out io.Writer) error {
 	if e := writeState(o.vault, "gaps.json", gaps); e != nil {
 		return e
 	}
-	rep := runReport{Vault: o.vault, GeneratedAt: time.Now().UTC().Format(time.RFC3339), Repositories: len(inputs), Failed: failed,
+	rep := runReport{Vault: o.vault, GeneratedAt: time.Now().UTC().Format(time.RFC3339), Repositories: len(inputs), Failed: failed, Skipped: skipped,
 		PendingQuestions: map[string]int{}, Acceleration: accelerationStatus(), PlatformScopes: a.platformScopes(configuredProviders(o.vault)),
 		PlatformCaptured: map[string]string{}, Pending: map[string]int{}, Comparison: map[string]int{}}
 	if len(classified) > 0 {
