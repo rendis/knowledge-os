@@ -754,11 +754,48 @@
     b.querySelector('.lbl').textContent = last ? u.again : `${u.next}: ${flowWord(FLOWS[i + 1], FLOWS[i + 1].name)}`;
     b.hidden = !on;
   }
+  // ================= export: frames as pixel-exact SVG shapes, for the README's images =================
+  // ?export=ask@e4+clear+big,sync@e7 renders each frame in both themes and leaves the result as JSON in #export;
+  // scripts/render_readme_assets.py reads it with a headless browser.
+  // AT is a label or a time; +clear drops the focus veil, +big gives the vault the stage, +say:TEXT sets the status line.
+  function exportFrame(id, at, theme) {
+    const root = document.documentElement, prev = root.getAttribute('data-theme'), [when, ...opts] = at.split('+');
+    root.setAttribute('data-theme', theme); readPalette();
+    load(id, false); tl.pause();
+    tl.seek(/^\d/.test(when) ? parseFloat(when) : when, true);
+    if (opts.includes('clear')) cur.st.focus.a = 0;
+    if (opts.includes('big')) cur.st.vault.zoom = 1;
+    const say = opts.find(o => o.startsWith('say:'));
+    if (say) Object.assign(cur.st.status, { text: say.slice(4), n: say.length, tone: 'B', a: 1 });
+    render(1.2);
+    const px4 = o.getImageData(0, 0, W, H).data, hex = i => '#' + [0, 1, 2].map(k => px4[i + k].toString(16).padStart(2, '0')).join('');
+    const paths = {};
+    for (let y = 0; y < H; y++) for (let x = 0; x < W;) {
+      const c = hex((y * W + x) * 4); let e = x + 1;
+      while (e < W && hex((y * W + e) * 4) === c) e++;
+      (paths[c] = paths[c] || []).push(`M${x} ${y}h${e - x}v1h${x - e}z`);
+      x = e;
+    }
+    if (prev) root.setAttribute('data-theme', prev); else root.removeAttribute('data-theme');
+    paletteDirty = true;
+    return { w: W, h: H, bg: P.bg, paths: Object.fromEntries(Object.entries(paths).map(([c, d]) => [c, d.join('')])) };
+  }
+  function exportAll(spec) {
+    const out = { font: FONT, palette: {}, frames: {} };
+    ['light', 'dark'].forEach(theme => {
+      document.documentElement.setAttribute('data-theme', theme); readPalette(); out.palette[theme] = { ...P };
+      spec.split(',').forEach(item => { const [id, at] = item.split('@'); out.frames[`${item}:${theme}`] = exportFrame(id, at, theme); });
+    });
+    const el = document.createElement('script'); el.type = 'application/json'; el.id = 'export';
+    el.textContent = JSON.stringify(out); document.body.appendChild(el);
+  }
+
   function start() {
-    // language: the viewer's last choice, else the browser's
+    // language: the one the link asks for (?lang=es), else the viewer's last choice, else the browser's
     let saved = null;
     try { saved = localStorage.getItem('kos-flows-lang'); } catch (e) { /* storage may be unavailable */ }
-    LANG = saved || ((navigator.language || 'en').toLowerCase().startsWith('es') ? 'es' : 'en');
+    const asked = new URLSearchParams(location.search).get('lang');
+    LANG = ['en', 'es'].includes(asked) ? asked : saved || ((navigator.language || 'en').toLowerCase().startsWith('es') ? 'es' : 'en');
     qa('#lang button').forEach(b => b.addEventListener('click', () => {
       if (b.dataset.lang === LANG) return;
       LANG = b.dataset.lang;
@@ -804,6 +841,8 @@
     new MutationObserver(() => { paletteDirty = true; }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
     addEventListener('resize', fit);
     fit();
+    const spec = new URLSearchParams(location.search).get('export');
+    if (spec) { LANG = 'en'; exportAll(spec); return; }
     gsap.ticker.add(time => render(time));
     load(location.hash.slice(1) || FLOWS[0].id);
   }
