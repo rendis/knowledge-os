@@ -39,6 +39,7 @@ func Run(ctx context.Context, command string, args []string, out io.Writer) erro
 	tests := fs.Bool("tests", false, "code: include tests in --grep")
 	path := fs.String("path", "", "code: glob limiting --grep and --func to some files")
 	up := fs.Int("up", 0, "code: --func follows the callers this many levels up")
+	down := fs.Bool("down", false, "code: --func lists the repository's functions it calls, each with its exits")
 	brief := fs.Bool("brief", false, "ask, read: paragraphs with their source marks only, no code or footnote text")
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -82,7 +83,7 @@ func Run(ctx context.Context, command string, args []string, out io.Writer) erro
 		if !set["budget"] {
 			*budget = ReadBudget
 		}
-		return idx.Code(ctx, CodeOptions{Repo: *repo, Grep: *grep, Show: *show, Func: *fn, Path: *path, Up: *up, IgnoreCase: *ignoreCase, Tests: *tests, Budget: *budget}, out)
+		return idx.Code(ctx, CodeOptions{Repo: *repo, Grep: *grep, Show: *show, Func: *fn, Path: *path, Up: *up, Down: *down, IgnoreCase: *ignoreCase, Tests: *tests, Budget: *budget}, out)
 	}
 	if command == "read" {
 		if *note == "" {

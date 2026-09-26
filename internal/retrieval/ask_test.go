@@ -261,3 +261,18 @@ func TestStemsStartWords(t *testing.T) {
 		t.Fatalf("a stem matches at a word start only: %+v", terms)
 	}
 }
+
+func TestAskNamingARepositoryKeepsOthersToOneLine(t *testing.T) {
+	opt, write := fixture(t)
+	write("20-Repos/orders.md", "---\ntipo: api\nconsume-de: [\"[[Acme]]\"]\n---\n# orders\n\n## Qué hace\n\n- Reintenta el envío a Acme tres veces.\n")
+	write("40-Integraciones/Acme.md", "---\ntipo: integracion\n---\n# Acme\n\nProveedor externo; reintenta según contrato.\n")
+	write("20-Repos/billing.md", "---\ntipo: api\nconsume-de: [\"[[Acme]]\"]\n---\n# billing\n\n## Qué hace\n\n- Reintenta facturas hacia Acme.\n")
+	out := askPack(t, opt, "orders Acme reintenta")
+	if !strings.Contains(out, "## 20-Repos/orders.md") || !strings.Contains(out, "## 40-Integraciones/Acme.md") {
+		t.Fatalf("the named notes are shown:\n%s", out)
+	}
+	// billing consumes Acme too, but the question names orders: billing only shares words.
+	if strings.Contains(out, "## 20-Repos/billing.md") || !strings.Contains(out, "Also sharing the question's words, not linked to the repository it names: 20-Repos/billing.md (") {
+		t.Fatalf("an unlinked repository takes one line:\n%s", out)
+	}
+}

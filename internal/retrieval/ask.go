@@ -182,7 +182,21 @@ func (i *Index) Ask(ctx context.Context, query string, o AskOptions, w io.Writer
 	for _, n := range notes {
 		stemPath[n.stem] = n.path
 	}
+	// When the question names a repository, its neighbours count, not those of the other notes it
+	// names (an integration every consumer links to would bring them all in).
+	anchors := named
 	for _, p := range named {
+		if strings.HasPrefix(p, "20-Repos/") {
+			anchors = nil
+			for _, q := range named {
+				if strings.HasPrefix(q, "20-Repos/") {
+					anchors = append(anchors, q)
+				}
+			}
+			break
+		}
+	}
+	for _, p := range anchors {
 		if nb, e := i.Neighbors(ctx, byPath[p].stem); e == nil {
 			for _, x := range nb.Outgoing {
 				near[x.Target] = true
@@ -279,6 +293,9 @@ func (i *Index) Ask(ctx context.Context, query string, o AskOptions, w io.Writer
 			if sub.Push != "" {
 				line += "; push " + sub.Push
 			}
+			if sub.Delivery != "" {
+				line += "; " + sub.Delivery
+			}
 			fmt.Fprintln(out, trimRunes(line, 400))
 		}
 	}
@@ -286,7 +303,20 @@ func (i *Index) Ask(ctx context.Context, query string, o AskOptions, w io.Writer
 		fmt.Fprintln(out, "\nNo note names or matches the question. Try an identifier from the code, or follow the sources beyond the vault below.")
 	}
 	render := &sourceRenderer{src: discover.NewSources(i.Root), code: o.Code, codeLeft: o.Budget * 3 / 10, perText: 6, brief: o.Brief, covered: map[string]bool{}}
+	// When the question names a repository, a note neither linked to it nor tied to it by a role only
+	// shares words: one line with where those words are, not paragraphs.
+	aside := []string{}
 	for k, n := range top {
+		if n.minor && !near[n.stem] && o.Focus == "" {
+			where := []string{}
+			for _, t := range terms {
+				if ls := termLines(byPath[n.path].raw, t); len(ls) > 0 && !t.common {
+					where = append(where, "`"+t.display()+"` L"+strings.Join(firstN(intsToStrings(ls), 4), ","))
+				}
+			}
+			aside = append(aside, n.path+" ("+strings.Join(firstN(where, 4), " · ")+")")
+			continue
+		}
 		if out.left() < 900 {
 			rest := []string{}
 			for _, m := range top[k:] {
@@ -298,6 +328,9 @@ func (i *Index) Ask(ctx context.Context, query string, o AskOptions, w io.Writer
 		if err := i.writeAskNote(ctx, out, n, byPath[n.path], terms, render, len(top)-k); err != nil {
 			return err
 		}
+	}
+	if len(aside) > 0 && out.left() > 300 {
+		fmt.Fprintf(out, "\nAlso sharing the question's words, not linked to the repository it names: %s (`kos read --note NAME --lines`).\n", strings.Join(aside, "; "))
 	}
 	// Terms no shown paragraph holds: where the pack is silent, with the lines to read.
 	gaps := []string{}
@@ -377,6 +410,9 @@ func (i *Index) writeAskNote(ctx context.Context, out *packWriter, n *askNote, n
 	if strings.HasPrefix(n.path, "20-Repos/") {
 		if s, ok := discover.RepositoryNoteState(i.Root, n.path); ok {
 			writeRepoState(s, out)
+			if !n.minor {
+				writeConsumed(out, discover.RepoSubscriptions(i.Root, s.Repo))
+			}
 			repo, commit = s.Repo, s.Commit
 		}
 	}
@@ -390,7 +426,7 @@ func (i *Index) writeAskNote(ctx context.Context, out *packWriter, n *askNote, n
 	case n.named:
 		k = askParagraphsNamed
 	case n.minor:
-		k = 2 // the question names a repository: other notes add context, not the answer
+		k = 1 // the question names a repository: other notes add context, not the answer
 	}
 	paras, more := selectParagraphs(raw, terms, k)
 	if len(paras) == 0 {
@@ -402,7 +438,14 @@ func (i *Index) writeAskNote(ctx context.Context, out *packWriter, n *askNote, n
 	// One note takes at most two fifths of what remains, so the next notes still get their paragraphs.
 	// A note takes its share of what remains (at most two fifths), so every note of the pack shows
 	// its best paragraphs; the last one takes what is left.
-	room := min(max(min(out.left()*2/5, out.left()*3/(2*remaining+1)), 2500), out.left()-300)
+	share := out.left() * 2 / 5
+	if n.named && repo != "" {
+		share = out.left() / 2 // the repository the question names: its code is the answer
+	}
+	room := min(max(min(share, out.left()*3/(2*remaining+1)), 2500), out.left()-300)
+	if n.minor {
+		room = min(room, 1800) // context for the named repository: its best paragraph, no code
+	}
 	if remaining == 1 {
 		room = out.left() - 300
 	}
@@ -419,9 +462,12 @@ func (i *Index) writeAskNote(ctx context.Context, out *packWriter, n *askNote, n
 	sort.SliceStable(byScore, func(a, b int) bool { return byScore[a].score > byScore[b].score })
 	blocks, used := []*block{}, 0
 	// A repository note keeps a third of its room for the code that answers the question.
-	textRoom := room
+	// The cited lines of step 2 leave a quarter of it to the matching code and its exits.
+	textRoom, citedRoom := room, room
 	if repo != "" && render.code {
-		textRoom = room * 2 / 3
+		// At least what a function's first lines, its exits and the calls below it need.
+		reserve := max(room/4, min(3500, room/2))
+		textRoom, citedRoom = min(room*2/3, room-reserve), room-reserve
 	}
 	for _, p := range byScore {
 		b := &block{p: p, code: map[int]string{}}
@@ -450,7 +496,7 @@ func (i *Index) writeAskNote(ctx context.Context, out *packWriter, n *askNote, n
 			}
 			for k, c := range b.cites {
 				code, ok := render.snippet(c.def, focusTerms(b.p.text))
-				if ok && runeLen(code) <= render.codeLeft && used+runeLen(code) <= room {
+				if ok && runeLen(code) <= render.codeLeft && used+runeLen(code) <= citedRoom {
 					b.code[k] = code
 					used += runeLen(code)
 					render.codeLeft -= runeLen(code)
@@ -510,19 +556,26 @@ func (i *Index) writeAskNote(ctx context.Context, out *packWriter, n *askNote, n
 	codeBefore := render.codeLeft
 	render.codeLeft = min(render.codeLeft, max(room-used, 0))
 	settings := []string{}
-	if repo != "" {
+	if repo != "" && !n.minor {
 		// The code files the shown paragraphs cite in this repository.
-		prefer := map[string]bool{}
+		prefer := map[string][][2]int{}
 		for _, b := range blocks {
 			for _, c := range b.cites {
 				for _, a := range discover.Anchors(c.def) {
 					if strings.EqualFold(a.Repo[strings.Index(a.Repo, "/")+1:], repo) {
-						prefer[a.Path] = true
+						if a.From > 0 {
+							prefer[a.Path] = append(prefer[a.Path], [2]int{a.From, max(a.To, a.From)})
+						} else if _, ok := prefer[a.Path]; !ok {
+							prefer[a.Path] = nil
+						}
 					}
 				}
 			}
 		}
-		settings = render.writeMatchingCode(out, repo, terms, prefer)
+		settings = render.writeMatchingCode(out, repo, terms, prefer, raw)
+		if text := render.processExits(repo, raw); text != "" && runeLen(text) < out.left()-600 {
+			fmt.Fprint(out, text)
+		}
 	}
 	byRepo, order, seenNames, fromQuery := map[string][]string{}, []string{}, map[string]bool{}, map[string]bool{}
 	add := func(r, name string, query bool) {
@@ -560,7 +613,9 @@ func (i *Index) writeAskNote(ctx context.Context, out *packWriter, n *askNote, n
 		}
 	}
 	for _, r := range order {
-		render.writeCode(out, r, byRepo[r], fromQuery)
+		if !n.minor {
+			render.writeCode(out, r, byRepo[r], fromQuery)
+		}
 	}
 	render.codeLeft = codeBefore - (min(codeBefore, max(room-used, 0)) - render.codeLeft)
 	if len(more) > 0 {
