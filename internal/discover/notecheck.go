@@ -199,7 +199,7 @@ func claimFor(body, id string) string {
 	return strings.Join(out, " ")
 }
 
-func checkNote(vault, notePath, repoOverride string, semantic bool) (noteCheck, error) {
+func checkNoteFresh(vault, notePath, repoOverride string, semantic bool) (noteCheck, error) {
 	rel, full := notePath, notePath
 	if filepath.IsAbs(notePath) {
 		rel, _ = filepath.Rel(vault, notePath)

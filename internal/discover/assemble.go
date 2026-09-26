@@ -197,10 +197,11 @@ func discoverRepositories(vault string, only map[string]bool) ([]repoInput, erro
 // Within one process (a sync verify checks many notes) the same lookups repeat for every note: the
 // remote of each checkout, the library candidates and the scan of each library at a commit.
 var (
-	memoMu     sync.Mutex
-	remoteMemo = map[string]string{}
-	libMemo    = map[string][]libCandidate{}
-	scanMemo   = map[string]*repoScan{}
+	memoMu          sync.Mutex
+	remoteMemo      = map[string]string{}
+	libMemo         = map[string][]libCandidate{}
+	scanMemo        = map[string]*repoScan{}
+	fingerprintMemo = map[string]string{}
 )
 
 func gitRemoteOf(p string) string {
