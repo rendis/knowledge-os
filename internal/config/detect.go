@@ -97,7 +97,7 @@ func Detect(root string) (Object, error) {
 		}
 	}
 	return Object{"workspace": w["status"], "repositories": repos, "worktree_root": worktree, "clouds": clouds, "tools": tools,
-		"databases": dbs, "jev": DiscoveryAcceleration()["jev"], "propose": next, "missing": missing}, nil
+		"databases": dbs, "propose": next, "missing": missing}, nil
 }
 
 // detectRun runs a local tool with a timeout; tests replace it.

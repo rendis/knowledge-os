@@ -143,7 +143,7 @@ class PlatformEmulatorTests(unittest.TestCase):
         return json.loads(result.stdout)
 
     def test_referenced_scopes_are_captured_and_wire_the_facts(self):
-        report = self.kos("discover", "run", "--classify", "off")
+        report = self.kos("discover", "run")
         self.assertEqual(sorted(report["platform_scopes_referenced"]), [f"aws:{ACCOUNT}/{REGION}", f"gcp:{PROJECT}"])
 
         captured = self.kos("discover", "platform", "--referenced")["captured"]
@@ -153,7 +153,7 @@ class PlatformEmulatorTests(unittest.TestCase):
         snapshots = {p.name: json.loads(p.read_text()) for p in (self.vault / "90-Meta/discovery/platform").glob("*.json")}
         self.assertLessEqual({f"aws-{ACCOUNT}-{REGION}.json", f"gcp-{PROJECT}.json"}, set(snapshots))
 
-        # Without Jev the agent answers the judgments; here only the DynamoDB client matters.
+        # The agent answers the judgments; here only the DynamoDB client matters.
         questions = self.kos("discover", "questions", "--kind", "dependency")["questions"]
         answers = [{"id": q["id"], "choice": "document_db", "confidence": 1} for q in questions
                    if any("dynamodb" in path for path in q["state"].get("imported_paths", []))]
@@ -161,7 +161,7 @@ class PlatformEmulatorTests(unittest.TestCase):
         answer_file = self.tmp / "answers.json"
         answer_file.write_text(json.dumps(answers))
         self.kos("discover", "answer", "--file", str(answer_file))
-        self.kos("discover", "run", "--classify", "off")
+        self.kos("discover", "run")
         facts = self.kos("discover", "report", "--repo", "SVC-orders")["facts"]
         resources = {r["name"].rsplit("/", 1)[-1]: r for r in facts["resources"]}
         gcp = resources["orders-cl-sub"]

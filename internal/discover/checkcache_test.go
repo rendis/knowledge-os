@@ -18,7 +18,7 @@ func TestNoteCheckCacheReusesOnlyUnchangedInputs(t *testing.T) {
 	vault := t.TempDir()
 	write(t, vault, "instance.yaml", "version: 1\ncell:\n  name: C\n  purpose: p\nsystems:\n  - id: s\n    name: S\n")
 	write(t, vault, "20-Repos/n.md", "---\ntipo: api\n---\n# n\n")
-	first, e := checkNote(vault, "20-Repos/n.md", "", false)
+	first, e := checkNote(vault, "20-Repos/n.md", "")
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -26,12 +26,12 @@ func TestNoteCheckCacheReusesOnlyUnchangedInputs(t *testing.T) {
 	if len(entries) != 1 {
 		t.Fatalf("a settled result is stored: %d entries", len(entries))
 	}
-	again, _ := checkNote(vault, "20-Repos/n.md", "", false)
+	again, _ := checkNote(vault, "20-Repos/n.md", "")
 	if again.Note != first.Note || again.OK != first.OK {
 		t.Fatalf("the stored result is reused: %+v %+v", first, again)
 	}
 	write(t, vault, "20-Repos/n.md", "---\ntipo: api\n---\n# n changed\n")
-	checkNote(vault, "20-Repos/n.md", "", false)
+	checkNote(vault, "20-Repos/n.md", "")
 	if entries, _ = os.ReadDir(checkCacheDir()); len(entries) != 2 {
 		t.Fatalf("a changed note is checked again: %d entries", len(entries))
 	}

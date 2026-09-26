@@ -307,22 +307,10 @@ func TestResolveExplicitInteriorPath(t *testing.T) {
 		t.Fatal(e)
 	}
 	canonical, _ := CanonicalRoot(root)
-	if r["vault_root"] != canonical || r["interaction_mode"] != "filesystem" || r["obsidian_available"] != false {
+	if r["vault_root"] != canonical {
 		t.Fatal(r)
 	}
 }
-func TestObsidianRegistrationExactPath(t *testing.T) {
-	root := t.TempDir()
-	canonical, _ := CanonicalRoot(root)
-	other := t.TempDir()
-	if got := matchingObsidianVault(canonical, "Wrong\t"+other+"\nVault with spaces\t"+root+"\n"); got != "Vault with spaces" {
-		t.Fatal(got)
-	}
-	if got := matchingObsidianVault(canonical, "One\t"+root+"\nTwo\t"+root+"\n"); got != "" {
-		t.Fatal("ambiguous registration selected", got)
-	}
-}
-
 func TestVaultOnlyResolutionSurvivesInvalidWorkspace(t *testing.T) {
 	root := fixture(t)
 	for _, p := range markers {

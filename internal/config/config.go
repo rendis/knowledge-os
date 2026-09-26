@@ -4,7 +4,6 @@ package config
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -16,7 +15,6 @@ import (
 	"regexp"
 	"slices"
 	"strings"
-	"time"
 
 	"go.yaml.in/yaml/v3"
 )
@@ -429,12 +427,7 @@ func Resolve(root string) (Object, error) {
 	if e != nil {
 		workspace = Object{"source_context": Object{"status": "unavailable", "roots": []any{}, "clone_root": nil, "clone_origin": nil, "clone_authorized": false, "warnings": []string{"workspace configuration is invalid; run onboard-developer before source access"}}}
 	}
-	available, name := obsidianBinding(r)
-	mode := "filesystem"
-	if name != "" {
-		mode = "obsidian-cli"
-	}
-	return Object{"status": "resolved", "vault_root": r, "declared_remote": decl, "interaction_mode": mode, "obsidian_available": available, "obsidian_vault": nullable(name), "source_context": workspace["source_context"], "orientation": Orientation(r, m)}, nil
+	return Object{"status": "resolved", "vault_root": r, "declared_remote": decl, "source_context": workspace["source_context"], "orientation": Orientation(r, m)}, nil
 }
 func Orientation(root string, m Object) Object {
 	issues := []string{}
@@ -484,15 +477,6 @@ func Orientation(root string, m Object) Object {
 	return Object{"ready": len(issues) == 0, "reason": reason, "cell": m["cell"], "systems": names, "issues": issues, "start_here": []string{"00-Home.md", "instance.yaml", "10-Sistemas/"}, "evidence_profile": profile, "enabled_types": types, "pending_inventory": pending}
 }
 
-// DiscoveryAcceleration reports whether classification questions can be answered by Jev.
-// It is optional: without it the agent answers the same questions.
-func DiscoveryAcceleration() Object {
-	if strings.TrimSpace(os.Getenv("TYPESAFE_API_KEY")) != "" {
-		return Object{"jev": "configured"}
-	}
-	return Object{"jev": "not-configured", "hint": "Optional: set TYPESAFE_API_KEY so `discover run` answers classification questions automatically (fast, low cost). Without it the agent answers them; nothing is blocked."}
-}
-
 func emit(out io.Writer, v any) error {
 	e := json.NewEncoder(out)
 	e.SetIndent("", "  ")
@@ -537,57 +521,6 @@ func readConfigBytes(path string) ([]byte, error) {
 
 // ValidBranch checks the shared portable Git reference-name contract.
 func ValidBranch(name string) bool { return validBranch(name) }
-
-func obsidianBinding(root string) (bool, string) {
-	executable, e := exec.LookPath("obsidian")
-	if e != nil {
-		return false, ""
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-	// Output is bounded independently of time to keep optional discovery cheap.
-	cmd := exec.CommandContext(ctx, executable, "vaults", "verbose")
-	var b limitedOutput
-	cmd.Stdout = &b
-	if e := cmd.Run(); e != nil {
-		return false, ""
-	}
-	return true, matchingObsidianVault(root, b.String())
-}
-
-type limitedOutput struct{ bytes.Buffer }
-
-func (b *limitedOutput) Write(p []byte) (int, error) {
-	if b.Len()+len(p) > 1<<20 {
-		return 0, errors.New("Obsidian registration output exceeds 1 MiB")
-	}
-	return b.Buffer.Write(p)
-}
-func matchingObsidianVault(root, text string) string {
-	names := map[string]bool{}
-	for _, line := range strings.Split(text, "\n") {
-		line = strings.TrimSpace(line)
-		name, path, ok := strings.Cut(line, "\t")
-		if !ok {
-			at := strings.IndexAny(line, " \t")
-			if at < 0 {
-				continue
-			}
-			name, path = line[:at], strings.TrimSpace(line[at:])
-		}
-		candidate, e := CanonicalRoot(strings.TrimSpace(path))
-		if e == nil && candidate == root {
-			names[strings.TrimSpace(name)] = true
-		}
-	}
-	if len(names) != 1 {
-		return ""
-	}
-	for name := range names {
-		return name
-	}
-	return ""
-}
 
 // ResolvePath checks only the supplied path and its ancestors; never siblings.
 func ResolvePath(path string) (Object, error) {

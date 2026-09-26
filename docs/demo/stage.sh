@@ -11,7 +11,7 @@ case "$1" in
     kos discover run >/dev/null
     kos discover answer --file .scratch/answers.json >/dev/null
     kos discover platform --provider gcp --scope acme-prd >/dev/null
-    kos discover run --classify off >/dev/null
+    kos discover run >/dev/null
     git add 90-Meta/discovery && git commit -q -m "chore(discovery): first run"
     ;;
   case)

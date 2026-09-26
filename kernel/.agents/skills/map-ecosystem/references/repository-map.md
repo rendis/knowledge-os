@@ -52,7 +52,7 @@ Publica el ajuste serializado en el topic configurado por `ADJUSTMENT_TOPIC`. [^
 
 ## Gates before review
 
-Run `<cli> discover check --vault "<vault>" --note <candidate>` (add `--semantic` when Jev is configured). Fix every `error`: G1 (an anchor that does not resolve, lines that do not exist, an identifier absent from the cited lines) and G2 (a connector category or resource group of the facts that the note neither cites nor names). Carry `pending` items into `Verificaciones pendientes`. `review` items (including G3: a declared topic/event relation the facts do not name) and semantic `says_nothing`/`contradicts` results go to the reviewer with their sentences. Mechanical fixes never reopen source analysis.
+Run `<cli> discover check --vault "<vault>" --note <candidate>`. Fix every `error`: G1 (an anchor that does not resolve, lines that do not exist, an identifier absent from the cited lines) and G2 (a connector category or resource group of the facts that the note neither cites nor names). Carry `pending` items into `Verificaciones pendientes`. `review` items (including G3: a declared topic/event relation the facts do not name) and semantic `says_nothing`/`contradicts` results go to the reviewer with their sentences. Mechanical fixes never reopen source analysis.
 
 ## Review
 

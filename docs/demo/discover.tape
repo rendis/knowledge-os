@@ -13,7 +13,7 @@ Ctrl+L
 Type "# Read the cloud: names and relations only, with your own login" Enter
 Type "kos discover platform --provider gcp --scope acme-prd | jq -c .captured" Sleep 300ms Enter
 Sleep 2s
-Type "kos discover run --classify off | jq -c '{pending_items}'" Sleep 300ms Enter
+Type "kos discover run | jq -c '{pending_items}'" Sleep 300ms Enter
 Sleep 2s
 Type "# Every connection keeps its evidence" Enter
 Type "kos discover report --repo acme-ledger | jq '.facts.resources[]|{name, via: [.evidence[].kind]}'" Sleep 300ms Enter

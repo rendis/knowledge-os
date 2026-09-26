@@ -301,7 +301,7 @@ func TestNoteGates(t *testing.T) {
 	link := "https://github.com/acme/SVC-orders/blob/" + sha + "/pub/pub.go#L5-L8"
 	good := "---\naliases: [\"SVC-orders\"]\ncommit-analizado: \"" + sha[:12] + "\"\n---\n# orders\n\nPublica en el topic `orders-cl-outbound` usando `TOPIC_OUT`. [^e1]\n\n[^e1]: [pub/pub.go](" + link + ") — L5-L8: `os.Getenv(\"TOPIC_OUT\")` y `pubsub.NewClient`\n"
 	write(t, vault, "20-Repos/orders.md", good)
-	r, e := checkNote(vault, "20-Repos/orders.md", "", false)
+	r, e := checkNote(vault, "20-Repos/orders.md", "")
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -310,7 +310,7 @@ func TestNoteGates(t *testing.T) {
 	}
 	write(t, vault, "25-Topics/orders-legacy.md", "---\ntipo: topic\n---\n# orders-legacy\n")
 	write(t, vault, "20-Repos/orders.md", strings.Replace(good, "---\n# orders", "publica-en: [\"[[orders-legacy]]\"]\n---\n# orders", 1))
-	r, _ = checkNote(vault, "20-Repos/orders.md", "", false)
+	r, _ = checkNote(vault, "20-Repos/orders.md", "")
 	flagged := false
 	for _, i := range r.Issues {
 		flagged = flagged || i.Gate == "G3-relation" && i.Severity == "review" && i.Where == "orders-legacy"
@@ -320,14 +320,14 @@ func TestNoteGates(t *testing.T) {
 	}
 	multi := strings.Replace(good, "[pub/pub.go]("+link+")", "[go.mod](https://github.com/acme/SVC-orders/blob/"+sha+"/go.mod), [pub/pub.go]("+link+")", 1)
 	write(t, vault, "20-Repos/orders.md", multi)
-	if r, _ = checkNote(vault, "20-Repos/orders.md", "", false); !r.OK {
+	if r, _ = checkNote(vault, "20-Repos/orders.md", ""); !r.OK {
 		t.Fatalf("an identifier in one of a footnote's cited files satisfies the footnote: %+v", r.Issues)
 	}
 	if i := strings.Index(good, "\n[^"); i >= 0 {
 		line := good[i+1:]
 		line = line[:strings.Index(line, "\n")+1]
 		write(t, vault, "20-Repos/orders.md", good+line)
-		if r, _ = checkNote(vault, "20-Repos/orders.md", "", false); r.OK {
+		if r, _ = checkNote(vault, "20-Repos/orders.md", ""); r.OK {
 			t.Fatal("a footnote defined twice fails the gate")
 		}
 	} else {
@@ -338,7 +338,7 @@ func TestNoteGates(t *testing.T) {
 	bad = strings.Replace(bad, "Publica en el topic `orders-cl-outbound` usando `TOPIC_OUT`.", "Publica eventos.", 1)
 	bad = strings.Replace(bad, "pub/pub.go](", "pub/pub.go]("+"", 1)
 	write(t, vault, "20-Repos/orders.md", bad)
-	r, _ = checkNote(vault, "20-Repos/orders.md", "", false)
+	r, _ = checkNote(vault, "20-Repos/orders.md", "")
 	gates := map[string]int{}
 	for _, i := range r.Issues {
 		if i.Severity == "error" {
@@ -356,9 +356,6 @@ func TestNoteGates(t *testing.T) {
 	}
 	if ok, _, _, _ := CheckNoteIntroduced(vault, "20-Repos/orders.md", nil); ok {
 		t.Fatal("the synced note must pass every gate")
-	}
-	if claim := claimFor("Hace A. Luego publica B. [^e2] [^e3]\n", "e3"); claim != "Luego publica B." {
-		t.Fatalf("claim %q", claim)
 	}
 	if !tokenPresent("health.port", "health:\n  port: 8086\n") || tokenPresent("health.host", "health:\n  port: 1\n") {
 		t.Fatal("dotted key paths follow YAML nesting")

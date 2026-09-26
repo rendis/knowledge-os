@@ -47,7 +47,6 @@ discover run|questions|answer|platform|report|check|corrections --vault PATH ...
 config status|detect|resolve|workspace|locate|capability|bind|catalog|areas|operation ...
 check links|bases --vault PATH
 audit --vault PATH
-check obsidian-binding --vault PATH --vault-name NAME
 investigation new|list|check|add|state|absorb|close|reopen --vault PATH ...
 handoff start|status|refresh|reconcile --vault PATH ...
 sync start|status|review|verify|acknowledge|finish|pull --vault PATH ...
@@ -185,7 +184,7 @@ func vaultAt(args []string) int {
 			return 2
 		}
 	case "check":
-		if len(args) > 1 && (args[1] == "links" || args[1] == "bases" || args[1] == "obsidian-binding") {
+		if len(args) > 1 && (args[1] == "links" || args[1] == "bases") {
 			return 2
 		}
 	}

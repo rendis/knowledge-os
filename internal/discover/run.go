@@ -1,10 +1,9 @@
 // Package discover extracts connection facts from source repositories, their configuration
 // and the platform, deterministically first. Judgments that code cannot make are asked once
-// (Jev when TYPESAFE_API_KEY is set, otherwise the agent) and stored in the cell vault.
+// (by the agent) and stored in the cell vault.
 package discover
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -19,10 +18,10 @@ import (
 )
 
 const Help = `discover COMMAND --vault PATH [options]
-  run        [--repo NAME ...] [--at head|note] [--classify auto|off]
+  run        [--repo NAME ...] [--at head|note]
              Scan repositories at an exact commit, apply stored judgments and platform
-             snapshots, write facts and the comparison with notes. With TYPESAFE_API_KEY
-             set, pending judgments are answered automatically (--classify auto).
+             snapshots, write facts and the comparison with notes; judgments not yet made
+             are left as questions.
   questions  [--kind dependency|config_key|config_entry] [--limit N]
              Pending judgments as JSON for the agent to answer (from the last run).
   answer     --file ANSWERS.json   Record agent answers: [{"id":..,"choice":..,"confidence":0..1}]
@@ -36,11 +35,10 @@ const Help = `discover COMMAND --vault PATH [options]
              The providers are a floor: --record stores what the agent read elsewhere
              (any service, cluster or host) with its command, so facts use it.
   report     [--repo NAME]   Last run summary, or one repository's facts.
-  check      --note PATH [--note PATH ...] [--repo NAME] [--semantic]
+  check      --note PATH [--note PATH ...] [--repo NAME]
              Gates for a repository note: G1 source anchors resolve at their commit and
              the identifiers they name are in the cited lines; G2 every connector and
-             configured resource is evidenced or addressed; freshness of cited files;
-             --semantic asks Jev whether each cited sentence is supported (review aid).
+             configured resource is evidenced or addressed; freshness of cited files.
              A candidate outside the vault is matched to its repository by its aliases.
   corrections  Note relations the last run could not support, as correction tasks.
 Facts and questions are local (.agents/state/discovery). Judgments and platform snapshots
@@ -49,15 +47,15 @@ are versioned under 90-Meta/discovery/. All output is JSON.`
 const stateRel = ".agents/state/discovery"
 
 type options struct {
-	vault, at, classify, kind, file string
-	provider, record                string
-	repos, scopes, notes            []string
-	limit                           int
-	referenced, dryRun, semantic    bool
+	vault, at, kind, file string
+	provider, record      string
+	repos, scopes, notes  []string
+	limit                 int
+	referenced, dryRun    bool
 }
 
 func parse(args []string) (string, options, error) {
-	o := options{at: "head", classify: "auto", limit: 200}
+	o := options{at: "head", limit: 200}
 	if len(args) == 0 {
 		return "", o, errors.New("discover requires a command; use --help")
 	}
@@ -82,8 +80,6 @@ func parse(args []string) (string, options, error) {
 		case "--note":
 			v, e = val()
 			o.notes = append(o.notes, v)
-		case "--semantic":
-			o.semantic = true
 		case "--scope":
 			v, e = val()
 			o.scopes = append(o.scopes, v)
@@ -93,8 +89,6 @@ func parse(args []string) (string, options, error) {
 			o.record, e = val()
 		case "--at":
 			o.at, e = val()
-		case "--classify":
-			o.classify, e = val()
 		case "--kind":
 			o.kind, e = val()
 		case "--file":
@@ -206,7 +200,7 @@ func Run(args []string, out io.Writer) error {
 	case "report":
 		return showReport(o, out)
 	case "check":
-		return runCheck(o, out, o.semantic)
+		return runCheck(o, out)
 	case "corrections":
 		return listCorrections(o, out)
 	}
@@ -220,8 +214,6 @@ type runReport struct {
 	Scanned          []string          `json:"scanned"`
 	Failed           []string          `json:"failed"`
 	PendingQuestions map[string]int    `json:"pending_questions"`
-	Acceleration     map[string]any    `json:"acceleration"`
-	Classified       map[string]any    `json:"classified_this_run,omitempty"`
 	PlatformScopes   []string          `json:"platform_scopes_referenced"`
 	PlatformCaptured map[string]string `json:"platform_captured"`
 	PlatformObserved int               `json:"platform_observed_names,omitempty"`
@@ -286,25 +278,6 @@ func runDiscovery(o options, out io.Writer) error {
 		return e
 	}
 	a := &assembly{scans: scans, st: st, platform: ix, providers: configuredProviders(o.vault)}
-	classified := map[string]any{}
-	if jev := newJev(); jev != nil && o.classify == "auto" {
-		// Dependencies and keys first: entry questions depend on key judgments.
-		for round := 0; round < 3; round++ {
-			qs := a.pendingQuestions()
-			if len(qs) == 0 {
-				break
-			}
-			done, failures := jev.answerAll(context.Background(), st, qs)
-			classified[fmt.Sprintf("round_%d", round+1)] = map[string]any{"asked": len(qs), "answered": done, "failures": len(failures)}
-			if e := st.save(o.vault); e != nil {
-				return e
-			}
-			if done == 0 {
-				break
-			}
-		}
-		classified["jev_calls"], classified["jev_input_tokens"] = jev.calls, jev.tokens
-	}
 	facts := a.facts()
 	qs := a.pendingQuestions()
 	if e := writeState(o.vault, "questions.json", qs); e != nil {
@@ -342,11 +315,8 @@ func runDiscovery(o options, out io.Writer) error {
 		return e
 	}
 	rep := runReport{Vault: o.vault, GeneratedAt: time.Now().UTC().Format(time.RFC3339), Repositories: len(inputs), Failed: failed, Skipped: skipped,
-		PendingQuestions: map[string]int{}, Acceleration: accelerationStatus(), PlatformScopes: a.platformScopes(configuredProviders(o.vault)),
+		PendingQuestions: map[string]int{}, PlatformScopes: a.platformScopes(configuredProviders(o.vault)),
 		PlatformCaptured: map[string]string{}, Pending: map[string]int{}, Comparison: map[string]int{}}
-	if len(classified) > 0 {
-		rep.Classified = classified
-	}
 	for _, s := range scans {
 		rep.Scanned = append(rep.Scanned, s.in.Name)
 	}
@@ -416,7 +386,7 @@ func listQuestions(o options, out io.Writer) error {
 	if o.limit > 0 && len(open) > o.limit {
 		open = open[:o.limit]
 	}
-	return emit(out, map[string]any{"pending": total, "returned": len(open), "answer_with": "kos discover answer --vault <VAULT> --file answers.json", "answer_format": `[{"id":"<question id>","choice":"<one option>","confidence":0.0-1.0}]`, "questions": open, "acceleration": accelerationStatus()})
+	return emit(out, map[string]any{"pending": total, "returned": len(open), "answer_with": "kos discover answer --vault <VAULT> --file answers.json", "answer_format": `[{"id":"<question id>","choice":"<one option>","confidence":0.0-1.0}]`, "questions": open})
 }
 
 func answerQuestions(o options, out io.Writer) error {
@@ -446,7 +416,7 @@ func answerQuestions(o options, out io.Writer) error {
 	if e := st.save(o.vault); e != nil {
 		return e
 	}
-	return emit(out, map[string]any{"recorded": n, "remaining": len(pending) - n, "next": "kos discover run --vault <VAULT> --classify off"})
+	return emit(out, map[string]any{"recorded": n, "remaining": len(pending) - n, "next": "kos discover run --vault <VAULT>"})
 }
 
 // configuredProviders reads platform.providers from the cell's instance.yaml.

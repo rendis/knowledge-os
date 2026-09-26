@@ -9,8 +9,7 @@ Load this reference as bootstrap context, then resolve the vault before reading 
 - [Source configuration and selection](#source-configuration-and-selection)
 - [Development destinations](#development-destinations)
 - [Managed clone authorization](#managed-clone-authorization)
-- [Interaction protocol](#interaction-protocol)
-- [Filesystem interaction](#filesystem-interaction)
+- [Interaction](#interaction)
 - [Completion criterion](#completion-criterion)
 
 ## Canonical identity
@@ -35,9 +34,7 @@ Supply a user-selected vault path, or the root derived from the active installed
 
 Bind `VAULT_ROOT` only from the returned `vault_root`. Its `source_context` contains ordered configured `roots`, `clone_root`, `clone_origin`, `clone_authorized` and warnings. An unavailable source context does not block vault-only work.
 
-The resolver makes a bounded optional `obsidian vaults verbose` query. `obsidian_vault` is set only for a unique registration matching the canonical filesystem path; `interaction_mode` is then `obsidian-cli`. Missing CLI, unavailable application or ambiguous registration leaves filesystem mode available. This probe does not launch Obsidian or select another vault.
-
-Bind `SOURCE_ROOTS` to `source_context.roots`, `CLONE_ROOT` to the configured clone root and `OBSIDIAN_VAULT` only to the verified registration name. Resolve again after a new user-supplied path, configuration change, clone or registration change. Re-establish machine-local bindings in a new session.
+Bind `SOURCE_ROOTS` to `source_context.roots`, and `CLONE_ROOT` to the configured clone root. Resolve again after a new user-supplied path, configuration change or clone. Re-establish machine-local bindings in a new session.
 
 ## Source configuration and selection
 
@@ -74,39 +71,10 @@ When a managed clone is missing, determine the production branch using the inven
 
 If `clone_authorized=false`, never clone. Ask for explicit approval and an exact existing root, then hand off to `onboard-developer` to record managed-clone authority before acquisition. If the user does not want persistent clone authority, require them to provide an already available checkout under a configured read-only root.
 
-## Interaction protocol
+## Interaction
 
-When `OBSIDIAN_VAULT` is available, verify the normalized filesystem binding before the first query. Run it from `VAULT_ROOT`; do not trust the Obsidian exit code alone because a missing vault can still return `0`:
-
-```text
-<CLI> check obsidian-binding --vault "<VAULT_ROOT>" --vault-name "<OBSIDIAN_VAULT>"
-```
-
-Then always target the vault explicitly:
-
-```text
-obsidian "vault=<obsidian_vault>" search "query=<term>"
-obsidian "vault=<obsidian_vault>" read "file=<canonical basename>"
-obsidian "vault=<obsidian_vault>" backlinks "file=<canonical basename>"
-obsidian "vault=<obsidian_vault>" unresolved
-obsidian "vault=<obsidian_vault>" orphans
-```
-
-Search and read the notes with the host's own tools. Obsidian CLI can additionally inspect canonical resolution, backlinks, unresolved links and orphans. Use the host's safe filesystem editing mechanism for versioned Markdown and skill files so Git can review the exact diff. Pass the resolved `VAULT_ROOT` explicitly to CLI operations.
-
-Never issue an Obsidian command without the explicit `"vault=<obsidian_vault>"` argument; the implicit target is the most recently focused vault and is not safe evidence.
-
-## Filesystem interaction
-
-If the resolver finds the vault but no matching Obsidian registration or CLI is available:
-
-1. Use native CLI search and targeted filesystem reads; `rg` remains a direct text-search fallback.
-2. Use `<CLI> check links --vault "<VAULT_ROOT>"` for filesystem link checks.
-3. Run all other Framework gates that are available.
-4. Report that Obsidian-native resolution, backlinks, or rendering were not verified.
-
-The companion `obsidian-markdown` and `obsidian-bases` skills improve Obsidian-specific authoring, but vault identity, routing, and evidence boundaries remain valid in either interaction mode.
+Search and read the notes with the host's own tools (`rg` for text). Use `<CLI> check links --vault "<VAULT_ROOT>"` for broken links and orphans, and run the other Framework gates that apply. Use the host's safe filesystem editing mechanism for versioned Markdown and skill files so Git can review the exact diff. Pass the resolved `VAULT_ROOT` explicitly to CLI operations. The `obsidian-markdown` and `obsidian-bases` skills cover Obsidian-specific authoring.
 
 ## Completion criterion
 
-Resolution is complete only when the canonical remote and markers identify one `VAULT_ROOT`, every path-dependent command is rooted there, any required source access has a usable configuration-backed `source_context`, and every Obsidian command names the verified `OBSIDIAN_VAULT` explicitly.
+Resolution is complete only when the canonical remote and markers identify one `VAULT_ROOT`, every path-dependent command is rooted there, any required source access has a usable configuration-backed `source_context`.

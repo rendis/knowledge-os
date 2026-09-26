@@ -98,7 +98,7 @@ def prepare(a):
         sh([cli(), "kernel", "update", "--vault", str(dst)])
         sh(["git", "-C", str(dst), "add", "-A"])
         sh(["git", "-C", str(dst), "commit", "-q", "--allow-empty", "-m", "chore(benchmark): fixture"], env=IDENTITY)
-        sh([cli(), "discover", "run", "--vault", str(dst), "--classify", "off"])
+        sh([cli(), "discover", "run", "--vault", str(dst)])
         facts = sorted((dst / ".agents/state/discovery/facts").glob("*.json"))
         fp["vaults"][key] = {"source_commit": v["commit"], "fixture": sh(["git", "-C", str(dst), "rev-parse", "--short=12", "HEAD"]),
                              "facts": hashlib.sha256(b"".join(sha256(f).encode() for f in facts)).hexdigest()[:16]}

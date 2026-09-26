@@ -2,7 +2,7 @@
 
 Usage: python3 -B evals/discovery/run_real.py --kos PATH VAULT [VAULT ...]
 
-It runs discovery with stored judgments only (--classify off, no model calls), then prints, per vault,
+It runs discovery with stored judgments only (no model calls), then prints, per vault,
 the relations that the notes declare and discovery supports, the discrepancies, pending items and
 cell gaps. Compare the totals with results.md before and after a change to the extraction code.
 """
@@ -19,7 +19,7 @@ def main() -> int:
     a = p.parse_args()
     totals = {"supported_relations": 0, "discrepancies": 0, "resources_without_topic_note": 0}
     for v in a.vaults:
-        out = subprocess.run([a.kos, "discover", "run", "--vault", v, "--classify", "off"], capture_output=True, text=True)
+        out = subprocess.run([a.kos, "discover", "run", "--vault", v], capture_output=True, text=True)
         if out.returncode != 0:
             print(f"{v}: discover failed: {out.stderr.strip()}", file=sys.stderr)
             return 1

@@ -7,7 +7,7 @@ init · adopt · doctor
 inventory · audit
 discover run|questions|answer|platform|report|check|corrections
 config status|resolve|workspace|locate|capability|bind|catalog|areas|operation|…
-check links|bases|obsidian-binding
+check links|bases
 investigation new|list|check|add|state|absorb|close|reopen
 handoff start|status|refresh|reconcile
 sync start|status|review|verify|acknowledge|finish|pull
@@ -23,7 +23,7 @@ Reading and searching notes, code and snapshots is left to the agent's own tools
 - **Development handoffs** (`handoff`): atomic task packages prepared in a repository worktree, with a managed `AGENTS.md` section that tells any harness how to work with them, and a deterministic reconciliation back into the case.
 - **Publication through Git** (`sync`): knowledge changes on a `sync/<slug>` branch, with gates, a review bound to the exact content and a fast-forward finish.
 
-Discovery judgments are answered by Jev when `TYPESAFE_API_KEY` is set, otherwise by the agent through `discover questions` and `discover answer`.
+Discovery judgments are answered by the agent through `discover questions` and `discover answer`.
 
 Failures, unwanted behaviors and proposals come back through the `report-to-distribution` skill as sanitized issues (templates in `.github/ISSUE_TEMPLATE/`).
 

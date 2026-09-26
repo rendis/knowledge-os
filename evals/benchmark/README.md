@@ -10,7 +10,7 @@ Fairness comes from holding everything except the setting constant:
 
 1. **One fixture.** `prepare` clones each vault at a pinned commit, applies the cell's discovery state
    (classifications, platform snapshots) and local workspace config, installs this distribution's current
-   kernel and computes discovery facts deterministically (`--classify off`). `fingerprint.json` records the
+   kernel and computes discovery facts deterministically. `fingerprint.json` records the
    distribution commit, kernel version, suite and question hashes, facts hashes, harness versions and the
    judge/reviewer. Results are comparable only under the same fingerprint; re-run `prepare` after a kernel
    change and benchmark every setting again.

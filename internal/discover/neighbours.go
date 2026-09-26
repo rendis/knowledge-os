@@ -169,7 +169,7 @@ func minInt(a, b int) int {
 // commit-analizado) only errors absent from the base version fail; pre-existing debt is reported but does
 // not block re-anchoring. Without base content every error fails.
 func CheckNoteIntroduced(vault, note string, base []byte) (bool, []string, int, error) {
-	r, e := checkNote(vault, note, "", false)
+	r, e := checkNote(vault, note, "")
 	if e != nil || r.OK {
 		return r.OK, nil, 0, e
 	}
@@ -195,7 +195,7 @@ func CheckNoteIntroduced(vault, note string, base []byte) (bool, []string, int, 
 		return false, nil, 0, e
 	}
 	defer os.Remove(tmp)
-	rb, e := checkNote(vault, tmp, "", false)
+	rb, e := checkNote(vault, tmp, "")
 	if e != nil {
 		return false, nil, 0, e
 	}
