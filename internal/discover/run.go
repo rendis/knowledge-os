@@ -150,6 +150,27 @@ func writeState(vault, name string, v any) error {
 	return os.WriteFile(p, append(b, '\n'), 0o644)
 }
 
+// storedFacts returns this run's facts plus the last stored facts of the tracked repositories it did
+// not scan; a repository no longer tracked is left out even if its facts file remains.
+func storedFacts(vault string, fresh []repoFacts, tracked map[string]bool) []repoFacts {
+	out := append([]repoFacts{}, fresh...)
+	scanned := map[string]bool{}
+	for _, f := range fresh {
+		scanned[f.Repo] = true
+	}
+	paths, _ := filepath.Glob(filepath.Join(vault, stateRel, "facts", "*.json"))
+	sort.Strings(paths)
+	for _, p := range paths {
+		var f repoFacts
+		b, e := os.ReadFile(p)
+		if e != nil || json.Unmarshal(b, &f) != nil || f.Repo == "" || scanned[f.Repo] || !tracked[f.Repo] {
+			continue
+		}
+		out = append(out, f)
+	}
+	return out
+}
+
 func readState(vault, name string, v any) error {
 	b, e := os.ReadFile(filepath.Join(vault, stateRel, name))
 	if os.IsNotExist(e) {
@@ -292,14 +313,26 @@ func runDiscovery(o options, out io.Writer) error {
 			return e
 		}
 	}
-	cmp, e := compareNotes(o.vault, facts)
+	// A run over some repositories keeps the last facts of the other tracked ones in the cell-wide
+	// comparison and gaps; a full run compares only what it scanned, as before.
+	all := facts
+	if len(only) > 0 {
+		tracked := map[string]bool{}
+		if every, e := discoverRepositories(o.vault, map[string]bool{}); e == nil {
+			for _, in := range every {
+				tracked[in.Name] = true
+			}
+		}
+		all = storedFacts(o.vault, facts, tracked)
+	}
+	cmp, e := compareNotes(o.vault, all)
 	if e != nil {
 		return e
 	}
 	if e := writeState(o.vault, "comparison.json", cmp); e != nil {
 		return e
 	}
-	gaps, e := cellGaps(o.vault, facts)
+	gaps, e := cellGaps(o.vault, all)
 	if e != nil {
 		return e
 	}

@@ -547,3 +547,35 @@ func TestShortNamesAreCheckedInTheScopeTheirFileDeclares(t *testing.T) {
 		t.Fatalf("a topic owned by another system's project is not missing from the consumer's project: %v", subjects)
 	}
 }
+
+func TestNoteNamesExpandBraceAlternatives(t *testing.T) {
+	n := vaultNote{fm: map[string]string{"nombre-raw": `"inventory-inbound-topic-{cl|co|pe}"`, "aliases": `["stock-{a|b}"]`}}
+	names := n.names("acme-scan-inventory-soh-inbound")
+	hit := false
+	for _, d := range names {
+		hit = hit || nameMatch(d, "inventory-inbound-topic-cl")
+	}
+	if short := (vaultNote{fm: map[string]string{"nombre-raw": `"svc-{|v2}"`}}).names("svc-note"); len(short) != 2 || short[1] != "svc-v2" {
+		t.Fatalf("a too-short variant is dropped: %v", short)
+	}
+	if !hit || len(names) != 6 {
+		t.Fatalf("a per-country resource matches the braced raw name: %v", names)
+	}
+}
+
+func TestPartialRunKeepsOtherRepositoriesFacts(t *testing.T) {
+	v := t.TempDir()
+	for _, r := range []string{"repo-a", "repo-b"} {
+		if e := writeState(v, filepath.Join("facts", r+".json"), repoFacts{Repo: r, Note: "20-Repos/" + r + ".md"}); e != nil {
+			t.Fatal(e)
+		}
+	}
+	fresh := []repoFacts{{Repo: "repo-a", Note: "20-Repos/repo-a.md", Commit: "new"}}
+	all := storedFacts(v, fresh, map[string]bool{"repo-a": true, "repo-b": true})
+	if len(all) != 2 || all[0].Commit != "new" || all[1].Repo != "repo-b" {
+		t.Fatalf("a partial run compares the scanned repository fresh and keeps the others: %+v", all)
+	}
+	if all := storedFacts(v, fresh, map[string]bool{"repo-a": true}); len(all) != 1 {
+		t.Fatalf("a repository no longer tracked is left out: %+v", all)
+	}
+}
