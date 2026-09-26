@@ -53,6 +53,7 @@ func listCorrections(o options, out io.Writer) error {
 }
 
 var (
+	bareName    = regexp.MustCompile(`[A-Za-z0-9][A-Za-z0-9_]*(?:[.\-][A-Za-z0-9_]+)+`)
 	claimTick   = regexp.MustCompile("`([^`\n]{3,200})`")
 	claimLink   = regexp.MustCompile(`\[\[([^\]|#]+)`)
 	resourceTok = regexp.MustCompile(`^[a-z0-9][a-z0-9._\-/:{}|]*$`)
@@ -261,6 +262,7 @@ func checkClaims(vault, text string) (map[string]any, error) {
 	seen := map[string]bool{}
 	unknown := []claimFlag{}
 	checked := 0
+	names := []string{}
 	candidates := []string{}
 	for _, m := range claimTick.FindAllStringSubmatch(text, -1) {
 		candidates = append(candidates, strings.TrimSpace(m[1]))
@@ -274,7 +276,26 @@ func checkClaims(vault, text string) (map[string]any, error) {
 		}
 		seen[c] = true
 		checked++
+		names = append(names, c)
 		if !isKnown(known, c) {
+			unknown = append(unknown, claimFlag{c, "no discovery fact, platform snapshot or note names it; verify it at the source or remove it"})
+		}
+	}
+	// Names written without backticks count too: a known one is checked; an unknown one is flagged
+	// only when it has a topic's shape (three dotted segments), since prose has hyphenated words.
+	for _, m := range bareName.FindAllString(text, -1) {
+		c := strings.TrimRight(m, ".,;:")
+		if seen[c] || !resourceCandidate(c) {
+			continue
+		}
+		seen[c] = true
+		switch {
+		case isKnown(known, c):
+			checked++
+			names = append(names, c)
+		case strings.Count(c, ".") >= 2:
+			checked++
+			names = append(names, c)
 			unknown = append(unknown, claimFlag{c, "no discovery fact, platform snapshot or note names it; verify it at the source or remove it"})
 		}
 	}
@@ -292,7 +313,11 @@ func checkClaims(vault, text string) (map[string]any, error) {
 			}
 		}
 	}
-	return map[string]any{"ok": len(unknown) == 0 && len(contradicted) == 0, "names_checked": checked, "unknown_names": unknown, "contradicted_relations": contradicted}, nil
+	res := map[string]any{"ok": len(unknown) == 0 && len(contradicted) == 0, "names_checked": checked, "names": names, "unknown_names": unknown, "contradicted_relations": contradicted}
+	if checked == 0 {
+		res["note"] = "no topic, subscription, event or repository name was recognized, so none was checked; write those names in backticks if the answer has any"
+	}
+	return res, nil
 }
 
 func runClaims(o options, out io.Writer) error {
