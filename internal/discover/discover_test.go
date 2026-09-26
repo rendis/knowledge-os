@@ -675,3 +675,16 @@ func TestMentionsExpandsBracedNames(t *testing.T) {
 		t.Error("a variant outside the braces is not mentioned")
 	}
 }
+
+func TestNoNodeAcknowledgementAtItsCommitOwnsNoGaps(t *testing.T) {
+	v := t.TempDir()
+	write(t, v, "90-Meta/.sync-acknowledgements.json", `{"repositories":[{"repository":"LEGACY","decision":"no-durable-node","analyzed_sha":"abc123def456"}]}`)
+	facts := []repoFacts{{Repo: "LEGACY", Commit: "abc123def4567890", Resources: []resource{{Type: "message_subscription", Name: "legacy-orders-sub"}}}}
+	if g, _ := cellGaps(v, facts); len(g) != 0 {
+		t.Fatalf("an acknowledged repository at its commit has no gaps: %v", g)
+	}
+	facts[0].Commit = "fff000"
+	if g, _ := cellGaps(v, facts); len(g) != 1 {
+		t.Fatalf("a later commit needs a new decision: %v", g)
+	}
+}
