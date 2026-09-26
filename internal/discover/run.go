@@ -543,8 +543,12 @@ func capturePlatform(o options, out io.Writer) error {
 
 func showReport(o options, out io.Writer) error {
 	if len(o.repos) == 1 {
+		repo, e := factsRepo(o.vault, o.repos[0])
+		if e != nil {
+			return e
+		}
 		var f repoFacts
-		if e := readState(o.vault, filepath.Join("facts", o.repos[0]+".json"), &f); e != nil {
+		if e := readState(o.vault, filepath.Join("facts", repo+".json"), &f); e != nil {
 			return e
 		}
 		var cmp []comparison
@@ -561,6 +565,42 @@ func showReport(o options, out io.Writer) error {
 		return e
 	}
 	return emit(out, rep)
+}
+
+// factsRepo resolves the name a reader has — the repository, its note's basename or a suffix of the
+// repository name — to the repository whose facts the last run stored.
+func factsRepo(vault, name string) (string, error) {
+	dir := filepath.Join(vault, stateRel, "facts")
+	paths, _ := filepath.Glob(filepath.Join(dir, "*.json"))
+	if len(paths) == 0 {
+		return "", fmt.Errorf("no discovery run found; run `kos discover run --vault %s` first", vault)
+	}
+	known := []string{}
+	for _, p := range paths {
+		repo := strings.TrimSuffix(filepath.Base(p), ".json")
+		if strings.EqualFold(repo, name) {
+			return repo, nil
+		}
+		known = append(known, repo)
+	}
+	var cmp []comparison
+	_ = readState(vault, "comparison.json", &cmp)
+	for _, c := range cmp {
+		if c.Note != "" && strings.EqualFold(strings.TrimSuffix(filepath.Base(c.Note), ".md"), name) {
+			return c.Repo, nil
+		}
+	}
+	matches := []string{}
+	for _, repo := range known {
+		if strings.HasSuffix(strings.ToLower(repo), "-"+strings.ToLower(name)) {
+			matches = append(matches, repo)
+		}
+	}
+	if len(matches) == 1 {
+		return matches[0], nil
+	}
+	sort.Strings(known)
+	return "", fmt.Errorf("no discovery facts for repository %q; known repositories: %s", name, strings.Join(known, ", "))
 }
 
 // credentialsInSources lists each versioned credential once by repository, file and key.
