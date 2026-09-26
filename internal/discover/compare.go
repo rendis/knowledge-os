@@ -1,6 +1,7 @@
 package discover
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -206,6 +207,13 @@ func compareNotes(vault string, facts []repoFacts) ([]comparison, error) {
 				}
 			}
 		}
+		// A logical resource (its per-country or per-environment variants) the note names once is documented.
+		named := map[string]bool{}
+		for _, r := range f.Resources {
+			if isMessaging(r.Type) && mentions(text, r.Name) {
+				named[r.Type+": "+logicalName(normalizeResource(r.Name))] = true
+			}
+		}
 		groups := map[string][]string{}
 		for _, r := range f.Resources {
 			if len(f.Languages) == 0 {
@@ -214,7 +222,7 @@ func compareNotes(vault string, facts []repoFacts) ([]comparison, error) {
 			if !isMessaging(r.Type) {
 				continue
 			}
-			matched := mentions(text, r.Name)
+			matched := named[r.Type+": "+logicalName(normalizeResource(r.Name))]
 			for _, d := range documented {
 				matched = matched || nameMatch(d, r.Name) || (r.Topic != "" && nameMatch(d, r.Topic))
 			}
@@ -270,7 +278,13 @@ func cellGaps(vault string, facts []repoFacts) ([]map[string]any, error) {
 		repos    map[string]bool
 	}
 	groups := map[string]*group{}
+	acked := noNodeAcknowledged(vault)
 	for _, f := range facts {
+		// A repository the cell decided not to map (no-durable-node at this very commit) owns no gaps;
+		// a later commit brings them back for a new decision.
+		if sha := acked[f.Repo]; sha != "" && f.Commit != "" && (strings.HasPrefix(f.Commit, sha) || strings.HasPrefix(sha, f.Commit)) {
+			continue
+		}
 		// A resource its repository's note names is addressed there (a test-only subscription, a
 		// configured name the code never reads); it does not need a topic note of its own.
 		noteText := ""
@@ -279,11 +293,17 @@ func cellGaps(vault string, facts []repoFacts) ([]map[string]any, error) {
 				noteText = strings.ToLower(string(b))
 			}
 		}
+		named := map[string]bool{}
+		for _, r := range f.Resources {
+			if isMessaging(r.Type) && mentions(noteText, r.Name) {
+				named[r.Type+": "+logicalName(normalizeResource(r.Name))] = true
+			}
+		}
 		for _, r := range f.Resources {
 			if !isMessaging(r.Type) {
 				continue
 			}
-			covered := mentions(noteText, r.Name)
+			covered := named[r.Type+": "+logicalName(normalizeResource(r.Name))]
 			for _, d := range names {
 				covered = covered || nameMatch(d, r.Name) || r.Topic != "" && nameMatch(d, r.Topic)
 			}
@@ -336,4 +356,30 @@ func mentions(text, name string) bool {
 		}
 	}
 	return false
+}
+
+// noNodeAcknowledged maps each repository the cell recorded as no-durable-node to the commit of that
+// decision (90-Meta/.sync-acknowledgements.json).
+func noNodeAcknowledged(vault string) map[string]string {
+	out := map[string]string{}
+	b, e := os.ReadFile(filepath.Join(vault, "90-Meta", ".sync-acknowledgements.json"))
+	if e != nil {
+		return out
+	}
+	var acks struct {
+		Repositories []struct {
+			Repository string `json:"repository"`
+			Decision   string `json:"decision"`
+			SHA        string `json:"analyzed_sha"`
+		} `json:"repositories"`
+	}
+	if json.Unmarshal(b, &acks) != nil {
+		return out
+	}
+	for _, a := range acks.Repositories {
+		if a.Decision == "no-durable-node" && a.SHA != "" {
+			out[a.Repository] = a.SHA
+		}
+	}
+	return out
 }
