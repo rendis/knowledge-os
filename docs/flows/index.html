@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Vault Flows</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&family=Manrope:wght@500;700;800&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+  :root {
+    --bg: #EAEEF6;
+    --surface: #FFFFFF;
+    --ink: #1C2130;
+    --ink-soft: #8A93A8;
+    --line: #D3D9E5;
+    --grid: #D9DEEA;
+    --accent: #3452F5;
+    --on-accent: #FFFFFF;
+    --accent-soft: #E2E7FF;
+    --coral: #EC5A4E;
+    --chip: #F1F3F9;
+    --shadow: rgba(28, 40, 90, .28);
+    --px-bg: #F4F6FB;
+    --px-screen: #1C2130;
+    --px-eye: #5CE1E6;
+    --px-accent2: #8EA2FF;
+    --px-gold: #FFC24B;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg: #0E1119;
+      --surface: #171B26;
+      --ink: #E7EAF3;
+      --ink-soft: #7C869C;
+      --line: #2E3546;
+      --grid: #232938;
+      --accent: #7A91FF;
+      --on-accent: #0E1119;
+      --accent-soft: #232B4A;
+      --coral: #FF7A6D;
+      --chip: #20263A;
+      --shadow: rgba(0, 0, 0, .6);
+      --px-bg: #12151E;
+      --px-screen: #07090E;
+      --px-eye: #5CE1E6;
+      --px-accent2: #3F52B5;
+      --px-gold: #FFC24B;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #0E1119;
+    --surface: #171B26;
+    --ink: #E7EAF3;
+    --ink-soft: #7C869C;
+    --line: #2E3546;
+    --grid: #232938;
+    --accent: #7A91FF;
+    --on-accent: #0E1119;
+    --accent-soft: #232B4A;
+    --coral: #FF7A6D;
+    --chip: #20263A;
+    --shadow: rgba(0, 0, 0, .6);
+    --px-bg: #12151E;
+    --px-screen: #07090E;
+    --px-eye: #5CE1E6;
+    --px-accent2: #3F52B5;
+    --px-gold: #FFC24B;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: Manrope, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-weight: 500;
+    padding-inline: 16px;
+    padding-block: 32px 48px;
+  }
+  .wrap { max-width: 1040px; margin: 0 auto; display: grid; gap: 22px; }
+
+  header { display: grid; gap: 14px; }
+  .eyebrow {
+    font: 500 12px/1 "JetBrains Mono", ui-monospace, Menlo, monospace;
+    letter-spacing: .08em; text-transform: uppercase; color: var(--ink-soft); white-space: nowrap;
+  }
+  .title-row { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 14px 24px; }
+  h1 { margin: 0; font-family: Silkscreen, ui-monospace, monospace; font-size: clamp(32px, 5vw, 46px); font-weight: 700; letter-spacing: .02em; line-height: 1; text-wrap: balance; }
+  .flows { display: flex; flex-wrap: wrap; gap: 8px; list-style: none; margin: 0; padding: 0; }
+  .flows button {
+    display: inline-flex; align-items: center; gap: 7px;
+    font: 700 13px/1 Manrope, ui-sans-serif, system-ui, sans-serif; padding: 5px 13px 5px 5px; border-radius: 999px; cursor: pointer;
+    border: 1.5px solid var(--line); background: transparent; color: var(--ink-soft);
+  }
+  .flows .n {
+    width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center;
+    font: 700 11px/1 "JetBrains Mono", ui-monospace, Menlo, monospace; background: var(--chip); color: var(--ink-soft);
+  }
+  .flows button[aria-current="page"] .n { background: var(--accent); color: var(--on-accent); }
+  .flows button:hover { color: var(--ink); border-color: var(--ink-soft); }
+  .flows button[aria-current="page"] { background: var(--ink); border-color: var(--ink); color: var(--surface); }
+  .flows button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .topline { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .lang { display: inline-flex; border: 1.5px solid var(--line); border-radius: 999px; padding: 2px; }
+  .lang button {
+    font: 700 11px/1 "JetBrains Mono", ui-monospace, Menlo, monospace; letter-spacing: .06em; cursor: pointer;
+    border: 0; border-radius: 999px; padding: 5px 9px; background: transparent; color: var(--ink-soft);
+  }
+  .lang button[aria-pressed="true"] { background: var(--ink); color: var(--surface); }
+  .lang button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .prefs { display: inline-flex; align-items: center; gap: 8px; }
+  .sound {
+    width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; cursor: pointer;
+    border: 1.5px solid var(--line); background: transparent; color: var(--ink-soft);
+  }
+  .sound:hover { color: var(--ink); border-color: var(--ink-soft); }
+  .sound[aria-pressed="true"] { color: var(--ink); }
+  .sound:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .sound svg { width: 17px; height: 17px; }
+  .sound[aria-pressed="true"] .off, .sound[aria-pressed="false"] .on { display: none; }
+  .lede { margin: 0; color: var(--ink-soft); font-size: 15px; max-width: 62ch; }
+
+  .stage {
+    background: var(--px-bg); border-radius: 20px; overflow: hidden;
+    box-shadow: 0 1px 0 var(--line), 0 24px 60px -34px var(--shadow);
+  }
+  #scene { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; image-rendering: pixelated; image-rendering: crisp-edges; background: var(--px-bg); }
+
+  .scrubbar { padding: 6px 18px 8px; }
+  .scrub {
+    --p: 0%;
+    display: block; width: 100%; margin: 0; height: 16px; appearance: none; -webkit-appearance: none; cursor: pointer; background: transparent;
+    background: linear-gradient(to right, var(--accent) var(--p), var(--line) var(--p)) center / 100% 4px no-repeat;
+  }
+  .scrub::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: var(--accent); border: 0; }
+  .scrub::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--accent); border: 0; }
+  .scrub:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .rail { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 6px; }
+  .rail button {
+    width: 100%; display: flex; flex-direction: column; align-items: center; gap: 8px;
+    background: none; border: 0; padding: 6px 2px; cursor: pointer; color: var(--ink-soft);
+    font: 700 12px/1.1 Manrope, ui-sans-serif, system-ui, sans-serif; border-radius: 12px;
+  }
+  .rail .dot {
+    width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center;
+    border: 2px solid var(--line); background: var(--surface); font-variant-numeric: tabular-nums;
+    transition: background .3s, border-color .3s, color .3s, transform .3s;
+  }
+  .rail button[data-state="done"] .dot { background: var(--accent-soft); border-color: var(--accent-soft); color: var(--accent); }
+  .rail button[aria-current="step"] { color: var(--ink); }
+  .rail button[aria-current="step"] .dot { background: var(--accent); border-color: var(--accent); color: var(--on-accent); transform: scale(1.12); }
+  .rail button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .now { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px 24px; }
+  .caption { display: grid; gap: 10px; min-height: 76px; align-content: start; }
+  .caption h2 { margin: 0; font-family: Silkscreen, ui-monospace, monospace; font-size: clamp(22px, 3vw, 30px); font-weight: 400; letter-spacing: .02em; text-wrap: balance; }
+  .cmds { display: flex; flex-wrap: wrap; gap: 8px; }
+  .cmds code {
+    font: 500 13px/1 "JetBrains Mono", ui-monospace, Menlo, monospace;
+    background: var(--chip); color: var(--ink); padding: 8px 10px; border-radius: 8px;
+  }
+  .cmds code::before { content: "$ "; color: var(--ink-soft); }
+  .controls { display: flex; align-items: center; gap: 10px; }
+  .controls .next-flow {
+    display: inline-flex; align-items: center; gap: 8px; width: auto; height: 46px; padding: 0 16px 0 20px; border-radius: 999px; white-space: nowrap;
+    font: 700 14px/1 Manrope, ui-sans-serif, system-ui, sans-serif; border: 0; background: var(--accent); color: var(--on-accent);
+  }
+  .controls .next-flow[hidden] { display: none; }
+  .next-flow svg { width: 18px; height: 18px; }
+  .next-flow:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+  .controls button {
+    width: 46px; height: 46px; border-radius: 50%; display: grid; place-items: center; cursor: pointer;
+    border: 2px solid var(--line); background: var(--surface); color: var(--ink);
+  }
+  .controls button.primary { width: 56px; height: 56px; background: var(--ink); border-color: var(--ink); color: var(--surface); }
+  .controls button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+  .controls svg { width: 20px; height: 20px; }
+
+  @media (max-width: 640px) {
+    .now { justify-content: center; }
+    .controls { flex-wrap: wrap; justify-content: center; }
+    .controls .next-flow { order: 1; flex-basis: 100%; justify-content: center; }
+    .rail .label, .rail button[aria-current="step"] .label { display: none; }
+    .eyebrow { letter-spacing: .03em; }
+    .rail { gap: 2px; }
+  }
+
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="topline">
+      <span class="eyebrow" id="eyebrow">knowledge-os · flows</span>
+      <div class="prefs">
+        <button type="button" class="sound" id="sound" aria-pressed="true" aria-label="Sound">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor"/><path class="on" d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/><path class="off" d="M16 9.5l5 5M21 9.5l-5 5"/></svg>
+        </button>
+        <div class="lang" id="lang" role="group" aria-label="Language">
+          <button type="button" data-lang="en" aria-pressed="true">EN</button>
+          <button type="button" data-lang="es" aria-pressed="false">ES</button>
+        </div>
+      </div>
+    </div>
+    <div class="title-row">
+      <h1 id="flowName">Onboard</h1>
+      <ul class="flows" id="flows" aria-label="Flows"></ul>
+    </div>
+    <p class="lede" id="flowLede"></p>
+  </header>
+
+  <section class="stage" aria-label="Flow animation">
+    <canvas id="scene" width="224" height="126" role="img" aria-label=""></canvas>
+    <div class="scrubbar"><input id="scrub" class="scrub" type="range" min="0" max="1000" value="0" aria-label="Animation position"></div>
+  </section>
+
+  <ol class="rail" id="rail"></ol>
+
+  <div class="now">
+    <div class="caption" aria-live="polite">
+      <h2 id="capTitle"></h2>
+      <div class="cmds" id="capCmds"></div>
+    </div>
+    <div class="controls">
+      <button id="nextFlow" type="button" class="next-flow" hidden><span class="lbl"></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+      <button id="prev" type="button" aria-label="Previous step">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>
+      </button>
+      <button id="play" type="button" class="primary" aria-label="Pause">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path id="playIcon" d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z"/></svg>
+      </button>
+      <button id="next" type="button" aria-label="Next step">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.13.0/gsap.min.js"></script>
+<script src="engine.js"></script>
+<script src="flows/onboard.js"></script>
+<script src="flows/discover.js"></script>
+<script src="flows/ask.js"></script>
+<script src="flows/investigate.js"></script>
+<script src="flows/handoff.js"></script>
+<script src="flows/sync.js"></script>
+<script>KF.start();</script>
+</body>
+</html>
