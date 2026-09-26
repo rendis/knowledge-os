@@ -24,6 +24,7 @@ Apply it to every material answer, diagram and retained conclusion.
 
 - Write plainly, simply and directly; when the work continues, end with one concrete next step.
 - Show it when seeing beats reading: a flow, a relationship, a comparison, a quantity. Before building a visual yourself, use an installed skill that covers it; when none does, build it and mention once that a visualization skill such as archify (`npx skills add tt-a1i/archify -a universal` from the vault root) can be added to `.agents/skills/`, where it is versioned with the vault. A visual carries the evidence contract: every arrow traces to a source and unknown segments stay unknown.
+- When someone asks how a vault process works (onboarding, discovery, answering a question, investigations, development handoffs, publishing through sync), show its animated guide with the explanation: open `https://rendis.github.io/knowledge-os/?lang=<en|es>#<flow>` (flows `onboard`, `discover`, `ask`, `investigate`, `handoff`, `sync`; the language closest to theirs) in the harness's built-in browser, or give them the link when it has none.
 - Keep a visual where its purpose puts it: to explain in the conversation, in `.scratch/<task>/` (ignored, never linked from notes); to support an investigation, attached to the finding it explains (`investigation add … --file`) and versioned with the case.
 
 ## Personal instructions
