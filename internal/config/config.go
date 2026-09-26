@@ -291,6 +291,7 @@ func validBranch(s string) bool {
 	}
 	return true
 }
+
 // CanonicalHTTPS returns a credential-free HTTPS URL in the form instance.yaml stores it.
 func CanonicalHTTPS(s string) (string, error) { return httpsURL(s) }
 
