@@ -32,6 +32,7 @@ type platformSubscription struct {
 	Push       string      `json:"push_endpoint,omitempty"`
 	Sink       string      `json:"sink,omitempty"`
 	DeadLetter string      `json:"dead_letter,omitempty"`
+	Delivery   string      `json:"delivery,omitempty"` // ack deadline, redelivery backoff, attempts, retention
 }
 
 // platformResource is a data service a provider lists: a database, collection, table, instance, bucket

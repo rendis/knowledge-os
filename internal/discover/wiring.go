@@ -19,6 +19,8 @@ type Wiring struct {
 	Scopes        []WiringScope // the captured scopes the absence of a subscription is bounded to
 	Confirm       string        // the provider command that lists the topic's subscriptions everywhere
 	NoSubs        []string      // captured scopes that list no subscription at all
+	Failed        []string      // snapshots whose capture did not succeed: scope (status)
+	PresentIn     []string      // captured scopes whose topic list has this topic
 	Similar       []string      // other topics with the same last segment, easy to confuse with this one
 }
 
@@ -35,8 +37,8 @@ type WiringRepo struct {
 
 // WiringSubscription is a subscription a platform snapshot lists on the topic.
 type WiringSubscription struct {
-	Scope, Captured, Name, Topic, Filter, Push, DeadLetter string
-	ConfiguredBy                                           []string
+	Scope, Captured, Name, Topic, Filter, Push, DeadLetter, Delivery string
+	ConfiguredBy                                                     []string
 }
 
 // Subscription finds a subscription by its short name in the captured platform scopes: the topic it
@@ -48,7 +50,7 @@ func Subscription(vault, name string) []WiringSubscription {
 	for _, s := range snaps {
 		for _, sub := range s.Subscriptions {
 			if short(sub.Name) == name {
-				out = append(out, WiringSubscription{Scope: s.Provider + ":" + s.Scope, Captured: s.CapturedAt, Name: name, Topic: short(sub.Topic), Filter: sub.Filter, Push: sub.Push, DeadLetter: short(sub.DeadLetter)})
+				out = append(out, WiringSubscription{Scope: s.Provider + ":" + s.Scope, Captured: s.CapturedAt, Name: name, Topic: short(sub.Topic), Filter: sub.Filter, Push: sub.Push, DeadLetter: short(sub.DeadLetter), Delivery: sub.Delivery})
 			}
 		}
 	}
@@ -65,10 +67,17 @@ func TopicWiring(vault, name string) (Wiring, bool) {
 	similar := map[string]bool{}
 	known := false
 	for _, s := range snaps {
+		scope := s.Provider + ":" + s.Scope
 		if s.Status != "ok" {
+			w.Failed = append(w.Failed, scope+" ("+s.Status+")")
 			continue
 		}
-		scope := s.Provider + ":" + s.Scope
+		for _, t := range s.Topics {
+			if short(t) == name {
+				w.PresentIn = append(w.PresentIn, scope)
+				break
+			}
+		}
 		if len(s.Subscriptions) == 0 {
 			w.NoSubs = append(w.NoSubs, scope)
 			continue
@@ -90,7 +99,7 @@ func TopicWiring(vault, name string) (Wiring, bool) {
 			if short(sub.Topic) != name {
 				continue
 			}
-			ws := WiringSubscription{Scope: scope, Captured: s.CapturedAt, Name: short(sub.Name), Filter: sub.Filter, Push: sub.Push, DeadLetter: short(sub.DeadLetter)}
+			ws := WiringSubscription{Scope: scope, Captured: s.CapturedAt, Name: short(sub.Name), Filter: sub.Filter, Push: sub.Push, DeadLetter: short(sub.DeadLetter), Delivery: sub.Delivery}
 			subNames[ws.Name] = append(subNames[ws.Name], len(w.Subscriptions))
 			w.Subscriptions = append(w.Subscriptions, ws)
 		}
@@ -149,3 +158,35 @@ func TopicWiring(vault, name string) (Wiring, bool) {
 func lastSegment(name string) string {
 	return name[strings.LastIndex(name, ".")+1:]
 }
+
+// RepoSubscriptions lists the subscriptions the discovery facts say a repository consumes, each as
+// the platform snapshots know it (topic, filter, dead letter, delivery) per captured scope.
+func RepoSubscriptions(vault, repo string) []WiringSubscription {
+	paths, _ := filepath.Glob(filepath.Join(vault, stateRel, "facts", "*.json"))
+	out, seen := []WiringSubscription{}, map[string]bool{}
+	for _, p := range paths {
+		b, e := os.ReadFile(p)
+		if e != nil {
+			continue
+		}
+		var f repoFacts
+		if json.Unmarshal(b, &f) != nil || !strings.EqualFold(f.Repo, repo) {
+			continue
+		}
+		for _, r := range f.Resources {
+			name := lastPath(r.Name)
+			if !strings.Contains(r.Type, "subscription") || seen[name] {
+				continue
+			}
+			seen[name] = true
+			subs := Subscription(vault, name)
+			if len(subs) == 0 {
+				out = append(out, WiringSubscription{Name: name, Topic: lastPath(r.Topic)})
+			}
+			out = append(out, subs...)
+		}
+	}
+	return out
+}
+
+func lastPath(s string) string { return s[strings.LastIndex(s, "/")+1:] }

@@ -122,6 +122,9 @@ func TestGCPCapture(t *testing.T) {
 	if cl.Name != "projects/acme-orders-prd/subscriptions/orders-cl-sub" || cl.DeadLetter != "projects/acme-orders-prd/topics/orders-dlq" || len(cl.Attributes) != 1 || cl.Attributes[0] != [2]string{"eventType", "orderConfirmed"} {
 		t.Fatalf("subscription %+v", cl)
 	}
+	if cl.Delivery != "ack deadline 10s, redelivery immediate (no retry policy), dead letter after 5 attempts" {
+		t.Fatalf("delivery %q", cl.Delivery)
+	}
 	if s.Subscriptions[0].Sink != "bigquery acme.orders.raw" {
 		t.Fatalf("bigquery delivery is a sink: %+v", s.Subscriptions[0])
 	}

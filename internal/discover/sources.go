@@ -2,12 +2,14 @@ package discover
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 // Anchor is one source permalink a note cites: owner/repo, commit, path and optional line range.
@@ -263,8 +265,41 @@ type Function struct {
 	From, To   int
 	Code       string // numbered lines
 	Words      []string
-	Outside    []int // matching lines of the same function beyond the lines shown
-	Callers    []Hit // where the function is called from, outside its own file's definition
+	Outside    []int  // matching lines of the same function beyond the lines shown
+	Callers    []Hit  // where the function is called from, outside its own file's definition
+	Start, End int    // the whole definition, when From-To shows only part of it
+	Exits      []Exit // where the whole definition leaves its main path
+	Rivals     int    // other definitions with the same name: a call may reach one of them
+	src        []string
+	hits       []int
+}
+
+// Within returns the function's code in at most span lines, picked as Functions picks them: the
+// blocks with the most matching lines first, its first line kept above.
+func (f Function) Within(span int) string {
+	if f.src == nil {
+		return f.Code
+	}
+	code, _ := numberShown(f.src, f.Start, linesToShow(f.Start, f.hits, span, len(f.src)))
+	return code
+}
+
+// numberShown numbers the shown lines of src, the function's first line kept above them and "…"
+// where lines are skipped.
+func numberShown(src []string, start int, shown []int) (string, int) {
+	numbered, prev := []string{}, 0
+	if start > 0 && (len(shown) == 0 || shown[0] > start) {
+		numbered = append(numbered, fmt.Sprintf("%4d│ %s", start, Redact(src[start-1])))
+		prev = start
+	}
+	for _, k := range shown {
+		if prev > 0 && k > prev+1 {
+			numbered = append(numbered, "    │ …")
+		}
+		numbered = append(numbered, fmt.Sprintf("%4d│ %s", k, Redact(src[k-1])))
+		prev = k
+	}
+	return strings.Join(numbered, "\n"), len(numbered)
 }
 
 // linesToShow picks at most span lines: the whole function when its matches fit from its first
@@ -367,14 +402,23 @@ var interfaceMethod = regexp.MustCompile(`^[A-Za-z_]\w*\s*\(\s*(?:\w+\s+[\w.*\[\
 
 // callers lists where name is called in the code of the reference branch, definitions left out.
 func (s *Sources) callers(r *sourceRepo, name, defFile string, n int) []Hit {
+	hits, _ := s.callersRivals(r, name, defFile, n)
+	return hits
+}
+
+// callersRivals is callers with how many other definitions share the name.
+func (s *Sources) callersRivals(r *sourceRepo, name, defFile string, n int) ([]Hit, int) {
 	text, _ := gitOutput(r.path, append([]string{"grep", "-n", "-I", "-w", "-F", "-e", name, r.head, "--", "."}, excluded...)...)
 	// Other packages defining a function with this name: a call qualified by one of them
 	// (otherpkg.GetID) is not a call of the one in defFile.
-	rivals, rivalDirs := map[string]bool{}, map[string]bool{}
+	rivals, rivalDirs, rivalCount := map[string]bool{}, map[string]bool{}, 0
 	for _, l := range strings.Split(text, "\n") {
-		if parts := strings.SplitN(l, ":", 4); len(parts) == 4 && definedName(parts[3]) == name && filepath.Dir(parts[1]) != filepath.Dir(defFile) {
-			rivals[filepath.Base(filepath.Dir(parts[1]))] = true
-			rivalDirs[filepath.Dir(parts[1])] = true
+		if parts := strings.SplitN(l, ":", 4); len(parts) == 4 && codeFile(parts[1]) && definedName(parts[3]) == name && !(parts[1] == defFile) {
+			rivalCount++
+			if filepath.Dir(parts[1]) != filepath.Dir(defFile) {
+				rivals[filepath.Base(filepath.Dir(parts[1]))] = true
+				rivalDirs[filepath.Dir(parts[1])] = true
+			}
 		}
 	}
 	own := filepath.Base(filepath.Dir(defFile))
@@ -389,6 +433,9 @@ func (s *Sources) callers(r *sourceRepo, name, defFile string, n int) []Hit {
 		t := strings.TrimSpace(parts[3])
 		if !codeFile(parts[1]) || definedName(parts[3]) == name || strings.HasPrefix(t, "//") || strings.HasPrefix(t, "#") || strings.HasPrefix(t, "*") || interfaceMethod.MatchString(t) || importLine.MatchString(t) {
 			continue
+		}
+		if !wholeWord(codeOnly(t), name) {
+			continue // the name only in a message or a trailing comment: 'duplicate check failed'
 		}
 		if defFile != "" && calledThroughRival(t, name, own, rivals, rivalDirs[filepath.Dir(parts[1])]) {
 			continue
@@ -409,7 +456,7 @@ func (s *Sources) callers(r *sourceRepo, name, defFile string, n int) []Hit {
 			break
 		}
 	}
-	return out
+	return out, rivalCount
 }
 
 func uniqueInts(xs []int) []int {
@@ -440,14 +487,15 @@ var methodOpen = regexp.MustCompile(`^\s*(?:async\s+|static\s+|public\s+|private
 
 var methodStart = regexp.MustCompile(`^\s*(?:async\s+|get\s+|set\s+|static\s+)*([A-Za-z_$][\w$]*)\s*(?:<[^>]*>)?\s*\([^;]*\)\s*(?::\s*[^={;]+)?\{\s*$`)
 
-var controlWord = map[string]bool{"if": true, "for": true, "while": true, "switch": true, "catch": true, "return": true, "else": true, "function": true, "do": true, "try": true, "with": true, "foreach": true, "synchronized": true, "using": true, "lock": true, "elif": true, "unless": true}
+var controlWord = map[string]bool{"if": true, "for": true, "while": true, "switch": true, "catch": true, "return": true, "else": true, "function": true, "do": true, "try": true, "with": true, "foreach": true, "synchronized": true, "using": true, "lock": true, "elif": true, "unless": true, "var": true, "const": true, "let": true, "import": true, "type": true, "new": true, "typeof": true, "await": true}
 
-var funcStart = regexp.MustCompile(`^\s*(?:func\b|def\b|(?:export\s+)?(?:async\s+)?function\b|(?:public|private|protected|internal|static|override)\b[^;=]*\(|(?:(?:export\s+)?(?:const|let|var)\s+)?[\w.]+\s*[:=]\s*(?:async\s+)?(?:function\b|\([^)]*\)\s*=>))`)
+var funcStart = regexp.MustCompile(`^\s*(?:func\b|def\b|(?:export\s+)?(?:async\s+)?function\b|(?:public|private|protected|internal|static|override)\b[^;=]*\(|(?:(?:export\s+)?(?:const|let|var)\s+)?[\w.]+\s*[:=]\s*(?:async\s+)?(?:function\b|\([^)]*\)\s*(?::[^=;]*)?=>))`)
 
 // Functions searches the code files of the reference branch for the words (case-insensitive
 // substrings, tests and comments left out) and returns up to n functions holding the most distinct
-// words, those in prefer first, each at most span lines.
-func (s *Sources) Functions(ownerRepo string, words []string, n, span int, prefer map[string]bool) ([]Function, string) {
+// words, each at most span lines. Functions holding a range prefer cites (path → cited ranges; none
+// for a whole file) come first, then the other functions of those files.
+func (s *Sources) Functions(ownerRepo string, words []string, n, span int, prefer map[string][][2]int) ([]Function, string) {
 	r := s.repo(ownerRepo)
 	if r.head == "" || len(words) == 0 {
 		return nil, ""
@@ -508,16 +556,39 @@ func (s *Sources) Functions(ownerRepo string, words []string, n, span int, prefe
 		}
 	}
 	list := []*fn{}
+	cited := map[*fn]bool{}
 	for _, f := range found {
 		list = append(list, f)
+		if f.f.From == 0 {
+			continue
+		}
+		end := functionEnd(files[f.f.Path], f.f.From, f.f.Path)
+		for _, r := range prefer[f.f.Path] {
+			if r[0] <= end && f.f.From <= r[1] {
+				cited[f] = true
+			}
+		}
 	}
 	sort.Slice(list, func(a, b int) bool {
-		// The files the note's best paragraphs cite come first: the code the claim is about.
-		if pa, pb := prefer[list[a].f.Path], prefer[list[b].f.Path]; pa != pb {
+		// Lines outside any function (imports, constants) say less than a function holding them.
+		if fa, fb := list[a].f.From > 0, list[b].f.From > 0; fa != fb {
+			return fa
+		}
+		// The functions the note's best paragraphs cite come first, then their files: the code
+		// the claim is about.
+		if ca, cb := cited[list[a]], cited[list[b]]; ca != cb {
+			return ca
+		}
+		_, pa := prefer[list[a].f.Path]
+		if _, pb := prefer[list[b].f.Path]; pa != pb {
 			return pa
 		}
 		if len(list[a].words) != len(list[b].words) {
 			return len(list[a].words) > len(list[b].words)
+		}
+		// Twin functions (sale and gift card handlers alike): the one whose path the question names.
+		if pa, pb := pathScore(list[a].f.Path, words), pathScore(list[b].f.Path, words); pa != pb {
+			return pa > pb
 		}
 		if len(list[a].lines) != len(list[b].lines) {
 			return len(list[a].lines) > len(list[b].lines)
@@ -534,22 +605,15 @@ func (s *Sources) Functions(ownerRepo string, words []string, n, span int, prefe
 			break
 		}
 		src := files[f.f.Path]
+		if f.f.From > 0 {
+			f.f.Start, f.f.End = f.f.From, functionEnd(src, f.f.From, f.f.Path)
+			f.f.Exits = exitsIn(src, f.f.Start, f.f.End, f.f.Path)
+		}
 		sort.Ints(f.lines)
 		f.lines = uniqueInts(f.lines)
 		shown := linesToShow(f.f.From, f.lines, span, len(src))
-		numbered, prev := []string{}, 0
-		if f.f.From > 0 && (len(shown) == 0 || shown[0] > f.f.From) {
-			numbered = append(numbered, fmt.Sprintf("%4d│ %s", f.f.From, Redact(src[f.f.From-1])))
-			prev = f.f.From
-		}
-		for _, k := range shown {
-			if prev > 0 && k > prev+1 {
-				numbered = append(numbered, "    │ …")
-			}
-			numbered = append(numbered, fmt.Sprintf("%4d│ %s", k, Redact(src[k-1])))
-			prev = k
-		}
-		f.f.Code = strings.Join(numbered, "\n")
+		f.f.Code, _ = numberShown(src, f.f.From, shown)
+		f.f.src, f.f.hits = src, f.lines
 		if len(shown) > 0 {
 			f.f.From, f.f.To = shown[0], shown[len(shown)-1]
 		}
@@ -563,7 +627,7 @@ func (s *Sources) Functions(ownerRepo string, words []string, n, span int, prefe
 			}
 		}
 		if name := definedName(f.f.Name); name != "" {
-			f.f.Callers = s.callers(r, name, f.f.Path, 4)
+			f.f.Callers, f.f.Rivals = s.callersRivals(r, name, f.f.Path, 4)
 		}
 		for w := range f.words {
 			f.f.Words = append(f.f.Words, w)
@@ -584,6 +648,9 @@ func codeFile(p string) bool {
 	}
 	return false
 }
+
+// WholeWord reports whether name occurs in text as a whole word.
+func WholeWord(text, name string) bool { return wholeWord(text, name) }
 
 func wholeWord(text, name string) bool {
 	for from := 0; ; {
@@ -664,19 +731,54 @@ func (s *Sources) Excerpt(a Anchor, names, focus []string, span int) (string, st
 // generated and minified assets, source maps and lock files.
 var excluded = []string{":(exclude)*_test.go", ":(exclude)*.test.*", ":(exclude)*.spec.*", ":(exclude)*Test*.java",
 	":(exclude)test/**", ":(exclude)tests/**", ":(exclude)**/test/**", ":(exclude)**/tests/**", ":(exclude)**/__tests__/**",
-	":(exclude)*.svg", ":(exclude)*.map", ":(exclude)*.min.js", ":(exclude)*.min.css", ":(exclude)*.lock", ":(exclude)package-lock.json", ":(exclude)*.snap"}
+	":(exclude)*.svg", ":(exclude)*.map", ":(exclude)*.min.js", ":(exclude)*.min.css", ":(exclude)*.lock", ":(exclude)package-lock.json", ":(exclude)*.snap",
+	":(exclude).mvn/**", ":(exclude)**/gradle/wrapper/**", ":(exclude)mvnw", ":(exclude)gradlew",
+	":(exclude)**/mock/**", ":(exclude)**/mocks/**", ":(exclude)mock/**", ":(exclude)mocks/**", ":(exclude)*_mock.go", ":(exclude)mock_*.go", ":(exclude)*.mock.*"}
 
 // Redact hides the value of a credential in a line of code or configuration (a secret-named key's
 // literal, a signed URL, a password in a connection string): kos never prints a secret it reads.
 func Redact(line string) string {
 	if m := lineKV.FindStringSubmatchIndex(line); m != nil {
 		key, value := line[m[2]:m[3]], line[m[4]:m[5]]
-		if credentialEntry(key, value) {
+		if !codeReference.MatchString(strings.TrimSpace(value)) && credentialEntry(key, value) {
 			return line[:m[4]] + "‹redacted›" + line[m[5]:]
 		}
 	}
-	return credentialValue.ReplaceAllString(line, "‹redacted›")
+	line = credentialValue.ReplaceAllString(line, "‹redacted›")
+	// A long random literal is a key whatever it is passed as: a positional header, an argument.
+	return opaqueLiteral.ReplaceAllStringFunc(line, func(q string) string {
+		v := q[1 : len(q)-1]
+		if hexRun.MatchString(v) || opaqueMixed(v) && !uuid.MatchString(v) {
+			return q[:1] + "‹redacted›" + q[len(q)-1:]
+		}
+		return q
+	})
 }
+
+var (
+	// A value in code that names a type or another value is not a literal: refresh_token: string,
+	// token: this.token, key: getKey().
+	codeReference = regexp.MustCompile(`^(?:string|number|boolean|any|unknown|str|int|bool|float|String|Integer|Boolean|Long|Object|object|null|undefined|None|nil)\??[\[\]|]*$|^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)+$|^[A-Za-z_$][\w$.]*\(`)
+	// A quoted run of 24+ hex digits, or 32+ characters of a base64 alphabet.
+	hexRun        = regexp.MustCompile(`^[0-9A-Fa-f]{24,}$`)
+	uuid          = regexp.MustCompile(`^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$`)
+	opaqueLiteral = regexp.MustCompile(`["'][0-9A-Fa-f]{24,}["']|["'][A-Za-z0-9+/_\-]{32,}={0,2}["']`)
+)
+
+// opaqueMixed reports whether a literal mixes lower case, upper case and digits like a random key,
+// not like a word or a name.
+func opaqueMixed(v string) bool {
+	var lower, upper, digit bool
+	for _, c := range v {
+		lower = lower || c >= 'a' && c <= 'z'
+		upper = upper || c >= 'A' && c <= 'Z'
+		digit = digit || c >= '0' && c <= '9'
+	}
+	return lower && upper && digit
+}
+
+// Vault is the root of the vault the sources belong to.
+func (s *Sources) Vault() string { return s.vault }
 
 // Tracked lists the repositories of the vault that have a local checkout.
 func Tracked(vault string) []string {
@@ -700,15 +802,41 @@ func (s *Sources) Resolve(name string) (string, string, bool) {
 	return name[strings.Index(name, "/")+1:], shortRef(r.ref), true
 }
 
-// Search greps a repository's reference branch for an extended regular expression: every matching
-// line of code or configuration (tests left out unless tests), the enclosing function of each, and
-// how many files were searched, so that no match is a statement with its scope.
+// GrepDialect is the regular expression syntax Search reads: Perl-compatible where git has PCRE
+// (\s, \d, \b and lookarounds work), POSIX extended otherwise.
+func GrepDialect() string {
+	pcreOnce.Do(func() {
+		cmd := exec.Command("git", "grep", "--no-index", "-P", "-q", "-e", `\s`, "--", "kos-pcre-probe")
+		cmd.Dir = os.TempDir()
+		e := cmd.Run()
+		ee, ok := e.(*exec.ExitError)
+		pcre = e == nil || ok && ee.ExitCode() == 1
+	})
+	if pcre {
+		return "Perl-compatible"
+	}
+	return "POSIX extended"
+}
+
+var (
+	pcreOnce sync.Once
+	pcre     bool
+)
+
+// Search greps a repository's reference branch for a regular expression (GrepDialect): every
+// matching line of code or configuration (tests left out unless tests), the enclosing function of
+// each, and how many files were searched, so that no match is a statement with its scope. A pattern
+// git rejects is an error, never an empty result.
 func (s *Sources) Search(ownerRepo, pattern, glob string, ignoreCase, tests, word bool) ([]Hit, map[Hit]string, int, error) {
 	r := s.repo(ownerRepo)
 	if r.head == "" {
 		return nil, nil, 0, fmt.Errorf("%s", r.err)
 	}
-	args := []string{"grep", "-n", "-I", "-E"}
+	dialect := "-E"
+	if GrepDialect() == "Perl-compatible" {
+		dialect = "-P"
+	}
+	args := []string{"grep", "-n", "-I", dialect}
 	if ignoreCase {
 		args = append(args, "-i")
 	}
@@ -725,10 +853,12 @@ func (s *Sources) Search(ownerRepo, pattern, glob string, ignoreCase, tests, wor
 		args = append(args, excluded...)
 	}
 	cmd := execGit(r.path, args...)
+	var stderr strings.Builder
+	cmd.Stderr = &stderr
 	b, e := cmd.Output()
 	if e != nil {
 		if ee, ok := e.(*exec.ExitError); !ok || ee.ExitCode() != 1 {
-			return nil, nil, 0, fmt.Errorf("git grep: %v", e)
+			return nil, nil, 0, fmt.Errorf("git grep %s rejected /%s/: %s", dialect, pattern, strings.TrimSpace(stderr.String()))
 		}
 	}
 	hits, in := []Hit{}, map[Hit]string{}
@@ -792,6 +922,10 @@ func (s *Sources) File(ownerRepo, path string, from, to int) (string, int, error
 // definition (up to span lines, numbered), its path and line, and its callers with the lines after
 // each call: what the caller does with the result.
 func (s *Sources) Definition(ownerRepo, name, glob string, span int) ([]Function, error) {
+	return s.definition(ownerRepo, name, glob, span, true)
+}
+
+func (s *Sources) definition(ownerRepo, name, glob string, span int, withCallers bool) ([]Function, error) {
 	r := s.repo(ownerRepo)
 	if r.head == "" {
 		return nil, fmt.Errorf("%s", r.err)
@@ -811,16 +945,10 @@ func (s *Sources) Definition(ownerRepo, name, glob string, span int) ([]Function
 		line, _ := strconv.Atoi(parts[2])
 		content, _ := s.files.file(r.path, r.head, parts[1])
 		src := strings.Split(strings.TrimRight(content, "\n"), "\n")
-		end := len(src)
-		for k := line; k < len(src); k++ {
-			if isFuncStart(src[k]) {
-				end = k
-				break
-			}
+		if masked := maskRawStrings(src, parts[1]); line <= len(masked) && definedName(masked[line-1]) != name {
+			continue // the name inside a multi-line string (a SQL query), not a definition
 		}
-		for end > line && strings.TrimSpace(src[end-1]) == "" {
-			end--
-		}
+		end := functionEnd(src, line, parts[1])
 		to := min(end, line+span-1)
 		numbered := []string{}
 		for k := line; k <= to; k++ {
@@ -829,8 +957,10 @@ func (s *Sources) Definition(ownerRepo, name, glob string, span int) ([]Function
 		if to < end {
 			numbered = append(numbered, fmt.Sprintf("    │ … %d more lines to L%d", end-to, end))
 		}
-		f := Function{Path: parts[1], Name: strings.TrimSpace(parts[3]), From: line, To: end, Code: strings.Join(numbered, "\n")}
-		f.Callers = s.callers(r, name, parts[1], 6)
+		f := Function{Path: parts[1], Name: strings.TrimSpace(parts[3]), From: line, To: end, Start: line, End: end, Code: strings.Join(numbered, "\n"), Exits: exitsIn(src, line, end, parts[1])}
+		if withCallers {
+			f.Callers, f.Rivals = s.callersRivals(r, name, parts[1], 80)
+		}
 		out = append(out, f)
 	}
 	return out, nil
@@ -868,4 +998,18 @@ func (s *Sources) Has(a Anchor) bool {
 	}
 	_, ok := s.files.file(r.path, a.Commit, a.Path)
 	return ok
+}
+
+// pathScore counts the question's words (each part of an identifier, its first six letters) that
+// a path holds: transactions-command → "transa" in transactionconfirmed/subscriber.go.
+func pathScore(path string, words []string) int {
+	p, n := strings.ToLower(path), 0
+	for _, w := range words {
+		for _, part := range strings.FieldsFunc(strings.ToLower(w), func(c rune) bool { return c < 'a' || c > 'z' }) {
+			if len(part) >= 4 && strings.Contains(p, part[:min(6, len(part))]) {
+				n++
+			}
+		}
+	}
+	return n
 }
