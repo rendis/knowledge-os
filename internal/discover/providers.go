@@ -94,8 +94,15 @@ func gcpMessaging(snap *platformSnapshot, project string) (string, error) {
 			Bucket string `json:"bucket"`
 		} `json:"cloudStorageConfig"`
 		DeadLetterPolicy struct {
-			DeadLetterTopic string `json:"deadLetterTopic"`
+			DeadLetterTopic     string `json:"deadLetterTopic"`
+			MaxDeliveryAttempts int    `json:"maxDeliveryAttempts"`
 		} `json:"deadLetterPolicy"`
+		AckDeadlineSeconds int `json:"ackDeadlineSeconds"`
+		RetryPolicy        *struct {
+			MinimumBackoff string `json:"minimumBackoff"`
+			MaximumBackoff string `json:"maximumBackoff"`
+		} `json:"retryPolicy"`
+		MessageRetentionDuration string `json:"messageRetentionDuration"`
 	}
 	if msg, e := jsonCLI(&subs, "gcloud", "pubsub", "subscriptions", "list", "--project", project, "--format=json"); e != nil {
 		return msg, e
@@ -108,8 +115,26 @@ func gcpMessaging(snap *platformSnapshot, project string) (string, error) {
 		case s.CloudStorageConfig.Bucket != "":
 			sink = "storage " + s.CloudStorageConfig.Bucket
 		}
+		// How a message comes back: the ack deadline, the backoff between redeliveries (none set
+		// means immediate), the attempts before the dead letter and how long an unacked one is kept.
+		delivery := []string{}
+		if s.AckDeadlineSeconds > 0 {
+			delivery = append(delivery, fmt.Sprintf("ack deadline %ds", s.AckDeadlineSeconds))
+		}
+		if s.RetryPolicy != nil {
+			delivery = append(delivery, "redelivery backoff "+s.RetryPolicy.MinimumBackoff+"–"+s.RetryPolicy.MaximumBackoff)
+		} else {
+			delivery = append(delivery, "redelivery immediate (no retry policy)")
+		}
+		if s.DeadLetterPolicy.MaxDeliveryAttempts > 0 {
+			delivery = append(delivery, fmt.Sprintf("dead letter after %d attempts", s.DeadLetterPolicy.MaxDeliveryAttempts))
+		}
+		if s.MessageRetentionDuration != "" {
+			delivery = append(delivery, "retention "+s.MessageRetentionDuration)
+		}
 		snap.Subscriptions = append(snap.Subscriptions, platformSubscription{Name: s.Name, Topic: s.Topic, Filter: s.Filter,
-			Attributes: filterAttributes(s.Filter), Push: s.PushConfig.PushEndpoint, Sink: sink, DeadLetter: s.DeadLetterPolicy.DeadLetterTopic})
+			Attributes: filterAttributes(s.Filter), Push: s.PushConfig.PushEndpoint, Sink: sink, DeadLetter: s.DeadLetterPolicy.DeadLetterTopic,
+			Delivery: strings.Join(delivery, ", ")})
 	}
 	return "", nil
 }

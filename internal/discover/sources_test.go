@@ -64,6 +64,7 @@ func TestSourcesGrepAndSymbol(t *testing.T) {
 		"a/send.go":           "package a\n\n// Send posts.\nfunc (s *S) Send() {\n\tfor i := 0; i < MAX_RETRIES; i++ {\n\t}\n}\n",
 		"a/send_test.go":      "package a\n// MAX_RETRIES in a test\n",
 		"a/main.go":           "package a\n\nfunc main() { (&S{}).Send() }\n",
+		"a/log.go":            "package a\n\nfunc Log() { log(\"Send failed\") }\n",
 		"k8s/production/env":  "MAX_RETRIES=6\n",
 		"k8s/development/env": "MAX_RETRIES=2\n",
 	})
@@ -151,7 +152,7 @@ func TestFunctionStartsAcrossLanguages(t *testing.T) {
 	for line, want := range map[string]string{
 		"func (s *S) Send() {":                              "Send",
 		"  async saveData(input: Order): Promise<number> {": "saveData",
-		"  async saveDataAcme (":                       "saveDataAcme",
+		"  async saveDataAcme (":                            "saveDataAcme",
 		"  public async close(): Promise<void> {":           "close",
 		"def run(self):":                                    "run",
 		"export const handler = async (event) => {":         "handler",
@@ -161,6 +162,22 @@ func TestFunctionStartsAcrossLanguages(t *testing.T) {
 	} {
 		if got := definedName(line); got != want || isFuncStart(line) != (want != "") {
 			t.Errorf("%q: name %q start %v, want %q", line, got, isFuncStart(line), want)
+		}
+	}
+}
+
+func TestRedactKeysNotFieldNames(t *testing.T) {
+	for in, want := range map[string]string{
+		"  refresh_token: string;":                         "  refresh_token: string;",
+		"  token: this.session.token,":                     "  token: this.session.token,",
+		"    '9f86d081884c7d659a2feaa0c55ad015a3bf4f1b',":  "    '‹redacted›',",
+		`  const key = "Zx9Qm2LpR7vT4kWn8YcB3hJd6FsA1gEu"`: `  const key = "‹redacted›"`,
+		`  const name = "order-already-exists-in-store"`:   `  const name = "order-already-exists-in-store"`,
+		`  id: "550e8400-e29b-41d4-a716-446655440000"`:     `  id: "550e8400-e29b-41d4-a716-446655440000"`,
+		"PASSWORD=hunter22x":                               "PASSWORD=‹redacted›",
+	} {
+		if got := Redact(in); got != want {
+			t.Errorf("Redact(%q) = %q, want %q", in, got, want)
 		}
 	}
 }
