@@ -21,9 +21,6 @@ var ErrIssues = errors.New("validation found issues")
 
 // Run accepts links|bases --vault PATH (flags may precede the operation).
 func Run(args []string, out io.Writer) error {
-	if len(args) > 0 && args[0] == "obsidian-binding" {
-		return runBinding(args[1:], out)
-	}
 	root, op := ".", ""
 	for i := 0; i < len(args); i++ {
 		switch args[i] {

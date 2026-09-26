@@ -224,7 +224,7 @@ func Run(args []string, out io.Writer) error {
 				}
 				caps = append(caps, c)
 			}
-			result = Object{"vault_root": root, "orientation": Orientation(root, m), "capabilities": caps, "discovery": DiscoveryAcceleration(), "platform_providers": PlatformProviders(m)}
+			result = Object{"vault_root": root, "orientation": Orientation(root, m), "capabilities": caps, "platform_providers": PlatformProviders(m)}
 			if w, we := Workspace(root); we == nil {
 				result.(Object)["workspace"] = w["status"] // uninitialized: this developer's onboarding is pending
 			}

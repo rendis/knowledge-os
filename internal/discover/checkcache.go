@@ -16,15 +16,15 @@ import (
 // snapshots, its identity and workspace, the repository notes' names and the refs of every checkout
 // (so fetching a commit or cloning a missing repository also invalidates a pending result). When none of them changed, the stored result is reused, so
 // a sync verify that runs again after one fix checks only what changed. KOS_NO_CACHE=1 disables it; KOS_CACHE_DIR moves it.
-func checkNote(vault, notePath, repoOverride string, semantic bool) (noteCheck, error) {
+func checkNote(vault, notePath, repoOverride string) (noteCheck, error) {
 	full := notePath
 	if !filepath.IsAbs(full) {
 		full = filepath.Join(vault, notePath)
 	}
 	text, e := os.ReadFile(full)
 	dir := checkCacheDir()
-	if e != nil || semantic || dir == "" || os.Getenv("KOS_NO_CACHE") != "" {
-		return checkNoteFresh(vault, notePath, repoOverride, semantic)
+	if e != nil || dir == "" || os.Getenv("KOS_NO_CACHE") != "" {
+		return checkNoteFresh(vault, notePath, repoOverride)
 	}
 	sum := sha256.New()
 	for _, part := range []string{checkFingerprint(vault), notePath, repoOverride, string(text)} {
@@ -38,7 +38,7 @@ func checkNote(vault, notePath, repoOverride string, semantic bool) (noteCheck, 
 			return r, nil
 		}
 	}
-	r, e := checkNoteFresh(vault, notePath, repoOverride, semantic)
+	r, e := checkNoteFresh(vault, notePath, repoOverride)
 	if e != nil {
 		return r, e
 	}

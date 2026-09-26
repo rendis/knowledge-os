@@ -51,6 +51,5 @@ Run `detect` again and give the card in a few lines, one mark per line:
 - worktrees: `<dir>`
 - each cloud: account, or its login command
 - each database target: port, or what is missing
-- Jev: configured, or optional (`TYPESAFE_API_KEY` makes discovery judgments automatic)
 
 Then resume the task that led here. Done when the card is delivered and every open line carries its fix.

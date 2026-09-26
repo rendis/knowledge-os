@@ -8,7 +8,7 @@ Este framework es la fuente de verdad para evidencia, scripts y gates del mapa d
 
 ## Principio Obsidian-native
 
-El vault es el grafo durable. The CLI derives relationships from Markdown/frontmatter and inspected external evidence; its local SQLite search index is reconstructible and is not a parallel authority. Una relación confirmada se escribe en la nota Obsidian correspondiente.
+El vault es el grafo durable. The CLI derives relationships from Markdown/frontmatter and inspected external evidence; it keeps no parallel authority. Una relación confirmada se escribe en la nota Obsidian correspondiente.
 
 `.sync-acknowledgements.json` is the only versioned synchronization process record and stays outside the graph. It records an exact branch and commit only as `no-durable-node` (accepted new repository without a node) or `no-documentation-change` (accepted existing-repository delta requiring no documentation update). A rejected or limited attempt creates no acknowledgement and advances no successful cursor. Acknowledgements preserve the note baseline and contain no technical facts, relationships, findings, free-form reasons, or secrets.
 
@@ -96,7 +96,6 @@ Select `<cli>` through `use-vault-cli` (`.agents/skills/use-vault-cli/SKILL.md`)
 | `<cli> config areas --vault "<vault_root>"`, `config reports`, `config operation` | Discover areas/reports and resolve a procedure by basename or report ID. | Derived catalog; executing a procedure requires its skill and authority. |
 | `<cli> audit --vault "<vault_root>"` | Check closed note schemas, sections, learning evidence structure, operational topology and process leakage. | Structure does not prove business truth, experimental quality or external state. |
 | `<cli> check links --vault "<vault_root>"` | Find broken links, alias targets, hidden-agent links and unexpected orphans. | Filesystem fallback does not replicate all Obsidian parsing. |
-| `<cli> check obsidian-binding --vault "<vault_root>" --vault-name "<obsidian_vault>"` | Verify explicit Obsidian name against the canonical filesystem root before native queries. | Requires Obsidian CLI; a zero exit code alone does not prove the binding. |
 | `<cli> check bases --vault "<vault_root>"` | Validate Bases after changing a Base, schema or property. | Does not execute expressions or plugin-defined functions. |
 | `<cli> inventory --vault "<vault_root>" [--github-user <login>]` | Compare repository freshness and synchronization cursors before and after sync. | Requires authenticated `gh` and network; cursors are process state, not technical evidence. |
 | `<cli> discover run`, `discover check --note <note>` | Extract connection facts at an exact commit; gate a note: anchors resolve, identifiers are in the cited lines, every discovered connector and resource is addressed. | Facts are evidence pointers; the checks prove anchors and coverage, not the correctness of the prose. |
@@ -121,7 +120,7 @@ Si varias cuentas inactivas tienen acceso, el comando termina con exit code 2 y 
 
 ## Gates
 
-Run the installed binary against the resolved absolute vault root. Consumer closure uses installed operations; distribution unit tests and Python evaluation tooling run only in the distribution checkout. A normal sync runs the final inventory, structural audit, link check and available Obsidian checks. Run Bases validation when a Base, schema or property changed.
+Run the installed binary against the resolved absolute vault root. Consumer closure uses installed operations; distribution unit tests and Python evaluation tooling run only in the distribution checkout. A normal sync runs the final inventory, structural audit and link check. Run Bases validation when a Base, schema or property changed.
 
 ```text
 <cli> config status --vault "<vault_root>"
@@ -130,8 +129,6 @@ Run the installed binary against the resolved absolute vault root. Consumer clos
 <cli> check links --vault "<vault_root>"
 <cli> check bases --vault "<vault_root>"
 ```
-
-Before any Obsidian-native query, run `<cli> check obsidian-binding --vault "<vault_root>" --vault-name "<obsidian_vault>"` and require success. It verifies that the explicit Obsidian name resolves to the same filesystem vault. A successful exit code alone is insufficient: Obsidian can return `Vault not found` with exit code zero. Once the binding is verified, run `obsidian "vault=<obsidian_vault>" unresolved` and `obsidian "vault=<obsidian_vault>" orphans`. If Obsidian is unavailable or its binding cannot be verified, record the limitation and use the native link check; never query another vault as fallback.
 
 Después de crear o revisar materialmente una skill compleja, ejecutar además una prueba ciega en un contexto de agente fresco: entregar solo la ruta de la skill y una solicitud realista contra fixtures temporales, sin la respuesta esperada, diagnóstico previo ni conclusiones del autor. Una skill que escribe (casos, handoffs, notas) se prueba sobre copias temporales, con hashes o estado antes y después, sin tocar vaults ni repositorios reales. Si el entorno no ofrece aislamiento de agente, registrar esta validación como no observada; no simularla en el mismo contexto.
 

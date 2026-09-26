@@ -1,7 +1,6 @@
 package discover
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -18,14 +17,12 @@ import (
 // Note gates. G1: every source anchor resolves at its commit and the identifiers it names are in
 // the cited lines. G2: every connector the code uses and every resource its configuration names
 // is evidenced or explicitly addressed in the note. Freshness: anchors citing files changed since
-// the analyzed commit. Optional semantic check: Jev judges whether the cited lines support the
-// sentence that cites them; without Jev the reviewer does it.
+// the analyzed commit. Whether the cited lines support the sentence is the reviewer's judgment.
 
 var (
 	permalink   = regexp.MustCompile(`https://github\.com/([^/\s]+)/([^/\s]+)/blob/([0-9a-f]{7,40})/([^)#\s]+)(?:#L(\d+)(?:-L(\d+))?)?`)
 	footnoteDef = regexp.MustCompile(`(?m)^\[\^([^\]]+)\]:\s*(.*)$`)
 	backtick    = regexp.MustCompile("`([^`\\n]{2,120})`")
-	sentenceEnd = regexp.MustCompile(`[.!?](\s|$)`)
 	hexRef      = regexp.MustCompile(`^[0-9a-f]{7,40}$`)
 	versionRef  = regexp.MustCompile(`^v?\d+(\.\d+)+([-+][\w.]+)?$`)
 	pathLike    = regexp.MustCompile(`^\.?[\w.\-]*(/[\w.\-]+)+/?$|^[\w\-]+\.[a-z0-9]{1,5}$`)
@@ -55,7 +52,6 @@ type noteCheck struct {
 	Anchors   map[string]int `json:"anchors"`
 	Coverage  map[string]int `json:"coverage"`
 	Freshness map[string]any `json:"freshness,omitempty"`
-	Semantic  map[string]any `json:"semantic,omitempty"`
 	Issues    []checkIssue   `json:"issues"`
 	OK        bool           `json:"ok"`
 }
@@ -163,43 +159,7 @@ func lineWindow(content string, from, to, pad int) string {
 	return strings.Join(lines[a:b], "\n")
 }
 
-// claimFor returns the sentence(s) of the note body that cite a footnote.
-func claimFor(body, id string) string {
-	ref := "[^" + id + "]"
-	refs := regexp.MustCompile(`\s*\[\^[^\]]+\]`)
-	out := []string{}
-	for _, para := range strings.Split(body, "\n") {
-		if strings.HasPrefix(strings.TrimSpace(para), "[^") || !strings.Contains(para, ref) {
-			continue
-		}
-		idx := strings.Index(para, ref)
-		// The cited sentence is the one the reference closes (references usually follow the
-		// period) or, mid-sentence, the one it sits in.
-		pre := strings.TrimSpace(refs.ReplaceAllString(para[:idx], ""))
-		search := strings.TrimRight(pre, ".!?")
-		start := 0
-		for _, m := range sentenceEnd.FindAllStringIndex(search, -1) {
-			start = m[1]
-		}
-		claim := strings.TrimSpace(pre[start:])
-		if !strings.HasSuffix(pre, ".") && !strings.HasSuffix(pre, "!") && !strings.HasSuffix(pre, "?") {
-			rest := refs.ReplaceAllString(para[idx:], "")
-			if m := sentenceEnd.FindStringIndex(rest); m != nil {
-				rest = rest[:m[1]]
-			}
-			claim = strings.TrimSpace(claim + " " + strings.TrimSpace(rest))
-		}
-		if claim != "" {
-			out = append(out, claim)
-		}
-		if len(out) == 2 {
-			break
-		}
-	}
-	return strings.Join(out, " ")
-}
-
-func checkNoteFresh(vault, notePath, repoOverride string, semantic bool) (noteCheck, error) {
+func checkNoteFresh(vault, notePath, repoOverride string) (noteCheck, error) {
 	rel, full := notePath, notePath
 	if filepath.IsAbs(notePath) {
 		rel, _ = filepath.Rel(vault, notePath)
@@ -370,13 +330,6 @@ func checkNoteFresh(vault, notePath, repoOverride string, semantic bool) (noteCh
 				st, _ := loadStore(vault)
 				ix, _ := loadPlatform(vault)
 				a := &assembly{scans: []*repoScan{s}, st: st, platform: ix, providers: configuredProviders(vault)}
-				if jev := newJev(); jev != nil {
-					if qs := a.pendingQuestions(); len(qs) > 0 && len(qs) <= 500 {
-						if n, _ := jev.answerAll(context.Background(), st, qs); n > 0 {
-							_ = st.save(vault)
-						}
-					}
-				}
 				f := a.facts()[0]
 				cited := map[string]bool{}
 				for _, an := range anchors {
@@ -520,42 +473,6 @@ func checkNoteFresh(vault, notePath, repoOverride string, semantic bool) (noteCh
 			}
 		}
 	}
-	// Optional semantic check of each verified footnote anchor.
-	if semantic {
-		jev := newJev()
-		if jev == nil {
-			r.Semantic = map[string]any{"status": "skipped", "reason": "TYPESAFE_API_KEY not set; the reviewer judges whether each citation supports its sentence"}
-		} else {
-			counts := map[string]int{}
-			for _, v := range ok {
-				if v.a.Footnote == "" {
-					continue
-				}
-				claim := claimFor(body, v.a.Footnote)
-				if claim == "" || strings.TrimSpace(v.code) == "" {
-					continue
-				}
-				q := question{ID: v.a.Footnote, Kind: "citation", State: map[string]any{"claim": claim, "code": v.code},
-					Instructions: "The `claim` (it may be written in Spanish) cites the source `code`. How does the code relate to the claim? Judge only from this code.",
-					Options:      map[string]string{"supports": "The code states the claim or directly implies it.", "contradicts": "The code shows something incompatible with the claim.", "says_nothing": "The code does not address the claim."}}
-				j, e := jev.ask(context.Background(), q)
-				if e != nil {
-					counts["failed"]++
-					continue
-				}
-				counts[j.Choice]++
-				where := "[^" + v.a.Footnote + "] " + v.a.Path
-				switch {
-				case j.Choice == "contradicts" && j.Confidence >= 0.7:
-					add("semantic", "error", where, fmt.Sprintf("cited code contradicts the sentence (confidence %.2f): %s", j.Confidence, trim(claim, 160)))
-				case j.Choice != "supports" || j.Confidence < 0.6:
-					counts["to_review"]++
-					add("semantic", "review", where, fmt.Sprintf("%s (confidence %.2f): %s", j.Choice, j.Confidence, trim(claim, 160)))
-				}
-			}
-			r.Semantic = map[string]any{"status": "checked", "results": counts, "jev_calls": jev.calls}
-		}
-	}
 	r.OK = true
 	for _, i := range r.Issues {
 		if i.Severity == "error" {
@@ -636,13 +553,6 @@ func uniqueStrings(xs []string) []string {
 	return firstN(m, len(m))
 }
 
-func trim(s string, n int) string {
-	if len(s) > n {
-		return s[:n] + "…"
-	}
-	return s
-}
-
 func firstList(xs []string, n int) []string {
 	if len(xs) > n {
 		return xs[:n]
@@ -650,7 +560,7 @@ func firstList(xs []string, n int) []string {
 	return xs
 }
 
-func runCheck(o options, out io.Writer, semantic bool) error {
+func runCheck(o options, out io.Writer) error {
 	if len(o.notes) == 0 {
 		return errors.New("--note is required")
 	}
@@ -661,7 +571,7 @@ func runCheck(o options, out io.Writer, semantic bool) error {
 		if len(o.repos) == 1 {
 			repo = o.repos[0]
 		}
-		r, e := checkNote(o.vault, n, repo, semantic)
+		r, e := checkNote(o.vault, n, repo)
 		if e != nil {
 			return e
 		}

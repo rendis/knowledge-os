@@ -37,7 +37,6 @@ Apply each dimension only where marked required (`R`), conditional on the concre
 | Installed CLI | R | R | R | R | R | R | The platform binary executes the resolver and applicable tooling |
 | Framework gates | — | — | — | R | C | C | Required when the resulting documentation will be applied and closed |
 | Local `main` baseline | — | — | R | R | C | C | Required when reconciliation will author and close vault changes |
-| Obsidian binding | O | O | O | O | O | O | Exact normalized vault path matches; otherwise use the documented filesystem fallback |
 | GitHub identity | — | C | C | — | R | C | Required only when the selected versioned evidence is remote |
 | Clone authorization | — | C | C | — | C | C | Required only when missing or stale evidence must be cloned or fetched |
 | Procedure binding | — | — | — | — | — | R | The semantic workspace view resolves the configured executor or adapter for the exact procedure and target |
@@ -62,11 +61,6 @@ After a `resolved` result, use its canonical `VAULT_ROOT` and run only applicabl
 <cli> check links --vault "<vault_root>"
 <cli> check bases --vault "<vault_root>"
 
-# Check exact Obsidian identity before native application queries.
-<cli> check obsidian-binding --vault "<vault_root>" --vault-name "<obsidian_vault>"
-obsidian "vault=<obsidian_vault>" unresolved
-obsidian "vault=<obsidian_vault>" orphans
-
 git --no-optional-locks -C "<vault_root>" show-ref --verify --quiet refs/heads/main
 git --no-optional-locks -C "<vault_root>" status --porcelain
 
@@ -74,7 +68,7 @@ git --no-optional-locks -C "<vault_root>" status --porcelain
 <cli> inventory --vault "<vault_root>" --format markdown
 ```
 
-The installed CLI requires neither Python nor Go. Git, GitHub CLI, Obsidian and procedure-specific tools are external dependencies only for operations that use them.
+The installed CLI requires neither Python nor Go. Git, GitHub CLI and procedure-specific tools are external dependencies only for operations that use them.
 
 Read `source_context` as defined in [vault-resolution.md](../../../../90-Meta/vault-resolution.md). An arbitrary directory is not proof that the target repository is usable. Report source configuration independently from readiness; mixed postures are valid:
 
@@ -122,8 +116,6 @@ If it is not `initialized`, load `onboard-developer`. The observed gap opens dem
 **CLI or gates unavailable.** Report the missing executable or exact failing gate. Restore the matching platform release through the distribution installer; rerun the affected checks. Do not replace a failed semantic review with a structural check.
 
 **Git baseline.** This vault uses local `main` as its only baseline. A missing `refs/heads/main` blocks authoring, closure, and synchronization. A dirty working tree does not affect readiness: report changed/untracked paths as delivery context and preserve unrelated work.
-
-**Obsidian binding.** Run `<cli> check obsidian-binding` before `unresolved` or `orphans`; Obsidian may print `Vault not found` with exit `0`. If no exact normalized registration matches, use `<cli> check links` and report that native backlinks/rendering were not verified.
 
 **GitHub identity.** Suggest `--github-user <login>` for a stored account, a non-interactive `GH_TOKEN`/`GITHUB_TOKEN`, or authenticating `gh` and checking SSO authorization. Never persist or print tokens.
 
