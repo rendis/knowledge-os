@@ -652,3 +652,26 @@ func TestNoiseIsNotARuntimeResource(t *testing.T) {
 		t.Errorf("an external host is a resource group: %q", g)
 	}
 }
+
+func TestPlaceholderIsNotAResource(t *testing.T) {
+	for _, v := range []string{"acme-topic-sub-in-value", "acme-sub-out-value", "orders-placeholder"} {
+		if resourceShaped(v) {
+			t.Errorf("%s is a template value, not a resource", v)
+		}
+	}
+	if !resourceShaped("acme-scan-store-reception-cl-inbound") {
+		t.Error("a real topic name is a resource")
+	}
+}
+
+func TestMentionsExpandsBracedNames(t *testing.T) {
+	text := "declara `topic_name=acme-scan-store-reception-{cl|co|pe}-inbound` y `acme-x-{cl,pe}-sub`"
+	for _, n := range []string{"acme-scan-store-reception-co-inbound", "acme-x-pe-sub"} {
+		if !mentions(text, n) {
+			t.Errorf("%s is mentioned through its braced form", n)
+		}
+	}
+	if mentions(text, "acme-scan-store-reception-ar-inbound") {
+		t.Error("a variant outside the braces is not mentioned")
+	}
+}

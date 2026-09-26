@@ -613,9 +613,15 @@ func (a *assembly) pendingQuestions() []question {
 	return qs
 }
 
+// placeholderName is a template value left for someone to fill in (acme-topic-sub-in-value).
+var placeholderName = regexp.MustCompile(`(?i)[-_.](value|placeholder|changeme|tbd|todo|xxx+)$`)
+
 // resourceShaped is a format rule: resource names, paths and URLs have no whitespace and
 // contain a separator; placeholders are resolved elsewhere.
 func resourceShaped(v string) bool {
+	if placeholderName.MatchString(v) {
+		return false
+	}
 	return !strings.ContainsAny(v, " \t") && strings.ContainsAny(v, "-._/:") && !strings.Contains(v, "${") && !strings.Contains(v, "{{")
 }
 
@@ -660,6 +666,9 @@ func (a *assembly) facts() []repoFacts {
 	}
 	res := map[*repoScan]map[string]*resource{}
 	add := func(s *repoScan, t, name string, ev evidence) {
+		if placeholderName.MatchString(name) {
+			return // a template value left to fill in names nothing
+		}
 		if res[s] == nil {
 			res[s] = map[string]*resource{}
 		}
