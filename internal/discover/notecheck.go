@@ -231,6 +231,13 @@ func checkNote(vault, notePath, repoOverride string, semantic bool) (noteCheck, 
 		return p
 	}
 	// G1 anchors
+	defined := map[string]bool{}
+	for _, m := range footnoteDef.FindAllStringSubmatch(text, -1) {
+		if defined[m[1]] {
+			add("G1-anchor", "error", "[^"+m[1]+"]", "footnote defined twice; only one definition renders, so the other citation is lost")
+		}
+		defined[m[1]] = true
+	}
 	anchors := parseAnchors(text)
 	body := text
 	if i := strings.Index(text[3:], "\n---"); strings.HasPrefix(text, "---") && i >= 0 {

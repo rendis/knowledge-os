@@ -323,6 +323,16 @@ func TestNoteGates(t *testing.T) {
 	if r, _ = checkNote(vault, "20-Repos/orders.md", "", false); !r.OK {
 		t.Fatalf("an identifier in one of a footnote's cited files satisfies the footnote: %+v", r.Issues)
 	}
+	if i := strings.Index(good, "\n[^"); i >= 0 {
+		line := good[i+1:]
+		line = line[:strings.Index(line, "\n")+1]
+		write(t, vault, "20-Repos/orders.md", good+line)
+		if r, _ = checkNote(vault, "20-Repos/orders.md", "", false); r.OK {
+			t.Fatal("a footnote defined twice fails the gate")
+		}
+	} else {
+		t.Fatal("the fixture has a footnote")
+	}
 	bad := strings.Replace(good, "`pubsub.NewClient`", "`kafka.NewWriter`", 1)
 	bad = strings.Replace(bad, "#L5-L8", "#L5-L40", 1)
 	bad = strings.Replace(bad, "Publica en el topic `orders-cl-outbound` usando `TOPIC_OUT`.", "Publica eventos.", 1)
