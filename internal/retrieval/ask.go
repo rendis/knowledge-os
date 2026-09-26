@@ -1,7 +1,6 @@
 package retrieval
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -17,45 +16,23 @@ import (
 	"knowledge-os/internal/discover"
 )
 
-// Ask assembles, in one call, what an agent needs to answer a question from the vault: where every
-// word of the question occurs across the notes, the notes the question names or matches with their
-// relevant passages, each passage's sources with their state on the reference branch and the cited
-// lines themselves, each repository note's checkout and freshness, the neighbouring notes, the cases
-// that mention them and the sources beyond the vault. The output stays within a character budget so a
-// harness never truncates it.
+// Ask maps a question onto the vault: every knowledge note that holds the question's terms, the lines
+// where they are, and whether the sources those lines cite still read the same on the reference
+// branch. It does not choose the answer or copy the notes: the agent reads them, directly or with
+// `read`. Every matching note is listed, so the most frequent match is never taken for the whole story.
 
 const (
-	askParagraphsNote  = 4
-	askParagraphsNamed = 10
-	askParagraphRunes  = 1600
-	askCodeNames       = 6
-	askCodePerNote     = 3
-	askNeighbours      = 10
-	askCases           = 5
-	askHitNotes        = 6
-	askHitLines        = 12
-	askHitRunes        = 3000
-	askHitLineRunes    = 420
-	// DefaultBudget keeps a pack under the ~30 000 characters a harness shows before truncating.
+	askLinesPerTerm = 12
+	askNoteLines    = 24 // notes described in full; the rest are named
+	askCases        = 5
+	// DefaultBudget keeps the output under the ~30 000 characters a harness shows before truncating.
 	DefaultBudget = 24000
 )
 
-// AskOptions bound a pack.
+// AskOptions bound the map.
 type AskOptions struct {
-	Notes      int
 	Visibility string
 	Budget     int
-	Code       bool
-	Focus      string // only this note
-	Brief      bool   // paragraphs with their source marks only
-}
-
-type askNote struct {
-	path, stem string
-	query      string
-	named      bool
-	minor      bool // another note, when the question names a repository
-	score      float64
 }
 
 type knowledgeNote struct {
@@ -64,13 +41,19 @@ type knowledgeNote struct {
 	aliases    []string
 }
 
-// Ask writes the evidence pack for query as Markdown.
+// askMatch is a note that holds some of the question's terms.
+type askMatch struct {
+	note     *knowledgeNote
+	named    bool
+	lines    map[string][]int // term display → lines
+	distinct int              // distinct selective terms it holds
+	weight   float64          // their summed rarity
+}
+
+// Ask writes the map for query as Markdown.
 func (i *Index) Ask(ctx context.Context, query string, o AskOptions, w io.Writer) error {
 	if strings.TrimSpace(query) == "" {
 		return fmt.Errorf("--query is required")
-	}
-	if o.Notes < 1 || o.Notes > 8 {
-		return fmt.Errorf("--notes must be between 1 and 8")
 	}
 	if o.Visibility != "all" && o.Visibility != "public" {
 		return fmt.Errorf("visibility must be all or public")
@@ -82,195 +65,266 @@ func (i *Index) Ask(ctx context.Context, query string, o AskOptions, w io.Writer
 	if err != nil {
 		return err
 	}
-	byPath := map[string]*knowledgeNote{}
-	for _, n := range notes {
-		byPath[n.path] = n
-	}
-	// 1. The notes the question names by basename or alias, and the words the question brings.
-	named := namedNotes(notes, query)
-	if o.Focus != "" {
-		f, err := findNote(notes, o.Focus)
+	if o.Visibility == "public" {
+		public, err := i.publicPaths(ctx)
 		if err != nil {
 			return err
 		}
-		named, o.Notes = []string{f.path}, 1
+		kept := notes[:0]
+		for _, n := range notes {
+			if public[n.path] {
+				kept = append(kept, n)
+			}
+		}
+		notes = kept
+	}
+	// The notes the question names by basename or alias; their names are not terms to locate.
+	named := map[string]bool{}
+	skip := map[string]bool{}
+	for _, p := range namedNotes(notes, query) {
+		named[p] = true
+		for _, n := range notes {
+			if n.path != p {
+				continue
+			}
+			for _, name := range append([]string{n.stem}, n.aliases...) {
+				f := fold(name)
+				skip[f] = true
+				for _, x := range words.FindAllString(f, -1) {
+					skip[x] = true
+				}
+			}
+		}
 	}
 	all := askTerms(query)
 	if err := i.weigh(ctx, all); err != nil {
 		return err
 	}
-	skip := map[string]bool{}
-	for _, p := range named {
-		n := byPath[p]
-		for _, name := range append([]string{n.stem}, n.aliases...) {
-			f := fold(name)
-			skip[f] = true
-			for _, w := range words.FindAllString(f, -1) {
-				skip[w] = true
-			}
-		}
-	}
-	terms := []askTerm{}
+	terms, common, absent := []askTerm{}, []askTerm{}, []string{}
 	for _, t := range all {
-		if !skip[t.stem] && !skip[t.word] {
+		switch {
+		case skip[t.stem] || skip[t.word]:
+		case t.df == 0:
+			if t.ident || runeLen(t.word) > 4 {
+				absent = append(absent, t.word)
+			}
+		case t.common:
+			common = append(common, t)
+		default:
 			terms = append(terms, t)
 		}
 	}
-	// 2. Rank notes: named, then one hop from a named note, then by BM25 over the other words.
-	ranked := map[string]*askNote{}
-	order := []*askNote{}
-	get := func(path string) *askNote {
-		if n, ok := ranked[path]; ok {
-			return n
-		}
-		n := &askNote{path: path, stem: strings.TrimSuffix(filepath.Base(path), filepath.Ext(path)), query: query}
-		ranked[path] = n
-		order = append(order, n)
-		return n
+	// Frequent words select only when the question brings nothing rarer.
+	selective := terms
+	if len(selective) == 0 {
+		selective = common
 	}
-	for _, p := range named {
-		get(p).named = true
-	}
-	casePaths := []string{}
-	caseTerms := map[string]bool{}
-	if len(terms) > 0 {
-		counts := map[string]int{}
-		rows, err := i.db.QueryContext(ctx, `SELECT path,body,bm25(passages,0,5,4,3,1,0,0,0,0) FROM passages
-  WHERE passages MATCH ? AND (?='all' OR visibility='public') ORDER BY bm25(passages,0,5,4,3,1,0,0,0,0),path,rowid LIMIT 300`, matchExpr(terms), o.Visibility)
-		if err != nil {
-			return err
-		}
-		for rows.Next() {
-			var path, body string
-			var rank float64
-			if err = rows.Scan(&path, &body, &rank); err != nil {
-				rows.Close()
-				return err
-			}
-			if strings.HasPrefix(strings.TrimSpace(body), "[^") {
-				continue // the footnote list is cited through the passages that use it
-			}
-			if isCase(path) {
-				if counts[path] == 0 {
-					casePaths = append(casePaths, path)
-				}
-				counts[path]++
-				f := fold(body)
-				for _, t := range terms {
-					if t.in(f) {
-						caseTerms[path+"\x00"+t.stem] = true
-					}
-				}
-				continue
-			}
-			if byPath[path] == nil || counts[path] == askParagraphsNamed {
-				continue
-			}
-			counts[path]++
-			get(path).score += rank
-		}
-		err = rows.Err()
-		rows.Close()
-		if err != nil {
-			return err
-		}
-	}
-	// One hop from a named note: a typed relation to it (a repository that publishes to or consumes
-	// the named topic) belongs in the pack whatever its words; a plain link only when it matches.
-	near, role := map[string]bool{}, map[string]bool{}
-	stemPath := map[string]string{}
+	matches := []*askMatch{}
 	for _, n := range notes {
-		stemPath[n.stem] = n.path
-	}
-	// When the question names a repository, its neighbours count, not those of the other notes it
-	// names (an integration every consumer links to would bring them all in).
-	anchors := named
-	for _, p := range named {
-		if strings.HasPrefix(p, "20-Repos/") {
-			anchors = nil
-			for _, q := range named {
-				if strings.HasPrefix(q, "20-Repos/") {
-					anchors = append(anchors, q)
-				}
+		m := &askMatch{note: n, named: named[n.path], lines: map[string][]int{}}
+		for _, t := range selective {
+			if ls := termLines(n.raw, t); len(ls) > 0 {
+				m.lines[t.display()] = ls
+				m.distinct++
+				m.weight += t.weight
 			}
+		}
+		if m.named || m.distinct > 0 {
+			matches = append(matches, m)
+		}
+	}
+	sort.SliceStable(matches, func(a, b int) bool {
+		x, y := matches[a], matches[b]
+		if x.named != y.named {
+			return x.named
+		}
+		if x.distinct != y.distinct {
+			return x.distinct > y.distinct
+		}
+		if x.weight != y.weight {
+			return x.weight > y.weight
+		}
+		return lineCount(x) > lineCount(y)
+	})
+	out := &packWriter{w: w, budget: o.Budget}
+	fmt.Fprintf(out, "# Vault map\n\nQuestion: %s\nVault: %s\n", strings.TrimSpace(query), i.Root)
+	writeNamedSubscriptions(out, i.Root, query, all)
+	if len(absent) > 0 {
+		fmt.Fprintf(out, "\nNo note contains: %s. What they name is absent from the notes or called differently: try a synonym, the code or the sources beyond the vault.\n", strings.Join(absent, ", "))
+	}
+	if len(common) > 0 && len(terms) > 0 {
+		parts := []string{}
+		for _, t := range common {
+			parts = append(parts, fmt.Sprintf("`%s` (%d passages)", t.display(), t.df))
+		}
+		fmt.Fprintf(out, "Too frequent to locate anything, left out: %s.\n", strings.Join(parts, ", "))
+	}
+	if len(matches) == 0 {
+		fmt.Fprintln(out, "\nNo note names or holds the question's terms. Try an identifier from the code, or the sources beyond the vault below.")
+	} else {
+		fmt.Fprintf(out, "\n## Notes holding the question's terms (%d, all of them; most terms first)\n", len(matches))
+	}
+	src := discover.NewSources(i.Root)
+	tail := i.mapTail(ctx, query, o.Visibility, selective, matches)
+	for k, m := range matches {
+		entry := i.mapEntry(m, selective, src)
+		if k == askNoteLines || runeLen(entry) > out.left()-runeLen(tail)-200 {
+			rest := []string{}
+			for _, x := range matches[k:] {
+				rest = append(rest, fmt.Sprintf("%s (%d)", x.note.path, x.distinct))
+			}
+			fmt.Fprintf(out, "\n- %d more, fewer terms each: %s\n", len(rest), trimRunes(strings.Join(rest, "; "), max(out.left()-runeLen(tail)-200, 200)))
 			break
 		}
+		fmt.Fprint(out, entry)
 	}
-	for _, p := range anchors {
-		if nb, e := i.Neighbors(ctx, byPath[p].stem); e == nil {
-			for _, x := range nb.Outgoing {
-				near[x.Target] = true
+	// A topic the question names: who publishes and consumes it, from the code and the platform.
+	for _, m := range matches {
+		if m.named && strings.HasPrefix(m.note.path, "25-Topics/") && out.left() > runeLen(tail)+1500 {
+			if wr, ok := discover.TopicWiring(i.Root, m.note.stem); ok {
+				fmt.Fprintf(out, "\n## Wiring of %s\n", m.note.stem)
+				writeWiring(wr, src, out, selective)
 			}
-			for _, x := range nb.Incoming {
-				near[x.Source] = true
-				if x.Field != "body" && x.Field != "sistema" && stemPath[x.Source] != "" {
-					role[x.Source] = true
-					get(stemPath[x.Source])
+		}
+	}
+	fmt.Fprint(out, tail)
+	return nil
+}
+
+func lineCount(m *askMatch) int {
+	n := 0
+	for _, ls := range m.lines {
+		n += len(ls)
+	}
+	return n
+}
+
+// mapEntry describes one matching note: what it is, where the terms are and whether the sources of
+// those paragraphs still hold.
+func (i *Index) mapEntry(m *askMatch, terms []askTerm, src *discover.Sources) string {
+	var b strings.Builder
+	label := ""
+	if m.named {
+		label = " (named)"
+	}
+	fmt.Fprintf(&b, "\n- `%s`%s — %s\n", m.note.path, label, trimRunes(overviewLine(m.note.stem, m.note.raw), 220))
+	where := []string{}
+	for _, t := range terms {
+		if ls, ok := m.lines[t.display()]; ok {
+			nums := firstN(intsToStrings(ls), askLinesPerTerm)
+			if len(ls) > askLinesPerTerm {
+				nums = append(nums, fmt.Sprintf("… (%d)", len(ls)))
+			}
+			where = append(where, "`"+t.display()+"` L"+strings.Join(nums, ","))
+		}
+	}
+	if len(where) > 0 {
+		fmt.Fprintf(&b, "  Lines: %s\n", strings.Join(where, " · "))
+	}
+	if line := sourcesLine(m, terms, src); line != "" {
+		fmt.Fprintf(&b, "  %s\n", line)
+	}
+	if strings.HasPrefix(m.note.path, "20-Repos/") {
+		if s, ok := discover.RepositoryNoteState(i.Root, m.note.path); ok {
+			fmt.Fprintf(&b, "  %s\n", repoStateLine(s))
+		}
+	}
+	return b.String()
+}
+
+// sourcesLine states whether the paragraphs holding the terms still stand on their sources: how many
+// cite lines that read the same on the reference branch, which ones changed, which cannot be checked
+// here and which cite nothing.
+func sourcesLine(m *askMatch, terms []askTerm, src *discover.Sources) string {
+	defs := footnoteDefinitions(string(m.note.raw))
+	if len(defs) == 0 {
+		return "Sources: the note cites no footnotes; its lines are claims to confirm in the code."
+	}
+	current, unknown, uncited := 0, 0, 0
+	changed := []string{}
+	ref := ""
+	for _, p := range parseParagraphs(m.note.raw) {
+		if len(terms) > 0 && !matchesAny(p.text, terms) {
+			continue
+		}
+		ids := footnoteRef.FindAllStringSubmatch(p.text, -1)
+		if len(ids) == 0 {
+			uncited++
+			continue
+		}
+		state := "current"
+		for _, id := range ids {
+			for _, a := range discover.Anchors(defs[id[1]]) {
+				st := src.State(a)
+				switch {
+				case st.Status == "changed":
+					state, ref = "changed", st.Ref
+				case st.Status == "unknown" && state == "current":
+					state = "unknown"
 				}
 			}
 		}
-	}
-	tier := func(n *askNote) int {
-		switch {
-		case n.named:
-			return 0
-		case role[n.stem] || near[n.stem] && n.score < 0:
-			return 1
-		}
-		return 2
-	}
-	if len(role) > 0 && o.Focus == "" {
-		o.Notes = max(o.Notes, min(len(named)+len(role), 6))
-	}
-	sort.SliceStable(order, func(a, b int) bool {
-		if ta, tb := tier(order[a]), tier(order[b]); ta != tb {
-			return ta < tb
-		}
-		return order[a].score < order[b].score
-	})
-	namesRepo := false
-	for _, p := range named {
-		namesRepo = namesRepo || strings.HasPrefix(p, "20-Repos/")
-	}
-	for _, n := range order {
-		n.minor = namesRepo && !n.named && !role[n.stem]
-	}
-	top := order
-	if o.Focus != "" {
-		top = []*askNote{ranked[named[0]]}
-	}
-	if len(top) > o.Notes {
-		top = top[:o.Notes]
-	}
-	caseScore := map[string]int{}
-	for k := range caseTerms {
-		caseScore[k[:strings.Index(k, "\x00")]]++
-	}
-	// A case counts when it shares half of the question's words (at least two).
-	need := max(2, (len(terms)+1)/2)
-	if len(terms) < 2 {
-		need = 1
-	}
-	kept := []string{}
-	for _, p := range casePaths {
-		if caseScore[p] >= need {
-			kept = append(kept, p)
+		switch state {
+		case "changed":
+			changed = append(changed, fmt.Sprintf("L%d", p.line))
+		case "unknown":
+			unknown++
+		default:
+			current++
 		}
 	}
-	sort.SliceStable(kept, func(a, b int) bool { return caseScore[kept[a]] > caseScore[kept[b]] })
-	casePaths = kept
-	// 3. The tail is written first so the passages get what remains of the budget.
-	var tail bytes.Buffer
-	shown := map[string]bool{}
-	for _, n := range top {
-		shown[n.stem] = true
+	parts := []string{}
+	if current > 0 {
+		parts = append(parts, fmt.Sprintf("%d ✓", current))
 	}
-	i.writeTail(ctx, &tail, top, shown, casePaths, byPath)
-	out := &packWriter{w: w, budget: o.Budget - runeLen(tail.String())}
-	fmt.Fprintf(out, "# Evidence pack\n\nQuestion: %s\nVault: %s\n", strings.TrimSpace(query), i.Root)
-	writeHitMap(out, all, notes, shown)
-	// A subscription the question names: what it reads, straight from the platform snapshots.
-	for _, t := range all {
+	if len(changed) > 0 {
+		parts = append(parts, fmt.Sprintf("⚠ %s (cited lines changed on %s: read them there)", strings.Join(firstN(changed, 8), ","), ref))
+	}
+	if unknown > 0 {
+		parts = append(parts, fmt.Sprintf("%d ? (not checkable here)", unknown))
+	}
+	if uncited > 0 {
+		parts = append(parts, fmt.Sprintf("%d cite nothing", uncited))
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return "Paragraphs with these terms: " + strings.Join(parts, " · ")
+}
+
+// repoStateLine is a repository note's freshness and what the last discovery run found against it.
+func repoStateLine(s discover.NoteState) string {
+	parts := []string{"Repository " + s.Repo}
+	switch {
+	case s.Unknown != "":
+		parts = append(parts, "freshness unknown: "+s.Unknown)
+	case len(s.StaleCited) > 0:
+		parts = append(parts, fmt.Sprintf("STALE: cited files changed up to %s (%s): %s", s.Ref, s.Head, strings.Join(firstN(s.StaleCited, 5), ", ")))
+	case s.ChangedFiles > 0:
+		parts = append(parts, fmt.Sprintf("fresh for its citations (%d uncited files changed up to %s)", s.ChangedFiles, s.Ref))
+	default:
+		parts = append(parts, "current: "+s.Ref+" is at the analyzed commit")
+	}
+	if s.CheckoutHead != "" {
+		ref := strings.TrimPrefix(strings.TrimPrefix(s.Ref, "refs/remotes/"), "refs/heads/")
+		parts = append(parts, fmt.Sprintf("the checkout is at %s, not %s: read code at %s (`kos code --repo %s` or `git show %s:PATH`)", s.CheckoutHead, ref, ref, s.Repo, ref))
+	}
+	if len(s.Discrepancies) > 0 {
+		ds := []string{}
+		for _, d := range s.Discrepancies {
+			ds = append(ds, d.Field+" [["+d.Target+"]]")
+		}
+		parts = append(parts, "unsupported by the code: "+strings.Join(firstN(ds, 4), ", "))
+	}
+	if len(s.Undocumented) > 0 {
+		parts = append(parts, fmt.Sprintf("%d resources in the code the note does not name", len(s.Undocumented)))
+	}
+	return strings.Join(parts, " · ")
+}
+
+// writeNamedSubscriptions writes what the platform snapshots say about a subscription the question names.
+func writeNamedSubscriptions(out io.Writer, root, query string, terms []askTerm) {
+	for _, t := range terms {
 		if len(t.phrase) == 0 && !strings.Contains(t.word, "-") && !strings.Contains(t.word, ".") {
 			continue
 		}
@@ -280,7 +334,7 @@ func (i *Index) Ask(ctx context.Context, query string, o AskOptions, w io.Writer
 				name = w
 			}
 		}
-		for _, sub := range discover.Subscription(i.Root, name) {
+		for _, sub := range discover.Subscription(root, name) {
 			line := fmt.Sprintf("Subscription %s @%s (captured %s): reads topic %s", sub.Name, sub.Scope, sub.Captured, sub.Topic)
 			if sub.Filter != "" {
 				line += "; filter " + sub.Filter
@@ -299,404 +353,54 @@ func (i *Index) Ask(ctx context.Context, query string, o AskOptions, w io.Writer
 			fmt.Fprintln(out, trimRunes(line, 400))
 		}
 	}
-	if len(top) == 0 {
-		fmt.Fprintln(out, "\nNo note names or matches the question. Try an identifier from the code, or follow the sources beyond the vault below.")
-	}
-	render := &sourceRenderer{src: discover.NewSources(i.Root), code: o.Code, codeLeft: o.Budget * 3 / 10, perText: 6, brief: o.Brief, covered: map[string]bool{}}
-	// When the question names a repository, a note neither linked to it nor tied to it by a role only
-	// shares words: one line with where those words are, not paragraphs.
-	aside := []string{}
-	for k, n := range top {
-		if n.minor && !near[n.stem] && o.Focus == "" {
-			where := []string{}
-			for _, t := range terms {
-				if ls := termLines(byPath[n.path].raw, t); len(ls) > 0 && !t.common {
-					where = append(where, "`"+t.display()+"` L"+strings.Join(firstN(intsToStrings(ls), 4), ","))
-				}
-			}
-			aside = append(aside, n.path+" ("+strings.Join(firstN(where, 4), " · ")+")")
-			continue
-		}
-		if out.left() < 900 {
-			rest := []string{}
-			for _, m := range top[k:] {
-				rest = append(rest, m.path)
-			}
-			fmt.Fprintf(out, "\nAlso matching, not shown for the budget: %s (`kos read --note NAME`).\n", strings.Join(rest, "; "))
-			break
-		}
-		if err := i.writeAskNote(ctx, out, n, byPath[n.path], terms, render, len(top)-k); err != nil {
-			return err
-		}
-	}
-	if len(aside) > 0 && out.left() > 300 {
-		fmt.Fprintf(out, "\nAlso sharing the question's words, not linked to the repository it names: %s (`kos read --note NAME --lines`).\n", strings.Join(aside, "; "))
-	}
-	// Terms no shown paragraph holds: where the pack is silent, with the lines to read.
-	gaps := []string{}
-	for _, t := range terms {
-		if !render.covered[t.stem] {
-			where := []string{}
-			for _, n := range top {
-				if ls := termLines(byPath[n.path].raw, t); len(ls) > 0 {
-					nums := []string{}
-					for _, l := range firstN(intsToStrings(ls), 6) {
-						nums = append(nums, l)
-					}
-					where = append(where, n.stem+" L"+strings.Join(nums, ","))
-				}
-			}
-			if len(where) > 0 {
-				gaps = append(gaps, "`"+t.display()+"` ("+strings.Join(where, "; ")+")")
-			} else {
-				gaps = append(gaps, "`"+t.display()+"` (in none of these notes)")
-			}
-		}
-	}
-	if len(gaps) > 0 && out.left() > 120 {
-		line := fmt.Sprintf("\nNot in any paragraph shown: %s. Read those lines, or treat that part of the question as not answered by the notes.\n", strings.Join(gaps, "; "))
-		fmt.Fprint(out, trimRunes(line, out.left()-2))
-	}
-	_, err = io.Copy(w, &tail)
-	return err
 }
 
-func intsToStrings(xs []int) []string {
-	out := make([]string, 0, len(xs))
-	for _, x := range xs {
-		out = append(out, fmt.Sprint(x))
-	}
-	return out
-}
-
-func (i *Index) writeAskNote(ctx context.Context, out *packWriter, n *askNote, note *knowledgeNote, terms []askTerm, render *sourceRenderer, remaining int) error {
-	raw := note.raw
-	fmt.Fprintf(out, "\n## %s\n\n%s\n", n.path, overviewLine(n.stem, raw))
-	if nb, err := i.Neighbors(ctx, n.stem); err == nil {
-		incoming := []string{}
-		for _, e := range nb.Incoming {
-			if e.Field != "body" {
-				incoming = append(incoming, e.Source+" ("+e.Field+")")
-			} else {
-				incoming = append(incoming, e.Source)
-			}
+// mapTail is the cases that share the question's terms, the sources beyond the vault and the legend.
+func (i *Index) mapTail(ctx context.Context, query, visibility string, terms []askTerm, matches []*askMatch) string {
+	var b strings.Builder
+	lines, seen := []string{}, map[string]bool{}
+	if len(terms) > 0 {
+		// A case counts when it holds half of the question's terms (at least two).
+		need := max(2, (len(terms)+1)/2)
+		if len(terms) < 2 {
+			need = 1
 		}
-		if len(incoming) > 0 {
-			fmt.Fprintf(out, "Linked from: %s\n", strings.Join(firstN(incoming, 10), ", "))
-		}
-	}
-	if sections := noteSections(raw); len(sections) > 0 {
-		fmt.Fprintf(out, "Sections: %s\n", strings.Join(sections, " · "))
-	}
-	// Where each term is in this note, common ones included: the lines to read when a paragraph
-	// did not make the pack.
-	where := []string{}
-	for _, t := range terms {
-		if ls := termLines(raw, t); len(ls) > 0 {
-			nums := []string{}
-			for _, l := range ls {
-				nums = append(nums, fmt.Sprint(l))
-			}
-			where = append(where, "`"+t.display()+"` L"+strings.Join(firstN(nums, 14), ","))
-		}
-	}
-	if len(where) > 0 {
-		fmt.Fprintf(out, "Terms in this note: %s\n", strings.Join(where, " · "))
-	}
-	if len(discover.Anchors(string(raw))) == 0 {
-		fmt.Fprintln(out, "Sources: this note cites no permalinks, so its paragraphs carry no ✓ or ⚠; paths it names are checked under `Files named`, and its claims are confirmed with `kos code`.")
-	}
-	repo, commit := "", ""
-	if strings.HasPrefix(n.path, "20-Repos/") {
-		if s, ok := discover.RepositoryNoteState(i.Root, n.path); ok {
-			writeRepoState(s, out)
-			if !n.minor {
-				writeConsumed(out, discover.RepoSubscriptions(i.Root, s.Repo), terms)
-			}
-			repo, commit = s.Repo, s.Commit
-		}
-	}
-	if strings.HasPrefix(n.path, "25-Topics/") {
-		if w, ok := discover.TopicWiring(i.Root, n.stem); ok {
-			writeWiring(w, render.src, out, terms)
-		}
-	}
-	k := askParagraphsNote
-	switch {
-	case n.named:
-		k = askParagraphsNamed
-	case n.minor:
-		k = 1 // the question names a repository: other notes add context, not the answer
-	}
-	paras, more := selectParagraphs(raw, terms, k)
-	if len(paras) == 0 {
-		// Named without a lexical match: its opening paragraphs state what it is.
-		paras, _ = selectParagraphs(raw, nil, 2)
-	}
-	defs := footnoteDefinitions(string(raw))
-	seen := map[string]bool{}
-	// One note takes at most two fifths of what remains, so the next notes still get their paragraphs.
-	// A note takes its share of what remains (at most two fifths), so every note of the pack shows
-	// its best paragraphs; the last one takes what is left.
-	share := out.left() * 2 / 5
-	if n.named && repo != "" {
-		share = out.left() / 2 // the repository the question names: its code is the answer
-	}
-	room := min(max(min(share, out.left()*3/(2*remaining+1)), 2500), out.left()-300)
-	if n.minor {
-		room = min(room, 1800) // context for the named repository: its best paragraph, no code
-	}
-	if remaining == 1 {
-		room = out.left() - 300
-	}
-	// 1. The most relevant paragraphs with their sources, while they fit.
-	type block struct {
-		p     paragraph
-		cites []citation
-		more  []string
-		files string
-		code  map[int]string // citation index → cited lines
-		size  int
-	}
-	byScore := append([]paragraph{}, paras...)
-	sort.SliceStable(byScore, func(a, b int) bool { return byScore[a].score > byScore[b].score })
-	blocks, used := []*block{}, 0
-	// A repository note keeps a third of its room for the code that answers the question.
-	// The cited lines of step 2 leave a quarter of it to the matching code and its exits.
-	textRoom, citedRoom := room, room
-	if repo != "" && render.code {
-		// At least what a function's first lines, its exits and the calls below it need.
-		reserve := max(room/4, min(3500, room/2))
-		textRoom, citedRoom = min(room*2/3, room-reserve), room-reserve
-	}
-	for _, p := range byScore {
-		b := &block{p: p, code: map[int]string{}}
-		b.cites, b.more = render.cited(p.text, defs, seen, repo, commit, render.perText, 1<<30)
-		b.files = render.filesLine(p.text, repo, commit)
-		b.size = runeLen(p.render()) + 20 + runeLen(b.files)
-		for _, c := range b.cites {
-			b.size += runeLen(c.line) + 1
-		}
-		if len(b.more) > 0 {
-			b.size += runeLen(alsoCited(b.more))
-		}
-		if len(blocks) > 0 && used+b.size > textRoom {
-			more = append(more, p.line)
-			continue
-		}
-		used += b.size
-		blocks = append(blocks, b)
-	}
-	// 2. The cited lines of the best paragraphs, a few per note, in what room remains.
-	if render.code {
-		shown := 0
-		for _, b := range blocks {
-			if shown == askCodePerNote {
-				break
-			}
-			for k, c := range b.cites {
-				code, ok := render.snippet(c.def, focusTerms(b.p.text))
-				if ok && runeLen(code) <= render.codeLeft && used+runeLen(code) <= citedRoom {
-					b.code[k] = code
-					used += runeLen(code)
-					render.codeLeft -= runeLen(code)
-					shown++
-					break
+		held := map[string]map[string]bool{}
+		order := []string{}
+		rows, err := i.db.QueryContext(ctx, `SELECT path,body FROM passages WHERE passages MATCH ? AND (?='all' OR visibility='public') ORDER BY path,rowid`, matchExpr(terms), visibility)
+		if err == nil {
+			for rows.Next() {
+				var path, body string
+				if rows.Scan(&path, &body) != nil || !isCase(path) {
+					continue
 				}
-			}
-		}
-	}
-	// 3. In note order, under their sections; a paragraph whose sources are all in another
-	// repository says which, so "who does what" reads off the pack.
-	sort.SliceStable(blocks, func(a, b int) bool { return blocks[a].p.line < blocks[b].p.line })
-	section := ""
-	for _, b := range blocks {
-		if b.p.section != section {
-			section = b.p.section
-			fmt.Fprintf(out, "\n### %s\n", section)
-		}
-		text := b.p.render()
-		if other := citedRepo(b.cites); other != "" && !strings.EqualFold(other, repo) {
-			text = strings.Replace(text, fmt.Sprintf("L%d", b.p.line), fmt.Sprintf("L%d (%s)", b.p.line, other), 1)
-		}
-		fmt.Fprintf(out, "\n%s\n", text)
-		f := fold(b.p.text)
-		for _, t := range terms {
-			if t.in(f) {
-				render.covered[t.stem] = true
-			}
-		}
-		if render.brief {
-			if len(b.cites)+len(b.more) > 0 {
-				fmt.Fprintln(out, briefSources(b.cites, b.more))
-			}
-		} else {
-			lines := []string{}
-			for k, c := range b.cites {
-				lines = append(lines, c.line)
-				if code, ok := b.code[k]; ok {
-					lines = append(lines, code)
+				if held[path] == nil {
+					held[path] = map[string]bool{}
+					order = append(order, path)
 				}
-			}
-			if len(b.more) > 0 {
-				lines = append(lines, alsoCited(b.more))
-			}
-			if len(lines) > 0 {
-				fmt.Fprintln(out, "Sources:\n"+strings.Join(lines, "\n"))
-			}
-		}
-		if b.files != "" {
-			fmt.Fprintln(out, b.files)
-		}
-	}
-	// 4. The code: where the question's words are in the repository's functions, then the code names
-	// of the best paragraphs, each looked up in the repository their sources cite.
-	sort.SliceStable(blocks, func(a, b int) bool { return blocks[a].p.score > blocks[b].p.score })
-	// The code sections count against this note's room too, not only against the code budget.
-	codeBefore := render.codeLeft
-	render.codeLeft = min(render.codeLeft, max(room-used, 0))
-	settings := []string{}
-	if repo != "" && !n.minor {
-		// The code files the shown paragraphs cite in this repository.
-		prefer := map[string][][2]int{}
-		for _, b := range blocks {
-			for _, c := range b.cites {
-				for _, a := range discover.Anchors(c.def) {
-					if strings.EqualFold(a.Repo[strings.Index(a.Repo, "/")+1:], repo) {
-						if a.From > 0 {
-							prefer[a.Path] = append(prefer[a.Path], [2]int{a.From, max(a.To, a.From)})
-						} else if _, ok := prefer[a.Path]; !ok {
-							prefer[a.Path] = nil
-						}
+				f := fold(body)
+				for _, t := range terms {
+					if t.in(f) {
+						held[path][t.stem] = true
 					}
 				}
 			}
+			rows.Close()
 		}
-		// The identifiers the best paragraphs name (BUSINESS_ID_IS_DUPLICATED, FindByBusinessId) find
-		// the code of the mechanism they describe better than the question's plain words.
-		ids := []string{}
-		for k, b := range blocks {
-			if k == 3 {
-				break
-			}
-			ids = append(ids, codeNames(b.p.text, 4, map[string]bool{})...)
-		}
-		settings = render.writeMatchingCode(out, repo, terms, prefer, raw, ids)
-		if text := render.processExits(repo, raw); text != "" && runeLen(text) < out.left()-600 {
-			fmt.Fprint(out, text)
-		}
-	}
-	byRepo, order, seenNames, fromQuery := map[string][]string{}, []string{}, map[string]bool{}, map[string]bool{}
-	add := func(r, name string, query bool) {
-		if r == "" || seenNames[name] {
-			return
-		}
-		if _, ok := byRepo[r]; !ok {
-			order = append(order, r)
-		}
-		if len(byRepo[r]) < askCodeNames {
-			seenNames[name] = true
-			fromQuery[name] = fromQuery[name] || query
-			byRepo[r] = append(byRepo[r], name)
-		}
-	}
-	for _, t := range terms {
-		if t.ident && len(t.phrase) == 0 && codeName.MatchString(t.word) {
-			for _, w := range words.FindAllString(n.query, -1) {
-				if fold(w) == t.word {
-					add(repo, w, true)
-				}
+		sort.SliceStable(order, func(a, c int) bool { return len(held[order[a]]) > len(held[order[c]]) })
+		for _, p := range order {
+			dir := strings.Join(strings.SplitN(p, "/", 3)[:2], "/")
+			if len(held[p]) >= need && !seen[dir] {
+				seen[dir] = true
+				lines = append(lines, fmt.Sprintf("- %s (%s)", dir, origin(p)))
 			}
 		}
 	}
-	for _, name := range settings {
-		add(repo, name, true)
-	}
-	for _, b := range blocks {
-		r := citedRepo(b.cites)
-		if r == "" {
-			r = repo
-		}
-		for _, name := range codeNames(b.p.text, askCodeNames, map[string]bool{}) {
-			add(r, name, false)
-		}
-	}
-	for _, r := range order {
-		if !n.minor {
-			render.writeCode(out, r, byRepo[r], fromQuery)
-		}
-	}
-	render.codeLeft = codeBefore - (min(codeBefore, max(room-used, 0)) - render.codeLeft)
-	if len(more) > 0 {
-		sort.Ints(more)
-		ls := []string{}
-		for _, l := range more {
-			ls = append(ls, fmt.Sprint(l))
-		}
-		match := []string{}
-		for _, t := range terms {
-			match = append(match, t.word)
-		}
-		fmt.Fprintf(out, "\nMore matching paragraphs at L%s: `kos read --note \"%s\" --match \"%s\"`.\n", strings.Join(firstN(ls, 12), ","), n.stem, strings.Join(firstN(match, 8), " "))
-	}
-	return nil
-}
-
-// writeTail writes the related notes, the cases, the sources beyond the vault and how to go on.
-func (i *Index) writeTail(ctx context.Context, out io.Writer, top []*askNote, shown map[string]bool, casePaths []string, byPath map[string]*knowledgeNote) {
-	neighbours := []string{}
-	for _, n := range top {
-		nb, err := i.Neighbors(ctx, n.stem)
-		if err != nil {
+	for _, m := range matches {
+		if !m.named {
 			continue
 		}
-		for _, e := range nb.Outgoing {
-			if !shown[e.Target] {
-				shown[e.Target] = true
-				neighbours = append(neighbours, e.Target)
-			}
-		}
-		for _, e := range nb.Incoming {
-			if !shown[e.Source] {
-				shown[e.Source] = true
-				neighbours = append(neighbours, e.Source)
-			}
-		}
-	}
-	stems := map[string]*knowledgeNote{}
-	for _, n := range byPath {
-		stems[n.stem] = n
-	}
-	existing := []string{}
-	for _, s := range neighbours {
-		if stems[s] != nil {
-			existing = append(existing, s) // a link without a note ([[HTTP]]) relates nothing
-		}
-	}
-	neighbours = existing
-	if len(neighbours) > 0 {
-		fmt.Fprintln(out, "\n## Related notes (one hop)")
-		for k, s := range neighbours {
-			if k == askNeighbours {
-				fmt.Fprintf(out, "- … %d more (`kos links --node NAME`)\n", len(neighbours)-askNeighbours)
-				break
-			}
-			if n, ok := stems[s]; ok {
-				fmt.Fprintln(out, "- "+trimRunes(overviewLine(s, n.raw), 190))
-			}
-		}
-	}
-	lines := []string{}
-	seen := map[string]bool{}
-	for _, p := range casePaths {
-		dir := strings.Join(strings.SplitN(p, "/", 3)[:2], "/")
-		if !seen[dir] {
-			seen[dir] = true
-			lines = append(lines, fmt.Sprintf("- %s (%s)", dir, origin(p)))
-		}
-	}
-	for _, n := range top {
-		ptrs, _, _ := i.investigationPointers(ctx, n.stem)
+		ptrs, _, _ := i.investigationPointers(ctx, m.note.stem)
 		for _, p := range ptrs {
 			dir := filepath.ToSlash(filepath.Dir(p.Path))
 			if !seen[dir] {
@@ -709,86 +413,38 @@ func (i *Index) writeTail(ctx context.Context, out io.Writer, top []*askNote, sh
 		lines = append(lines[:askCases], fmt.Sprintf("- … %d more", len(lines)-askCases))
 	}
 	if len(lines) > 0 {
-		fmt.Fprintln(out, "\n## Investigations that mention this (case context; load read-only through manage-investigation)")
-		fmt.Fprintln(out, strings.Join(lines, "\n"))
+		fmt.Fprintln(&b, "\n## Investigations that mention this (case context; load read-only through manage-investigation)")
+		fmt.Fprintln(&b, strings.Join(lines, "\n"))
 	}
-	writeSources(i.Root, out)
-	fmt.Fprintln(out, "\n## Reading this pack\n\n- ✓ the cited lines read the same on the reference branch; ⚠ they changed since the cited commit: read them there before relying on the claim; ? not checkable here. `L57` is the line of a paragraph in its note.\n- The paragraphs are the best matches, not the whole note: the hit map and each note's *Terms in this note* give the other lines; `kos read --note NAME --lines FROM-TO` returns them with their sources.\n- Before delivering an answer that names topics, subscriptions, events or repositories, run `kos discover claims` on the draft.")
+	writeSources(i.Root, &b)
+	fmt.Fprintln(&b, "\n## Reading this map\n\n- It lists every note holding the terms; it does not say which one answers. Read the lines it gives, in the file or with `kos read --note NAME --lines FROM-TO` (which checks each footnote those lines cite), and follow each note whose lines bear on the question: two notes can describe two paths.\n- ✓ the cited lines read the same on the reference branch; ⚠ they changed since the cited commit: read them there before relying on the claim; ? not checkable here. A paragraph that cites nothing is a claim to confirm in the code.\n- Before delivering an answer that names topics, subscriptions, events or repositories, run `kos discover claims --file -` on the draft.")
+	return b.String()
 }
 
-// writeHitMap writes where each word of the question occurs across the knowledge notes: the recall
-// a reader otherwise gets from grep, in a few lines.
-func writeHitMap(out *packWriter, terms []askTerm, notes []*knowledgeNote, inPack map[string]bool) {
-	if len(terms) == 0 {
-		return
+// publicPaths is the set of notes whose passages are public.
+func (i *Index) publicPaths(ctx context.Context) (map[string]bool, error) {
+	rows, err := i.db.QueryContext(ctx, `SELECT DISTINCT path FROM passages WHERE visibility='public'`)
+	if err != nil {
+		return nil, err
 	}
-	var b strings.Builder
-	absent, common := []string{}, []string{}
-	for _, t := range terms {
-		if t.df == 0 {
-			if t.ident || runeLen(t.word) > 4 {
-				absent = append(absent, t.word)
-			}
-			continue
+	defer rows.Close()
+	out := map[string]bool{}
+	for rows.Next() {
+		var p string
+		if err := rows.Scan(&p); err != nil {
+			return nil, err
 		}
-		type hit struct {
-			stem  string
-			lines []int
-		}
-		hits := []hit{}
-		for _, n := range notes {
-			ls := termLines(n.raw, t)
-			if len(ls) > 0 {
-				hits = append(hits, hit{n.stem, ls})
-			}
-		}
-		if len(hits) == 0 {
-			continue
-		}
-		sort.SliceStable(hits, func(a, c int) bool {
-			if inPack[hits[a].stem] != inPack[hits[c].stem] {
-				return inPack[hits[a].stem] // the notes the pack shows first: their lines are the next read
-			}
-			return len(hits[a].lines) > len(hits[c].lines)
-		})
-		// A word in a third of the notes locates nothing; its count is enough.
-		if len(hits) >= 8 && len(hits)*3 > len(notes) {
-			common = append(common, fmt.Sprintf("`%s` (%d notes)", t.display(), len(hits)))
-			continue
-		}
-		parts, size := []string{}, 0
-		for k, h := range hits {
-			if k == askHitNotes || size > askHitLineRunes {
-				parts = append(parts, fmt.Sprintf("+%d notes", len(hits)-k))
-				break
-			}
-			ls := []string{}
-			for x, l := range h.lines {
-				if x == askHitLines {
-					ls = append(ls, "…")
-					break
-				}
-				ls = append(ls, fmt.Sprint(l))
-			}
-			part := fmt.Sprintf("%s ×%d L%s", h.stem, len(h.lines), strings.Join(ls, ","))
-			parts = append(parts, part)
-			size += runeLen(part)
-		}
-		fmt.Fprintf(&b, "- `%s` — %s\n", t.display(), strings.Join(parts, "; "))
+		out[p] = true
 	}
-	text := b.String()
-	if runeLen(text) > askHitRunes {
-		text = trimRunes(text, askHitRunes) + "\n"
+	return out, rows.Err()
+}
+
+func intsToStrings(xs []int) []string {
+	out := make([]string, 0, len(xs))
+	for _, x := range xs {
+		out = append(out, fmt.Sprint(x))
 	}
-	if text != "" {
-		fmt.Fprint(out, "\n## Where the words are (every knowledge note, line numbers)\n\n"+text)
-	}
-	if len(common) > 0 {
-		fmt.Fprintf(out, "Too frequent to locate, used only to rank: %s; each note below lists their lines.\n", strings.Join(common, ", "))
-	}
-	if len(absent) > 0 {
-		fmt.Fprintf(out, "No note contains: %s. What they name is absent from the vault or called differently; try a synonym or the sources beyond the vault.\n", strings.Join(absent, ", "))
-	}
+	return out
 }
 
 // termLines returns the body lines of a note that contain the term, footnote definitions excluded.
@@ -980,7 +636,7 @@ func (i *Index) weigh(ctx context.Context, terms []askTerm) error {
 	return nil
 }
 
-// knowledgeNotes loads every knowledge note once: the pack reads names, aliases, lines and sections
+// knowledgeNotes loads every knowledge note once: the map reads names, aliases, lines and sections
 // from them.
 func (i *Index) knowledgeNotes(ctx context.Context) ([]*knowledgeNote, error) {
 	rows, err := i.db.QueryContext(ctx, `SELECT path FROM files ORDER BY path`)

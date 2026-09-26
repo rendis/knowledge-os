@@ -77,7 +77,7 @@ func (i *Index) Read(ctx context.Context, name string, o ReadOptions, w io.Write
 	fmt.Fprintf(out, "# %s\n", note.path)
 	if o.Lines == "" {
 		// The whole note or a section: its summary and outline. A line range is a follow-up read:
-		// the header was in the pack already.
+		// the header was read already.
 		fmt.Fprintf(out, "\n%s\n", overviewLine(note.stem, note.raw))
 		if sections := noteSections(note.raw); len(sections) > 0 {
 			fmt.Fprintf(out, "Sections: %s\n", strings.Join(sections, " · "))

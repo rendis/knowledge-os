@@ -5,39 +5,24 @@ import (
 	"regexp"
 	"sort"
 	"strings"
-
-	"knowledge-os/internal/discover"
 )
 
 // A note's unit of knowledge is a paragraph: a bullet, a numbered step, a table, a block of prose.
-// The pack selects paragraphs, not index chunks, so each shows whole, with its line, once.
+// `read` shows paragraphs, not index chunks, so each shows whole, with its line, once.
 
 type paragraph struct {
 	line    int // first line, 1-based
 	section string
 	text    string
 	table   bool
-	score   float64
-	similar []int    // lines of near-identical paragraphs folded into this one
-	differ  []string // for each folded paragraph, the words it has that this one lacks
-	via     int      // for a paragraph with none of the terms: the matching paragraph whose code it cites
 }
 
-const paragraphsPerSection = 4
-
 var listItem = regexp.MustCompile(`^(?:[-*+]|\d+[.)])\s`)
-
-// render writes the paragraph with its line, so a claim can be cited and read again.
-// render writes the paragraph whole up to a generous limit; a longer one is cut at a sentence with
-// the command that reads it whole, so a pack never ends a claim mid-sentence without saying so.
-func (p paragraph) render() string { return p.renderWithin(askParagraphRunes) }
 
 // end is the paragraph's last line.
 func (p paragraph) end() int { return p.line + strings.Count(p.text, "\n") }
 
-// renderWithin writes the paragraph cut at limit characters (0: whole), and for each folded alike
-// paragraph its line and what differs in it (L46 [production/acco]), so an environment or country
-// that behaves differently is never hidden by the fold.
+// renderWithin writes the paragraph with its line, cut at limit characters (0: whole).
 func (p paragraph) renderWithin(limit int) string {
 	text := p.text
 	if limit > 0 && runeLen(text) > limit {
@@ -47,26 +32,10 @@ func (p paragraph) renderWithin(limit int) string {
 		}
 		text = cut + fmt.Sprintf(" … (cut: `kos read --note NAME --lines %d-%d` has it whole)", p.line, p.end())
 	}
-	extra := ""
-	if len(p.similar) > 0 {
-		ls := []string{}
-		for k, l := range p.similar {
-			d := ""
-			if k < len(p.differ) && p.differ[k] != "" {
-				d = " [" + p.differ[k] + "]"
-			}
-			ls = append(ls, fmt.Sprintf("L%d%s", l, d))
-		}
-		extra = fmt.Sprintf(" (+%d alike: %s)", len(p.similar), strings.Join(firstN(ls, 14), ", "))
-	}
-	head := fmt.Sprintf("L%d", p.line)
-	if p.via > 0 {
-		head += fmt.Sprintf(" (cites the code of L%d)", p.via)
-	}
 	if p.table {
-		return fmt.Sprintf("%s%s\n%s", head, extra, text)
+		return fmt.Sprintf("L%d\n%s", p.line, text)
 	}
-	return fmt.Sprintf("%s %s%s", head, text, extra)
+	return fmt.Sprintf("L%d %s", p.line, text)
 }
 
 // parseParagraphs splits a note body into paragraphs with their section path.
@@ -161,193 +130,6 @@ func parseParagraphs(raw []byte) []paragraph {
 	}
 	flush()
 	return out
-}
-
-// selectParagraphs returns up to k paragraphs that cover the most weighted terms, at most a few per
-// section, near-identical ones folded together, in note order; and the lines of the other matches.
-// Without terms it returns the note's first k paragraphs.
-func selectParagraphs(raw []byte, terms []askTerm, k int) ([]paragraph, []int) {
-	all := parseParagraphs(raw)
-	if len(terms) == 0 {
-		if len(all) > k {
-			all = all[:k]
-		}
-		return all, nil
-	}
-	// Covering more of the question's terms comes first; a term's rarity only orders equal coverage,
-	// so a word the question asks for is never drowned by being frequent in the vault.
-	top := 0.0
-	for _, t := range terms {
-		top = max(top, t.weight)
-	}
-	// Terms whose stems contain one another (dedupl, duplic) name one thing: counted once.
-	group := make([]int, len(terms))
-	for a := range terms {
-		group[a] = a
-		for b := 0; b < a; b++ {
-			if strings.Contains(terms[a].stem, terms[b].stem) || strings.Contains(terms[b].stem, terms[a].stem) {
-				group[a] = group[b]
-				break
-			}
-		}
-	}
-	cands := []paragraph{}
-	for _, p := range all {
-		f := fold(p.text)
-		best := map[int]float64{}
-		for x, t := range terms {
-			if t.in(f) {
-				// A word a sixth of the vault holds (sale, venta) says little about this paragraph.
-				v := 1 + t.weight/max(top, 1)
-				if t.common {
-					v = 0.3
-				}
-				best[group[x]] = max(best[group[x]], v)
-			}
-		}
-		for _, v := range best {
-			p.score += v
-		}
-		if p.score > 0 {
-			if p.table {
-				p.text = matchingRows(p.text, terms)
-			}
-			cands = append(cands, p)
-		}
-	}
-	sort.SliceStable(cands, func(a, b int) bool { return cands[a].score > cands[b].score })
-	cands = append(cands, sharingSources(raw, all, cands)...)
-	sort.SliceStable(cands, func(a, b int) bool { return cands[a].score > cands[b].score })
-	// A section gives at most its share of k, never less than a few: a note answering in one section
-	// fills k from it, one answering in many spreads.
-	sections := map[string]bool{}
-	for _, c := range cands {
-		sections[c.section] = true
-	}
-	cap := max(paragraphsPerSection, (k+len(sections)-1)/max(len(sections), 1))
-	chosen, more := []paragraph{}, []int{}
-	perSection := map[string]int{}
-	sigs := [][]string{}
-	for _, c := range cands {
-		sig := signature(c.text)
-		folded := false
-		for x := range chosen {
-			if jaccard(sig, sigs[x]) >= 0.6 {
-				chosen[x].similar = append(chosen[x].similar, c.line)
-				chosen[x].differ = append(chosen[x].differ, difference(c.text, chosen[x].text))
-				folded = true
-				break
-			}
-		}
-		if folded {
-			continue
-		}
-		if len(chosen) == k || perSection[c.section] == cap {
-			more = append(more, c.line)
-			continue
-		}
-		perSection[c.section]++
-		chosen = append(chosen, c)
-		sigs = append(sigs, sig)
-	}
-	sort.SliceStable(chosen, func(a, b int) bool { return chosen[a].line < chosen[b].line })
-	for x := range chosen {
-		sort.Ints(chosen[x].similar)
-	}
-	return chosen, more
-}
-
-// sharingSources returns the paragraphs that hold none of the terms but cite a code file several
-// matches cite: the same mechanism told in other words ("consulta antes de notificar" next to
-// "deduplicación"). Configuration and files a quarter of the paragraphs cite relate nothing.
-func sharingSources(raw []byte, all, cands []paragraph) []paragraph {
-	defs := footnoteDefinitions(string(raw))
-	files := func(text string) map[string]bool {
-		out := map[string]bool{}
-		for _, m := range footnoteRef.FindAllStringSubmatch(text, -1) {
-			for _, a := range discover.Anchors(defs[m[1]]) {
-				if discover.CodeFile(a.Path) {
-					out[a.Path] = true
-				}
-			}
-		}
-		return out
-	}
-	citing := map[string]int{}
-	for _, p := range all {
-		for f := range files(p.text) {
-			citing[f]++
-		}
-	}
-	// A code file cited mostly by matching paragraphs (two or more) is where the mechanism lives; a
-	// paragraph citing it tells more of the same mechanism.
-	hub, hubLine := map[string]float64{}, map[string]paragraph{}
-	strong := []paragraph{} // matches through at least one word that is not common in the vault
-	for _, c := range cands {
-		if c.score >= 1 {
-			strong = append(strong, c)
-		}
-	}
-	cands = strong
-	for _, c := range cands {
-		for f := range files(c.text) {
-			if citing[f]*4 <= len(all) {
-				hub[f] += c.score
-				if b, ok := hubLine[f]; !ok || c.score > b.score {
-					hubLine[f] = c
-				}
-			}
-		}
-	}
-	matchedCiting := map[string]int{}
-	for _, c := range cands {
-		for f := range files(c.text) {
-			matchedCiting[f]++
-		}
-	}
-	matched := map[int]bool{}
-	for _, c := range cands {
-		matched[c.line] = true
-	}
-	out := []paragraph{}
-	for _, p := range all {
-		if matched[p.line] {
-			continue
-		}
-		for f := range files(p.text) {
-			// Specific to the matches: at least two of them cite it and they are most of its citers.
-			// Never above the best match it follows: it tells more of that mechanism, it does not lead.
-			if v := min(hub[f]*0.6, hubLine[f].score*0.8); matchedCiting[f] >= 2 && matchedCiting[f]*2 >= citing[f] && v > p.score {
-				p.via, p.score = hubLine[f].line, v
-			}
-		}
-		if p.via > 0 {
-			out = append(out, p)
-		}
-	}
-	return out
-}
-
-// matchingRows keeps a table's header and the rows that hold a term.
-func matchingRows(table string, terms []askTerm) string {
-	rows := strings.Split(table, "\n")
-	if len(rows) <= 4 {
-		return table
-	}
-	out := rows[:2]
-	for _, r := range rows[2:] {
-		f := fold(r)
-		for _, t := range terms {
-			if t.in(f) {
-				out = append(out, r)
-				break
-			}
-		}
-	}
-	if len(out) == 2 {
-		return table
-	}
-	return strings.Join(out, "\n")
 }
 
 // difference lists, in order, the tokens of text that base lacks (at most four): what makes an

@@ -23,14 +23,12 @@ func Run(ctx context.Context, command string, args []string, out io.Writer) erro
 	visibility := fs.String("visibility", "all", "all or public")
 	rebuild := fs.Bool("rebuild", false, "rebuild index")
 	fs.String("folder", "", "overview: limit to one knowledge folder, e.g. 20-Repos")
-	notes := fs.Int("notes", 4, "ask: notes in the pack, 1..8")
-	budget := fs.Int("budget", DefaultBudget, "ask, read: output characters")
-	code := fs.Bool("code", true, "ask, read: include the cited source lines")
+	budget := fs.Int("budget", DefaultBudget, "ask, read, code: output characters")
+	code := fs.Bool("code", true, "read: include the cited source lines")
 	note := fs.String("note", "", "read: note basename, alias or path")
 	section := fs.String("section", "", "read: heading text")
 	lines := fs.String("lines", "", "read: FROM-TO")
 	match := fs.String("match", "", "read: keep the paragraphs holding one of these terms")
-	focus := fs.String("focus", "", "ask: only this note (basename, alias or path)")
 	repo := fs.String("repo", "", "code: repository, its note's basename or alias, or all")
 	grep := fs.String("grep", "", "code: extended regular expression to search at the reference branch")
 	show := fs.String("show", "", "code: path[:FROM-TO] to show at the reference branch")
@@ -40,7 +38,7 @@ func Run(ctx context.Context, command string, args []string, out io.Writer) erro
 	path := fs.String("path", "", "code: glob limiting --grep and --func to some files")
 	up := fs.Int("up", 0, "code: --func follows the callers this many levels up")
 	down := fs.Bool("down", false, "code: --func lists the repository's functions it calls, each with its exits")
-	brief := fs.Bool("brief", false, "ask, read: paragraphs with their source marks only, no code or footnote text")
+	brief := fs.Bool("brief", false, "read: paragraphs with their source marks only, no code or footnote text")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -77,7 +75,7 @@ func Run(ctx context.Context, command string, args []string, out io.Writer) erro
 		return encoder.Encode(idx.Stats)
 	}
 	if command == "ask" {
-		return idx.Ask(ctx, *query, AskOptions{Notes: *notes, Visibility: *visibility, Budget: *budget, Code: *code && !*brief, Focus: *focus, Brief: *brief}, out)
+		return idx.Ask(ctx, *query, AskOptions{Visibility: *visibility, Budget: *budget}, out)
 	}
 	if command == "code" {
 		if !set["budget"] {

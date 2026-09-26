@@ -25,7 +25,6 @@ const (
 var (
 	footnoteRef  = regexp.MustCompile(`\[\^([^\]\s]+)\]`)
 	permalinkMD  = regexp.MustCompile(`\[[^\]]*\]\((https://github\.com/[^/\s]+/([^/\s]+)/blob/([0-9a-f]{7,40})/([^)#\s]+)(#L\d+(?:-L\d+)?)?)\)`)
-	backtickPath = regexp.MustCompile("`(\\.?/?[\\w.\\-]+(?:/[\\w.\\-]+)+\\.[A-Za-z0-9]{1,6})`")
 	codeName     = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 	symbolToken  = regexp.MustCompile(`[A-Za-z_][A-Za-z0-9_.]*(?:\(\))?`)
 	textLines    = regexp.MustCompile(`(?i)(?:\bl[íi]neas?\s+|\bL)(\d+)(?:\s*[-–]\s*L?(\d+))?`)
@@ -49,7 +48,7 @@ func (p *packWriter) Write(b []byte) (int, error) {
 	runes := utf8.RuneCount(b)
 	if p.budget > 0 && p.n+runes > p.budget {
 		keep := []rune(string(b))[:max(0, p.budget-p.n-120)]
-		_, e := p.w.Write([]byte(string(keep) + "\n… [cut at the budget: ask again with --focus NOTE, --brief or a larger --budget]\n"))
+		_, e := p.w.Write([]byte(string(keep) + "\n… [cut at the budget: read a narrower range, use --brief or a larger --budget]\n"))
 		p.n, p.cut = p.budget, true
 		return len(b), e
 	}
@@ -68,7 +67,6 @@ type sourceRenderer struct {
 	codeLeft int  // characters of cited lines the output may still carry
 	perText  int  // footnotes resolved per text; the rest are listed by id
 	brief    bool // one line of source marks instead of the footnotes
-	covered  map[string]bool
 	routed   bool // a URL setting was followed to its route already
 }
 
@@ -236,41 +234,6 @@ func focusTerms(text string) []string {
 		}
 	}
 	return out
-}
-
-// filesLine checks the repository paths a text names in backticks when it cites no footnote for
-// them: whether each exists at the note's analyzed commit and still reads the same on the reference
-// branch. Notes that cite files by path get the same check as notes that cite permalinks.
-func (r *sourceRenderer) filesLine(body, repo, commit string) string {
-	if repo == "" || commit == "" {
-		return ""
-	}
-	marks := []string{}
-	seen := map[string]bool{}
-	for _, m := range backtickPath.FindAllStringSubmatch(body, -1) {
-		p := strings.TrimPrefix(m[1], "./")
-		if seen[p] || len(marks) == 8 {
-			continue
-		}
-		seen[p] = true
-		a := discover.Anchor{Repo: repo, Commit: commit, Path: p}
-		if !r.src.Has(a) {
-			continue // a path of another repository or a route, not a file of this one
-		}
-		st := r.src.State(a)
-		mark := "✓"
-		switch st.Status {
-		case "changed":
-			mark = "⚠ changed on " + st.Ref
-		case "unknown":
-			mark = "?"
-		}
-		marks = append(marks, "`"+p+"` "+mark)
-	}
-	if len(marks) == 0 {
-		return ""
-	}
-	return "Files named: " + strings.Join(marks, " · ")
 }
 
 // symbolNames returns the code names a footnote's text mentions after its link, in order: words
@@ -449,183 +412,7 @@ func commonDir(paths []string) string {
 	return prefix
 }
 
-// writeMatchingCode shows the functions of the repository at its reference branch that hold the
-// most of the question's words: the code that answers "what happens when", not only the note's words.
-// The first one lists its exits, each checked against the note in raw.
-func (r *sourceRenderer) writeMatchingCode(out *packWriter, repo string, terms []askTerm, prefer map[string][][2]int, raw []byte, ids []string) []string {
-	if !r.code {
-		return nil
-	}
-	settings, seen := []string{}, map[string]bool{}
-	words := []string{}
-	for _, t := range terms {
-		// A word in a third of the notes (proces*, sale) finds every handler: it does not choose one.
-		if len(t.phrase) == 0 && runeLen(t.stem) >= 4 && !t.common {
-			words = append(words, t.stem)
-		}
-	}
-	for _, id := range ids {
-		if runeLen(id) >= 6 {
-			words = append(words, id)
-		}
-	}
-	all, ref := r.src.Functions(repo, words, 4, 80, prefer)
-	fns := []discover.Function{}
-	for _, f := range all {
-		// A constructor or an initializer holds the question's words in its fields, not its logic.
-		if n := discover.DefinedName(f.Name); n == "constructor" || n == "__init__" || n == "init" || n == "New" {
-			continue
-		}
-		if len(fns) < 2 {
-			fns = append(fns, f)
-		}
-	}
-	// Twins: the same name holding the same words (a sale and a gift card handler, a confirmed and a
-	// reprocessed service). Neither is picked for the reader: both are shown whole, with their exits.
-	twin := len(fns) > 1 && discover.DefinedName(fns[0].Name) != "" && discover.DefinedName(fns[0].Name) == discover.DefinedName(fns[1].Name) && len(fns[0].Words) == len(fns[1].Words)
-	for k, f := range fns {
-		if k == 1 && twin {
-			fmt.Fprintf(out, "\nTwin of the function above: another %s holding the same words, in %s; which one the question means is read from the paths.\n", discover.DefinedName(f.Name), f.Path)
-		} else if k > 0 {
-			// the second function gets fewer lines: it is context, the first is the answer
-			lines := strings.Split(f.Code, "\n")
-			if len(lines) > 16 {
-				f.Code = strings.Join(append(lines[:16], "    │ …"), "\n")
-			}
-		}
-		if _, cited := prefer[f.Path]; len(f.Words) < 2 && len(words) > 1 && !cited {
-			continue // one common word in an uncited function says nothing about the question
-		}
-		lang := strings.TrimPrefix(filepath.Ext(f.Path), ".")
-		head := fmt.Sprintf("\nCode matching %s in %s at %s — %s#L%d-L%d:\n```%s\n", strings.Join(f.Words, ", "), repo, ref, f.Path, f.From, f.To, lang)
-		code := strings.Split(f.Code, "\n")
-		exits, below := "", ""
-		if (k == 0 || twin) && f.Name != "" {
-			// Where it leaves its main path, and whether the note says so; then what the functions
-			// it calls do with an error, which decides its paths as much as its own lines.
-			exits = exitLines(f, raw, ref, 8)
-			below = belowLine(r.src, repo, f)
-		}
-		tail := ""
-		if len(f.Outside) > 0 {
-			ls := []string{}
-			for _, l := range f.Outside {
-				ls = append(ls, fmt.Sprint(l))
-			}
-			tail += fmt.Sprintf("Also matching in this function: L%s (`git -C <checkout> show %s:%s`).\n", strings.Join(firstN(ls, 12), ","), ref, f.Path)
-		}
-		if len(f.Callers) == 0 && f.Name != "" {
-			tail += "Called from: nowhere by name in this repository's code at " + ref + " (tests left out).\n" + registrations(r.src, repo, f)
-		}
-		if len(f.Callers) > 0 {
-			cs := []string{}
-			for _, c := range f.Callers {
-				in := ""
-				if c.In != "" {
-					in = " in " + c.In
-				}
-				cs = append(cs, fmt.Sprintf("%s:%d%s `%s`", c.Path, c.Line, in, trimRunes(strings.ReplaceAll(c.Text, "`", "'"), 90)))
-			}
-			tail += "Called from: " + strings.Join(cs, " · ") + " (`kos code --repo " + repo + " --func NAME` shows a function with what its callers do with the result)\n"
-			if f.Rivals > 0 {
-				tail += fmt.Sprintf("%s has %d other definitions in this repository: a call through an interface or a variable may reach any of them.\n", discover.DefinedName(f.Name), f.Rivals)
-			}
-		}
-		room := min(r.codeLeft, out.left()-300)
-		text := head + f.Code + "\n```\n" + exits + below + tail
-		if runeLen(text) > room {
-			// Too long for what remains: its first lines rather than nothing, keeping the exits,
-			// which sum up the whole function; the callers go before the code gets too short.
-			// The blocks holding the most of the question's words are kept, not the first lines.
-			cut := fmt.Sprintf("    │ … fewer lines for the budget: `kos code --repo %s --func %s` has it whole\n```\n", repo, discover.DefinedName(f.Name))
-			fit := func(extra string) string {
-				for span := len(code) - 1; span >= 4; span-- {
-					c := f.Within(span)
-					if runeLen(head+c+"\n"+cut+extra) <= room {
-						return c
-					}
-				}
-				return ""
-			}
-			// What goes first when room is short: the callers, then the calls below, then exits
-			// beyond the first four; the function's first line and its exits stay.
-			// The calls below (a swallowed error, a retry that skips work) outrank the exits beyond
-			// the first four: they are what the function's own lines cannot show.
-			c := fit(exits + below + tail)
-			if c == "" || strings.Count(c, "\n") < 10 {
-				tail = ""
-				c = fit(exits + below)
-			}
-			if (c == "" || strings.Count(c, "\n") < 10) && f.Name != "" {
-				exits = exitLines(f, raw, ref, 4)
-				c = fit(exits + below)
-			}
-			if c == "" || strings.Count(c, "\n") < 10 {
-				below = ""
-				c = fit(exits)
-			}
-			if c == "" && exits != "" {
-				c = code[0]
-				if runeLen(head+c+"\n"+cut+exits) > room {
-					exits = exitLines(f, raw, ref, 4)
-				}
-				if runeLen(head+c+"\n"+cut+exits) > room {
-					return settings
-				}
-			} else if c == "" {
-				return settings
-			}
-			text = head + c + "\n" + cut + exits + below + tail
-		}
-		r.codeLeft -= runeLen(text)
-		fmt.Fprint(out, text)
-		// The settings this code reads (MAX_RETRIES): their values per environment come next.
-		for _, w := range settingsIn(f.Code) {
-			if !seen[w] {
-				seen[w] = true
-				settings = append(settings, w)
-			}
-		}
-	}
-	return settings
-}
-
 var settingName = regexp.MustCompile(`\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b`)
-
-// codeNames returns, in order, the code names a text writes in backticks: identifiers with a
-// capital, an underscore or a dot (FindByOrderId, MAX_RETRIES, s.useCase.Handle → Handle).
-func codeNames(text string, limit int, seen map[string]bool) []string {
-	out := []string{}
-	// Constants written in capitals with underscores (BUSINESS_ID_IS_DUPLICATED) name code even
-	// without backticks: where they are produced is often the answer.
-	for _, n := range settingName.FindAllString(text, -1) {
-		if len(n) >= 6 && !seen[n] && len(out) < limit {
-			seen[n] = true
-			out = append(out, n)
-		}
-	}
-	for _, m := range regexp.MustCompile("`([^`\\s]+)`").FindAllStringSubmatch(text, -1) {
-		n := strings.TrimSuffix(m[1], "()")
-		if strings.ContainsAny(n, "/") || strings.Count(n, ".") > 2 {
-			continue // a path or a resource name, not a symbol
-		}
-		if k := strings.LastIndex(n, "."); k >= 0 {
-			n = n[k+1:]
-		}
-		if len(n) < 4 || seen[n] || !codeName.MatchString(n) || strings.IndexFunc(n, func(c rune) bool { return c == '_' || c >= 'A' && c <= 'Z' }) < 0 {
-			continue
-		}
-		if strings.ToUpper(n) == n && !strings.Contains(n, "_") {
-			continue // POST, JSON, PENDING: a word in capitals, not a symbol to look up
-		}
-		seen[n] = true
-		out = append(out, n)
-		if len(out) == limit {
-			break
-		}
-	}
-	return out
-}
 
 // citedRepo is the one repository all the citations point at, or "".
 func citedRepo(cites []citation) string {
@@ -1123,87 +910,8 @@ func init() {
 	}
 }
 
-// processExits lists where the repository ends its own process, each checked against the note:
-// an exit the note does not name is a path its ✓ cannot vouch for. Exits while starting (main, init,
-// loading configuration) only say the process does not start, and are grouped apart.
-func (r *sourceRenderer) processExits(repo string, raw []byte) string {
-	if !r.code {
-		return ""
-	}
-	hits, ref := r.src.ProcessExits(repo)
-	running, starting, count := []discover.Hit{}, []string{}, map[string]int{}
-	for _, h := range hits {
-		if startupFunc.MatchString(h.In) || startupFile.MatchString(h.Path) && h.In == "" {
-			// Grouped by function: loadProperties ×5 (internal/infra/config/property/properties.go:85)
-			key := h.In
-			if key == "" {
-				key = filepath.Base(h.Path)
-			}
-			if count[key] == 0 {
-				starting = append(starting, key+"\x00"+fmt.Sprintf("%s:%d", h.Path, h.Line))
-			}
-			count[key]++
-			continue
-		}
-		running = append(running, h)
-	}
-	for k, v := range starting {
-		key, at, _ := strings.Cut(v, "\x00")
-		starting[k] = fmt.Sprintf("%s (%s)", key, at)
-		if count[key] > 1 {
-			starting[k] = fmt.Sprintf("%s ×%d (%s)", key, count[key], at)
-		}
-	}
-	if len(running) == 0 && len(starting) == 0 {
-		return ""
-	}
-	text := fmt.Sprintf("\nProcess exits in %s at %s (tests left out", repo, ref)
-	if len(running) > 8 {
-		text += fmt.Sprintf("): %d lines end the running process (`kos code --repo %s --grep 'process\\.exit|os\\.Exit|log\\.Fatal|sys\\.exit'`)", len(running), repo)
-	} else if len(running) > 0 {
-		lines := strings.Split(fold(string(raw)), "\n")
-		rows := []string{}
-		for _, h := range running {
-			row := fmt.Sprintf("%s:%d", h.Path, h.Line)
-			if h.In != "" {
-				row += " in " + h.In
-			}
-			row += " `" + trimRunes(strings.ReplaceAll(h.Text, "`", "'"), 70) + "`"
-			call := fold(strings.SplitN(discover.ExitCall(h.Text), "(", 2)[0])
-			at := 0
-			for k, l := range lines {
-				if strings.Contains(l, call) && (h.In == "" || strings.Contains(l, fold(h.In))) {
-					at = k + 1
-					break
-				}
-			}
-			if at > 0 {
-				row += fmt.Sprintf(" — note L%d", at)
-			} else {
-				row += " — ✗"
-			}
-			rows = append(rows, row)
-		}
-		text += "; ✗ = no line of this note names the call with its function): " + strings.Join(rows, " · ")
-	} else {
-		text += ")"
-	}
-	if len(starting) > 0 {
-		sep := ". "
-		if len(running) == 0 {
-			sep = ": "
-		}
-		text += fmt.Sprintf("%sonly while starting: %s", sep, strings.Join(firstN(starting, 4), " · "))
-		if len(starting) > 4 {
-			text += fmt.Sprintf(" +%d", len(starting)-4)
-		}
-	}
-	return text + "\n"
-}
-
 var (
 	startupFunc = regexp.MustCompile(`(?i)^(main|init|setup\w*|bootstrap\w*|start(up)?|run|load\w*|read(config|env|properties)\w*|must\w*|new(config|app|server)\w*|configure\w*)$`)
-	startupFile = regexp.MustCompile(`(^|/)(main\.go|index\.[jt]s|server\.[jt]s|app\.[jt]s|main\.py|__main__\.py)$|(^|/)cmd/`)
 )
 
 // citingParagraph is the first body line of the note that cites, through a footnote, a range of
@@ -1230,53 +938,6 @@ func citingParagraph(rawLines []string, path string, line int) (int, string) {
 		}
 	}
 	return 0, ""
-}
-
-// belowLine names the repository's functions f calls that swallow an error, throw or end the
-// process: `saveData` (oracle.ts:94) catches and continues at L139.
-func belowLine(src *discover.Sources, repo string, f discover.Function) string {
-	// Functions that end the process, so a call two levels down that reaches one shows too.
-	ends := processEnders(src, repo)
-	rows := []string{}
-	for _, c := range src.Callees(repo, f, 12) {
-		if len(c.Defs) > 2 {
-			continue // an interface method or a common name: which one runs is not known here
-		}
-		for _, d := range c.Defs {
-			notable := []string{}
-			for _, e := range d.Exits {
-				switch {
-				case strings.HasPrefix(e.Kind, "catches"), strings.HasPrefix(e.Kind, "continues after"), e.Kind == "exits the process", e.Kind == "throws", e.Kind == "panics":
-					notable = append(notable, fmt.Sprintf("%s at L%d", e.Kind, e.Line))
-				}
-			}
-			for _, h := range d.Hazards() {
-				notable = append(notable, fmt.Sprintf("on redelivery can leave at L%d without %s", h.Early, strings.Join(h.Skipped, ", ")))
-			}
-			for _, via := range src.Callees(repo, d, 12) {
-				for _, vd := range via.Defs {
-					for _, h := range vd.Hazards() {
-						notable = append(notable, fmt.Sprintf("calls %s, which on redelivery can leave at L%d without %s", via.Name, h.Early, strings.Join(h.Skipped, ", ")))
-					}
-					for e := range ends {
-						switch {
-						case via.Name == e:
-							notable = append(notable, fmt.Sprintf("calls %s, which ends the process", e))
-						case strings.Contains(vd.Code, e+"("):
-							notable = append(notable, fmt.Sprintf("reaches a process exit through %s → %s", via.Name, e))
-						}
-					}
-				}
-			}
-			if len(notable) > 0 {
-				rows = append(rows, fmt.Sprintf("`%s` (%s:%d, called at L%d) %s", c.Name, d.Path, d.Start, c.Line, strings.Join(firstN(uniqueStrings(notable), 3), ", ")))
-			}
-		}
-	}
-	if len(rows) == 0 {
-		return ""
-	}
-	return "Below it: " + strings.Join(firstN(rows, 5), " · ") + " (`kos code --repo " + repo + " --func NAME --down` lists every call with its exits)\n"
 }
 
 // spanLines is how many lines an "L12-L40" range covers.
@@ -1363,71 +1024,6 @@ func eventTypes(src *discover.Sources, repo, topic string) string {
 	return strings.Join(firstN(rows, 8), " · ")
 }
 
-func uniqueStrings(xs []string) []string {
-	seen, out := map[string]bool{}, []string{}
-	for _, x := range xs {
-		if !seen[x] {
-			seen[x] = true
-			out = append(out, x)
-		}
-	}
-	return out
-}
-
-// writeConsumed: the subscriptions a repository reads, from the discovery facts, with what the
-// platform snapshots say of each (topic, filter, dead letter, delivery): where its failures go.
-func writeConsumed(out io.Writer, subs []discover.WiringSubscription, terms []askTerm) {
-	if len(subs) == 0 {
-		return
-	}
-	// Many: those the question's words name, the rest counted.
-	if len(subs) > 6 {
-		named := []discover.WiringSubscription{}
-		for _, s := range subs {
-			f := fold(s.Name + " " + s.Topic + " " + s.Filter)
-			for _, t := range terms {
-				if !t.common && t.in(f) {
-					named = append(named, s)
-					break
-				}
-			}
-		}
-		if len(named) > 0 && len(named) < len(subs) {
-			rest := len(subs) - len(named)
-			writeConsumed(out, named, nil)
-			fmt.Fprintf(out, "  (+%d other subscriptions it consumes, not named by the question: `kos ask` with their names)\n", rest)
-			return
-		}
-	}
-	consumedOrder(subs)
-	rows := []string{}
-	for _, s := range subs {
-		row := s.Name
-		if s.Scope != "" {
-			row += " @" + s.Scope
-		}
-		if s.Topic != "" {
-			row += " ← " + s.Topic
-		}
-		if s.Filter != "" {
-			row += " filter " + s.Filter
-		}
-		switch {
-		case s.Scope == "":
-			row += " (in no captured snapshot)"
-		case s.DeadLetter != "":
-			row += " dead letter " + s.DeadLetter
-		default:
-			row += " no dead letter"
-		}
-		if s.Delivery != "" {
-			row += " (" + s.Delivery + ")"
-		}
-		rows = append(rows, trimRunes(row, 260))
-	}
-	fmt.Fprintf(out, "Consumes (discovery facts + platform snapshots): %s\n", strings.Join(firstN(rows, 6), "; "))
-}
-
 // processEnders names the functions of a repository that end the running process.
 func processEnders(src *discover.Sources, repo string) map[string]bool {
 	hits, _ := src.ProcessExits(repo)
@@ -1449,19 +1045,6 @@ func endsThrough(f discover.Function, ends map[string]bool) string {
 		}
 	}
 	return ""
-}
-
-var consumedOrder = func(subs []discover.WiringSubscription) {
-	rank := func(s discover.WiringSubscription) int {
-		switch {
-		case s.Scope == "":
-			return 3
-		case strings.Contains(s.Scope, "prod") || strings.Contains(s.Scope, "prd"):
-			return 0
-		}
-		return 1
-	}
-	sort.SliceStable(subs, func(a, b int) bool { return rank(subs[a]) < rank(subs[b]) })
 }
 
 var declaredConst = regexp.MustCompile(`^\s*(?:(?:export|public|private|static|final|const|var|let|val)\s+)*(?:\w+\s+)?([A-Za-z_]\w*)\s*:?=\s*["']`)

@@ -43,8 +43,8 @@ const help = `kos — the knowledge OS of a team: evidence-first vault operation
 init --vault PATH [answers]   create a cell vault (asks what the flags leave out; init --help)
 adopt --vault PATH [--force]  install the kernel into existing notes
 doctor --vault PATH [--strict] read-only health of a vault
-ask --vault PATH --query TERMS [--notes 1..8] [--focus NOTE] [--brief] [--budget CHARS] [--code=false]
-                           the evidence pack for a question in one call (Markdown)
+ask --vault PATH --query TERMS [--budget CHARS]
+                           every note holding the terms, their lines and source state (Markdown)
 read --vault PATH --note NAME [--section TEXT | --lines FROM-TO] [--match TERMS] [--brief] [--budget CHARS]
                            a note, section or range with its sources checked (Markdown)
 code --vault PATH --repo NAME|all (--grep REGEX [-i] [--tests] | --show PATH[:FROM-TO] | --func NAME [--up N]) [--path GLOB]
