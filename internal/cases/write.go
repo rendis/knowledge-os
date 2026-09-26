@@ -236,13 +236,15 @@ func setFrontmatter(text, key, value string) string {
 	return "---\n" + strings.Join(out, "\n") + text[4+end:]
 }
 
+// sentence closes s with a full stop unless it already ends one; a closing bracket or quote ends a
+// sentence only when the text inside it does ("(E-001)" gets one, "(see E-001.)" does not).
 func sentence(s string) string {
 	s = strings.TrimSpace(s)
 	if s == "" {
 		return s
 	}
-	r, _ := utf8.DecodeLastRuneInString(s)
-	if !strings.ContainsRune(".?!:)", r) {
+	r, _ := utf8.DecodeLastRuneInString(strings.TrimRight(s, ")]\"'”’»"))
+	if !strings.ContainsRune(".?!:", r) {
 		s += "."
 	}
 	return s
