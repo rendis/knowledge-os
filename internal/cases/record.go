@@ -168,9 +168,16 @@ func buildRecord(o options, c Case, text, loc string, files []file) (string, str
 		body += " " + L["repository"] + ": " + p.Repository + "; " + L["branch"] + " `" + p.Branch + "`; " + L["package"] + " `handoffs/" + filepath.Base(p.Path) + "`."
 	}
 	if len(files) > 0 {
-		quoted := []string{}
+		quoted, names := []string{}, map[string]bool{}
 		for i := range files {
 			files[i].rel = "artifacts/" + id + "-" + unsafeName.ReplaceAllString(filepath.Base(files[i].src), "-")
+			if names[files[i].rel] {
+				return "", "", nil, fmt.Errorf("two attached files would both be stored as %s: rename one so each keeps its content", files[i].rel)
+			}
+			names[files[i].rel] = true
+			if _, e := os.Stat(filepath.Join(o.vault, filepath.Dir(c.Path), files[i].rel)); e == nil {
+				return "", "", nil, fmt.Errorf("%s already exists: an attached file is never overwritten", files[i].rel)
+			}
 			quoted = append(quoted, "`"+files[i].rel+"`")
 		}
 		body += " " + L["files"] + ": " + strings.Join(quoted, ", ") + "."

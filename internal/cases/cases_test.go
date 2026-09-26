@@ -197,6 +197,9 @@ func TestCaseChangesGoThroughTheCLI(t *testing.T) {
 	os.WriteFile(log, []byte("retry 1 order=42\napi_key=abcd1234\n"), 0o644)
 	refused("credential", "add", "--kind", "evidence", "--text", "Log", "--source", "solicitante 2026-09-25", "--level", "demonstrated", "--file", log)
 	os.WriteFile(log, []byte("retry 1 order=42\nretry 2 order=42\n"), 0o644)
+	other := filepath.Join(t.TempDir(), "retry.log")
+	os.WriteFile(other, []byte("retry 3 order=43\n"), 0o644)
+	refused("both be stored", "add", "--kind", "evidence", "--text", "Dos logs", "--source", "solicitante 2026-09-25", "--level", "demonstrated", "--file", log, "--file", other)
 	if m := must("add", "--kind", "evidence", "--text", "El reintento reenvía sin clave de idempotencia", "--source", "solicitante 2026-09-25, log de UAT", "--level", "observed", "--limits", "una orden, UAT", "--file", log, "--resolves", "Q-001"); m["record"] != "E-001" {
 		t.Fatalf("evidence %v", m)
 	}
