@@ -115,15 +115,24 @@ func nameMatch(doc, found string) bool {
 	return subset(d, f) || subset(f, d) && len(f) >= 2 && len(d)-len(f) <= 1
 }
 
+// names are the note's stem, raw name and aliases; alternatives in braces (topic-{cl|co|pe}) expand to
+// each variant, so a per-country resource matches the logical name the note documents.
 func (n vaultNote) names(stem string) []string {
 	out := []string{stem}
+	add := func(name string) {
+		for _, v := range expandBraces(name) {
+			if len(strings.Trim(v, "-_. ")) >= 6 { // a variant as short as "svc-" would match any resource
+				out = append(out, v)
+			}
+		}
+	}
 	if raw := strings.Trim(n.fm["nombre-raw"], `"'`); raw != "" {
-		out = append(out, raw)
+		add(raw)
 	}
 	if m := regexp.MustCompile(`\[(.*)\]`).FindStringSubmatch(n.fm["aliases"]); m != nil {
 		for _, a := range strings.Split(m[1], ",") {
 			if a = strings.Trim(strings.TrimSpace(a), `"'`); a != "" {
-				out = append(out, a)
+				add(a)
 			}
 		}
 	}
