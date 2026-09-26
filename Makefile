@@ -18,7 +18,7 @@ VERSION := $(shell cat kernel/VERSION)
 publish: release
 	@test -z "$$(git status --porcelain --untracked-files=no)" || (echo "commit first: a release is built from a clean commit" >&2; exit 1)
 	git tag -f v$(VERSION)
-	GH_TOKEN=$$(gh auth token --user rendis) git push -q origin HEAD v$(VERSION)
+	GH_TOKEN=$$(gh auth token --user rendis) git -c credential.helper= -c 'credential.helper=!gh auth git-credential' push -q origin HEAD:main v$(VERSION)
 	GH_TOKEN=$$(gh auth token --user rendis) gh release create v$(VERSION) --repo rendis/knowledge-os --title v$(VERSION) \
 	  --notes "kos $(VERSION). Install: gh release download --repo rendis/knowledge-os --pattern install-kos.sh --output - | sh" \
 	  dist/kos-* dist/SHA256SUMS dist/install-kos.sh dist/install-kos.ps1 dist/VERSION dist/THIRD_PARTY_NOTICES.txt
