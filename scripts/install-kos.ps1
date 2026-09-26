@@ -1,6 +1,9 @@
 # Install or update kos, the knowledge OS CLI, on Windows.
 #
-#   gh release download --repo rendis/knowledge-os --pattern install-kos.ps1 --output install-kos.ps1; ./install-kos.ps1
+#   irm https://github.com/rendis/knowledge-os/releases/latest/download/install-kos.ps1 | iex
+#
+# The release is downloaded over HTTPS; when that fails (a private fork in KOS_REPO), the GitHub CLI
+# and your login read it instead.
 #
 # Environment: KOS_REPO (default rendis/knowledge-os), KOS_VERSION (default latest),
 # KOS_INSTALL_DIR (default $HOME\.local\bin), KOS_DOWNLOAD_URL (base URL of the assets).
@@ -18,10 +21,17 @@ try {
     Invoke-WebRequest "$base/$asset" -OutFile (Join-Path $work $asset)
     Invoke-WebRequest "$base/SHA256SUMS" -OutFile (Join-Path $work 'SHA256SUMS')
   } else {
-    $tag = @()
-    if ($version -ne 'latest') { $tag = @("v$version") }
-    gh release download @tag --repo $repo --pattern $asset --pattern SHA256SUMS --dir $work
-    if ($LASTEXITCODE -ne 0) { throw "gh could not read $repo: log in with an account that can read it" }
+    $base = if ($version -eq 'latest') { "https://github.com/$repo/releases/latest/download" } else { "https://github.com/$repo/releases/download/v$version" }
+    try {
+      Invoke-WebRequest "$base/$asset" -OutFile (Join-Path $work $asset)
+      Invoke-WebRequest "$base/SHA256SUMS" -OutFile (Join-Path $work 'SHA256SUMS')
+    } catch {
+      if (-not (Get-Command gh -ErrorAction SilentlyContinue)) { throw "download failed: $base/$asset (a private repository needs the GitHub CLI)" }
+      $tag = @()
+      if ($version -ne 'latest') { $tag = @("v$version") }
+      gh release download @tag --repo $repo --pattern $asset --pattern SHA256SUMS --dir $work --clobber
+      if ($LASTEXITCODE -ne 0) { throw "gh could not read $repo: log in with an account that can read it" }
+    }
   }
   $expected = (Get-Content (Join-Path $work 'SHA256SUMS') | Where-Object { ($_ -split '\s+')[1] -eq $asset } | ForEach-Object { ($_ -split '\s+')[0] })
   $actual = (Get-FileHash (Join-Path $work $asset) -Algorithm SHA256).Hash.ToLower()

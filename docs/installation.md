@@ -2,15 +2,15 @@
 
 ## Install kos
 
-`kos` is one executable per machine that serves every vault; vaults carry no binaries. The repository is private, so the release is read with the GitHub CLI and an account that can read it:
+`kos` is one executable per machine that serves every vault; vaults carry no binaries. The installer downloads the latest release and checks its checksum:
 
 ```bash
-gh release download --repo rendis/knowledge-os --pattern install-kos.sh --output - | sh   # macOS, Linux, WSL
+curl -fsSL https://github.com/rendis/knowledge-os/releases/latest/download/install-kos.sh | sh   # macOS, Linux, WSL
 kos version          # this kos, the kernel it carries, the vault's kernel, a newer release if any
 kos update           # replace this kos with the latest release (checksum verified)
 ```
 
-Windows uses `install-kos.ps1` the same way; `sh scripts/install-kos.sh --local` builds from a checkout. When a newer kos exists, every command prints one `kos notice:` line on stderr, and the agent offers the update.
+Windows: `irm https://github.com/rendis/knowledge-os/releases/latest/download/install-kos.ps1 | iex` in PowerShell. `sh scripts/install-kos.sh --local` builds from a checkout, and a private fork set in `KOS_REPO` is read with the GitHub CLI. When a newer kos exists, every command prints one `kos notice:` line on stderr, and the agent offers the update.
 
 ## Create a cell vault
 
