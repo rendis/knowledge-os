@@ -12,25 +12,25 @@ HERE = pathlib.Path(__file__).parent
 # Fixed judge for every graded run, so settings are compared under the same grader. The judge sees only
 # the question, the expected facts and the answer text: never the harness, model or effort that wrote it.
 JUDGE = {"harness": "codex", "model": "gpt-5.5", "effort": "medium"}
-PROMPT = """Eres un evaluador estricto. Compara la RESPUESTA con los HECHOS ESPERADOS y las AFIRMACIONES PROHIBIDAS.
-Pregunta: {question}
-Hechos esperados: lo que la pregunta pide (cada uno vale 1 punto; 0.5 si está parcial o impreciso; 0 si falta o es incorrecto):
+PROMPT = """You are a strict grader. Compare the ANSWER with the EXPECTED FACTS and the FORBIDDEN CLAIMS. The question, facts and answer may be in any language.
+Question: {question}
+Expected facts: what the question asks for (each is worth 1 point; 0.5 when partial or imprecise; 0 when missing or wrong):
 {expected}
-Contexto adicional: útil pero no pedido; NO suma ni resta al puntaje, solo indica cuáles aparecen (1 si aparece correcto, 0 si no):
+Additional context: useful but not asked for; it neither adds to nor subtracts from the score, only record which ones appear (1 if it appears correctly, 0 if not):
 {extra}
-Afirmaciones prohibidas (si la respuesta afirma alguna sin reserva, es una violación):
+Forbidden claims (asserting one without reservation is a violation):
 {must_not}
-RESPUESTA:
+ANSWER:
 <<<
 {answer}
 >>>
-Una respuesta concisa que cubre lo pedido es correcta: no la penalices por omitir el contexto adicional.
-Responde SOLO un objeto JSON: {{"points": [<puntaje por hecho esperado en orden>], "extra_points": [<1 o 0 por cada contexto adicional en orden>], "violations": [<texto de cada violación>], "unsupported_claims": [<afirmaciones técnicas relevantes que no se desprenden de evidencia citada o parecen inventadas>], "verdict": "correct|partial|incorrect"}}"""
+A concise answer that covers what was asked is correct: do not penalize it for leaving out the additional context.
+Reply ONLY with a JSON object: {{"points": [<score per expected fact, in order>], "extra_points": [<1 or 0 per additional context item, in order>], "violations": [<text of each violation>], "unsupported_claims": [<relevant technical claims that do not follow from cited evidence or look invented>], "verdict": "correct|partial|incorrect"}}"""
 
 
 def grade(q, rec):
-    prompt = PROMPT.format(question=q["question"], expected="\n".join(f"- {e}" for e in q["expected"]), extra="\n".join(f"- {e}" for e in q.get("extra", [])) or "- (ninguno)",
-                           must_not="\n".join(f"- {m}" for m in q["must_not"]) or "- (ninguna)", answer=rec.get("answer", "")[:12000])
+    prompt = PROMPT.format(question=q["question"], expected="\n".join(f"- {e}" for e in q["expected"]), extra="\n".join(f"- {e}" for e in q.get("extra", [])) or "- (none)",
+                           must_not="\n".join(f"- {m}" for m in q["must_not"]) or "- (none)", answer=rec.get("answer", "")[:12000])
     text = ""
     for _ in range(3):  # a hung judge session is retried, never allowed to abort the whole grading
         try:

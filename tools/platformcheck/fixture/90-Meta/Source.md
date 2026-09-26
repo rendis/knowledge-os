@@ -2,6 +2,6 @@
 
 ## Reception
 
-quasarinitial recepción: synthetic evidence for local retrieval.
+quasarinitial: synthetic evidence.
 
 [[00-Home]]

@@ -4,7 +4,7 @@ Load this reference before planning or writing a note under `70-Aprendizajes/`.
 
 ## Identity and filename
 
-Name a note `Aprendizaje - <problema o decisión>.md`. The basename describes the stable question and material context, never the investigation ID, work-item reference, implementation branch, person, or date.
+Name a note `Aprendizaje - <problem or decision>.md`. The basename describes the stable question and material context, never the investigation ID, work-item reference, implementation branch, person, or date.
 
 Search existing basenames, `aplica-a`, dimensions, body text, wikilinks, and backlinks before choosing a target. Prefer one cumulative note for equivalent contexts.
 
@@ -15,7 +15,7 @@ Search existing basenames, `aplica-a`, dimensions, body text, wikilinks, and bac
 tipo: aprendizaje
 estado: vigente
 resultado: cambio-adoptado
-aplica-a: ["[[nodo-canónico]]"]
+aplica-a: ["[[canonical-node]]"]
 dimensiones: [rendimiento]
 investigaciones-origen: [20260729-174159-rendimiento-reporteria-tags]
 fecha-conclusion: 2026-07-29

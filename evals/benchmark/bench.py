@@ -19,10 +19,10 @@ import judge  # noqa: E402
 
 REVIEWER = judge.JUDGE  # the flow reviewer is the same fixed grader family and setting as the QA judge
 IDENTITY = {"GIT_AUTHOR_NAME": "benchmark", "GIT_AUTHOR_EMAIL": "benchmark@invalid", "GIT_COMMITTER_NAME": "benchmark", "GIT_COMMITTER_EMAIL": "benchmark@invalid"}
-REVIEW_PROMPT = """Eres un revisor independiente de evidencia; no escribiste este cambio. En este vault (directorio actual) la rama `{branch}` propone cambios sobre `{base}`. Revisa `git diff {base}...{branch}` en modo de solo lectura: no modifiques archivos, no hagas commit, fetch ni push.
-Sigue `.agents/skills/map-ecosystem/references/final-note-review.md`. Contrasta cada afirmación cambiada con las fuentes en el commit que cita (resuelve los checkouts con `{cli} config resolve --vault .` y lee con `git -C <repo> show <sha>:<ruta>`) y con los snapshots de `90-Meta/discovery/platform/`. Las anclas que pasaron G1 existen; juzga su interpretación. Verifica que no se perdió conocimiento válido de la nota base y que lo desconocido queda como límite.
-Resultado de los gates: {gates}
-Responde SOLO un objeto JSON: {{"verdict": "accept|revise", "findings": [{{"file": "...", "claim": "frase exacta", "evidence": "archivo:línea en commit que la contradice", "severity": "material|minor"}}]}}"""
+REVIEW_PROMPT = """You are an independent evidence reviewer; you did not write this change. In this vault (the current directory) the branch `{branch}` proposes changes on `{base}`. Review `git diff {base}...{branch}` read-only: do not modify files, commit, fetch or push.
+Follow `.agents/skills/map-ecosystem/references/final-note-review.md`. Check every changed claim against the sources at the commit it cites (resolve the checkouts with `{cli} config resolve --vault .` and read with `git -C <repo> show <sha>:<path>`) and against the snapshots in `90-Meta/discovery/platform/`. Anchors that passed G1 exist; judge their interpretation. Verify that no valid knowledge of the base note was lost and that what is unknown stays a limit.
+Gate results: {gates}
+Reply ONLY with a JSON object: {{"verdict": "accept|revise", "findings": [{{"file": "...", "claim": "exact sentence", "evidence": "file:line at the commit that contradicts it", "severity": "material|minor"}}]}}"""
 
 
 def sh(args, cwd=None, env=None, check=True):
@@ -129,10 +129,10 @@ def qa(a):
         subprocess.run([sys.executable, "-B", str(HERE.parent / "regression" / "judge.py"), "--questions", str(suite["_dir"] / suite["questions"]), "--answers", str(out)], check=True)
 
 
-REPAIR_PROMPT = """En este vault, la rama `{branch}` recibió una revisión independiente con veredicto revise y estos hallazgos:
+REPAIR_PROMPT = """In this vault, the branch `{branch}` received an independent review with verdict revise and these findings:
 {findings}
-Estado de los gates: {gates}
-Corrige solo las afirmaciones señaladas y los gates que fallan, contra la evidencia y sin reabrir el análisis. Commitea en la misma rama, corre `discover check` en las notas de repositorio tocadas y `sync verify`. No registres review, no ejecutes `sync finish`, no hagas push. Los repositorios fuente son de solo lectura (git fetch permitido, nada más). Termina con los commits y el resultado de los gates."""
+Gate state: {gates}
+Correct only the flagged claims and the failing gates, against the evidence and without reopening the analysis. Commit on the same branch, run `discover check` on the repository notes you touched and `sync verify`. Do not record a review, do not run `sync finish`, do not push. Source repositories are read-only (git fetch allowed, nothing else). End with the commits and the gate results."""
 
 
 def evaluate(dst, base, out_prefix, timeout):

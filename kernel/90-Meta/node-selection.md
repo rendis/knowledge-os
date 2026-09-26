@@ -6,7 +6,7 @@ Load this reference before any authorized vault write and for any read-only ques
 
 ## Authority
 
-From `VAULT_ROOT`, use `90-Meta/Convenciones.md` as the only normative catalog. Read **Estructura**, **Selección del tipo de nodo**, **Ciclo de vida común**, **Nombres de notas**, and the contract for the selected type. Use `AGENTS.md` for guardrails and `90-Meta/Auditoria - Framework.md` for evidence and gates. Do not copy a nearby note when it conflicts with the current contract.
+From `VAULT_ROOT`, use `90-Meta/Convenciones.md` as the only normative catalog. Read **Structure**, **Node selection**, **Lifecycle**, **Names**, and the contract for the selected type. Use `AGENTS.md` for guardrails and `90-Meta/Auditoria - Framework.md` for evidence and gates. Do not copy a nearby note when it conflicts with the current contract.
 
 ## Selection procedure
 

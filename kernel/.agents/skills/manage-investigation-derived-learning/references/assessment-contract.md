@@ -71,15 +71,15 @@ A reproducible method qualifies only when its procedure, inputs, and criteria ar
 Present this card in the user's language:
 
 ```text
-Resultado: <extractable|no-learning|already-covered|insufficient-evidence>
-Acción: <create|enrich|challenge|supersede|none>
-Identidad evaluada: <stable question + applicability context>
-Evidencia revisada: <direct sources and boundary>
-Razón decisiva: <why this outcome/action>
-Nota canónica: <path or none>
-Aplicabilidad: <where it applies and does not apply>
-Faltantes o revalidación: <exact retry/revalidation trigger or none>
-Efectos realizados: <none during assessment>
+Outcome: <extractable|no-learning|already-covered|insufficient-evidence>
+Action: <create|enrich|challenge|supersede|none>
+Assessed identity: <stable question + applicability context>
+Evidence reviewed: <direct sources and boundary>
+Decisive reason: <why this outcome/action>
+Canonical note: <path or none>
+Applicability: <where it applies and does not apply>
+Missing or revalidation: <exact retry/revalidation trigger or none>
+Effects performed: <none during assessment>
 ```
 
 Assessment is complete only when every field is explicit. Do not imply a learning exists merely because the user invoked extraction.

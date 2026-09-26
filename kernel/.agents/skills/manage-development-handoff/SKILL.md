@@ -30,14 +30,16 @@ depends-on: DH-NNN               # optional: tasks this one builds on
 
 # <The task in one line>
 
-## Tarea            (Task)                — what to achieve and why, in a few sentences
-## Cambios          (Changes)             — each change: file, module or contract, and what changes
-## Criterios de aceptación (Acceptance criteria) — observable results and how to verify them
-## Contexto necesario (Required context)  — only the facts this task needs: contracts, events, data, rules, with permalinks
-## Fuera de alcance (Out of scope)
-## Preguntas abiertas (Open questions)     — only those that affect this task
-## Referencias      (References)          — optional: vault remote and case id for read-only lookup
+## Task                — what to achieve and why, in a few sentences
+## Changes             — each change: file, module or contract, and what changes
+## Acceptance criteria — observable results and how to verify them
+## Required context    — only the facts this task needs: contracts, events, data, rules, with permalinks
+## Out of scope
+## Open questions      — only those that affect this task
+## References          — optional: vault remote and case id for read-only lookup
 ```
+
+Write the headings in the case's language; `investigation check` accepts them in English or Spanish (`Tarea`, `Cambios`, `Criterios de aceptación`, `Contexto necesario`, `Fuera de alcance`, `Preguntas abiertas`, `Referencias`).
 
 Keep it atomic: one repository, one task, the smallest context that answers the implementation questions. Split a milestone into tasks that can each be verified alone; a task that needs another's result names it in `depends-on` (a task of the same worktree starts after it; a task in another repository is a prerequisite whose needed result the package states). The implementing agent has no vault: write the fact or cite a permalink instead of a `[[note]]` link. Before preparing, run the [implementation-sufficiency](../manage-investigation/references/implementation-sufficiency.md) questions against the package and fill what is missing from the case. `<CLI> investigation check` gates packages too (required sections, dependencies that exist and form no cycle, no vault links, no credential or local path, atomic size). Record each package with `<CLI> investigation add --id <case> --kind handoff --package handoffs/DH-NNN.md`.
 
