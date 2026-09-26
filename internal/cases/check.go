@@ -38,6 +38,7 @@ var (
 	heading2       = regexp.MustCompile(`(?m)^##\s+(.+?)\s*$`)
 	recordDef      = regexp.MustCompile("^\\s*(?:[-*+]\\s+|\\|\\s*|#{2,4}\\s+)?[*_`]*((?:AC|DH|CH|[EDQRSAF])-\\d{3,})\\b")
 	inlineCode     = regexp.MustCompile("`[^`\\n]+`")
+	formerKind     = regexp.MustCompile(`\b(?:AC|CH|[AS])-\d{3,}\b`)
 	recordRef      = regexp.MustCompile(`\b((?:AC|DH|CH|[EDQRSAF])-\d{3,})\b`)
 	sourceRef      = regexp.MustCompile("\\]\\(|\\[\\[|https?://|`[^`\\s]*[/.][^`\\s]*`|@[0-9a-f]{7,}|\\b[0-9a-f]{7,40}\\b|#L\\d+|\\b(?:A|E|F)-\\d{3,}\\b|\\b[A-Z][A-Z0-9]{1,9}-\\d{2,}\\b|(?i)snapshot|(?i)\\bquery\\b|(?i)\\bconsulta\\b|(?i)\\b(?:solicitante|requester|usuario|user|reuni[oó]n|meeting)\\b[^\\n]*\\d{4}-\\d{2}-\\d{2}")
 	wikilink       = regexp.MustCompile(`\[\[([^\]|#]+)`)
@@ -209,9 +210,15 @@ func checkContent(vault, full, raw string, ix vaultIndex) Result {
 		}
 	}
 	dir := filepath.Dir(full)
-	// Inline code is text, not a reference: attached file names (`artifacts/E-012-A-001-summary.md`)
-	// and identifiers from outside the case (an earlier version's `A-001`).
-	for _, m := range recordRef.FindAllStringSubmatch(inlineCode.ReplaceAllString(body, ""), -1) {
+	// Inline code holding an attached file name (`artifacts/E-012-A-001-summary.md`) or an identifier of a
+	// kind cases no longer define (an earlier version's `A-001`) is text; a current kind is still checked.
+	refs := inlineCode.ReplaceAllStringFunc(body, func(span string) string {
+		if strings.HasPrefix(span, "`artifacts/") {
+			return ""
+		}
+		return formerKind.ReplaceAllString(span, "")
+	})
+	for _, m := range recordRef.FindAllStringSubmatch(refs, -1) {
 		id := m[1]
 		if defs[id] || fileRecord(dir, id) {
 			continue
