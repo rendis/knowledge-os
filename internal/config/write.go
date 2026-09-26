@@ -82,7 +82,7 @@ func Edit(path, expected string, create bool, validate func(Object) error, chang
 	if e = enc.Close(); e != nil {
 		return e
 	}
-	f, e := os.CreateTemp(filepath.Dir(path), ".vaultctl-config-*")
+	f, e := os.CreateTemp(filepath.Dir(path), ".kos-config-*")
 	if e != nil {
 		return e
 	}

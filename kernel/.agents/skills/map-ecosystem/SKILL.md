@@ -3,7 +3,7 @@ name: map-ecosystem
 description: "Trigger: query, document, related-vault catalog, or mapping-completion status. Orient first when bootstrap is incomplete. Inventory and synchronization belong to synchronize-ecosystem."
 license: Apache-2.0
 metadata:
-  author: documentation-vault maintainers
+  author: knowledge-os maintainers
   version: "1.0"
 ---
 

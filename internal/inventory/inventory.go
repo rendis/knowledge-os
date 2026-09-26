@@ -16,8 +16,8 @@ import (
 	"strings"
 	"time"
 
-	"documentation-vault/internal/config"
 	"go.yaml.in/yaml/v3"
+	"knowledge-os/internal/config"
 )
 
 type object = map[string]any

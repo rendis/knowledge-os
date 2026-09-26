@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"strings"
 
-	"documentation-vault/internal/devhandoff"
+	"knowledge-os/internal/devhandoff"
 )
 
 // Reconciliation imports what a handoff worktree produced since the last mark into its development

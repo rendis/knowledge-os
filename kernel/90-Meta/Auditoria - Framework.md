@@ -111,7 +111,7 @@ For deployment/configuration evidence, inspect the exact source files and releva
 
 ## Resolución de identidad GitHub
 
-`vaultctl inventory` no asume que la cuenta global activa de `gh` corresponde al repositorio actual. Resuelve una identidad por ejecución, valida acceso a la organización y usa el mismo token efímero para inventario, ramas y resolución de repos ausentes. Nunca ejecuta `gh auth switch`, persiste usuarios/tokens ni imprime secretos.
+`kos inventory` no asume que la cuenta global activa de `gh` corresponde al repositorio actual. Resuelve una identidad por ejecución, valida acceso a la organización y usa el mismo token efímero para inventario, ramas y resolución de repos ausentes. Nunca ejecuta `gh auth switch`, persiste usuarios/tokens ni imprime secretos.
 
 La precedencia es:
 

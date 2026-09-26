@@ -1,11 +1,11 @@
 package retrieval
 
 import (
-	"documentation-vault/internal/config"
-	"documentation-vault/internal/discover"
 	"encoding/json"
 	"fmt"
 	"io"
+	"knowledge-os/internal/config"
+	"knowledge-os/internal/discover"
 	"os"
 	"path/filepath"
 	"regexp"

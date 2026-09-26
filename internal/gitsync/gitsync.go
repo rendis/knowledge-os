@@ -19,11 +19,11 @@ import (
 	"strings"
 	"time"
 
-	"documentation-vault/internal/audit"
-	"documentation-vault/internal/cases"
-	"documentation-vault/internal/check"
-	"documentation-vault/internal/config"
-	"documentation-vault/internal/discover"
+	"knowledge-os/internal/audit"
+	"knowledge-os/internal/cases"
+	"knowledge-os/internal/check"
+	"knowledge-os/internal/config"
+	"knowledge-os/internal/discover"
 )
 
 const Help = `sync COMMAND --vault PATH [options]

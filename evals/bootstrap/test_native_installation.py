@@ -31,7 +31,7 @@ class NativeInstallationTests(unittest.TestCase):
         for name in ("install.sh", "VERSION", "MANAGED_PATHS", "instance.schema.yaml", "go.mod", "go.sum"):
             shutil.copy2(DIST / name, cls.dist / name)
         # All artifacts are checked by installer preflight, including non-host targets.
-        shutil.copytree(DIST / "dist", cls.dist / "dist", ignore=shutil.ignore_patterns("tests", "vaultctl", "*.test"))
+        shutil.copytree(DIST / "dist", cls.dist / "dist", ignore=shutil.ignore_patterns("tests", "kos", "*.test"))
         native_runtime.release(cls.dist)  # Fail with actionable build error, never skip coverage.
 
     def setUp(self):

@@ -80,7 +80,7 @@ The graph navigates repo → topic → repo when topics are enabled. Never docum
 
 ## Repository note frontmatter
 
-Closed contract. Do not add properties without updating this file, affected Bases, and the native `vaultctl audit` validator.
+Closed contract. Do not add properties without updating this file, affected Bases, and the native `kos audit` validator.
 
 ```yaml
 ---

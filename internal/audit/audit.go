@@ -2,12 +2,12 @@
 package audit
 
 import (
-	"documentation-vault/internal/config"
 	"errors"
 	"flag"
 	"fmt"
 	"go.yaml.in/yaml/v3"
 	"io"
+	"knowledge-os/internal/config"
 	"os"
 	"path/filepath"
 	"regexp"

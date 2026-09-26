@@ -28,7 +28,7 @@ def target() -> str:
 
 
 def filename(selected: str) -> str:
-    return "vaultctl-" + selected.replace("/", "-") + (".exe" if selected.startswith("windows/") else "")
+    return "kos-" + selected.replace("/", "-") + (".exe" if selected.startswith("windows/") else "")
 
 
 def local_paths(selected: str) -> tuple[str, str]:
@@ -144,7 +144,7 @@ def install(dist: Path, dest: Path, current: dict) -> None:
                         shutil.copyfileobj(reader, writer)
                 writer.flush()
                 os.fsync(writer.fileno())
-            os.chmod(name, 0o755 if output.name.startswith("vaultctl-") else 0o644)
+            os.chmod(name, 0o755 if output.name.startswith("kos-") else 0o644)
             os.replace(name, output)
         finally:
             if os.path.exists(name):

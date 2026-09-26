@@ -1,6 +1,6 @@
-"""Regression check of `vaultctl discover` against installed cell vaults (local, never installed in cells).
+"""Regression check of `kos discover` against installed cell vaults (local, never installed in cells).
 
-Usage: python3 -B evals/discovery/run_real.py --vaultctl PATH VAULT [VAULT ...]
+Usage: python3 -B evals/discovery/run_real.py --kos PATH VAULT [VAULT ...]
 
 It runs discovery with stored judgments only (--classify off, no model calls), then prints, per vault,
 the relations that the notes declare and discovery supports, the discrepancies, pending items and
@@ -14,12 +14,12 @@ import sys
 
 def main() -> int:
     p = argparse.ArgumentParser()
-    p.add_argument("--vaultctl", required=True)
+    p.add_argument("--kos", required=True)
     p.add_argument("vaults", nargs="+")
     a = p.parse_args()
     totals = {"supported_relations": 0, "discrepancies": 0, "resources_without_topic_note": 0}
     for v in a.vaults:
-        out = subprocess.run([a.vaultctl, "discover", "run", "--vault", v, "--classify", "off"], capture_output=True, text=True)
+        out = subprocess.run([a.kos, "discover", "run", "--vault", v, "--classify", "off"], capture_output=True, text=True)
         if out.returncode != 0:
             print(f"{v}: discover failed: {out.stderr.strip()}", file=sys.stderr)
             return 1

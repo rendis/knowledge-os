@@ -1,7 +1,7 @@
 .PHONY: build test test-race release test-installer test-platform
 
 build:
-	CGO_ENABLED=0 go build -trimpath -o dist/vaultctl ./cmd/vaultctl
+	CGO_ENABLED=0 go build -trimpath -o dist/kos ./cmd/kos
 
 test:
 	go vet ./...

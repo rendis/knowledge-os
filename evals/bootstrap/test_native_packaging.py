@@ -105,7 +105,7 @@ class NativePackagingTests(unittest.TestCase):
         current = runtime.release(self.dist)
         self.assertEqual(runtime.conflicts(self.dest, current, current), [])
         runtime.install(self.dist, self.dest, current)
-        other = self.dest / ".agents/bin/vaultctl-windows-amd64.exe"
+        other = self.dest / ".agents/bin/kos-windows-amd64.exe"
         other.write_bytes(b"corrupt non-host artifact")
         self.assertIn(other.relative_to(self.dest).as_posix(), runtime.conflicts(self.dest, current, current))
         self.assertEqual(runtime.status(self.dest, current, current)["status"], "drift")
@@ -132,7 +132,7 @@ class NativePackagingTests(unittest.TestCase):
         self.dest.mkdir()
         with mock.patch.object(installer, "DIST", self.dist):
             installer.ensure_gitignore_lines(self.dest)
-        self.assertIn("!/.agents/bin/vaultctl-windows-amd64.exe", (self.dest / ".gitignore").read_text())
+        self.assertIn("!/.agents/bin/kos-windows-amd64.exe", (self.dest / ".gitignore").read_text())
         self.manifest["version"] = "0.0.0"
         self.write_manifest()
         with self.assertRaisesRegex(RuntimeError, "version differs"):

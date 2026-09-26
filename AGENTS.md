@@ -1,4 +1,4 @@
-# documentation-vault — distribution
+# knowledge-os — distribution
 
 This checkout is the **installable template**, not a cell knowledge vault. Do not map systems, write `10/`–`70/` notes, or treat `kernel/AGENTS.md` as this repo's router.
 
@@ -12,7 +12,7 @@ Consumer vaults are created with `./install.sh init --dest <vault>`. Work here i
 
 ## Layers
 
-- **CLI** — `cmd/vaultctl`, `internal/`, `tools/`. The native `vaultctl` every cell runs; cells receive no Python.
+- **CLI** — `cmd/kos`, `internal/`, `tools/`. The native `kos` every cell runs; cells receive no Python.
 - **Installer** — `install.sh`, `scripts/`. Init / update / doctor / adopt. Update copies managed kernel paths and selected adapters, removes the files the lock recorded that the distribution no longer ships, and never overwrites a cell's `instance.yaml`, `00-Home.md`, or notes under `10/`–`70/`.
 - **Kernel payload** — `kernel/`. Copied into every cell. `kernel/AGENTS.md` is the **cell** router (evidence contract, navigation, skills). Keep it thin; keep product names out.
 - **Adapters** — `adapters/`. Opt-in at init, or later by listing them in the cell's `instance.yaml` and running `update`. Ship engines and generic samples, not another team's recipes.

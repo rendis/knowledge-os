@@ -8,7 +8,7 @@ import (
 	"io"
 	"time"
 
-	"documentation-vault/internal/config"
+	"knowledge-os/internal/config"
 )
 
 func Run(ctx context.Context, command string, args []string, out io.Writer) error {

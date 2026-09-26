@@ -11,7 +11,7 @@ import (
 	"sort"
 	"strings"
 
-	"documentation-vault/internal/config"
+	"knowledge-os/internal/config"
 )
 
 // A cell run discovers every repository, then assembles cross-repository facts:
@@ -959,10 +959,10 @@ func (a *assembly) pendingFor(f repoFacts) []pending {
 		case scope != "" && ok:
 			out = append(out, pending{Kind: "platform-access", Subject: r.Name, Detail: fmt.Sprintf("scope %s could not be read (%s)", scope, snap.Status), Confirm: snap.Confirm})
 		default:
-			detail, confirm := "not found in any captured platform scope", "vaultctl discover platform --vault <VAULT> --provider <PROVIDER> --scope <SCOPE>"
+			detail, confirm := "not found in any captured platform scope", "kos discover platform --vault <VAULT> --provider <PROVIDER> --scope <SCOPE>"
 			if scope != "" {
 				provider, id, _ := strings.Cut(scope, ":")
-				detail, confirm = "scope "+scope+" has not been captured", "vaultctl discover platform --vault <VAULT> --provider "+provider+" --scope "+id
+				detail, confirm = "scope "+scope+" has not been captured", "kos discover platform --vault <VAULT> --provider "+provider+" --scope "+id
 			}
 			out = append(out, pending{Kind: "platform-unverified", Subject: r.Name, Detail: detail, Confirm: confirm})
 		}
@@ -970,7 +970,7 @@ func (a *assembly) pendingFor(f repoFacts) []pending {
 	out = append(out, a.unmanaged(f)...)
 	for _, d := range f.Dependencies {
 		if d.Category == "unclassified" {
-			out = append(out, pending{Kind: "classification", Subject: d.ID, Detail: "dependency category not yet judged", Confirm: "vaultctl discover questions --vault <VAULT>"})
+			out = append(out, pending{Kind: "classification", Subject: d.ID, Detail: "dependency category not yet judged", Confirm: "kos discover questions --vault <VAULT>"})
 		}
 	}
 	return out
@@ -1039,7 +1039,7 @@ func (a *assembly) unmanaged(f repoFacts) []pending {
 		}
 		out = append(out, pending{Kind: "platform-unmanaged", Subject: c,
 			Detail:  fmt.Sprintf("no configured platform provider reads %s (%s): inspect it read-only with the tools in reach and record what you observe", c, strings.Join(deps, ", ")),
-			Confirm: "vaultctl discover platform --vault <VAULT> --record <FILE>"})
+			Confirm: "kos discover platform --vault <VAULT> --record <FILE>"})
 	}
 	return out
 }

@@ -17,7 +17,7 @@ import (
 	"strings"
 	"time"
 
-	"documentation-vault/internal/config"
+	"knowledge-os/internal/config"
 )
 
 const Help = `investigation COMMAND --vault PATH [options]

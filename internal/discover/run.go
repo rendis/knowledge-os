@@ -15,7 +15,7 @@ import (
 	"strings"
 	"time"
 
-	"documentation-vault/internal/config"
+	"knowledge-os/internal/config"
 )
 
 const Help = `discover COMMAND --vault PATH [options]
@@ -153,7 +153,7 @@ func writeState(vault, name string, v any) error {
 func readState(vault, name string, v any) error {
 	b, e := os.ReadFile(filepath.Join(vault, stateRel, name))
 	if os.IsNotExist(e) {
-		return fmt.Errorf("no discovery run found; run `vaultctl discover run --vault %s` first", vault)
+		return fmt.Errorf("no discovery run found; run `kos discover run --vault %s` first", vault)
 	}
 	if e != nil {
 		return e
@@ -381,7 +381,7 @@ func listQuestions(o options, out io.Writer) error {
 	if o.limit > 0 && len(open) > o.limit {
 		open = open[:o.limit]
 	}
-	return emit(out, map[string]any{"pending": total, "returned": len(open), "answer_with": "vaultctl discover answer --vault <VAULT> --file answers.json", "answer_format": `[{"id":"<question id>","choice":"<one option>","confidence":0.0-1.0}]`, "questions": open, "acceleration": accelerationStatus()})
+	return emit(out, map[string]any{"pending": total, "returned": len(open), "answer_with": "kos discover answer --vault <VAULT> --file answers.json", "answer_format": `[{"id":"<question id>","choice":"<one option>","confidence":0.0-1.0}]`, "questions": open, "acceleration": accelerationStatus()})
 }
 
 func answerQuestions(o options, out io.Writer) error {
@@ -411,7 +411,7 @@ func answerQuestions(o options, out io.Writer) error {
 	if e := st.save(o.vault); e != nil {
 		return e
 	}
-	return emit(out, map[string]any{"recorded": n, "remaining": len(pending) - n, "next": "vaultctl discover run --vault <VAULT> --classify off"})
+	return emit(out, map[string]any{"recorded": n, "remaining": len(pending) - n, "next": "kos discover run --vault <VAULT> --classify off"})
 }
 
 // configuredProviders reads platform.providers from the cell's instance.yaml.
@@ -499,7 +499,7 @@ func capturePlatform(o options, out io.Writer) error {
 			}
 		}
 	}
-	return emit(out, map[string]any{"captured": result, "stored_in": platformRel, "next": "vaultctl discover run --vault <VAULT>"})
+	return emit(out, map[string]any{"captured": result, "stored_in": platformRel, "next": "kos discover run --vault <VAULT>"})
 }
 
 func showReport(o options, out io.Writer) error {
