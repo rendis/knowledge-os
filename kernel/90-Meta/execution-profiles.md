@@ -11,7 +11,7 @@ These are starting recommendations, not measured model equivalences or proof of 
 3. Run deterministic checks as tools. Do not start another model for a command whose contract already decides the result.
 4. Keep operational status, eligibility, enablement, and failure-cause classification with the coordinating agent (or a same-class reviewer). Do not send those decisions to a weaker executor.
 
-Small or tightly coupled work stays inline. Personal executor preferences in the optional root `AGENTS.personal.md` override these defaults and the examples below; they select strategy only. Permissions, evidence gates, source authority, and workflow ownership still apply. A preference can prohibit delegation or require a specific executor.
+Small or tightly coupled work stays inline. Personal executor preferences in the optional root `AGENTS.personal.md` override these defaults and the measured baseline below; they select strategy only. Permissions, evidence gates, source authority, and workflow ownership still apply. A preference can prohibit delegation or require a specific executor.
 
 ## Availability
 
@@ -34,19 +34,6 @@ When several families are usable, follow the user's family order. Without one, p
 | Deterministic checks | Direct tool execution |
 
 Use measured cost when available; otherwise label the choice a starting recommendation, not demonstrated savings.
-
-## Examples (dated)
-
-Open translation table, not an allowlist. Updated 2026-09-16 independently of workflow and output contracts. `AGENTS.personal.md` and current user direction override it. Select other exposed models when documented capabilities or task-relevant observations support the role; version numbers and similar names do not establish equivalence. Columns are alternatives within the available environment, not instructions to switch providers. Composer effort is unspecified; other effort settings apply only where exposed. Luna/high has user-reported visual pilot evidence, not a general quality guarantee.
-
-| Shape | OpenAI | Claude | Grok / Composer |
-| --- | --- | --- | --- |
-| Extract, list, or format | gpt-5.6-luna / medium | Sonnet 5 / medium | Composer 2.5 |
-| Specified execution and visual generation | gpt-5.6-luna / high | Sonnet 5 / medium | Composer 2.5 |
-| Bounded analysis and semantic extraction | gpt-5.6-sol / low | Opus 5 / low | Grok 4.6 / high |
-| Planning and semantic review | gpt-5.6-sol / medium | Opus 5 / medium | Grok 4.6 / high |
-| Ambiguous diagnosis and complex decisions | gpt-5.6-sol / high | Opus 5 / high | Grok 4.6 / high, non-preferred fallback when available options require it |
-| Deterministic checks | Direct tool execution | Direct tool execution | Direct tool execution |
 
 ## Measured baseline (2026-09-25)
 
