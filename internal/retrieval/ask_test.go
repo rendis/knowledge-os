@@ -17,59 +17,10 @@ func askPack(t *testing.T, opt Options, query string) string {
 	}
 	defer idx.Close()
 	var b bytes.Buffer
-	if e := idx.Ask(ctx, query, AskOptions{Notes: 4, Visibility: "all", Budget: DefaultBudget, Code: true}, &b); e != nil {
+	if e := idx.Ask(ctx, query, AskOptions{Visibility: "all", Budget: DefaultBudget}, &b); e != nil {
 		t.Fatal(e)
 	}
 	return b.String()
-}
-
-func TestAskPacksNamedNoteNeighboursAndSources(t *testing.T) {
-	opt, write := fixture(t)
-	write("20-Repos/orders.md", "---\naliases: [\"APP1-orders\"]\ntipo: api\npublica-en: [\"[[orders-out]]\"]\n---\n# orders\n\n## Propósito\n\n- Publica órdenes confirmadas hacia [[orders-out]] con reintentos.\n\n## Qué hace\n\n- Deduplicación por business ID antes de publicar. [^e1]\n\n- Registra métricas de latencia sin relación con la pregunta.\n\n[^e1]: [src/dedup.go](https://github.com/acme/APP1-orders/blob/0123456789abcdef0123/src/dedup.go#L10-L20) — `Seen`\n")
-	write("25-Topics/orders-out.md", "---\ntipo: topic\n---\n# orders-out\n\nTopic donde se publican órdenes confirmadas.\n")
-	write("20-Repos/billing.md", "---\ntipo: api\n---\n# billing\n\nFactura órdenes; deduplicación propia por folio.\n")
-	write("90-Meta/Convenciones.md", "# Convenciones\n\nDeduplicación de notas.\n")
-	write("investigations/20260101-x/investigation.md", "# Caso orders\n\nEl caso revisa orders y su deduplicación.\n")
-	out := askPack(t, opt, "¿Cómo deduplica orders antes de publicar?")
-	for _, want := range []string{
-		"## 20-Repos/orders.md",
-		"Deduplicación por business ID antes de publicar.",
-		"APP1-orders@0123456789ab:src/dedup.go#L10-L20",
-		"## 25-Topics/orders-out.md",
-		"investigations/20260101-x",
-	} {
-		if !strings.Contains(out, want) {
-			t.Fatalf("missing %q in\n%s", want, out)
-		}
-	}
-	if strings.Contains(out, "métricas de latencia") {
-		t.Fatalf("a paragraph without a word of the question is noise:\n%s", out)
-	}
-	if strings.Contains(out, "## 90-Meta/") {
-		t.Fatalf("vault guidance is not knowledge:\n%s", out)
-	}
-	// The named note comes first; its neighbour before a note that only shares words.
-	if a, b, c := strings.Index(out, "## 20-Repos/orders.md"), strings.Index(out, "## 25-Topics/orders-out.md"), strings.Index(out, "## 20-Repos/billing.md"); !(a < b && (c < 0 || b < c)) {
-		t.Fatalf("order named, neighbour, lexical broken:\n%s", out)
-	}
-}
-
-func TestAskMatchesAliasesAndInflections(t *testing.T) {
-	opt, write := fixture(t)
-	write("20-Repos/orders.md", "---\naliases: [\"APP1-orders\"]\n---\n# orders\n\nPublica órdenes.\n")
-	write("30-Flujos/Flujo - Cierre.md", "# Flujo - Cierre\n\nLa deduplicación ocurre al cierre.\n")
-	out := askPack(t, opt, "qué hace APP1-orders")
-	if !strings.Contains(out, "## 20-Repos/orders.md") {
-		t.Fatalf("alias not matched:\n%s", out)
-	}
-	out = askPack(t, opt, "cuándo deduplica el cierre")
-	if !strings.Contains(out, "La deduplicación ocurre al cierre.") {
-		t.Fatalf("inflection not matched:\n%s", out)
-	}
-	out = askPack(t, opt, "zanahoria morada")
-	if !strings.Contains(out, "No note contains: zanahoria, morada") {
-		t.Fatalf("unmatched terms not reported:\n%s", out)
-	}
 }
 
 func TestContainsNameNeedsWholeName(t *testing.T) {
@@ -113,43 +64,6 @@ func TestAskTermsKeepIdentifiersAndPhrases(t *testing.T) {
 	}
 	if _, ok := got["el"]; ok {
 		t.Error("short words are not terms")
-	}
-}
-
-func TestAskHitMapAndBudget(t *testing.T) {
-	opt, write := fixture(t)
-	long := ""
-	for k := range 60 {
-		long += fmt.Sprintf("- Paso %d: el cierre %s deduplica ventas %s y publica acuses %s. [^e1]\n\n", k, strings.Repeat("x", k%7+3), strings.Repeat("y", k%5+3), strings.Repeat("z", k%11+3))
-	}
-	long += "[^e1]: [a.go](https://github.com/acme/APP1-x/blob/0123456789abcdef0123/a.go#L1)\n"
-	for _, n := range []string{"alpha", "beta", "gamma", "delta", "epsilon"} {
-		write("20-Repos/"+n+".md", "---\ntipo: api\n---\n# "+n+"\n\n## Propósito\n\n"+long)
-	}
-	write("30-Flujos/cierre.md", "# cierre\n\nIntro.\n\nEl cierre deduplica.\n")
-	ctx := context.Background()
-	idx, e := Open(ctx, opt)
-	if e != nil {
-		t.Fatal(e)
-	}
-	defer idx.Close()
-	for _, budget := range []int{6000, 12000} {
-		var b bytes.Buffer
-		if e := idx.Ask(ctx, "cómo deduplica el cierre las ventas", AskOptions{Notes: 8, Visibility: "all", Budget: budget, Code: true}, &b); e != nil {
-			t.Fatal(e)
-		}
-		out := b.String()
-		if n := len([]rune(out)); n > budget {
-			t.Fatalf("pack of %d characters exceeds its budget %d", n, budget)
-		}
-		for _, want := range []string{"## Where the words are", "cierre ×1 L5", "`dedupl*`", "## Reading this pack"} {
-			if !strings.Contains(out, want) {
-				t.Fatalf("budget %d: missing %q in\n%s", budget, want, out)
-			}
-		}
-		if !strings.Contains(out, "Also matching, not shown for the budget") && !strings.Contains(out, "More matching paragraphs at L") {
-			t.Fatalf("budget %d: what did not fit must be named:\n%s", budget, out)
-		}
 	}
 }
 
@@ -202,21 +116,14 @@ func TestParagraphsAreWholeLinedAndFolded(t *testing.T) {
 			t.Fatalf("markers and footnote definitions are not paragraphs: %+v", p)
 		}
 	}
-	terms := askTerms("duplicados deduplica")
-	for k := range terms {
-		terms[k].weight = 1
+	folded := ""
+	for k, p := range ps {
+		if k > 0 && jaccard(signature(p.text), signature(ps[k-1].text)) >= 0.6 {
+			folded += fmt.Sprintf("L%d [%s] ", p.line, difference(p.text, ps[k-1].text))
+		}
 	}
-	got, _ := selectParagraphs(raw, terms, 10)
-	lines := []string{}
-	for _, p := range got {
-		lines = append(lines, p.render())
-	}
-	out := strings.Join(lines, "\n")
-	if !strings.Contains(out, "L10 - En development/accl se configura Firestore en acme-dev, base acme y registro de duplicados orders-transaction. (+2 alike: L11 [development/acco], L12 [development/acpe])") {
-		t.Fatalf("alike paragraphs fold:\n%s", out)
-	}
-	if !strings.Contains(out, "| dos | duplicados |") || strings.Contains(out, "| tres | nada |") {
-		t.Fatalf("a long table keeps its header and matching rows:\n%s", out)
+	if !strings.Contains(folded, "L11 [development/acco]") || !strings.Contains(folded, "L12 [development/acpe]") {
+		t.Fatalf("alike paragraphs are found with what differs: %q", folded)
 	}
 }
 
@@ -262,17 +169,65 @@ func TestStemsStartWords(t *testing.T) {
 	}
 }
 
-func TestAskNamingARepositoryKeepsOthersToOneLine(t *testing.T) {
+func TestAskMapsEveryMatchingNote(t *testing.T) {
 	opt, write := fixture(t)
-	write("20-Repos/orders.md", "---\ntipo: api\nconsume-de: [\"[[Acme]]\"]\n---\n# orders\n\n## Qué hace\n\n- Reintenta el envío a Acme tres veces.\n")
-	write("40-Integraciones/Acme.md", "---\ntipo: integracion\n---\n# Acme\n\nProveedor externo; reintenta según contrato.\n")
-	write("20-Repos/billing.md", "---\ntipo: api\nconsume-de: [\"[[Acme]]\"]\n---\n# billing\n\n## Qué hace\n\n- Reintenta facturas hacia Acme.\n")
-	out := askPack(t, opt, "orders Acme reintenta")
-	if !strings.Contains(out, "## 20-Repos/orders.md") || !strings.Contains(out, "## 40-Integraciones/Acme.md") {
-		t.Fatalf("the named notes are shown:\n%s", out)
+	write("20-Repos/orders.md", "---\naliases: [\"APP1-orders\"]\ntipo: api\n---\n# orders\n\n## Qué hace\n\n- Deduplicación por business ID antes de publicar. [^e1]\n\n- Publica el cierre con deduplicación previa.\n\n- Registra métricas de latencia.\n\n[^e1]: [src/dedup.go](https://github.com/acme/APP1-orders/blob/0123456789abcdef0123/src/dedup.go#L10-L20) — `Seen`\n")
+	write("20-Repos/listener.md", "---\ntipo: api\n---\n# listener\n\nIntro.\n\nTambién publica el cierre por otra ruta.\n")
+	write("20-Repos/billing.md", "---\ntipo: api\n---\n# billing\n\nFactura; deduplicación propia por folio al cierre.\n")
+	write("90-Meta/Convenciones.md", "# Convenciones\n\nDeduplicación de notas al cierre.\n")
+	write("investigations/20260101-x/investigation.md", "# Caso\n\nEl caso revisa la deduplicación del cierre.\n")
+	out := askPack(t, opt, "¿Cómo deduplica APP1-orders el cierre?")
+	for _, want := range []string{
+		"# Vault map",
+		"## Notes holding the question's terms (3, all of them; most terms first)",
+		"- `20-Repos/orders.md` (named)",
+		"`dedupl*` L9,11",
+		"Paragraphs with these terms: ",
+		"1 cite nothing",
+		"- `20-Repos/listener.md`",
+		"`cierr*` L8",
+		"Sources: the note cites no footnotes",
+		"investigations/20260101-x",
+		"## Reading this map",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("missing %q in\n%s", want, out)
+		}
 	}
-	// billing consumes Acme too, but the question names orders: billing only shares words.
-	if strings.Contains(out, "## 20-Repos/billing.md") || !strings.Contains(out, "Also sharing the question's words, not linked to the repository it names: 20-Repos/billing.md (") {
-		t.Fatalf("an unlinked repository takes one line:\n%s", out)
+	if strings.Contains(out, "90-Meta/") || strings.Contains(out, "métricas de latencia") {
+		t.Fatalf("vault guidance is not knowledge, and the map copies no paragraph:\n%s", out)
+	}
+	// Named first, then the note holding more terms before the one holding one.
+	if a, b, c := strings.Index(out, "`20-Repos/orders.md`"), strings.Index(out, "`20-Repos/billing.md`"), strings.Index(out, "`20-Repos/listener.md`"); !(a < b && b < c) {
+		t.Fatalf("order named, more terms, fewer terms broken:\n%s", out)
+	}
+	if out = askPack(t, opt, "zanahoria morada"); !strings.Contains(out, "No note contains: zanahoria, morada") {
+		t.Fatalf("unmatched terms not reported:\n%s", out)
+	}
+}
+
+func TestAskMapStaysWithinItsBudget(t *testing.T) {
+	opt, write := fixture(t)
+	for k := range 60 {
+		write(fmt.Sprintf("20-Repos/n%02d.md", k), fmt.Sprintf("---\ntipo: api\n---\n# n%02d\n\nEl cierre deduplica ventas %s.\n", k, strings.Repeat("x", k)))
+	}
+	ctx := context.Background()
+	idx, e := Open(ctx, opt)
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer idx.Close()
+	var b bytes.Buffer
+	if e := idx.Ask(ctx, "cómo deduplica el cierre las ventas", AskOptions{Visibility: "all", Budget: 6000}, &b); e != nil {
+		t.Fatal(e)
+	}
+	out := b.String()
+	if n := len([]rune(out)); n > 6000 {
+		t.Fatalf("map of %d characters exceeds its budget", n)
+	}
+	for _, want := range []string{"(60, all of them", "more, fewer terms each: 20-Repos/", "## Reading this map"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("missing %q in\n%s", want, out)
+		}
 	}
 }

@@ -13,7 +13,7 @@ When the question requires another domain vault discovered through authorized re
 For a bounded question about an already identified source, read it directly when no relationship discovery is needed. Preserve vault/repository identity, private-case loading and access checks. Use the graph steps below when locating context or relationships; a direct read does not prove graph completeness.
 
 1. If orientation may be incomplete, run `<cli> config status --vault "<VAULT_ROOT>"` and inspect `orientation`. If `ready` is false, load [orientation.md](orientation.md) and stop. Do not read Home, Convenciones, or Framework as a prelude to classifying a dependency question.
-2. First hop — `<cli> ask --vault "<VAULT_ROOT>" --query "<question>"` returns the named and matching notes with their passages, sources, one hop of relations and the cases that mention them. Use the portable graph queries below (Obsidian app not required) only for what the pack does not reach:
+2. First hop — `<cli> ask --vault "<VAULT_ROOT>" --query "<question>"` lists every note holding the question's terms with their lines and the state of their sources, a named topic's wiring and the cases that mention them; read those lines in each note that bears on the question. Use the portable graph queries below (Obsidian app not required) for relations beyond them:
 
 ```text
 <cli> links --vault "<VAULT_ROOT>" --node "<stem>"

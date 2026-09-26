@@ -44,6 +44,7 @@ type Sources struct {
 	repos   map[string]*sourceRepo
 	changed map[string]map[string]bool // repo path + commit → files changed up to the reference head
 	hunks   map[string][][2]int
+	commits map[string]string // repo path + cited commit → full commit ("" when absent)
 	files   *gitCache
 }
 
@@ -53,7 +54,7 @@ type sourceRepo struct {
 
 // NewSources binds a reader to the vault's workspace.
 func NewSources(vault string) *Sources {
-	return &Sources{vault: vault, repos: map[string]*sourceRepo{}, changed: map[string]map[string]bool{}, hunks: map[string][][2]int{}, files: &gitCache{commits: map[string]bool{}, files: map[string]*string{}}}
+	return &Sources{vault: vault, repos: map[string]*sourceRepo{}, changed: map[string]map[string]bool{}, hunks: map[string][][2]int{}, commits: map[string]string{}, files: &gitCache{commits: map[string]bool{}, files: map[string]*string{}}}
 }
 
 func (s *Sources) repo(ownerRepo string) *sourceRepo {
@@ -97,8 +98,12 @@ func (s *Sources) State(a Anchor) AnchorState {
 		return AnchorState{Status: "unknown", Detail: r.err}
 	}
 	short := shortRef(r.ref)
-	full, e := resolveCommit(r.path, a.Commit)
-	if e != nil || full == "" {
+	full, ok := s.commits[r.path+"\x00"+a.Commit]
+	if !ok {
+		full, _ = resolveCommit(r.path, a.Commit)
+		s.commits[r.path+"\x00"+a.Commit] = full
+	}
+	if full == "" {
 		return AnchorState{Status: "unknown", Ref: short, Detail: "commit " + a.Commit + " is not in the local checkout; fetch it"}
 	}
 	if full == r.head {
