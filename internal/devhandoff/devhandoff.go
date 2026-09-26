@@ -294,7 +294,7 @@ func start(o options, out io.Writer) error {
 			}
 		}
 	}
-	res["next"] = "open a new agent session rooted at " + dest + " (or work there with work-in-repository); record " + p.Handoff + " in the case"
+	res["next"] = "implement in a new agent session rooted at " + dest + " rather than the vault session, so its own instructions, skills, MCP servers and hooks load; record " + p.Handoff + " in the case"
 	return emit(out, res)
 }
 

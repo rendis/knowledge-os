@@ -45,7 +45,7 @@ Keep it atomic: one repository, one task, the smallest context that answers the 
 
 1. `<CLI> handoff start --vault "<root>" --package <case>/handoffs/DH-NNN.md` shows the effects: worktree and branch to create from the base (the remote-tracking base when present), or the existing worktree reused when it is already on that branch; the task copy; the local exclusion; the managed segment added or updated in `AGENTS.md`.
 2. Present the effects to the user and apply with `--apply` once authorized. Start the tasks of a milestone in dependency order; each one joins the same worktree, and a later task can be added while earlier ones are in progress.
-3. Hand over the worktree path: the user (or `work-in-repository`) opens a new agent session there. Preparing a handoff does not authorize implementing it.
+3. Hand over the worktree path and recommend implementing in a new agent session rooted there rather than in this vault session: only a session rooted in the worktree loads the repository's own instructions, skills, MCP servers and hooks natively; from the vault they are files to read, not an active environment. Preparing a handoff does not authorize implementing it.
 
 The command never commits, pushes, fetches or changes other branches. The segment change in `AGENTS.md` is a tracked file change: the repository's normal workflow commits it (once per repository, since it is identical everywhere).
 
