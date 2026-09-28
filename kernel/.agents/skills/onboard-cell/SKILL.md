@@ -35,7 +35,7 @@ Then onboard yourself on this machine ([onboard-developer](../onboard-developer/
 
 ## 5. First reading
 
-On a sync branch: `<CLI> inventory`, `<CLI> discover run` (the agent answers the judgments it leaves with `discover questions` and `discover answer`) and, with the user's authorization, `<CLI> discover platform --referenced`. Commit the discovery state, `sync verify`, and publish per the team's Git policy. When `discover run` references scopes of a cloud missing from `platform.providers`, propose adding it.
+On a sync branch: `<CLI> inventory`, `<CLI> discover run` (the agent answers the judgments it leaves with `discover questions` and `discover answer`) and, with the user's authorization, `<CLI> discover platform --referenced`. Commit the discovery state, `sync verify`, and publish per the team's Git policy. When `discover run` references scopes of a cloud missing from `platform.providers`, propose adding it. When the organization runs GitHub Actions on self-hosted runners, set `ci.runner` in `instance.yaml` to the label its other repositories use and run `<CLI> kernel update --vault "<vault>"`.
 
 ## 6. Readiness report
 
