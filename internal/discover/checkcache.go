@@ -124,14 +124,16 @@ func checkFingerprint(vault string) string {
 			add(k, notes[k])
 		}
 	}
-	// Topic and event notes, by name and frontmatter: G4-relation matches resources against them.
-	_ = filepath.WalkDir(filepath.Join(vault, "25-Topics"), func(p string, d fs.DirEntry, err error) error {
-		if err == nil && !d.IsDir() {
-			b, _ := os.ReadFile(p)
-			add(p, fmt.Sprint(frontmatterOf(b)))
-		}
-		return nil
-	})
+	// Topic, event and integration notes, by name and frontmatter: G4-relation matches resources against them.
+	for _, dir := range []string{"25-Topics", "40-Integraciones"} {
+		_ = filepath.WalkDir(filepath.Join(vault, dir), func(p string, d fs.DirEntry, err error) error {
+			if err == nil && !d.IsDir() {
+				b, _ := os.ReadFile(p)
+				add(p, fmt.Sprint(frontmatterOf(b)))
+			}
+			return nil
+		})
+	}
 	// Every checkout under the workspace roots, by its refs on disk: a fetch or a new commit changes them.
 	// Reading the files avoids hundreds of git processes per check.
 	if w, e := config.Workspace(vault); e == nil {

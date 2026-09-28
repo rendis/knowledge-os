@@ -518,6 +518,7 @@ func checkNoteFresh(vault, notePath, repoOverride string) (noteCheck, error) {
 					}
 				}
 				r.Issues = append(r.Issues, undeclaredRelations(vault, fm, body, f)...)
+				r.Issues = append(r.Issues, undeclaredCalls(vault, full, fm, body, f)...)
 				// Freshness: anchors on files changed since the analyzed commit.
 				head, e := resolveCommit(in.Path, ref)
 				if refErr != "" {

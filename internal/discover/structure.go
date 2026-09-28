@@ -296,3 +296,112 @@ func CopiesIntroduced(vault, note string, base []byte) ([]string, error) {
 	}
 	return out, nil
 }
+
+// serviceSuffix is what a Kubernetes Service or DNS name usually adds to a repository's name.
+var serviceSuffix = regexp.MustCompile(`-(service|svc|srv)$`)
+
+// endpointHost is the host an HTTP, gRPC or file-transfer endpoint names: the URL's host, or the part before the
+// first "/" or ":" of a bare host, lower-cased.
+func endpointHost(v string) string {
+	v = strings.ToLower(strings.TrimSpace(v))
+	if i := strings.Index(v, "://"); i >= 0 {
+		v = v[i+3:]
+	}
+	v = strings.TrimPrefix(v, "dns:///")
+	if i := strings.IndexAny(v, "/?#"); i >= 0 {
+		v = v[:i]
+	}
+	if i := strings.LastIndex(v, "@"); i >= 0 {
+		v = v[i+1:]
+	}
+	if i := strings.Index(v, ":"); i >= 0 {
+		v = v[:i]
+	}
+	return v
+}
+
+// undeclaredCalls lists repository and integration notes whose service an HTTP, gRPC or file-transfer endpoint of
+// this repository names (by host) but the note neither declares in a relation field nor explains under
+// Limitaciones y desconocimientos. Only hosts that resolve to a note of this vault count: an external host without
+// a note is left to the reviewer.
+func undeclaredCalls(vault, notePath string, fm map[string]string, body string, f repoFacts) []checkIssue {
+	if len(f.Languages) == 0 {
+		return nil
+	}
+	notes, e := loadNotes(vault)
+	if e != nil {
+		return nil
+	}
+	self := ownNames(notePath, fm)
+	byName := map[string]string{}
+	for stem, n := range notes {
+		if n.folder != "20-Repos" && n.folder != "40-Integraciones" {
+			continue
+		}
+		for _, name := range n.names(stem) {
+			name = strings.ToLower(name)
+			if _, taken := byName[name]; !taken {
+				byName[name] = stem
+			}
+		}
+	}
+	addressed := map[string]bool{}
+	for _, field := range edgeFields {
+		for _, m := range wikilink.FindAllStringSubmatch(fm[field], -1) {
+			addressed[strings.TrimSpace(m[1])] = true
+		}
+	}
+	_, texts := sections(body)
+	for _, m := range wikilink.FindAllStringSubmatch(texts["Limitaciones y desconocimientos"], -1) {
+		addressed[strings.TrimSpace(m[1])] = true
+	}
+	type call struct {
+		files bool
+		hosts []string
+	}
+	calls := map[string]*call{}
+	for _, r := range f.Resources {
+		own := false
+		for _, ev := range r.Evidence {
+			own = own || ev.Kind == "config" || ev.Kind == "code"
+		}
+		files := r.Type == "storage_bucket"
+		if !own || r.Type != "http_endpoint" && !files {
+			continue
+		}
+		host := endpointHost(r.Name)
+		if host == "" || files && !strings.Contains(strings.ToLower(r.Name), "ftp") {
+			continue // a bucket name is data, not a connection to another service
+		}
+		label := strings.SplitN(host, ".", 2)[0]
+		stem := ""
+		for _, c := range []string{host, label, serviceSuffix.ReplaceAllString(label, "")} {
+			if s, ok := byName[c]; ok {
+				stem = s
+				break
+			}
+		}
+		if stem == "" || addressed[stem] || self[strings.ToLower(stem)] {
+			continue
+		}
+		c := calls[stem]
+		if c == nil {
+			c = &call{}
+			calls[stem] = c
+		}
+		c.files = c.files || files
+		c.hosts = appendUnique(c.hosts, host)
+	}
+	out := []checkIssue{}
+	for _, stem := range sortedKeys(calls) {
+		c := calls[stem]
+		field := "`consume-de`"
+		if c.files {
+			field = "`lee-de` or `escribe-en`"
+		}
+		out = append(out, checkIssue{"G4-relation", "error", "[[" + stem + "]]", fmt.Sprintf(
+			"the repository calls %s, which is [[%s]], but no relation field declares it; declare it in %s, or explain under Limitaciones y desconocimientos why it is not a relation",
+			strings.Join(firstList(c.hosts, 3), ", "), stem, field)})
+	}
+	return out
+}
