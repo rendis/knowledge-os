@@ -303,3 +303,29 @@ func TestVerifyPushRangeWithSeveralSyncs(t *testing.T) {
 		t.Fatalf("only the direct commit between syncs is unreviewed: %v", res)
 	}
 }
+
+func TestPushRangeUsesTheReviewedBase(t *testing.T) {
+	v := vault(t)
+	pushed, _ := git(v, "rev-parse", "HEAD")
+	write(t, v, "00-Home.md", "---\ntipo: indice\n---\n# Home\n\n[[Sales]] editado a mano.\n")
+	run(t, v, "commit", "-qam", "docs: direct edit")
+	// A later sync that touches the same file does not cover the direct edit made before it started.
+	if _, e := call(t, "start", "--vault", v, "--name", "home"); e != nil {
+		t.Fatal(e)
+	}
+	write(t, v, "00-Home.md", "---\ntipo: indice\n---\n# Home\n\n[[Sales]] revisado.\n")
+	run(t, v, "commit", "-qam", "docs: home")
+	if _, e := call(t, "review", "--vault", v, "--verdict", "accept", "--reviewer", "r"); e != nil {
+		t.Fatal(e)
+	}
+	if res, e := call(t, "verify", "--vault", v, "--base", pushed, "--allow-no-change"); e == nil || len(toStrings(res["problems"])) != 1 {
+		t.Fatalf("the direct edit before the sync stays unreviewed: %v", res)
+	}
+	// A review recorded against the pushed base covers the whole range, the direct edit included.
+	if _, e := call(t, "review", "--vault", v, "--base", pushed, "--verdict", "accept", "--reviewer", "r"); e != nil {
+		t.Fatal(e)
+	}
+	if res, e := call(t, "verify", "--vault", v, "--base", pushed, "--allow-no-change"); e != nil || res["ok"] != true {
+		t.Fatalf("a review of the whole range covers it: %v %v", e, res)
+	}
+}

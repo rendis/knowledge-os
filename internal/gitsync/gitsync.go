@@ -275,8 +275,9 @@ func knowledgeChanges(vault, from, to string) []string {
 }
 
 // reviewedRange checks a range that may hold several finished syncs, as a push to the base branch does. Each
-// accepted review covers the commits of its sync: from the nearest earlier point whose knowledge changes up to
-// the review match its digest (the sync's start) to the review itself. A commit that changes knowledge outside
+// accepted review covers the commits of its sync, from the base it records (Knowledge-Base) to the review itself,
+// when its digest matches the knowledge changes of that span. A review recorded before Knowledge-Base existed
+// covers from the nearest earlier point whose changes match its digest. A commit that changes knowledge outside
 // every covered span, including after the last review, is unreviewed.
 func reviewedRange(vault, base string) []string {
 	list, e := git(vault, "rev-list", "--reverse", "--first-parent", base+"..HEAD")
@@ -295,11 +296,32 @@ func reviewedRange(vault, base string) []string {
 		if !strings.Contains(body, "Knowledge-Review: accept") {
 			continue
 		}
-		want := ""
+		want, from := "", ""
 		for _, l := range strings.Split(body, "\n") {
 			if v, ok := strings.CutPrefix(l, "Knowledge-Digest:"); ok {
 				want = strings.TrimSpace(v)
 			}
+			if v, ok := strings.CutPrefix(l, "Knowledge-Base:"); ok {
+				from = strings.TrimSpace(v)
+			}
+		}
+		if from != "" {
+			start := -1
+			for p := i - 1; p >= 0; p-- {
+				if points[p] == from {
+					start = p
+					break
+				}
+			}
+			if _, e := git(vault, "merge-base", "--is-ancestor", from, points[0]); start < 0 && e == nil {
+				start = 0 // the sync started before the checked range
+			}
+			if start >= 0 && digestAt(vault, points[i], knowledgeChanges(vault, from, points[i])) == want {
+				for k := start + 1; k <= i; k++ {
+					covered[k] = true
+				}
+			}
+			continue
 		}
 		for p := i - 1; p >= 0; p-- {
 			if files := knowledgeChanges(vault, points[p], points[i]); len(files) > 0 && digestAt(vault, points[i], files) == want {
@@ -381,7 +403,7 @@ func review(o opts, out io.Writer) error {
 	if d, _ := dirty(o.vault); len(d) > 0 {
 		return fmt.Errorf("commit the reviewed content first: %v", d)
 	}
-	files, _, e := changed(o)
+	files, mb, e := changed(o)
 	if e != nil {
 		return e
 	}
@@ -389,7 +411,7 @@ func review(o opts, out io.Writer) error {
 		return errors.New("nothing to review: no knowledge change on this branch")
 	}
 	d := digest(o.vault, files)
-	msg := fmt.Sprintf("chore(sync): record review %s\n\n%s\n\nKnowledge-Review: %s\nKnowledge-Reviewer: %s\nKnowledge-Digest: %s\n", o.verdict, strings.TrimSpace(o.summary), o.verdict, o.reviewer, d)
+	msg := fmt.Sprintf("chore(sync): record review %s\n\n%s\n\nKnowledge-Review: %s\nKnowledge-Reviewer: %s\nKnowledge-Digest: %s\nKnowledge-Base: %s\n", o.verdict, strings.TrimSpace(o.summary), o.verdict, o.reviewer, d, mb)
 	if _, e := git(o.vault, "commit", "--allow-empty", "-q", "-m", msg); e != nil {
 		return e
 	}
