@@ -25,7 +25,15 @@ ANSWER:
 {answer}
 >>>
 A concise answer that covers what was asked is correct: do not penalize it for leaving out the additional context.
-Reply ONLY with a JSON object: {{"points": [<score per expected fact, in order>], "extra_points": [<1 or 0 per additional context item, in order>], "violations": [<text of each violation>], "unsupported_claims": [<relevant technical claims that do not follow from cited evidence or look invented>], "verdict": "correct|partial|incorrect"}}"""
+For every expected fact scored below 1, name why the point was lost with exactly one kind:
+- "omitted": the answer does not address it;
+- "abstained": the answer declares it unknown or unverified;
+- "wrong": the answer states something incompatible with it;
+- "direction": the answer inverts a direction (producer and consumer, caller and callee, source and target, cause and effect);
+- "path": the answer describes another path, branch, case or environment than the one the fact requires, or only one of several;
+- "imprecise": the answer is close but incomplete or vague.
+Reply ONLY with a JSON object: {{"points": [<score per expected fact, in order>], "losses": [<null for a full point, otherwise the kind, one per expected fact, in order>], "extra_points": [<1 or 0 per additional context item, in order>], "violations": [<text of each violation>], "unsupported_claims": [<relevant technical claims that do not follow from cited evidence or look invented>], "verdict": "correct|partial|incorrect"}}"""
+LOSS_KINDS = ("omitted", "abstained", "wrong", "direction", "path", "imprecise")
 
 
 def grade(q, rec):
@@ -42,6 +50,7 @@ def grade(q, rec):
     m = re.search(r"\{.*\}", text, re.S)
     g = json.loads(m.group(0)) if m else {"verdict": "error", "points": [], "violations": [], "unsupported_claims": []}
     g["score"] = round(sum(g.get("points", [])) / max(len(q["expected"]), 1), 3)
+    g["losses"] = [k if k in LOSS_KINDS else None for k in (g.get("losses") or [])]
     if q.get("extra"):
         g["extra_score"] = round(sum(g.get("extra_points", [])) / len(q["extra"]), 3)
     return g
@@ -67,6 +76,25 @@ def main():
         out_tokens = sum((r.get("usage") or {}).get("output", (r.get("usage") or {}).get("output_tokens", 0)) for r in recs)
         secs = sum(r["seconds"] for r in recs)
         print(f"{d.name}: n={n} mean_score={score:.3f} verdicts={[grades[r['id']]['verdict'] for r in recs]} violations={viol} unsupported={uns} seconds={secs:.0f} input_tokens={tokens} output_tokens={out_tokens} cost_usd={cost:.2f}")
+        s = summary(recs, grades)
+        print(f"  by vault: {s['by_vault']}  lost points by kind: {s['losses']}")
+
+
+def summary(recs, grades):
+    """Score and violations per vault, and the lost points by kind: where the answers fail, not only how much."""
+    by_vault, losses = {}, {}
+    for r in recs:
+        g = grades.get(r["id"]) or {}
+        v = by_vault.setdefault(r.get("vault", "?"), {"n": 0, "score": 0.0, "violations": 0})
+        v["n"] += 1
+        v["score"] += g.get("score", 0)
+        v["violations"] += len(g.get("violations", []))
+        for kind, pts in zip(g.get("losses") or [], g.get("points") or []):
+            if kind:
+                losses[kind] = round(losses.get(kind, 0) + 1 - pts, 2)
+    for v in by_vault.values():
+        v["score"] = round(v["score"] / v["n"], 3)
+    return {"by_vault": by_vault, "losses": dict(sorted(losses.items(), key=lambda x: -x[1]))}
 
 
 if __name__ == "__main__":

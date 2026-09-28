@@ -36,6 +36,7 @@ in this repository.
 ```json
 {
  "questions": "questions.json",
+ "heldout": ["<question id>", "..."],
  "vaults": {"<key>": {"source": "<vault checkout>", "commit": "<sha>", "branch": "<default branch>",
                       "config": "fixtures/<key>/config.yaml", "overlay": "fixtures/<key>/overlay"}},
  "quick": ["<question id>", "..."],
@@ -47,6 +48,20 @@ in this repository.
 Question entries follow `evals/regression/README.md`. Include questions over a note known to be wrong: they
 measure whether a setting verifies before it asserts. A flow scenario stays reproducible while its source
 reference branch still points at `source_target`; record a new scenario when it moves.
+
+## Held-out questions: the reference for quality
+
+Questions that shaped the kernel (the ones a rule was written for, or the quick set used to screen models)
+end up answered well by construction: in the reference campaign the quick set scored 1.00 for the top settings,
+while ten questions no kernel change had seen scored 0.64–0.67 with or without `kos`. List the questions that no
+kernel change has been tuned on under `heldout`, never edit the kernel while looking at their answers, and
+report quality claims (a kernel change helps, a setting is good enough) from them:
+
+```bash
+python3 -B evals/benchmark/bench.py qa --suite SUITE.json --work WORK --setting claude:opus:medium --heldout
+```
+
+When a held-out question has driven a fix, move it out of `heldout` and write a new one in its place.
 
 ## Run
 
@@ -88,10 +103,24 @@ follows the trail beyond the notes or stops at "unknown". Mark such questions wi
 python3 -B evals/benchmark/bench.py qa --suite SUITE.json --work WORK --setting codex:gpt-6-sol:low --ids S6
 ```
 
+## Measuring a kernel behavior with an arm
+
+`--arm` runs the same questions with one behavior removed and nothing else changed. `no-review` tells the
+session no independent reviewer is available, so the router's rule for answering without one applies: compare
+score, violations, time and cost with the normal arm on the held-out set before deciding whether review stays
+mandatory for answers (publication review is not affected).
+
+```bash
+python3 -B evals/benchmark/bench.py qa --suite SUITE.json --work WORK --setting claude:opus:medium --heldout --arm no-review
+```
+
 ## Metrics
 
 - Questions: judge score (share of expected facts stated), violations (forbidden claims asserted without
-  reserve), time, tokens, cost.
+  reserve), time, tokens, cost; the score per vault and the lost points by kind (`omitted`, `abstained`,
+  `wrong`, `direction`, `path`, `imprecise`), which say what to fix: `direction` points at missing typed
+  relations in the notes, `path` at a flow the notes do not assemble, `abstained` at a trail the agent did not
+  follow.
 - Flows: the author runs the scenario prompt; deterministic gates (`sync verify`: note gates, stale neighbour
   notes, structural issues) and the fixed reviewer judge the branch. A `revise` verdict or a failing gate gets a
   focused repair from the same setting and a new review, up to `--repairs` (default 2), as the sync protocol
