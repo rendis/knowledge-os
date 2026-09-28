@@ -36,7 +36,7 @@ Load @AGENTS.personal.md from the vault root when present, before classifying re
 `<CLI>` is `kos`, installed once per machine; inside the vault `--vault` defaults to it. It builds and checks the map (discovery, gates, sync, investigations, handoffs); reading and searching are done with your own tools. Read [use-vault-cli](.agents/skills/use-vault-cli/SKILL.md) before any CLI operation, and whenever `kos` is missing or prints a notice.
 
 - **Notes**: search and read them directly. Each claim cites its source in a footnote, a permalink at the commit the note analyzed; `<CLI> discover check --vault "<root>" --note <repository note>` says whether the files it cites changed since then.
-- **Code**: read a repository at its reference branch, never from its checkout's working tree, which may be on another branch. `<CLI> inventory --vault "<root>" --repo NAME` gives the reference branch and whether the note is current; `<CLI> config locate --vault "<root>" --remote <url>` gives the checkout; then `git -C <checkout> show <branch>:<path>`, `git -C <checkout> grep -n <pattern> <branch>`.
+- **Code**: read a repository at its reference branch, never from its checkout's working tree, which may be on another branch. `<CLI> config locate --vault "<root>" --repo NAME` (the note, an alias or the repository name) returns the checkout (`path`), the reference branch with its `ref` and whether the note's `commit-analizado` matches it, without the network; then `git -C <path> show <ref>:<file>`, `git -C <path> grep -n <pattern> <ref>`.
 - **Before stating that something is absent**, search the notes and the code at the reference branch, and say what the search covered.
 - `discover report --repo NAME` for every connection the discovery found in a repository.
 

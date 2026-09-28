@@ -24,6 +24,7 @@ const Help = `config --vault PATH COMMAND [options]
     [--development-worktree-root PATH | --disable-development-worktree-root]
     [--proxy-port ENV=PORT ...] [--expected-hash SHA256]
   locate --remote URL            Match repository Git identity in configured roots
+  locate --repo NAME             Checkout and reference branch of a repository, note or alias (no network)
   schema-repository              Locate configured schema repository
   proxy-port --environment NAME  Resolve local database proxy port
   worktree-root                  Resolve configured development worktree root
@@ -38,7 +39,7 @@ func Run(args []string, out io.Writer) error {
 	cmd := ""
 	bools := map[string]bool{"--disable-managed-clone": true, "--disable-development-worktree-root": true}
 	values := map[string]bool{}
-	for _, n := range strings.Fields("--vault --capability --procedure --target --repository-root --managed-clone-root --development-worktree-root --proxy-port --expected-hash --remote --environment --basename --report-id") {
+	for _, n := range strings.Fields("--vault --capability --procedure --target --repository-root --managed-clone-root --development-worktree-root --proxy-port --expected-hash --remote --repo --environment --basename --report-id") {
 		values[n] = true
 	}
 	for i := 0; i < len(args); i++ {
@@ -83,7 +84,7 @@ func Run(args []string, out io.Writer) error {
 		return errors.New("config command is required; use config --help")
 	}
 	accepted := map[string]string{
-		"status": "", "detect": "", "resolve": "", "capability": "--capability", "bind": "--capability --procedure --expected-hash", "database-targets": "", "database-target": "--target", "workspace": "", "workspace-update": "--repository-root --managed-clone-root --disable-managed-clone --development-worktree-root --disable-development-worktree-root --proxy-port --expected-hash", "workspace-init": "--repository-root --managed-clone-root --disable-managed-clone --development-worktree-root --disable-development-worktree-root --proxy-port --expected-hash", "locate": "--remote", "schema-repository": "", "proxy-port": "--environment", "worktree-root": "", "catalog": "", "areas": "", "reports": "", "operation": "--basename --report-id",
+		"status": "", "detect": "", "resolve": "", "capability": "--capability", "bind": "--capability --procedure --expected-hash", "database-targets": "", "database-target": "--target", "workspace": "", "workspace-update": "--repository-root --managed-clone-root --disable-managed-clone --development-worktree-root --disable-development-worktree-root --proxy-port --expected-hash", "workspace-init": "--repository-root --managed-clone-root --disable-managed-clone --development-worktree-root --disable-development-worktree-root --proxy-port --expected-hash", "locate": "--remote --repo", "schema-repository": "", "proxy-port": "--environment", "worktree-root": "", "catalog": "", "areas": "", "reports": "", "operation": "--basename --report-id",
 	}
 	allowedFlags, known := accepted[cmd]
 	if !known {
@@ -116,7 +117,14 @@ func Run(args []string, out io.Writer) error {
 	case "catalog":
 		result, e = Catalog(root)
 	case "locate":
-		result, e = LocateRepository(root, one("--remote"))
+		switch {
+		case (one("--remote") == "") == (one("--repo") == ""):
+			e = errors.New("locate takes exactly one of --remote URL or --repo NAME")
+		case one("--repo") != "":
+			result, e = LocateRepositoryByName(root, one("--repo"))
+		default:
+			result, e = LocateRepository(root, one("--remote"))
+		}
 	case "schema-repository":
 		result, e = SchemaRepository(root)
 	case "areas":

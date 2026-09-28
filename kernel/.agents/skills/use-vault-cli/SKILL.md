@@ -31,7 +31,7 @@ Execute the commands documented in this reference or the owning workflow, substi
 
 | Need | Operation |
 |---|---|
-| Read notes, code or snapshots | Your own file and search tools; code at the repository's reference branch (`inventory --repo NAME` names it, `git -C <checkout> show <branch>:<path>`) |
+| Read notes, code or snapshots | Your own file and search tools; code at the repository's reference branch: `config locate --repo NAME` (note, alias or repository name) returns the checkout (`path`), the reference branch with its `ref` and whether the note matches it, without the network; then `git -C <path> show <ref>:<file>` |
 | Initial vault orientation | `config status --vault "<root>"` |
 | Propose this person's workspace (clones, worktrees, cloud logins, ports) | `config --vault "<root>" detect` |
 | Discover connections of the cell's repositories | `discover run --vault "<root>"` (see [Discovery](#discovery)) |
@@ -52,7 +52,7 @@ The providers are the floor. A `platform-unmanaged` pending item names a service
 
 `discover report --vault "<root>" [--repo NAME]` returns the last summary or one repository's facts and comparison.
 
-`discover check --vault "<root>" --note <path>` gates a repository note or candidate (a candidate outside the vault is matched by its `aliases`): G1 source permalinks resolve at their commit and the backticked identifiers of each footnote are in the cited lines; G2 every connector category and resource group of the facts is cited or named; G3 (`review`) a relation to a topic/event note that the repository's evidence does not name; stale cited files since `commit-analizado`. `error` blocks publication; `pending` becomes `Verificaciones pendientes`; `review` goes to the reviewer.
+`discover check --vault "<root>" --note <path>` gates a repository note or candidate (a candidate outside the vault is matched by its `aliases`): G1 source permalinks resolve at their commit and the backticked identifiers of each footnote are in the cited lines; G2 every connector category and resource group of the facts is cited or named; G3 (`review`) a relation to a topic/event note that the repository's evidence does not name; G4 (`error`) whether the note works as a map: undeclared typed relations, empty core sections beside cited claims elsewhere, paragraphs copied into another note; stale cited files since `commit-analizado`. A repository note cites its own repository at `commit-analizado` in the short form `path#L1-L9 — text` (a permalink there fails `G1-format`; `discover shorten --vault "<root>" --note <path>` rewrites them), and a note without anchors fails G1. `error` blocks publication (a note touched only to re-anchor may keep the errors its base had, never add one); `pending` becomes `Verificaciones pendientes`; `review` goes to the reviewer.
 
 `discover corrections --vault "<root>"` lists every note relation the last run found unsupported, as a correction task.
 
