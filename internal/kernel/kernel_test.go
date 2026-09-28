@@ -126,3 +126,22 @@ func TestSourcesIncludeSelectedAdaptersOnly(t *testing.T) {
 		t.Fatal("an unknown adapter is refused")
 	}
 }
+
+func TestGatesWorkflowRunsOnTheCellRunner(t *testing.T) {
+	v := install(t)
+	wf := filepath.Join(v, ".github", "workflows", "knowledge-gates.yml")
+	if b, _ := os.ReadFile(wf); !strings.Contains(string(b), "runs-on: ubuntu-latest") {
+		t.Fatalf("the default runner is GitHub-hosted: %s", b)
+	}
+	os.WriteFile(filepath.Join(v, "instance.yaml"), []byte("version: 1\ncell:\n  name: C\n  purpose: p\nsystems:\n  - id: s\n    name: S\nadapters: []\nci:\n  runner: corp-runner\n"), 0o644)
+	if res, e := run(t, "update", "--vault", v); e != nil {
+		t.Fatalf("update after changing ci.runner: %v %v", e, res)
+	}
+	b, _ := os.ReadFile(wf)
+	if !strings.Contains(string(b), "    runs-on: corp-runner\n") || strings.Contains(string(b), "ubuntu-latest\n") {
+		t.Fatalf("the workflow runs on the cell's runner: %s", b)
+	}
+	if res, _ := run(t, "status", "--vault", v); res["current"] != true {
+		t.Fatalf("the rendered workflow is the kernel's content, not a local edit: %v", res)
+	}
+}
