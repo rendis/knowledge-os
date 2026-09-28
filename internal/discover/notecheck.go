@@ -17,7 +17,7 @@ import (
 // Note gates. G1: every source anchor resolves at its commit and the identifiers it names are in
 // the cited lines. G2: every connector the code uses and every resource its configuration names
 // is evidenced or explicitly addressed in the note. Freshness: anchors citing files changed since
-// the analyzed commit. Whether the cited lines support the sentence is the reviewer's judgment.
+// the analyzed commit. G4 (structure.go): typed relations, core sections and duplicated paragraphs. Whether the cited lines support the sentence is the reviewer's judgment.
 
 var (
 	permalink   = regexp.MustCompile(`https://github\.com/([^/\s]+)/([^/\s]+)/blob/([0-9a-f]{7,40})/([^)#\s]+)(?:#L(\d+)(?:-L(\d+))?)?`)
@@ -92,6 +92,62 @@ func (g *gitCache) commit(repo, sha string) bool {
 	_, e := resolveCommit(repo, sha)
 	g.commits[k] = e == nil
 	return e == nil
+}
+
+// relativeRef is one citation of the short form a repository note may use for its own repository at its
+// `commit-analizado`: `[^e3]: src/publisher.go#L27-L48, cmd/main.go#L9 — text`.
+var relativeRef = regexp.MustCompile("^`?([\\w.\\-]+(?:/[\\w.\\-]+)*)(?:#L(\\d+)(?:-L(\\d+))?)?`?$")
+
+// relativeAnchors reads the short citations of a repository note, resolved against its own repository
+// (`org/repo`) and `commit-analizado`. A footnote that holds a permalink keeps the long form.
+func relativeAnchors(note, repo, commit string) []anchor {
+	out := []anchor{}
+	if repo == "" || commit == "" {
+		return out
+	}
+	for _, line := range strings.Split(note, "\n") {
+		m := footnoteDef.FindStringSubmatch(line)
+		if m == nil {
+			continue
+		}
+		head, text, found := strings.Cut(m[2], " — ")
+		if !found || strings.Contains(head, "://") {
+			continue // no short citation, or a permalink footnote (read by parseAnchors)
+		}
+		items := []anchor{}
+		for _, item := range strings.Split(head, ",") {
+			r := relativeRef.FindStringSubmatch(strings.TrimSpace(item))
+			if r == nil || !shortRefLooksLikePath(r[1], r[2] != "") {
+				items = nil
+				break
+			}
+			a := anchor{Footnote: m[1], Repo: repo, Commit: commit, Path: r[1], Text: text}
+			if r[2] != "" {
+				a.From, _ = strconv.Atoi(r[2])
+				a.To = a.From
+			}
+			if r[3] != "" {
+				a.To, _ = strconv.Atoi(r[3])
+			}
+			items = append(items, a)
+		}
+		out = append(out, items...)
+	}
+	return out
+}
+
+// shortRefLooksLikePath tells a cited path from a word: it has a directory or an extension, cites lines, or is a
+// conventional file without extension (Dockerfile, Makefile…).
+func shortRefLooksLikePath(p string, lines bool) bool {
+	switch {
+	case strings.ContainsAny(p, "./"), lines:
+		return true
+	}
+	switch p {
+	case "Dockerfile", "Makefile", "Jenkinsfile", "Procfile", "Containerfile", "Gemfile", "Rakefile", "Vagrantfile", "LICENSE", "CODEOWNERS":
+		return true
+	}
+	return false
 }
 
 func parseAnchors(note string) []anchor {
@@ -198,7 +254,22 @@ func checkNoteFresh(vault, notePath, repoOverride string) (noteCheck, error) {
 		}
 		defined[m[1]] = true
 	}
+	// The repository is named by the note's own aliases (candidates may live outside the vault).
+	repoName := repoOverride
+	if repoName == "" {
+		repoName = noteRepository(vault, full, fm)
+	}
+	commit := strings.Trim(fm["commit-analizado"], `"'`)
 	anchors := parseAnchors(text)
+	if repoName != "" && commit != "" {
+		if inputs, e := discoverRepositories(vault, map[string]bool{repoName: true}); e == nil && len(inputs) == 1 {
+			if id, e := config.RemoteIdentity(inputs[0].Remote); e == nil {
+				if parts := strings.SplitN(id, "/", 2); len(parts) == 2 {
+					anchors = append(anchors, relativeAnchors(text, parts[1], commit)...)
+				}
+			}
+		}
+	}
 	body := text
 	if i := strings.Index(text[3:], "\n---"); strings.HasPrefix(text, "---") && i >= 0 {
 		body = text[3+i+4:]
@@ -309,13 +380,14 @@ func checkNoteFresh(vault, notePath, repoOverride string) (noteCheck, error) {
 			ok = append(ok, verified{a, code})
 		}
 	}
-	// G2 coverage against the repository's own facts at the analyzed commit.
-	// The repository is named by the note's own aliases (candidates may live outside the vault).
-	repoName := repoOverride
-	if repoName == "" {
-		repoName = noteRepository(vault, full, fm)
+	// G4 structure: core sections that deny what the note's other sections cite.
+	if _, isRepo := fm["commit-analizado"]; isRepo {
+		if _, n := shortenCitations(text, full, fm); n > 0 {
+			add("G1-format", "error", "footnotes", fmt.Sprintf("%d footnote(s) cite the note's own repository at commit-analizado with a permalink; use the short form path#Lfrom-Lto (`discover shorten --note %s` rewrites them)", n, r.Note))
+		}
+		r.Issues = append(r.Issues, emptyCoreSections(body)...)
 	}
-	commit := strings.Trim(fm["commit-analizado"], `"'`)
+	// G2 coverage against the repository's own facts at the analyzed commit.
 	r.Repo, r.Commit = repoName, commit
 	if repoName != "" && commit != "" {
 		inputs, e := discoverRepositories(vault, map[string]bool{repoName: true})
@@ -433,7 +505,7 @@ func checkNoteFresh(vault, notePath, repoOverride string) (noteCheck, error) {
 					}
 				}
 				if r.Anchors["total"] == 0 {
-					add("G1-anchor", "warning", r.Note, "the note has no source permalinks; claims cannot be verified mechanically (add anchors on its next update)")
+					add("G1-anchor", "error", "footnotes", "the note has no source anchors; cite each fact with path#Lfrom-Lto at commit-analizado so it can be verified mechanically")
 				}
 				for _, p := range f.Pending {
 					add("pending", "pending", p.Subject, p.Kind+": "+p.Detail)
@@ -445,6 +517,7 @@ func checkNoteFresh(vault, notePath, repoOverride string) (noteCheck, error) {
 						}
 					}
 				}
+				r.Issues = append(r.Issues, undeclaredRelations(vault, fm, body, f)...)
 				// Freshness: anchors on files changed since the analyzed commit.
 				head, e := resolveCommit(in.Path, ref)
 				if refErr != "" {

@@ -37,9 +37,14 @@ const Help = `discover COMMAND --vault PATH [options]
   report     [--repo NAME]   Last run summary, or one repository's facts.
   check      --note PATH [--note PATH ...] [--repo NAME]
              Gates for a repository note: G1 source anchors resolve at their commit and
-             the identifiers they name are in the cited lines; G2 every connector and
-             configured resource is evidenced or addressed; freshness of cited files.
-             A candidate outside the vault is matched to its repository by its aliases.
+             the identifiers they name are in the cited lines, and the note cites its own
+             repository in the short form; G2 every connector and configured resource is
+             evidenced or addressed; G4 the note works as a map (typed relations, facts in
+             their sections, no copies); freshness of cited files. A candidate outside the
+             vault is matched to its repository by its aliases.
+  shorten    --note PATH [--note PATH ...]
+             Rewrite a repository note's permalinks to its own repository at its
+             commit-analizado into the short form (path#Lfrom-Lto — text), in place.
   corrections  Note relations the last run could not support, as correction tasks.
 Facts and questions are local (.agents/state/discovery). Judgments and platform snapshots
 are versioned under 90-Meta/discovery/. All output is JSON.`
@@ -203,6 +208,8 @@ func Run(args []string, out io.Writer) error {
 		return runCheck(o, out)
 	case "corrections":
 		return listCorrections(o, out)
+	case "shorten":
+		return runShorten(o, out)
 	}
 	return fmt.Errorf("unknown discover command %q", cmd)
 }

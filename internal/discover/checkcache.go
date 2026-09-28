@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io/fs"
 	"knowledge-os/internal/config"
 	"os"
@@ -16,7 +17,27 @@ import (
 // snapshots, its identity and workspace, the repository notes' names and the refs of every checkout
 // (so fetching a commit or cloning a missing repository also invalidates a pending result). When none of them changed, the stored result is reused, so
 // a sync verify that runs again after one fix checks only what changed. KOS_NO_CACHE=1 disables it; KOS_CACHE_DIR moves it.
+//
+// Duplicated paragraphs depend on every other note, so they are computed on each call, outside the stored result.
 func checkNote(vault, notePath, repoOverride string) (noteCheck, error) {
+	r, e := checkNoteCached(vault, notePath, repoOverride)
+	if e != nil {
+		return r, e
+	}
+	full := notePath
+	if !filepath.IsAbs(full) {
+		full = filepath.Join(vault, notePath)
+	}
+	if text, e := os.ReadFile(full); e == nil {
+		if dups := duplicateParagraphs(vault, full, text); len(dups) > 0 {
+			r.Issues = append(r.Issues, dups...)
+			r.OK = false
+		}
+	}
+	return r, nil
+}
+
+func checkNoteCached(vault, notePath, repoOverride string) (noteCheck, error) {
 	full := notePath
 	if !filepath.IsAbs(full) {
 		full = filepath.Join(vault, notePath)
@@ -103,6 +124,14 @@ func checkFingerprint(vault string) string {
 			add(k, notes[k])
 		}
 	}
+	// Topic and event notes, by name and frontmatter: G4-relation matches resources against them.
+	_ = filepath.WalkDir(filepath.Join(vault, "25-Topics"), func(p string, d fs.DirEntry, err error) error {
+		if err == nil && !d.IsDir() {
+			b, _ := os.ReadFile(p)
+			add(p, fmt.Sprint(frontmatterOf(b)))
+		}
+		return nil
+	})
 	// Every checkout under the workspace roots, by its refs on disk: a fetch or a new commit changes them.
 	// Reading the files avoids hundreds of git processes per check.
 	if w, e := config.Workspace(vault); e == nil {

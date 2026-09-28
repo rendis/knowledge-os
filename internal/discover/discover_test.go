@@ -305,8 +305,35 @@ func TestNoteGates(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	if !r.OK || r.Anchors["verified"] != 1 || r.Coverage["connector_categories_evidenced"] != 1 || r.Coverage["resource_groups_addressed"] != 1 {
-		t.Fatalf("good note must pass: %+v", r)
+	onlyFormat := func(r noteCheck) bool {
+		for _, i := range r.Issues {
+			if i.Severity == "error" && i.Gate != "G1-format" {
+				return false
+			}
+		}
+		return true
+	}
+	if r.OK || !onlyFormat(r) || r.Anchors["verified"] != 1 || r.Coverage["connector_categories_evidenced"] != 1 || r.Coverage["resource_groups_addressed"] != 1 {
+		t.Fatalf("a permalink to the note's own repository at commit-analizado passes G1 but must use the short form: %+v", r)
+	}
+	var out strings.Builder
+	if e := runShorten(options{vault: vault, notes: []string{"20-Repos/orders.md"}}, &out); e != nil || !strings.Contains(out.String(), `"shortened": 1`) {
+		t.Fatalf("shorten: %v %s", e, out.String())
+	}
+	if b, _ := os.ReadFile(filepath.Join(vault, "20-Repos/orders.md")); !strings.Contains(string(b), "[^e1]: pub/pub.go#L5-L8 — L5-L8:") {
+		t.Fatalf("shorten rewrites the permalink to path#lines and keeps the text: %s", b)
+	}
+	if r, _ = checkNote(vault, "20-Repos/orders.md", ""); !r.OK || r.Anchors["verified"] != 1 {
+		t.Fatalf("the shortened note passes every gate: %+v", r.Issues)
+	}
+	short := strings.Replace(good, "[pub/pub.go]("+link+")", "pub/pub.go#L5-L8", 1)
+	write(t, vault, "20-Repos/orders.md", short)
+	if r, _ = checkNote(vault, "20-Repos/orders.md", ""); !r.OK || r.Anchors["verified"] != 1 {
+		t.Fatalf("a short citation resolves against the note's repository at commit-analizado: %+v %+v", r.Anchors, r.Issues)
+	}
+	write(t, vault, "20-Repos/orders.md", strings.Replace(short, "`pubsub.NewClient`", "`kafka.NewWriter`", 1))
+	if r, _ = checkNote(vault, "20-Repos/orders.md", ""); r.OK {
+		t.Fatal("a short citation is held to the same identifier check as a permalink")
 	}
 	write(t, vault, "25-Topics/orders-legacy.md", "---\ntipo: topic\n---\n# orders-legacy\n")
 	write(t, vault, "20-Repos/orders.md", strings.Replace(good, "---\n# orders", "publica-en: [\"[[orders-legacy]]\"]\n---\n# orders", 1))
@@ -315,12 +342,12 @@ func TestNoteGates(t *testing.T) {
 	for _, i := range r.Issues {
 		flagged = flagged || i.Gate == "G3-relation" && i.Severity == "review" && i.Where == "orders-legacy"
 	}
-	if !r.OK || !flagged {
+	if !onlyFormat(r) || !flagged {
 		t.Fatalf("a relation the evidence does not support goes to review without failing the gate: %+v", r.Issues)
 	}
 	multi := strings.Replace(good, "[pub/pub.go]("+link+")", "[go.mod](https://github.com/acme/SVC-orders/blob/"+sha+"/go.mod), [pub/pub.go]("+link+")", 1)
 	write(t, vault, "20-Repos/orders.md", multi)
-	if r, _ = checkNote(vault, "20-Repos/orders.md", ""); !r.OK {
+	if r, _ = checkNote(vault, "20-Repos/orders.md", ""); !onlyFormat(r) {
 		t.Fatalf("an identifier in one of a footnote's cited files satisfies the footnote: %+v", r.Issues)
 	}
 	if i := strings.Index(good, "\n[^"); i >= 0 {
@@ -348,8 +375,8 @@ func TestNoteGates(t *testing.T) {
 	if r.OK || gates["G1-anchor"] == 0 {
 		t.Fatalf("invented identifier or impossible range must fail G1: %+v", r.Issues)
 	}
-	if ok, _, pre, _ := CheckNoteIntroduced(vault, "20-Repos/orders.md", []byte(bad)); !ok || pre == 0 {
-		t.Fatal("a touched note keeping its pre-existing errors must not block")
+	if ok, intro, pre, _ := CheckNoteIntroduced(vault, "20-Repos/orders.md", []byte(bad)); !ok || pre == 0 {
+		t.Fatal("a touched note keeping its pre-existing errors must not block", intro, pre)
 	}
 	if ok, introduced, _, _ := CheckNoteIntroduced(vault, "20-Repos/orders.md", []byte(good)); ok || len(introduced) == 0 {
 		t.Fatal("errors added to a touched note must block")

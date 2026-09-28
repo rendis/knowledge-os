@@ -37,22 +37,24 @@ Do not rediscover connectors by searching the repository. Explain each fact's ro
 
 ## Evidence format (checked mechanically)
 
-Cite at the bound commit, one verifiable fact per cited sentence, with the reference right after the fact it supports:
+Write each section as readable prose that answers its question, and cite at the bound commit: a footnote closes the sentence or the coherent paragraph whose facts it supports, and one footnote may cite several line ranges. A repository note cites its own repository in the short form, a path and lines resolved against the note's repository at `commit-analizado`:
 
 ```markdown
-Publica el ajuste serializado en el topic configurado por `ADJUSTMENT_TOPIC`. [^e3]
+Publica el ajuste serializado en el topic configurado por `ADJUSTMENT_TOPIC` y reintenta la publicación antes de devolver el error. [^e3]
 
-[^e3]: [src/services/publisher.go](https://github.com/<org>/<repo>/blob/<full-sha>/src/services/publisher.go#L27-L48) — L27-L48: `os.Getenv("ADJUSTMENT_TOPIC")` y `publishWithRetry`
+[^e3]: src/services/publisher.go#L27-L48, src/services/retry.go#L10-L22 — `os.Getenv("ADJUSTMENT_TOPIC")` y `publishWithRetry`
 ```
 
+- The short form is `path#Lfrom-Lto` (or `path#Lline`, or a bare `path`), several separated by commas, then ` — ` and the text. Another repository, or a commit other than `commit-analizado`, keeps the permalink form `[path](https://github.com/<org>/<repo>/blob/<full-sha>/<path>#L27-L48) — text`; topic, flow and other non-repository notes always use permalinks. A permalink to the note's own repository at `commit-analizado` fails G1 (`G1-format`): `<cli> discover shorten --vault "<vault>" --note <note>` rewrites those footnotes mechanically. A repository note without anchors fails G1 too.
 - Backticked identifiers in a footnote must appear in its cited lines; backticked paths must exist at the commit.
+- Each fact lives in the section that answers it (Gatillo, Qué hace, Entradas y salidas, Persistencia y datos; deployment and runtime configuration in Infraestructura y scheduling), each messaging relation the repository has is declared in its relation field, and a fact is stated once in the note that owns it: G4 checks all three.
 - Platform facts cite the snapshot: `[^p1]: platform <provider> <scope> captured <date> — <subscription or queue> → <topic>, filter <expression>`.
 - Limitations, negations and inferences are written as limits, not cited as if the code proved them.
 - Distinguish implementation, configured behavior and observed runtime.
 
 ## Gates before review
 
-Run `<cli> discover check --vault "<vault>" --note <candidate>`. Fix every `error`: G1 (an anchor that does not resolve, lines that do not exist, an identifier absent from the cited lines) and G2 (a connector category or resource group of the facts that the note neither cites nor names). Carry `pending` items into `Verificaciones pendientes`. `review` items (including G3: a declared topic/event relation the facts do not name) and semantic `says_nothing`/`contradicts` results go to the reviewer with their sentences. Mechanical fixes never reopen source analysis.
+Run `<cli> discover check --vault "<vault>" --note <candidate>`. Fix every `error`: G1 (an anchor that does not resolve, lines that do not exist, an identifier absent from the cited lines) and G2 (a connector category or resource group of the facts that the note neither cites nor names). Carry `pending` items into `Verificaciones pendientes`. G4 errors say the note does not work as a map; a synced note has none, and a note touched only to re-anchor adds none: `G4-relation` (a topic or event the repository's messaging names, with its note, is not in a relation field: declare `publica-en` or `gatillado-por`, or explain under `Limitaciones y desconocimientos` why it is not a relation), `G4-structure` (a core section says nothing was observed while cited claims sit elsewhere: move each claim under the section it answers) and `G4-duplicate` (a paragraph repeats a topic, flow or other note: keep the fact in the note that owns it and link it). `sync verify` also refuses a topic, flow or other knowledge note on the branch that copies a repository note. `review` items (G3: a declared topic/event relation the facts do not name) go to the reviewer. Mechanical fixes never reopen source analysis.
 
 ## Review
 
