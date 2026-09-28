@@ -124,3 +124,26 @@ func TestShortenCitationsKeepsMixedFootnotes(t *testing.T) {
 		t.Fatalf("only footnotes citing the own repository at commit-analizado become short: %d\n%s", n, got)
 	}
 }
+
+func TestUndeclaredCalls(t *testing.T) {
+	vault := t.TempDir()
+	writeNote(t, vault, "20-Repos/demo/product-query.md", "---\naliases: [\"APP01-product-query\"]\n---\n")
+	writeNote(t, vault, "40-Integraciones/Provider.md", "---\ntipo: integracion-externa\naliases: [\"sftp.provider.example\"]\n---\n")
+	f := repoFacts{Languages: map[string]int{"go": 3}, Resources: []resource{
+		{Type: "http_endpoint", Name: "http://product-query-service/api/v1/categories", Evidence: []evidence{{Kind: "config"}}},
+		{Type: "http_endpoint", Name: "product-query-svc.ns.svc.cluster.local:50051", Evidence: []evidence{{Kind: "config"}}},
+		{Type: "storage_bucket", Name: "sftp://sftp.provider.example/inbox", Evidence: []evidence{{Kind: "config"}}},
+		{Type: "storage_bucket", Name: "product-query", Evidence: []evidence{{Kind: "config"}}},
+		{Type: "http_endpoint", Name: "https://api.unknown.example/v1", Evidence: []evidence{{Kind: "config"}}},
+		{Type: "http_endpoint", Name: "http://orders-command-service/x", Evidence: []evidence{{Kind: "config"}}},
+	}}
+	fm := map[string]string{"aliases": `["APP01-orders-command"]`}
+	got := undeclaredCalls(vault, "/v/20-Repos/demo/orders-command.md", fm, "", f)
+	if len(got) != 2 || got[0].Where != "[[Provider]]" || !strings.Contains(got[0].Detail, "`lee-de` or `escribe-en`") ||
+		got[1].Where != "[[product-query]]" || !strings.Contains(got[1].Detail, "`consume-de`") || !strings.Contains(got[1].Detail, "product-query-svc.ns.svc.cluster.local") {
+		t.Fatalf("HTTP and gRPC hosts resolve to the repository note, an SFTP host to its integration; a bucket name, an unknown host and the note itself do not count: %+v", got)
+	}
+	if got := undeclaredCalls(vault, "/v/20-Repos/demo/orders-command.md", map[string]string{"consume-de": `["[[product-query]]"]`, "lee-de": `["[[Provider]]"]`}, "", f); len(got) != 0 {
+		t.Fatalf("declared calls are not reported: %+v", got)
+	}
+}

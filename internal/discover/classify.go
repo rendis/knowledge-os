@@ -112,7 +112,7 @@ var resourceOptions = map[string]string{
 	"message_subscription":    "Holds the name, path, ARN, URL or id of a subscription or queue a consumer reads from (any broker or cloud).",
 	"database_object":         "Holds a database, schema, table, collection or dataset name, or a database host/connection.",
 	"storage_bucket":          "Holds a cloud storage bucket or a remote file location (for example an SFTP path or host).",
-	"http_endpoint":           "Holds a URL, host, base path or route of an HTTP API of ANOTHER service that is called.",
+	"http_endpoint":           "Holds a URL, host, base path or route of an HTTP or gRPC API of ANOTHER service that is called.",
 	"service_identity":        "Holds the name of this deployable service itself: deployment, container, cloud function, microservice or application name.",
 	"cloud_project_or_region": "Holds a cloud project, account or subscription id, region, cluster, namespace or environment name.",
 	"secret_reference":        "Holds a reference to a secret, credential, API key or token.",
