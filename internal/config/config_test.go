@@ -352,3 +352,41 @@ func TestReferenceBranchOrder(t *testing.T) {
 		t.Fatal(e)
 	}
 }
+func TestLocateRepositoryByName(t *testing.T) {
+	root := fixture(t)
+	repos := t.TempDir()
+	repo := filepath.Join(repos, "checkout-dir")
+	os.Mkdir(repo, 0700)
+	git(t, repo, "init", "--quiet", "-b", "develop")
+	git(t, repo, "-c", "user.name=t", "-c", "user.email=t@example.org", "commit", "--quiet", "--allow-empty", "-m", "one")
+	git(t, repo, "remote", "add", "origin", "git@example.org:team/APP01-orders.git")
+	if _, e := UpdateWorkspace(root, WorkspaceUpdate{Roots: []string{repos}}); e != nil {
+		t.Fatal(e)
+	}
+	head, _ := exec.Command("git", "-C", repo, "rev-parse", "HEAD").Output()
+	write(t, root, "20-Repos/demo/orders.md", "---\naliases: [\"APP01-orders\"]\ncommit-analizado: \""+string(head[:12])+"\"\n---\n")
+	// The note stem, an alias or the repository name bind the same checkout; develop comes from the order.
+	write(t, root, "instance.yaml", instanceFixture+"sources:\n  reference_branch_order: [develop, main]\n")
+	for _, name := range []string{"orders", "APP01-orders", "app01-orders"} {
+		r, e := LocateRepositoryByName(root, name)
+		if e != nil || r["status"] != "ok" || r["reference_branch"] != "develop" || r["note_state"] != "current" || r["note"] != "20-Repos/demo/orders.md" || r["repo"] != "APP01-orders" {
+			t.Fatalf("%s: %v %v", name, r, e)
+		}
+	}
+	git(t, repo, "-c", "user.name=t", "-c", "user.email=t@example.org", "commit", "--quiet", "--allow-empty", "-m", "two")
+	if r, _ := LocateRepositoryByName(root, "orders"); r["note_state"] != "changed" {
+		t.Fatalf("a newer reference head leaves the note changed: %v", r)
+	}
+	// A configured branch that the checkout lacks is reported, not replaced by another branch.
+	write(t, root, "instance.yaml", instanceFixture+"sources:\n  reference_branches:\n    APP01-orders: release\n")
+	if r, _ := LocateRepositoryByName(root, "orders"); r["status"] != "ok" || r["reference_branch"] != nil || r["reference_error"] == nil {
+		t.Fatalf("missing configured branch must be reported: %v", r)
+	}
+	if r, _ := LocateRepositoryByName(root, "unknown"); r["status"] != "not_found" {
+		t.Fatalf("unknown name: %v", r)
+	}
+	var out bytes.Buffer
+	if e := Run([]string{"locate", "--vault", root, "--repo", "orders", "--remote", "x"}, &out); e == nil {
+		t.Fatal("--repo and --remote together must be refused")
+	}
+}

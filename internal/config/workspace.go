@@ -4,7 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -134,11 +136,35 @@ func LocateRepository(root, remote string) (Object, error) {
 	if e != nil {
 		return nil, e
 	}
-	w, e := Workspace(root)
+	paths, e := checkouts(root)
 	if e != nil {
 		return nil, e
 	}
 	matches := []string{}
+	for _, p := range paths {
+		got, e := RemoteIdentity(gitRemote(p))
+		if e == nil && got == want {
+			matches = append(matches, p)
+		}
+	}
+	switch len(matches) {
+	case 0:
+		return Object{"status": "not_found", "remote": want}, nil
+	case 1:
+		return Object{"status": "ok", "path": matches[0], "remote": want}, nil
+	default:
+		return Object{"status": "ambiguous", "matches": matches, "remote": want}, nil
+	}
+}
+
+// checkouts are the Git checkouts the workspace roots expose: a root that is itself a checkout, otherwise its
+// immediate children. There is no recursive scan.
+func checkouts(root string) ([]string, error) {
+	w, e := Workspace(root)
+	if e != nil {
+		return nil, e
+	}
+	out := []string{}
 	seen := map[string]bool{}
 	for _, r := range list(obj(w["source_context"])["roots"]) {
 		p := str(obj(r)["path"])
@@ -163,32 +189,135 @@ func LocateRepository(root, remote string) (Object, error) {
 		}
 		for _, candidate := range candidates {
 			canonical, e := filepath.EvalSymlinks(candidate)
-			if e != nil {
-				continue
-			}
-			if seen[canonical] {
+			if e != nil || seen[canonical] {
 				continue
 			}
 			seen[canonical] = true
-			if _, e := os.Stat(filepath.Join(canonical, ".git")); e != nil {
-				continue
-			}
-			got, e := RemoteIdentity(gitRemote(canonical))
-			if e == nil && got == want {
-				matches = append(matches, canonical)
+			if _, e := os.Stat(filepath.Join(canonical, ".git")); e == nil {
+				out = append(out, canonical)
 			}
 		}
 	}
-	sort.Strings(matches)
+	sort.Strings(out)
+	return out, nil
+}
+
+var (
+	noteAliases  = regexp.MustCompile(`(?m)^aliases:\s*\[(.*?)\]`)
+	noteAnalyzed = regexp.MustCompile(`(?m)^commit-analizado:\s*"?([0-9a-f]+)"?`)
+)
+
+// LocateRepositoryByName binds a repository named by its note, one of the note's aliases or its repository
+// name to the local checkout and the reference branch a reader must use, without contacting any remote: the
+// branch is `sources.reference_branches`, else the first of `sources.reference_branch_order` present in the
+// checkout, and `note` compares the note's `commit-analizado` with that branch as of the checkout's last fetch.
+func LocateRepositoryByName(root, name string) (Object, error) {
+	if strings.TrimSpace(name) == "" {
+		return nil, errors.New("--repo needs a repository, note or alias name")
+	}
+	names := map[string]bool{strings.ToLower(name): true}
+	notePath, analyzed := "", ""
+	_ = filepath.WalkDir(filepath.Join(root, "20-Repos"), func(p string, d os.DirEntry, e error) error {
+		if e != nil || d.IsDir() || !strings.HasSuffix(p, ".md") || notePath != "" {
+			return nil
+		}
+		b, e := os.ReadFile(p)
+		if e != nil {
+			return nil
+		}
+		own := []string{strings.TrimSuffix(d.Name(), ".md")}
+		if m := noteAliases.FindStringSubmatch(string(b)); m != nil {
+			for _, a := range strings.Split(m[1], ",") {
+				if a = strings.Trim(strings.TrimSpace(a), `"'`); a != "" {
+					own = append(own, a)
+				}
+			}
+		}
+		for _, n := range own {
+			if strings.EqualFold(n, name) {
+				rel, _ := filepath.Rel(root, p)
+				notePath = filepath.ToSlash(rel)
+				if m := noteAnalyzed.FindStringSubmatch(string(b)); m != nil {
+					analyzed = m[1]
+				}
+				for _, o := range own {
+					names[strings.ToLower(o)] = true
+				}
+				break
+			}
+		}
+		return nil
+	})
+	paths, e := checkouts(root)
+	if e != nil {
+		return nil, e
+	}
+	type match struct{ path, repo, remote string }
+	matches := []match{}
+	for _, p := range paths {
+		remote := gitRemote(p)
+		repo := filepath.Base(p)
+		if remote != "" {
+			r := strings.TrimSuffix(strings.TrimRight(remote, "/"), ".git")
+			repo = r[strings.LastIndexAny(r, "/:")+1:]
+		}
+		if names[strings.ToLower(repo)] {
+			matches = append(matches, match{p, repo, remote})
+		}
+	}
+	res := Object{"repo": name}
+	if notePath != "" {
+		res["note"] = notePath
+	}
 	switch len(matches) {
 	case 0:
-		return Object{"status": "not_found", "remote": want}, nil
+		res["status"] = "not_found"
+		return res, nil
 	case 1:
-		return Object{"status": "ok", "path": matches[0], "remote": want}, nil
 	default:
-		return Object{"status": "ambiguous", "matches": matches, "remote": want}, nil
+		found := []string{}
+		for _, m := range matches {
+			found = append(found, m.path)
+		}
+		res["status"], res["matches"] = "ambiguous", found
+		return res, nil
 	}
+	m := matches[0]
+	res["status"], res["repo"], res["path"] = "ok", m.repo, m.path
+	if id, e := RemoteIdentity(m.remote); e == nil {
+		res["remote"] = id
+	}
+	inst, e := LoadInstance(root)
+	if e != nil {
+		return nil, e
+	}
+	candidates := ReferenceBranchOrder(inst)
+	if configured := str(obj(obj(inst["sources"])["reference_branches"])[m.repo]); configured != "" {
+		candidates = []string{configured}
+	}
+	for _, b := range candidates {
+		for _, ref := range []string{"refs/remotes/origin/" + b, "refs/heads/" + b} {
+			out, e := exec.Command("git", "-C", m.path, "rev-parse", "--verify", "--quiet", ref+"^{commit}").Output()
+			if e != nil {
+				continue
+			}
+			head := strings.TrimSpace(string(out))
+			res["reference_branch"], res["ref"], res["head"] = b, ref, head[:12]
+			switch {
+			case notePath == "":
+				res["note_state"] = "no-note"
+			case analyzed != "" && strings.HasPrefix(head, analyzed):
+				res["note_state"] = "current"
+			default:
+				res["note_state"] = "changed"
+			}
+			return res, nil
+		}
+	}
+	res["reference_error"] = "none of " + strings.Join(candidates, ", ") + " exists in the checkout; fetch it or declare the branch in sources.reference_branches"
+	return res, nil
 }
+
 func SchemaRepository(root string) (Object, error) {
 	m, e := LoadInstance(root)
 	if e != nil {
