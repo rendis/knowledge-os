@@ -234,3 +234,72 @@ func TestSyncKeepsTheBranchItStartedFrom(t *testing.T) {
 		t.Fatalf("the sync branch remembers its base: %v %v", e, res)
 	}
 }
+
+func TestVerifyRejectsCopiedRepositoryParagraphs(t *testing.T) {
+	v := vault(t)
+	fact := "El manejador elimina los ceros iniciales de tienda, terminal y folio antes de componer el identificador, y usa el id del evento cuando falta la tienda o el terminal."
+	write(t, v, "20-Repos/sales/orders-command.md", "---\ntipo: suscriptor\n---\n# orders-command\n\n"+fact+"\n")
+	run(t, v, "add", "-A")
+	run(t, v, "commit", "-qm", "docs: repository note")
+	if _, e := call(t, "start", "--vault", v, "--name", "copy"); e != nil {
+		t.Fatal(e)
+	}
+	write(t, v, "10-Sistemas/Sales.md", "---\ntipo: sistema\n---\n# Sales\n\nSistema de ventas.\n\n"+fact+"\n")
+	run(t, v, "commit", "-qam", "docs: copy a repository paragraph")
+	if _, e := call(t, "review", "--vault", v, "--verdict", "accept", "--reviewer", "r"); e != nil {
+		t.Fatal(e)
+	}
+	res, e := call(t, "verify", "--vault", v)
+	if e == nil || len(asList(res["copied_paragraphs"])) != 1 || !strings.Contains(strings.Join(toStrings(res["problems"]), " "), "copies 1 paragraph") {
+		t.Fatalf("a knowledge note that copies a repository note must fail verify: %v", res)
+	}
+}
+
+func TestVerifyAllowNoChangeForPushes(t *testing.T) {
+	v := vault(t)
+	write(t, v, "AGENTS.md", "kernel update\n")
+	run(t, v, "commit", "-qam", "chore: update the kernel")
+	if res, e := call(t, "verify", "--vault", v, "--base", "HEAD~1"); e == nil || res["ok"] != false {
+		t.Fatalf("without the flag a range with no knowledge change is refused: %v", res)
+	}
+	if res, e := call(t, "verify", "--vault", v, "--base", "HEAD~1", "--allow-no-change"); e != nil || res["ok"] != true {
+		t.Fatalf("a kernel-only push passes the CI gate: %v %v", e, res)
+	}
+	write(t, v, "10-Sistemas/Sales.md", "---\ntipo: sistema\n---\n# Sales\n\nEditado sin revisión.\n")
+	run(t, v, "commit", "-qam", "docs: direct edit")
+	if res, e := call(t, "verify", "--vault", v, "--base", "HEAD~1", "--allow-no-change"); e == nil || !strings.Contains(strings.Join(toStrings(res["problems"]), " "), "no accepted review covers") {
+		t.Fatalf("a knowledge commit without review fails the CI gate: %v", res)
+	}
+}
+
+func TestVerifyPushRangeWithSeveralSyncs(t *testing.T) {
+	v := vault(t)
+	pushed, _ := git(v, "rev-parse", "HEAD")
+	sync := func(name, content string) {
+		if _, e := call(t, "start", "--vault", v, "--name", name); e != nil {
+			t.Fatal(e)
+		}
+		write(t, v, "10-Sistemas/Sales.md", "---\ntipo: sistema\n---\n# Sales\n\n"+content+"\n")
+		run(t, v, "commit", "-qam", "docs: "+name)
+		if _, e := call(t, "review", "--vault", v, "--verdict", "accept", "--reviewer", "r"); e != nil {
+			t.Fatal(e)
+		}
+		if _, e := call(t, "finish", "--vault", v); e != nil {
+			t.Fatal(e)
+		}
+	}
+	sync("first", "Sistema de ventas y devoluciones.")
+	write(t, v, "AGENTS.md", "kernel update\n")
+	run(t, v, "commit", "-qam", "chore: update the kernel")
+	sync("second", "Sistema de ventas, devoluciones y cambios.")
+	if res, e := call(t, "verify", "--vault", v, "--base", pushed, "--allow-no-change"); e != nil || res["ok"] != true {
+		t.Fatalf("two reviewed syncs and a kernel update pass the push gate: %v %v", e, res)
+	}
+	write(t, v, "00-Home.md", "---\ntipo: indice\n---\n# Home\n\n[[Sales]] editado a mano.\n")
+	run(t, v, "commit", "-qam", "docs: direct edit")
+	sync("third", "Sistema de ventas.")
+	res, e := call(t, "verify", "--vault", v, "--base", pushed, "--allow-no-change")
+	if e == nil || len(toStrings(res["problems"])) != 1 || !strings.Contains(toStrings(res["problems"])[0], "no accepted review covers") {
+		t.Fatalf("only the direct commit between syncs is unreviewed: %v", res)
+	}
+}

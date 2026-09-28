@@ -32,9 +32,12 @@ const Help = `sync COMMAND --vault PATH [options]
   review  --verdict accept|revise --reviewer NAME [--summary TEXT]
                                         Record the reviewer's verdict on the committed content
                                         as a commit whose trailers bind it by digest.
-  verify  [--base BRANCH]               Gates for the branch: every changed repository note passes
+  verify  [--base REV] [--allow-no-change]
+                                        Gates for the branch: every changed repository note passes
                                         discover check, no new audit/link/Bases issue versus the
                                         base, clean tree, and an accepted review of the final content.
+                                        --allow-no-change accepts a range without knowledge changes
+                                        (the CI gate on pushes, e.g. a kernel update).
   acknowledge --repo NAME --commit SHA --decision D [--branch main] [--date YYYY-MM-DD]
                                         Record a reviewed repository commit that needs no note change
                                         (D: no-documentation-change | no-durable-node |
@@ -56,6 +59,7 @@ var (
 
 type opts struct {
 	vault, name, base, verdict, reviewer, summary, repo, commit, decision, branch, date string
+	allowNoChange                                                                       bool
 }
 
 func git(dir string, args ...string) (string, error) {
@@ -87,6 +91,10 @@ func Run(args []string, out io.Writer) error {
 	fields := map[string]*string{"--vault": &o.vault, "--name": &o.name, "--base": &o.base, "--verdict": &o.verdict, "--reviewer": &o.reviewer,
 		"--summary": &o.summary, "--repo": &o.repo, "--commit": &o.commit, "--decision": &o.decision, "--branch": &o.branch, "--date": &o.date}
 	for i := 1; i < len(args); i++ {
+		if args[i] == "--allow-no-change" {
+			o.allowNoChange = true
+			continue
+		}
 		p, ok := fields[args[i]]
 		if !ok || i+1 >= len(args) {
 			return fmt.Errorf("unknown or incomplete option %s", args[i])
@@ -238,6 +246,79 @@ func digest(vault string, files []string) string {
 	return hex.EncodeToString(h.Sum(nil))
 }
 
+// digestAt is digest over the files' content at rev.
+func digestAt(vault, rev string, files []string) string {
+	h := sha256.New()
+	for _, f := range files {
+		blob, e := git(vault, "rev-parse", "--verify", "--quiet", rev+":"+f)
+		if e != nil {
+			blob = "deleted"
+		}
+		fmt.Fprintf(h, "%s\x00%s\n", f, blob)
+	}
+	return hex.EncodeToString(h.Sum(nil))
+}
+
+func knowledgeChanges(vault, from, to string) []string {
+	d, e := git(vault, "diff", "--name-only", "--no-renames", from, to)
+	if e != nil {
+		return nil
+	}
+	out := []string{}
+	for _, f := range strings.Split(d, "\n") {
+		if f != "" && knowledgePath.MatchString(f) {
+			out = append(out, f)
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
+// reviewedRange checks a range that may hold several finished syncs, as a push to the base branch does. Each
+// accepted review covers the commits of its sync: from the nearest earlier point whose knowledge changes up to
+// the review match its digest (the sync's start) to the review itself. A commit that changes knowledge outside
+// every covered span, including after the last review, is unreviewed.
+func reviewedRange(vault, base string) []string {
+	list, e := git(vault, "rev-list", "--reverse", "--first-parent", base+"..HEAD")
+	if e != nil {
+		return []string{"cannot list the range: " + e.Error()}
+	}
+	points := []string{base}
+	for _, c := range strings.Split(list, "\n") {
+		if c != "" {
+			points = append(points, c)
+		}
+	}
+	covered := make([]bool, len(points))
+	for i := 1; i < len(points); i++ {
+		body, _ := git(vault, "log", "-1", "--format=%B", points[i])
+		if !strings.Contains(body, "Knowledge-Review: accept") {
+			continue
+		}
+		want := ""
+		for _, l := range strings.Split(body, "\n") {
+			if v, ok := strings.CutPrefix(l, "Knowledge-Digest:"); ok {
+				want = strings.TrimSpace(v)
+			}
+		}
+		for p := i - 1; p >= 0; p-- {
+			if files := knowledgeChanges(vault, points[p], points[i]); len(files) > 0 && digestAt(vault, points[i], files) == want {
+				for k := p + 1; k <= i; k++ {
+					covered[k] = true
+				}
+				break
+			}
+		}
+	}
+	problems := []string{}
+	for i := 1; i < len(points); i++ {
+		if !covered[i] && len(knowledgeChanges(vault, points[i-1], points[i])) > 0 {
+			problems = append(problems, fmt.Sprintf("commit %s changes knowledge that no accepted review covers; publish knowledge through a reviewed sync/ branch", points[i][:12]))
+		}
+	}
+	return problems
+}
+
 type reviewRecord struct {
 	Commit, Verdict, Reviewer, Digest string
 }
@@ -378,7 +459,10 @@ func baseTree(vault, rev string) (string, func(), error) {
 	return dir, cleanup, nil
 }
 
-var analyzed = regexp.MustCompile(`(?m)^commit-analizado:.*$`)
+var (
+	analyzed        = regexp.MustCompile(`(?m)^commit-analizado:.*$`)
+	knowledgeFolder = regexp.MustCompile(`^[1-7]\d-`)
+)
 
 func verify(o opts) (map[string]any, error) {
 	res := map[string]any{"branch": current(o.vault), "base": o.base}
@@ -422,6 +506,31 @@ func verify(o opts) (map[string]any, error) {
 		}
 	}
 	res["note_gates"] = notes
+	// A topic, flow, integration or other knowledge note changed on the branch must not copy a repository
+	// note: the repository note owns the fact and the others link it. Copies its base already had are debt.
+	copies := []any{}
+	for _, f := range files {
+		top := strings.SplitN(f, "/", 2)[0]
+		if !strings.HasSuffix(f, ".md") || top == "20-Repos" || !knowledgeFolder.MatchString(top) {
+			continue
+		}
+		if _, e := os.Stat(filepath.Join(o.vault, f)); e != nil {
+			continue
+		}
+		var base []byte
+		if old, e := git(o.vault, "show", mb+":"+f); e == nil {
+			base = []byte(old + "\n")
+		}
+		introduced, e := discover.CopiesIntroduced(o.vault, f, base)
+		if e != nil {
+			return nil, e
+		}
+		if len(introduced) > 0 {
+			copies = append(copies, map[string]any{"note": f, "copied": introduced})
+			problems = append(problems, fmt.Sprintf("%s copies %d paragraph(s) of repository notes; keep each fact in its repository note and link that note", f, len(introduced)))
+		}
+	}
+	res["copied_paragraphs"] = copies
 	caseGates := []any{}
 	for _, f := range files {
 		if !strings.HasPrefix(f, "investigations/") || filepath.Base(f) != "investigation.md" {
@@ -500,6 +609,11 @@ func verify(o opts) (map[string]any, error) {
 			problems = append(problems, "discovery state: "+e.Error())
 		}
 		res["discovery_state_only"] = true
+	case len(files) == 0 && o.allowNoChange:
+		res["no_knowledge_change"] = true
+	case o.allowNoChange:
+		// A pushed range can hold several finished syncs: each accepted review covers its own sync.
+		problems = append(problems, reviewedRange(o.vault, mb)...)
 	case len(files) == 0:
 		problems = append(problems, "no knowledge change on this branch")
 	case rr == nil:

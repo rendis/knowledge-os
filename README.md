@@ -93,7 +93,7 @@ More: [installation and updates](docs/installation.md) · [the kos CLI](docs/cli
 <summary><b>What the cell owns</b></summary>
 <br>
 
-The cell owns `instance.yaml`, `00-Home.md`, the root Bases, notes under `10/`–`70/` and `investigations/`. The distribution owns the `AGENTS.md` router, the generic files under `90-Meta/`, the skills and the specialist definitions. `kos kernel update` refuses kernel files edited in the vault until `--force` and never rewrites cell-owned files. Details in [installation](docs/installation.md#ownership-in-a-cell).
+The cell owns `instance.yaml`, `00-Home.md`, the root Bases, notes under `10/`–`70/` and `investigations/`. The distribution owns the `AGENTS.md` router, the generic files under `90-Meta/`, the skills, the specialist definitions and the `knowledge-gates` CI workflow, which runs `kos sync verify` on every push and pull request. `kos kernel update` refuses kernel files edited in the vault until `--force` and never rewrites cell-owned files. Details in [installation](docs/installation.md#ownership-in-a-cell).
 
 </details>
 
