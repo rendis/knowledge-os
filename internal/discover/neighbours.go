@@ -176,7 +176,11 @@ func CheckNoteIntroduced(vault, note string, base []byte) (bool, []string, int, 
 	keys := func(c noteCheck) map[string]bool {
 		out := map[string]bool{}
 		for _, i := range c.Issues {
-			if i.Severity == "error" {
+			switch {
+			case i.Severity != "error":
+			case strings.HasPrefix(i.Gate, "G4-") || i.Gate == "G1-format": // counts in the detail change as debt is paid; the subject does not
+				out[i.Gate+"|"+i.Where] = true
+			default:
 				out[i.Gate+"|"+i.Where+"|"+i.Detail] = true
 			}
 		}
