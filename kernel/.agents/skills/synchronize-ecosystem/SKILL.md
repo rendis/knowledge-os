@@ -33,7 +33,7 @@ A sync brings repository notes to the current production commit of their sources
 
 - Keep the base current with `<cli> sync pull --vault "<vault>"`: it fast-forwards when possible and never merges meaning automatically.
 - Base moved (another developer published): `sync pull` lists the knowledge files changed on both sides. Rebase the branch; for each listed file re-apply this run's facts onto the upstream note, commit, re-run the gates and get the merged meaning reviewed. Never force-push.
-- To make the remote enforce the gates on every pull request, the team can copy `90-Meta/ci/knowledge-gates.yml` to `.github/workflows/`; it runs `sync verify` with the vault's own Linux binary.
+- The kernel installs `.github/workflows/knowledge-gates.yml`: on every push and pull request the remote runs `sync verify` with the kos release of the vault's kernel, so a knowledge change committed outside a reviewed sync branch fails there too. A vault hosted outside GitHub runs `kos sync verify --vault . --base <previous commit> --allow-no-change` in its own CI.
 - Source moved during the run: re-run `discover run --repo <name>` and redo only that repository's delta.
 - Interrupted run: the branch and its commits are the state; continue from `sync status`.
 
