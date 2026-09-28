@@ -52,6 +52,8 @@ Homologated benchmark (`evals/benchmark`) on real cell vaults, one fixed blind j
 | Claude Sonnet 5 / low | 0.83 (3) | 0.7 | 83% | after 2 repairs, USD 1.32 |
 | Claude Haiku 4.5 / low | 0.90 (3) | 1.7 | 57% | not measured |
 
+The quick set is saturated for the top settings (1.00); it ranks settings but cannot show that a kernel change improves answers. Quality claims come from held-out questions no kernel change was tuned on, which scored 0.64–0.67 for Opus 5.5 / medium in the reference comparison (`evals/benchmark`, held-out).
+
 Reading it: choose among settings without violations. Opus 5.5 / medium and Grok 4.7 / medium set the ceiling; Opus 5.5 / low and Sonnet 5 / medium are the cheaper safe settings; gpt-6-sol / low answers what is asked without violations but concisely (little unrequested context), and its syncs needed repairs that the gates and the reviewer caught. Every sync reached acceptance: the gates and the independent review, not the model, carry publication quality. Low effort does not lower the total cost of a sync when repairs follow. Settings not listed are unmeasured; screen them with the quick check before relying on them.
 
 ## Delegate and verify

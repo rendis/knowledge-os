@@ -1,7 +1,7 @@
 """Homologated benchmark of harness settings on real cell vaults: questions and publication flows.
 
 python3 -B evals/benchmark/bench.py prepare --suite SUITE.json --work DIR
-python3 -B evals/benchmark/bench.py qa      --suite SUITE.json --work DIR --setting claude:sonnet:low [--runs 3 | --quick] [--ids S1,S2]
+python3 -B evals/benchmark/bench.py qa      --suite SUITE.json --work DIR --setting claude:sonnet:low [--runs 3 | --quick | --heldout] [--ids S1,S2] [--arm no-review]
 python3 -B evals/benchmark/bench.py flow    --suite SUITE.json --work DIR --setting claude:sonnet:low [--runs 1]
 python3 -B evals/benchmark/bench.py report  --work DIR
 
@@ -111,10 +111,16 @@ def qa(a):
     suite, work = load_suite(a.suite), pathlib.Path(a.work)
     setting = parse_setting(a.setting)
     qs = json.loads((suite["_dir"] / suite["questions"]).read_text())
+    if a.quick and a.heldout:
+        raise SystemExit("choose --quick or --heldout")
     if a.quick:  # the suite's discriminating subset, one pass: screening a new model against the baseline
         qs = [q for q in qs if q["id"] in set(suite.get("quick", []))]
         if not qs:
             raise SystemExit("the suite declares no quick question ids")
+    if a.heldout:  # questions never used to shape the kernel: the reference for claims about answer quality
+        qs = [q for q in qs if q["id"] in set(suite.get("heldout", []))]
+        if not qs:
+            raise SystemExit("the suite declares no heldout question ids")
     if a.ids:  # a named subset, e.g. a question added to measure one behavior
         wanted = set(a.ids.split(","))
         qs = [q for q in qs if q["id"] in wanted]
@@ -123,9 +129,10 @@ def qa(a):
     runs = a.runs or (1 if a.quick else 3)
     vaults = {k: str(work / "vaults" / k) for k in suite["vaults"]}
     for i in range(1, runs + 1):
-        out = work / "qa" / (tag(setting) + ("-quick" if a.quick else "") + ("-" + a.ids.replace(",", "-") if a.ids else "")) / f"run{i}"
+        name = tag(setting) + ("-quick" if a.quick else "") + ("-heldout" if a.heldout else "") + ("-" + a.arm if a.arm else "") + ("-" + a.ids.replace(",", "-") if a.ids else "")
+        out = work / "qa" / name / f"run{i}"
         with cf.ThreadPoolExecutor(a.parallel) as ex:
-            list(ex.map(lambda q: runner.run_one(setting[0], q, vaults[q["vault"]], out, setting[1], setting[2]), [q for q in qs if q["vault"] in vaults]))
+            list(ex.map(lambda q: runner.run_one(setting[0], q, vaults[q["vault"]], out, setting[1], setting[2], a.arm), [q for q in qs if q["vault"] in vaults]))
         subprocess.run([sys.executable, "-B", str(HERE.parent / "regression" / "judge.py"), "--questions", str(suite["_dir"] / suite["questions"]), "--answers", str(out)], check=True)
 
 
@@ -226,13 +233,17 @@ def report(a):
             recs = [json.loads(f.read_text()) for f in r.glob("*.json") if f.name != "grades.json"]
             if not g or not recs:
                 continue
+            s = judge.summary(recs, g)
             runs.append({"score": mean([x["score"] for x in g.values()]), "violations": sum(len(x.get("violations", [])) for x in g.values()),
+                         "by_vault": {k: v["score"] for k, v in s["by_vault"].items()}, "losses": s["losses"],
                          "seconds": sum(x["seconds"] for x in recs), "input": sum((x.get("usage") or {}).get("input_total", 0) for x in recs),
                          "output": sum((x.get("usage") or {}).get("output", 0) for x in recs), "cost": sum(x.get("cost_usd") or 0 for x in recs) or None, "n": len(recs)})
         if runs:
             rows.append({"setting": d.name, "runs": len(runs), "score_mean": mean([r["score"] for r in runs]), "score_min": min(r["score"] for r in runs),
                          "score_max": max(r["score"] for r in runs), "violations_per_run": mean([r["violations"] for r in runs]), "answers_per_run": runs[0]["n"],
-                         "seconds": mean([r["seconds"] for r in runs]), "input_tokens": mean([r["input"] for r in runs]), "output_tokens": mean([r["output"] for r in runs]), "cost_usd": mean([r["cost"] for r in runs])})
+                         "seconds": mean([r["seconds"] for r in runs]), "input_tokens": mean([r["input"] for r in runs]), "output_tokens": mean([r["output"] for r in runs]), "cost_usd": mean([r["cost"] for r in runs]),
+                         "by_vault": {k: mean([r["by_vault"].get(k) for r in runs]) for k in sorted({k for r in runs for k in r["by_vault"]})},
+                         "losses": {k: mean([r["losses"].get(k, 0) for r in runs]) for k in sorted({k for r in runs for k in r["losses"]})}})
     for d in sorted((work / "flows").glob("*")) if (work / "flows").exists() else []:
         recs = [json.loads(f.read_text()) for f in d.glob("*/run*.json") if not f.name.endswith((".review.txt", ".txt"))]
         recs = [r for r in recs if "rounds" in r]
@@ -250,6 +261,8 @@ def report(a):
     if rows:
         md += ["## Questions", "", "| Setting | Runs | Score mean (min–max) | Violations / run | Time / run (s) | Input tokens / run | Output tokens / run | USD / run |", "|---|---|---|---|---|---|---|---|"]
         md += [f"| {r['setting']} | {r['runs']} | {f(r['score_mean'], 3)} ({f(r['score_min'], 3)}–{f(r['score_max'], 3)}) | {f(r['violations_per_run'], 1)} of {r['answers_per_run']} | {f(r['seconds'], 0)} | {f(r['input_tokens'], 0)} | {f(r['output_tokens'], 0)} | {f(r['cost_usd'])} |" for r in rows]
+        md += ["", "Where the points go: mean score per vault and lost points per run by kind (see `evals/regression/judge.py`).", "", "| Setting | Score by vault | Lost points by kind |", "|---|---|---|"]
+        md += [f"| {r['setting']} | {', '.join(f'{k} {f(v, 3)}' for k, v in r['by_vault'].items()) or '—'} | {', '.join(f'{k} {f(v, 1)}' for k, v in sorted(r['losses'].items(), key=lambda x: -x[1])) or '—'} |" for r in rows]
     if frows:
         md += ["", "## Publication flows (author until accepted, bounded repairs)", "", "| Setting | Runs | Accepted first pass | Accepted after repairs | Repairs / run | Material findings first pass | Stale neighbours first pass | Sources unchanged | Author time (s) | Author input tokens | Author USD |", "|---|---|---|---|---|---|---|---|---|---|---|"]
         md += [f"| {r['setting']} | {r['runs']} | {r['first_pass_accepted']} | {r['accepted']} | {f(r['repairs'], 1)} | {f(r['first_pass_material'], 1)} | {f(r['stale_neighbours_first_pass'], 1)} | {r['sources_unchanged']} | {f(r['seconds'], 0)} | {f(r['input_tokens'], 0)} | {f(r['cost_usd'])} |" for r in frows]
@@ -268,6 +281,8 @@ def main():
             s.add_argument("--setting", required=True)
             s.add_argument("--runs", type=int, default=0 if name == "qa" else 1)
             s.add_argument("--quick", action="store_true", help="qa only: the suite's quick subset, one run")
+            s.add_argument("--heldout", action="store_true", help="qa only: the suite's held-out subset, the reference for quality claims")
+            s.add_argument("--arm", default="", choices=sorted(runner.ARMS), help="qa only: measure one behavior, e.g. no-review")
             s.add_argument("--ids", default="", help="qa only: comma-separated question ids to run")
             s.add_argument("--parallel", type=int, default=4)
             s.add_argument("--timeout", type=int, default=3600)

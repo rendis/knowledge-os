@@ -20,6 +20,10 @@ python3 -B evals/regression/run.py --harness codex --questions Q.json --out OUT 
 python3 -B evals/regression/judge.py --questions Q.json --answers OUT
 ```
 
+`judge.py` also names why each lost point was lost (`omitted`, `abstained`, `wrong`, `direction`, `path`,
+`imprecise`) and prints the score per vault, so a change can be read as "fewer direction errors in one cell"
+rather than a single mean. `run.py --arm no-review` runs the questions without the independent reviewer.
+
 `run.py` supports `claude` (`-p`, default Opus at medium effort), `codex` (default gpt-5.5 at medium
 reasoning, read-only sandbox) and `cursor` (its default model); `--model` and `--effort` compare cheaper
 settings. `judge.py` grades with Codex so Claude answers are judged by another model family.

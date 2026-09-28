@@ -1,7 +1,7 @@
 """Run the regression questions against installed cell vaults through a real agent harness.
 
 python3 -B evals/regression/run.py --harness claude|codex|cursor --questions FILE --out DIR \
-    --vault a=PATH --vault b=PATH [--model M] [--effort low|medium|high] [--ids S1,S2] [--parallel 4]
+    --vault a=PATH --vault b=PATH [--model M] [--effort low|medium|high] [--ids S1,S2] [--parallel 4] [--arm no-review]
 
 Each question runs in a fresh headless session whose working directory is the vault, exactly as a
 developer would ask it. Answers, usage and duration are stored per question for judge.py.
@@ -11,6 +11,9 @@ import argparse, concurrent.futures as cf, json, os, pathlib, subprocess, tempfi
 
 HERE = pathlib.Path(__file__).parent
 SUFFIX = "\n\n(Read-only question: do not modify files or run actions with effects.)"
+# Arms measure one kernel behavior with the same questions: "no-review" leaves the session without the
+# independent reviewer, so the router's rule for answering without one applies.
+ARMS = {"": "", "no-review": "\n\n(No independent reviewer is available in this session: do not dispatch evidence-reviewer.)"}
 DEFAULTS = {"claude": ("opus", "medium"), "codex": ("gpt-5.5", "medium"), "cursor": ("", "")}
 
 
@@ -96,10 +99,10 @@ def execute(harness, prompt, cwd, model, effort, out_file, write=False, timeout=
     return rec
 
 
-def run_one(harness, q, vault, out_dir, model, effort):
+def run_one(harness, q, vault, out_dir, model, effort, arm=""):
     out_dir.mkdir(parents=True, exist_ok=True)
-    rec = {"id": q["id"], "vault": vault}
-    rec.update(execute(harness, q["question"] + SUFFIX, vault, model, effort, out_dir / f"{q['id']}.last.txt"))
+    rec = {"id": q["id"], "vault": q.get("vault", vault), "arm": arm}
+    rec.update(execute(harness, q["question"] + ARMS[arm] + SUFFIX, vault, model, effort, out_dir / f"{q['id']}.last.txt"))
     (out_dir / f"{q['id']}.json").write_text(json.dumps(rec, ensure_ascii=False, indent=1))
     return rec
 
@@ -114,12 +117,13 @@ def main():
     p.add_argument("--effort", default="")
     p.add_argument("--ids", default="")
     p.add_argument("--parallel", type=int, default=4)
+    p.add_argument("--arm", default="", choices=sorted(ARMS), help="measure one behavior: no-review")
     a = p.parse_args()
     vaults = dict(v.split("=", 1) for v in a.vault)
     model, effort = a.model or DEFAULTS[a.harness][0], a.effort or DEFAULTS[a.harness][1]
     qs = [q for q in json.load(open(a.questions)) if q["vault"] in vaults and (not a.ids or q["id"] in a.ids.split(","))]
     with cf.ThreadPoolExecutor(a.parallel) as ex:
-        for rec in ex.map(lambda q: run_one(a.harness, q, vaults[q["vault"]], pathlib.Path(a.out), model, effort), qs):
+        for rec in ex.map(lambda q: run_one(a.harness, q, vaults[q["vault"]], pathlib.Path(a.out), model, effort, a.arm), qs):
             print(rec["id"], rec["returncode"], rec["seconds"], "s", rec.get("cost_usd"), flush=True)
 
 
