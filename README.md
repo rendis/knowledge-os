@@ -85,6 +85,25 @@ kos init --vault ~/vaults/payments
 # 3. Open the vault with Claude Code, Codex or Cursor: onboard-developer sets up your machine
 ```
 
+Or let an agent do steps 1 and 2: paste this into Claude Code, Codex or Cursor.
+
+```text
+Install knowledge-os on this machine and create my team's cell vault.
+
+1. If `kos version` works, run `kos update`. Otherwise install kos: on macOS, Linux or WSL
+   `curl -fsSL https://github.com/rendis/knowledge-os/releases/latest/download/install-kos.sh | sh`;
+   on Windows, in PowerShell, `irm https://github.com/rendis/knowledge-os/releases/latest/download/install-kos.ps1 | iex`.
+   Confirm it with `kos version`.
+2. Read https://raw.githubusercontent.com/rendis/knowledge-os/main/kernel/.agents/skills/onboard-cell/SKILL.md
+   and follow its steps 1 to 4 with `kos` as the CLI: propose the cell's identity, repositories,
+   reference branches and clouds from evidence, and confirm them with me before writing anything.
+   Ask me where the vault goes.
+3. Create it without prompts: `kos init --vault <path> --yes` with the confirmed answers as flags
+   (`kos init --help` lists them), or `kos adopt --vault <path>` if the folder already holds notes.
+4. Run `kos doctor --vault <path>` and report the result. Then tell me to open the vault in a new
+   session, where onboard-developer sets up my machine and the first discovery starts.
+```
+
 <img src="docs/assets/demo-onboard.gif" width="100%" alt="kos init asks for the cell's name, purpose, systems, GitHub organization, repository prefixes, reference branches, clouds, trackers and language, creates the vault, and kos doctor reports it installed and current.">
 
 More: [installation and updates](docs/installation.md) · [the kos CLI](docs/cli.md) · [decisions](docs/adr/)
