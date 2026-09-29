@@ -133,6 +133,9 @@ func TestGatesWorkflowRunsOnTheCellRunner(t *testing.T) {
 	if b, _ := os.ReadFile(wf); !strings.Contains(string(b), "runs-on: ubuntu-latest") {
 		t.Fatalf("the default runner is GitHub-hosted: %s", b)
 	}
+	if b, _ := os.ReadFile(wf); !strings.Contains(string(b), "ref: ${{ github.event.pull_request.head.sha || github.sha }}") {
+		t.Fatalf("a pull request verifies the branch head, not GitHub's temporary merge: %s", b)
+	}
 	os.WriteFile(filepath.Join(v, "instance.yaml"), []byte("version: 1\ncell:\n  name: C\n  purpose: p\nsystems:\n  - id: s\n    name: S\nadapters: []\nci:\n  runner: corp-runner\n"), 0o644)
 	if res, e := run(t, "update", "--vault", v); e != nil {
 		t.Fatalf("update after changing ci.runner: %v %v", e, res)

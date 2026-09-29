@@ -304,6 +304,33 @@ func TestVerifyPushRangeWithSeveralSyncs(t *testing.T) {
 	}
 }
 
+func TestPullRequestVerifiesTheBranchHeadNotTheTemporaryMerge(t *testing.T) {
+	v := vault(t)
+	if _, e := call(t, "start", "--vault", v, "--name", "pr"); e != nil {
+		t.Fatal(e)
+	}
+	write(t, v, "10-Sistemas/Sales.md", "---\ntipo: sistema\n---\n# Sales\n\nSistema de ventas y devoluciones.\n")
+	run(t, v, "commit", "-qam", "docs: pr")
+	if _, e := call(t, "review", "--vault", v, "--verdict", "accept", "--reviewer", "r"); e != nil {
+		t.Fatal(e)
+	}
+	head, _ := git(v, "rev-parse", "HEAD")
+	// The base moved while the PR was open, so GitHub's refs/pull/N/merge is a true merge commit.
+	run(t, v, "switch", "-q", "main")
+	write(t, v, "AGENTS.md", "kernel update\n")
+	run(t, v, "commit", "-qam", "chore: update the kernel")
+	run(t, v, "update-ref", "refs/remotes/origin/main", "HEAD")
+	run(t, v, "switch", "-q", "--detach", "HEAD")
+	run(t, v, "merge", "-q", "--no-ff", "-m", "Merge "+head+" into main", head)
+	if res, e := call(t, "verify", "--vault", v, "--base", "origin/main", "--allow-no-change"); e == nil || !strings.Contains(strings.Join(toStrings(res["problems"]), " "), "no accepted review covers") {
+		t.Fatalf("the temporary merge hides the review on its second parent: %v", res)
+	}
+	run(t, v, "switch", "-q", "--detach", head)
+	if res, e := call(t, "verify", "--vault", v, "--base", "origin/main", "--allow-no-change"); e != nil || res["ok"] != true {
+		t.Fatalf("the PR's own head, as the workflow checks it out, passes: %v %v", e, res)
+	}
+}
+
 func TestPushRangeUsesTheReviewedBase(t *testing.T) {
 	v := vault(t)
 	pushed, _ := git(v, "rev-parse", "HEAD")
