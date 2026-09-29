@@ -1,6 +1,6 @@
 // Package gitsync publishes knowledge through Git: a local branch is the synchronization run,
-// commits are its checkpoints, a review commit binds the accepted content by digest, and a
-// fast-forward merge publishes it. No other run state exists.
+// commits are its checkpoints, a review commit binds the accepted content by digest and records
+// it in the tree (90-Meta/sync-reviews/), and a fast-forward merge publishes it. No other run state exists.
 package gitsync
 
 import (
@@ -31,7 +31,9 @@ const Help = `sync COMMAND --vault PATH [options]
   status                                Branch, base, changed knowledge files and review state.
   review  --verdict accept|revise --reviewer NAME [--summary TEXT]
                                         Record the reviewer's verdict on the committed content
-                                        as a commit whose trailers bind it by digest.
+                                        as a commit whose trailers bind it by digest and that adds a
+                                        record under 90-Meta/sync-reviews/ (it survives rebase and
+                                        squash merges).
   verify  [--base REV] [--allow-no-change]
                                         Gates for the branch: every changed repository note passes
                                         discover check, no new audit/link/Bases issue versus the
@@ -48,7 +50,10 @@ const Help = `sync COMMAND --vault PATH [options]
                                         changed on both sides (they need the merged meaning reviewed).
 Publishing to the remote follows the repository's Git policy. All output is JSON.`
 
-const ackRel = "90-Meta/.sync-acknowledgements.json"
+const (
+	ackRel     = "90-Meta/.sync-acknowledgements.json"
+	reviewsDir = "90-Meta/sync-reviews"
+)
 
 var (
 	knowledgePath = regexp.MustCompile(`^([1-7]\d-[^/]+/.+\.md|00-Home\.md|[^/]+\.base|90-Meta/\.sync-acknowledgements\.json|investigations/[^/]+/.+)$`)
@@ -341,6 +346,71 @@ func reviewedRange(vault, base string) []string {
 	return problems
 }
 
+type blobChange struct {
+	From string `json:"from"`
+	To   string `json:"to"`
+}
+
+// reviewFile is the review record kept in the tree, so it survives any merge method that keeps the content.
+type reviewFile struct {
+	Verdict  string                `json:"verdict"`
+	Reviewer string                `json:"reviewer"`
+	Summary  string                `json:"summary,omitempty"`
+	Base     string                `json:"base"`
+	Digest   string                `json:"digest"`
+	Files    map[string]blobChange `json:"files"`
+}
+
+func blobAt(vault, rev, f string) string {
+	if b, e := git(vault, "rev-parse", "--verify", "--quiet", rev+":"+f); e == nil {
+		return b
+	}
+	return "deleted"
+}
+
+// reviewedContent checks a range by content, whatever merge method brought it: every knowledge file the range
+// changes must go from its content at base to its content at HEAD through the transitions of accepted review
+// records the range adds. An edit no review saw breaks the chain. It returns the problems and whether the
+// range adds any record.
+func reviewedContent(vault, base string) ([]string, bool) {
+	added, e := git(vault, "diff", "--name-only", "--no-renames", "--diff-filter=A", base, "HEAD", "--", reviewsDir)
+	if e != nil {
+		return []string{"cannot list the review records: " + e.Error()}, false
+	}
+	recs := []reviewFile{}
+	for _, p := range strings.Split(added, "\n") {
+		if !strings.HasSuffix(p, ".json") {
+			continue
+		}
+		body, e := git(vault, "show", "HEAD:"+p)
+		var r reviewFile
+		if e == nil && json.Unmarshal([]byte(body), &r) == nil && r.Verdict == "accept" {
+			recs = append(recs, r)
+		}
+	}
+	problems := []string{}
+	for _, f := range knowledgeChanges(vault, base, "HEAD") {
+		cur, want := blobAt(vault, base, f), blobAt(vault, "HEAD", f)
+		for step := 0; cur != want && step < len(recs); step++ {
+			next := cur
+			for _, r := range recs {
+				if c, ok := r.Files[f]; ok && c.From == cur && c.To != cur {
+					next = c.To
+					break
+				}
+			}
+			if next == cur {
+				break
+			}
+			cur = next
+		}
+		if cur != want {
+			problems = append(problems, fmt.Sprintf("%s changes knowledge that no accepted review covers; publish knowledge through a reviewed sync/ branch", f))
+		}
+	}
+	return problems, added != ""
+}
+
 type reviewRecord struct {
 	Commit, Verdict, Reviewer, Digest string
 }
@@ -411,11 +481,27 @@ func review(o opts, out io.Writer) error {
 		return errors.New("nothing to review: no knowledge change on this branch")
 	}
 	d := digest(o.vault, files)
-	msg := fmt.Sprintf("chore(sync): record review %s\n\n%s\n\nKnowledge-Review: %s\nKnowledge-Reviewer: %s\nKnowledge-Digest: %s\nKnowledge-Base: %s\n", o.verdict, strings.TrimSpace(o.summary), o.verdict, o.reviewer, d, mb)
-	if _, e := git(o.vault, "commit", "--allow-empty", "-q", "-m", msg); e != nil {
+	rec := reviewFile{Verdict: o.verdict, Reviewer: o.reviewer, Summary: strings.TrimSpace(o.summary), Base: mb, Digest: d, Files: map[string]blobChange{}}
+	for _, f := range files {
+		rec.Files[f] = blobChange{From: blobAt(o.vault, mb, f), To: blobAt(o.vault, "HEAD", f)}
+	}
+	// The record is content, not only history: a rebase merge drops empty commits and a squash may drop trailers.
+	rel := fmt.Sprintf("%s/%s-%s-%s.json", reviewsDir, time.Now().UTC().Format("20060102T150405Z"), o.verdict, d[:12])
+	b, _ := json.MarshalIndent(rec, "", "  ")
+	if e := os.MkdirAll(filepath.Join(o.vault, reviewsDir), 0o755); e != nil {
 		return e
 	}
-	return emit(out, map[string]any{"recorded": o.verdict, "files": files, "digest": d})
+	if e := os.WriteFile(filepath.Join(o.vault, rel), append(b, '\n'), 0o644); e != nil {
+		return e
+	}
+	if _, e := git(o.vault, "add", "--", rel); e != nil {
+		return e
+	}
+	msg := fmt.Sprintf("chore(sync): record review %s\n\n%s\n\nKnowledge-Review: %s\nKnowledge-Reviewer: %s\nKnowledge-Digest: %s\nKnowledge-Base: %s\n", o.verdict, strings.TrimSpace(o.summary), o.verdict, o.reviewer, d, mb)
+	if _, e := git(o.vault, "commit", "-q", "-m", msg); e != nil {
+		return e
+	}
+	return emit(out, map[string]any{"recorded": o.verdict, "files": files, "digest": d, "record": rel})
 }
 
 // structural returns audit, link and Bases issues of a vault tree as comparable strings.
@@ -634,8 +720,18 @@ func verify(o opts) (map[string]any, error) {
 	case len(files) == 0 && o.allowNoChange:
 		res["no_knowledge_change"] = true
 	case o.allowNoChange:
-		// A pushed range can hold several finished syncs: each accepted review covers its own sync.
-		problems = append(problems, reviewedRange(o.vault, mb)...)
+		// A pushed range can hold several finished syncs, merged by any method: the review records in the tree
+		// cover it by content. Reviews recorded only as commit trailers (before the records) are checked on the
+		// first-parent history.
+		byContent, recorded := reviewedContent(o.vault, mb)
+		if len(byContent) > 0 {
+			if byHistory := reviewedRange(o.vault, mb); len(byHistory) == 0 {
+				byContent = nil
+			} else if !recorded {
+				byContent = byHistory
+			}
+		}
+		problems = append(problems, byContent...)
 	case len(files) == 0:
 		problems = append(problems, "no knowledge change on this branch")
 	case rr == nil:

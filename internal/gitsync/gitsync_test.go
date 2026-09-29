@@ -322,12 +322,97 @@ func TestPullRequestVerifiesTheBranchHeadNotTheTemporaryMerge(t *testing.T) {
 	run(t, v, "update-ref", "refs/remotes/origin/main", "HEAD")
 	run(t, v, "switch", "-q", "--detach", "HEAD")
 	run(t, v, "merge", "-q", "--no-ff", "-m", "Merge "+head+" into main", head)
-	if res, e := call(t, "verify", "--vault", v, "--base", "origin/main", "--allow-no-change"); e == nil || !strings.Contains(strings.Join(toStrings(res["problems"]), " "), "no accepted review covers") {
-		t.Fatalf("the temporary merge hides the review on its second parent: %v", res)
+	if res, e := call(t, "verify", "--vault", v, "--base", "origin/main", "--allow-no-change"); e != nil || res["ok"] != true {
+		t.Fatalf("the review record in the tree covers the temporary merge too: %v %v", e, res)
 	}
 	run(t, v, "switch", "-q", "--detach", head)
 	if res, e := call(t, "verify", "--vault", v, "--base", "origin/main", "--allow-no-change"); e != nil || res["ok"] != true {
 		t.Fatalf("the PR's own head, as the workflow checks it out, passes: %v %v", e, res)
+	}
+}
+
+// reviewedBranch leaves a sync/ branch with one reviewed knowledge commit and main moved by a kernel update, as a
+// pull request finds it; it returns main's commit before the merge.
+func reviewedBranch(t *testing.T, v string) string {
+	t.Helper()
+	if _, e := call(t, "start", "--vault", v, "--name", "pr"); e != nil {
+		t.Fatal(e)
+	}
+	write(t, v, "10-Sistemas/Sales.md", "---\ntipo: sistema\n---\n# Sales\n\nSistema de ventas y devoluciones.\n")
+	run(t, v, "commit", "-qam", "docs: pr")
+	if _, e := call(t, "review", "--vault", v, "--verdict", "accept", "--reviewer", "r"); e != nil {
+		t.Fatal(e)
+	}
+	run(t, v, "switch", "-q", "main")
+	write(t, v, "AGENTS.md", "kernel update\n")
+	run(t, v, "commit", "-qam", "chore: update the kernel")
+	before, _ := git(v, "rev-parse", "HEAD")
+	return before
+}
+
+func TestReviewSurvivesRebaseAndSquashMerges(t *testing.T) {
+	// GitHub's rebase merge replays the branch's non-empty commits; a squash keeps only the PR title.
+	for name, merge := range map[string][]string{
+		"rebase": {"rebase", "-q", "--no-keep-empty", "main", "sync/pr"},
+		"squash": {"merge", "-q", "--squash", "sync/pr"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			v := vault(t)
+			before := reviewedBranch(t, v)
+			run(t, v, merge...)
+			if name == "squash" {
+				run(t, v, "commit", "-qm", "Sales refresh (#1)")
+			} else {
+				run(t, v, "switch", "-q", "main")
+				run(t, v, "merge", "-q", "--ff-only", "sync/pr")
+			}
+			if res, e := call(t, "verify", "--vault", v, "--base", before, "--allow-no-change"); e != nil || res["ok"] != true {
+				t.Fatalf("the published content keeps its review: %v %v", e, res)
+			}
+			write(t, v, "10-Sistemas/Sales.md", "---\ntipo: sistema\n---\n# Sales\n\nEditado sin revisión.\n")
+			run(t, v, "commit", "-qam", "docs: direct edit")
+			if res, e := call(t, "verify", "--vault", v, "--base", before, "--allow-no-change"); e == nil || !strings.Contains(strings.Join(toStrings(res["problems"]), " "), "10-Sistemas/Sales.md changes knowledge that no accepted review covers") {
+				t.Fatalf("an edit after the review stays unreviewed: %v", res)
+			}
+		})
+	}
+}
+
+func TestTrailerOnlyReviewsStillCoverAFastForward(t *testing.T) {
+	v := vault(t)
+	pushed, _ := git(v, "rev-parse", "HEAD")
+	write(t, v, "10-Sistemas/Sales.md", "---\ntipo: sistema\n---\n# Sales\n\nSistema de ventas y devoluciones.\n")
+	run(t, v, "commit", "-qam", "docs: pr")
+	d := digestAt(v, "HEAD", []string{"10-Sistemas/Sales.md"})
+	// The review as kos 0.22.4 and earlier recorded it: an empty commit with trailers.
+	run(t, v, "commit", "-q", "--allow-empty", "-m", "chore(sync): record review accept\n\nKnowledge-Review: accept\nKnowledge-Reviewer: r\nKnowledge-Digest: "+d+"\nKnowledge-Base: "+pushed)
+	if res, e := call(t, "verify", "--vault", v, "--base", pushed, "--allow-no-change"); e != nil || res["ok"] != true {
+		t.Fatalf("a branch reviewed before the records existed still publishes: %v %v", e, res)
+	}
+}
+
+func TestRecoverAReviewLostByARebaseMerge(t *testing.T) {
+	v := vault(t)
+	pushed, _ := git(v, "rev-parse", "HEAD")
+	// A review recorded before the records existed lives only in an empty commit, which a rebase merge drops.
+	write(t, v, "10-Sistemas/Sales.md", "---\ntipo: sistema\n---\n# Sales\n\nSistema de ventas y devoluciones.\n")
+	run(t, v, "commit", "-qam", "docs: pr")
+	res, e := call(t, "verify", "--vault", v, "--base", pushed, "--allow-no-change")
+	if e == nil || !strings.Contains(strings.Join(toStrings(res["problems"]), " "), "no accepted review covers") {
+		t.Fatalf("the rebased content without its review fails the push gate: %v", res)
+	}
+	// Recovery: the reviewer records the published range on a sync/ branch against main before the merge.
+	if _, e := call(t, "start", "--vault", v, "--name", "restore-review"); e != nil {
+		t.Fatal(e)
+	}
+	if _, e := call(t, "review", "--vault", v, "--base", pushed, "--verdict", "accept", "--reviewer", "r", "--summary", "restores the review a rebase merge dropped"); e != nil {
+		t.Fatal(e)
+	}
+	if res, e := call(t, "verify", "--vault", v, "--base", pushed, "--allow-no-change"); e != nil || res["ok"] != true {
+		t.Fatalf("the restored review covers the published range: %v %v", e, res)
+	}
+	if res, e := call(t, "verify", "--vault", v, "--base", "main", "--allow-no-change"); e != nil || res["ok"] != true {
+		t.Fatalf("the recovery branch adds no knowledge change: %v %v", e, res)
 	}
 }
 
