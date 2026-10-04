@@ -18,30 +18,34 @@ import (
 )
 
 const Help = `discover COMMAND --vault PATH [options]
-  run        [--repo NAME ...] [--at head|note]
+  run        [--repo NAME ...] [--at head|note] [--read-only]
              Scan repositories at an exact commit, apply stored judgments and platform
-             snapshots, write facts and the comparison with notes; judgments not yet made
+             snapshots, write facts and the comparison with notes (or return them without writes with
+             --read-only); judgments not yet made
              are left as questions.
   questions  [--kind dependency|config_key|config_entry] [--limit N]
              Pending judgments as JSON for the agent to answer (from the last run).
   answer     --file ANSWERS.json   Record agent answers: [{"id":..,"choice":..,"confidence":0..1}]
-  platform   [--provider NAME] [--scope ID ...] [--referenced] [--dry-run] | --record FILE
+  platform   [--provider NAME] [--scope ID ...] [--referenced] [--dry-run] [--read-only] | --record FILE
              Capture read-only listings (names and relations, never data) of messaging,
              document and SQL databases, object storage and (gcp) the warehouse, with the
-             provider's own CLI and the developer's login. Providers: gcp (project id),
+             provider's own CLI and the developer's login; --read-only returns snapshots
+             without storing them. Providers: gcp (project id),
              aws (<account>/<region>), azure (subscription id). --provider may be omitted
              when the cell configures one (platform.providers). --referenced uses the
              scopes of the configured providers named by configuration in the last run.
              The providers are a floor: --record stores what the agent read elsewhere
              (any service, cluster or host) with its command, so facts use it.
   report     [--repo NAME]   Last run summary, or one repository's facts.
-  check      --note PATH [--note PATH ...] [--repo NAME]
+  check      --note PATH [--note PATH ...] [--repo NAME] [--read-only]
              Gates for a repository note: G1 source anchors resolve at their commit and
              the identifiers they name are in the cited lines, and the note cites its own
              repository in the short form; G2 every connector and configured resource is
              evidenced or addressed; G4 the note works as a map (typed relations, facts in
              their sections, no copies); freshness of cited files. A candidate outside the
-             vault is matched to its repository by its aliases.
+             vault is matched to its repository by its aliases. --read-only prevents
+             cache writes; ok is the publication gate, verified also requires no
+             pending evidence or unresolved review.
   shorten    --note PATH [--note PATH ...]
              Rewrite a repository note's permalinks to its own repository at its
              commit-analizado into the short form (path#Lfrom-Lto — text), in place.
@@ -52,11 +56,11 @@ are versioned under 90-Meta/discovery/. All output is JSON.`
 const stateRel = ".agents/state/discovery"
 
 type options struct {
-	vault, at, kind, file string
-	provider, record      string
-	repos, scopes, notes  []string
-	limit                 int
-	referenced, dryRun    bool
+	vault, at, kind, file        string
+	provider, record             string
+	repos, scopes, notes         []string
+	limit                        int
+	referenced, dryRun, readOnly bool
 }
 
 func parse(args []string) (string, options, error) {
@@ -105,6 +109,8 @@ func parse(args []string) (string, options, error) {
 			}
 		case "--referenced":
 			o.referenced = true
+		case "--read-only":
+			o.readOnly = true
 		case "--dry-run":
 			o.dryRun = true
 		default:
@@ -113,6 +119,9 @@ func parse(args []string) (string, options, error) {
 		if e != nil {
 			return "", o, e
 		}
+	}
+	if o.readOnly && (cmd != "run" && cmd != "check" && cmd != "platform" || o.record != "") {
+		return "", o, errors.New("--read-only is supported by run, check and platform capture, not mutations")
 	}
 	if o.vault == "" {
 		return "", o, errors.New("--vault is required")
@@ -151,16 +160,21 @@ func writeState(vault, name string, v any) error {
 // not scan; a repository no longer tracked is left out even if its facts file remains.
 func storedFacts(vault string, fresh []repoFacts, tracked map[string]bool) []repoFacts {
 	out := append([]repoFacts{}, fresh...)
+	canonicalTracked := map[string]bool{}
+	for name, enabled := range tracked {
+		key := strings.ToLower(name)
+		canonicalTracked[key] = canonicalTracked[key] || enabled
+	}
 	scanned := map[string]bool{}
 	for _, f := range fresh {
-		scanned[f.Repo] = true
+		scanned[strings.ToLower(f.Repo)] = true
 	}
 	paths, _ := filepath.Glob(filepath.Join(vault, stateRel, "facts", "*.json"))
 	sort.Strings(paths)
 	for _, p := range paths {
 		var f repoFacts
 		b, e := os.ReadFile(p)
-		if e != nil || json.Unmarshal(b, &f) != nil || f.Repo == "" || scanned[f.Repo] || !tracked[f.Repo] {
+		if e != nil || json.Unmarshal(b, &f) != nil || f.Repo == "" || scanned[strings.ToLower(f.Repo)] || !canonicalTracked[strings.ToLower(f.Repo)] {
 			continue
 		}
 		out = append(out, f)
@@ -235,6 +249,12 @@ type runReport struct {
 
 func runDiscovery(o options, out io.Writer) error {
 	start := time.Now()
+	persist := func(name string, value any) error {
+		if o.readOnly {
+			return nil
+		}
+		return writeState(o.vault, name, value)
+	}
 	only := map[string]bool{}
 	for _, r := range o.repos {
 		only[r] = true
@@ -245,6 +265,15 @@ func runDiscovery(o options, out io.Writer) error {
 	}
 	scans := []*repoScan{}
 	failed := []string{}
+	found := map[string]bool{}
+	for _, in := range inputs {
+		found[strings.ToLower(in.Name)] = true
+	}
+	for _, name := range o.repos {
+		if !found[strings.ToLower(name)] {
+			failed = append(failed, name+": no bound checkout in configured roots")
+		}
+	}
 	skipped := []string{} // checkouts without a commit are not sources yet
 	for _, in := range inputs {
 		if c := noteCommit(o.vault, in.Note); o.at == "note" && c != "" {
@@ -263,7 +292,6 @@ func runDiscovery(o options, out io.Writer) error {
 			failed = append(failed, in.Name+": "+e.Error())
 			continue
 		}
-		s.in.Commit, _ = resolveCommit(in.Path, in.Ref)
 		scans = append(scans, s)
 	}
 	if len(o.repos) > 0 {
@@ -275,7 +303,7 @@ func runDiscovery(o options, out io.Writer) error {
 	if e != nil {
 		return e
 	}
-	if st.dropped > 0 {
+	if st.dropped > 0 && !o.readOnly {
 		if e := st.save(o.vault); e != nil {
 			return e
 		}
@@ -287,22 +315,22 @@ func runDiscovery(o options, out io.Writer) error {
 	a := &assembly{scans: scans, st: st, platform: ix, providers: configuredProviders(o.vault)}
 	facts := a.facts()
 	qs := a.pendingQuestions()
-	if e := writeState(o.vault, "questions.json", qs); e != nil {
+	if e := persist("questions.json", qs); e != nil {
 		return e
 	}
 	for _, f := range facts {
-		if e := writeState(o.vault, filepath.Join("facts", f.Repo+".json"), f); e != nil {
+		if e := persist(filepath.Join("facts", f.Repo+".json"), f); e != nil {
 			return e
 		}
 	}
-	// A run over some repositories keeps the last facts of the other tracked ones in the cell-wide
-	// comparison and gaps; a full run compares only what it scanned, as before.
+	// Persisted partial runs retain other tracked facts in the cell-wide comparison.
+	// Read-only runs compare only evidence scanned in this invocation.
 	all := facts
-	if len(only) > 0 {
+	if len(only) > 0 && !o.readOnly {
 		tracked := map[string]bool{}
 		if every, e := discoverRepositories(o.vault, map[string]bool{}); e == nil {
 			for _, in := range every {
-				tracked[in.Name] = true
+				tracked[strings.ToLower(in.Name)] = true
 			}
 		}
 		all = storedFacts(o.vault, facts, tracked)
@@ -311,14 +339,14 @@ func runDiscovery(o options, out io.Writer) error {
 	if e != nil {
 		return e
 	}
-	if e := writeState(o.vault, "comparison.json", cmp); e != nil {
+	if e := persist("comparison.json", cmp); e != nil {
 		return e
 	}
 	gaps, e := cellGaps(o.vault, all)
 	if e != nil {
 		return e
 	}
-	if e := writeState(o.vault, "gaps.json", gaps); e != nil {
+	if e := persist("gaps.json", gaps); e != nil {
 		return e
 	}
 	rep := runReport{Vault: o.vault, GeneratedAt: time.Now().UTC().Format(time.RFC3339), Repositories: len(inputs), Failed: failed, Skipped: skipped,
@@ -354,8 +382,17 @@ func runDiscovery(o options, out io.Writer) error {
 	}
 	rep.Comparison["resources_without_topic_note"] = len(gaps)
 	rep.Duration = time.Since(start).Round(time.Millisecond).String()
-	if e := writeState(o.vault, "report.json", rep); e != nil {
+	if e := persist("report.json", rep); e != nil {
 		return e
+	}
+	if o.readOnly {
+		if e := emit(out, map[string]any{"report": rep, "facts": facts, "questions": qs, "comparison": cmp, "gaps": gaps}); e != nil {
+			return e
+		}
+		if len(failed) > 0 || (len(o.repos) > 0 && len(skipped) > 0) {
+			return fmt.Errorf("discovery incomplete: %d failed, %d skipped repositories; see report.failed and report.skipped", len(failed), len(skipped))
+		}
+		return nil
 	}
 	return emit(out, rep)
 }
@@ -487,11 +524,15 @@ func capturePlatform(o options, out io.Writer) error {
 		return emit(out, map[string]any{"would_capture": uniq, "commands": cmds})
 	}
 	result := map[string]string{}
+	snapshots := []platformSnapshot{}
 	for _, k := range uniq {
 		n, sc, _ := strings.Cut(k, ":")
 		s := providers[n].capture(sc)
-		if e := saveSnapshot(o.vault, s); e != nil {
-			return e
+		snapshots = append(snapshots, s)
+		if !o.readOnly {
+			if e := saveSnapshot(o.vault, s); e != nil {
+				return e
+			}
 		}
 		result[k] = s.Status
 		if s.Status == "ok" {
@@ -505,11 +546,14 @@ func capturePlatform(o options, out io.Writer) error {
 				result[k] = "ok (" + strings.Join(partial, ", ") + ")"
 			}
 		}
-		if s.Status != "ok" {
+		if s.Status != "ok" && !o.readOnly {
 			if b, e := os.ReadFile(snapshotPath(o.vault, n, sc)); e == nil && strings.Contains(string(b), `"refresh_failed"`) {
 				result[k] = s.Status + " (previous snapshot kept)"
 			}
 		}
+	}
+	if o.readOnly {
+		return emit(out, map[string]any{"captured": result, "snapshots": snapshots})
 	}
 	return emit(out, map[string]any{"captured": result, "stored_in": platformRel, "next": "kos discover run --vault <VAULT>"})
 }

@@ -2,12 +2,84 @@ package discover
 
 import (
 	"bytes"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
+	"time"
 )
+
+func TestObservationKeepsCaptureProvenance(t *testing.T) {
+	v := t.TempDir()
+	source := filepath.Join(t.TempDir(), "observation.json")
+	const captured = "2000-01-01T03:00:00.123+03:00"
+	b := `{"provider":"local","scope":"probe","service":"fixture","command":"printf fixture","captured_at":"` + captured + `","captured_by":"original-collector","resources":[{"name":"probe-resource"}]}`
+	if e := os.WriteFile(source, []byte(b), 0o644); e != nil {
+		t.Fatal(e)
+	}
+	var out bytes.Buffer
+	if e := recordObservation(options{vault: v, record: source}, &out); e != nil {
+		t.Fatal(e)
+	}
+	observations, e := loadObservations(v)
+	if e != nil || len(observations) != 1 {
+		t.Fatalf("recorded observations: %+v %v", observations, e)
+	}
+	if ob := observations[0]; ob.CapturedAt != captured || ob.CapturedBy != "original-collector" {
+		t.Fatalf("import must preserve the capture time and collector: %+v", ob)
+	}
+	// Preserving a collector must keep the observation's existing credential guard.
+	b = strings.Replace(b, "original-collector", "https://collector.example.test/run?sig=AbCdEfGhIjKlMnOp", 1)
+	if e := os.WriteFile(source, []byte(b), 0o644); e != nil {
+		t.Fatal(e)
+	}
+	if e := recordObservation(options{vault: v, record: source}, &out); e == nil || !strings.Contains(e.Error(), "credential") {
+		t.Fatalf("a collector with credentials must be refused: %v", e)
+	}
+	observations, e = loadObservations(v)
+	if e != nil || len(observations) != 1 || observations[0].CapturedBy != "original-collector" {
+		t.Fatalf("a rejected import must keep the previous observation: %+v %v", observations, e)
+	}
+}
+
+func TestObservationDefaultsAndInvalidCaptureTime(t *testing.T) {
+	for _, captured := range []string{"", "not-a-date"} {
+		t.Run(captured, func(t *testing.T) {
+			v := t.TempDir()
+			source := filepath.Join(t.TempDir(), "observation.json")
+			b, _ := json.Marshal(observation{Provider: "local", Scope: "probe", Service: "fixture", Command: "printf fixture", CapturedAt: captured, Resources: []observedResource{{Name: "probe-resource"}}})
+			if e := os.WriteFile(source, b, 0o644); e != nil {
+				t.Fatal(e)
+			}
+			var out bytes.Buffer
+			before := time.Now().UTC().Truncate(time.Second)
+			e := recordObservation(options{vault: v, record: source}, &out)
+			if captured != "" {
+				if e == nil || !strings.Contains(e.Error(), "captured_at") {
+					t.Fatalf("invalid capture time must be refused: %v", e)
+				}
+				if observations, _ := loadObservations(v); len(observations) != 0 {
+					t.Fatal("an invalid observation was written")
+				}
+				return
+			}
+			if e != nil {
+				t.Fatal(e)
+			}
+			observations, e := loadObservations(v)
+			if e != nil || len(observations) != 1 {
+				t.Fatalf("recorded observations: %+v %v", observations, e)
+			}
+			ob := observations[0]
+			at, e := time.Parse(time.RFC3339, ob.CapturedAt)
+			if e != nil || at.Before(before) || at.After(time.Now().UTC()) || ob.CapturedBy != "agent" {
+				t.Fatalf("legacy inputs still get capture defaults: %+v %v", ob, e)
+			}
+		})
+	}
+}
 
 func TestObservationsExtendThePlatformBeyondTheProviders(t *testing.T) {
 	vault := t.TempDir()

@@ -104,7 +104,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	if e := notices(args, stderr); e != nil {
 		return e
 	}
-	if root, vk := vaultKernel(args); vk != "" {
+	if root, vk := vaultKernel(args); vk != "" && !has(args, "--read-only") {
 		vaults.Register(root)
 	}
 	switch args[0] {
@@ -263,8 +263,10 @@ func gated(args []string) bool {
 }
 
 func notices(args []string, stderr io.Writer) error {
-	if latest := release.Newer(version); latest != "" {
-		fmt.Fprintf(stderr, "kos notice: kos %s is available (this is %s); tell the user and, with their approval, run `kos update`: it lists the vaults whose kernel it would update\n", latest, version)
+	if !has(args, "--read-only") {
+		if latest := release.Newer(version); latest != "" {
+			fmt.Fprintf(stderr, "kos notice: kos %s is available (this is %s); tell the user and, with their approval, run `kos update`: it lists the vaults whose kernel it would update\n", latest, version)
+		}
 	}
 	root, vk := vaultKernel(args)
 	if vk == "" || args[0] == "kernel" {

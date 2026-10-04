@@ -1,0 +1,35 @@
+name: distribution-tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: distribution-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  distribution:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      KOS_NO_UPDATE_CHECK: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Isolate the vault catalog
+        run: echo "KOS_VAULTS_FILE=$RUNNER_TEMP/kos-tests/vaults.json" >> "$GITHUB_ENV"
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - name: Check Go and evaluator regressions
+        run: make test test-race test-evals
+      - name: Build the release
+        run: make release
+      - name: Check the fresh release and installers
+        run: make test-installer

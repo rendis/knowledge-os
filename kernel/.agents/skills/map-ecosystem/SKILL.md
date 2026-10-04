@@ -37,7 +37,7 @@ Choose the next action from the existing knowledge, not from the number of pendi
 | --- | --- |
 | Full onboarding requested, or the selected task requires source access and roots/acquisition choice are missing | Use `onboard-developer` (this machine's roots and clone choice; `onboard-cell` for the cell's sources) to collect unresolved decisions before source acquisition; return to the selected map branch afterward. |
 | Incomplete bootstrap or where-to-start request | Load `references/orientation.md`. |
-| Which service publishes/consumes a topic, event, table or endpoint | Read the discovery facts (`<cli> discover report --vault "<vault>" --repo <name>`, or run `discover run` when absent) and the platform wiring they cite; open the owning notes for behavior. |
+| Which service publishes/consumes a topic, event, table or endpoint | Read the discovery facts (`<cli> discover report --vault "<vault>" --repo <name>`, or run `discover run --read-only` when absent) and the platform wiring they cite; open the owning notes for behavior. |
 | Context, dependency, or impact question | Load `references/interrogation.md`. |
 | A related vault is discovered in authorized repository exploration or supplied by the user | Load `references/cross-vault-consultation.md` before consulting it; return to the active branch. |
 | Register, update, list or remove related vaults; or a mapping discovers a candidate to register | Load `references/vault-catalog.md`; discovery requires confirmation before registration. |

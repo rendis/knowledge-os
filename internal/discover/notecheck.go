@@ -54,6 +54,7 @@ type noteCheck struct {
 	Freshness map[string]any `json:"freshness,omitempty"`
 	Issues    []checkIssue   `json:"issues"`
 	OK        bool           `json:"ok"`
+	Verified  bool           `json:"verified"`
 }
 
 type gitCache struct {
@@ -233,18 +234,13 @@ func checkNoteFresh(vault, notePath, repoOverride string) (noteCheck, error) {
 		r.Issues = append(r.Issues, checkIssue{gate, sev, where, detail})
 	}
 	g := &gitCache{commits: map[string]bool{}, files: map[string]*string{}}
-	checkouts := map[string]string{}
+	checkouts := sourceCheckouts(vault)
 	locate := func(repo string) string {
-		if p, ok := checkouts[repo]; ok {
-			return p
+		id, e := config.RemoteIdentity("https://github.com/" + repo + ".git")
+		if e != nil {
+			return ""
 		}
-		loc, e := config.LocateRepository(vault, "https://github.com/"+repo+".git")
-		p := ""
-		if e == nil && loc["status"] == "ok" {
-			p, _ = loc["path"].(string)
-		}
-		checkouts[repo] = p
-		return p
+		return checkouts[id]
 	}
 	// G1 anchors
 	defined := map[string]bool{}
@@ -260,13 +256,28 @@ func checkNoteFresh(vault, notePath, repoOverride string) (noteCheck, error) {
 		repoName = noteRepository(vault, full, fm)
 	}
 	commit := strings.Trim(fm["commit-analizado"], `"'`)
-	anchors := parseAnchors(text)
+	var inputs []repoInput
+	var bindingErr error
 	if repoName != "" && commit != "" {
-		if inputs, e := discoverRepositories(vault, map[string]bool{repoName: true}); e == nil && len(inputs) == 1 {
-			if id, e := config.RemoteIdentity(inputs[0].Remote); e == nil {
-				if parts := strings.SplitN(id, "/", 2); len(parts) == 2 {
-					anchors = append(anchors, relativeAnchors(text, parts[1], commit)...)
-				}
+		inputs, bindingErr = discoverRepositories(vault, map[string]bool{repoName: true})
+	}
+	if commit != "" && (bindingErr != nil || len(inputs) != 1) {
+		detail := "no bound checkout for this repository note; configure its repository root and identity to verify short citations"
+		if bindingErr != nil {
+			detail += ": " + bindingErr.Error()
+		} else if len(inputs) > 1 {
+			detail = "ambiguous checkout identity for this repository note; select one configured source checkout"
+		}
+		add("G1-anchor", "pending", "footnotes", detail)
+		add("G2-coverage", "pending", "repository", "repository coverage cannot be checked without one bound checkout")
+	} else if repoName != "" && commit == "" {
+		add("G2-coverage", "pending", repoName, "commit-analizado is missing; bind an exact source revision to check repository coverage")
+	}
+	anchors := parseAnchors(text)
+	if len(inputs) == 1 {
+		if id, e := config.RemoteIdentity(inputs[0].Remote); e == nil {
+			if parts := strings.SplitN(id, "/", 2); len(parts) == 2 {
+				anchors = append(anchors, relativeAnchors(text, parts[1], commit)...)
 			}
 		}
 	}
@@ -318,6 +329,12 @@ func checkNoteFresh(vault, notePath, repoOverride string) (noteCheck, error) {
 		}
 		content, exists := g.file(repo, a.Commit, a.Path)
 		if !exists {
+			names, e := gitOutputRaw(repo, "ls-tree", "--name-only", "-z", a.Commit, "--", a.Path)
+			if e != nil || strings.Contains("\x00"+names, "\x00"+a.Path+"\x00") {
+				r.Anchors["unverifiable"]++
+				add("G1-anchor", "pending", where, "cannot read the cited file at commit "+a.Commit+"; restore source access to verify")
+				continue
+			}
 			r.Anchors["errors"]++
 			add("G1-anchor", "error", where, "file does not exist at commit "+a.Commit)
 			continue
@@ -390,8 +407,7 @@ func checkNoteFresh(vault, notePath, repoOverride string) (noteCheck, error) {
 	// G2 coverage against the repository's own facts at the analyzed commit.
 	r.Repo, r.Commit = repoName, commit
 	if repoName != "" && commit != "" {
-		inputs, e := discoverRepositories(vault, map[string]bool{repoName: true})
-		if e == nil && len(inputs) == 1 {
+		if bindingErr == nil && len(inputs) == 1 {
 			in := inputs[0]
 			ref, refErr := in.Ref, in.RefErr
 			in.Ref = commit
@@ -547,9 +563,12 @@ func checkNoteFresh(vault, notePath, repoOverride string) (noteCheck, error) {
 			}
 		}
 	}
-	r.OK = true
+	r.OK, r.Verified = true, true
 	for _, i := range r.Issues {
-		if i.Severity == "error" {
+		if i.Severity == "pending" || i.Severity == "review" || i.Severity == "error" {
+			r.Verified = false
+		}
+		if i.Severity == "error" || (i.Severity == "pending" && (i.Gate == "G1-anchor" || i.Gate == "G2-coverage")) {
 			r.OK = false
 		}
 	}
@@ -645,7 +664,7 @@ func runCheck(o options, out io.Writer) error {
 		if len(o.repos) == 1 {
 			repo = o.repos[0]
 		}
-		r, e := checkNote(o.vault, n, repo)
+		r, e := checkNoteMode(o.vault, n, repo, !o.readOnly)
 		if e != nil {
 			return e
 		}

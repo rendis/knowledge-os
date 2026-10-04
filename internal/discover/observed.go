@@ -48,6 +48,7 @@ var obsSlug = regexp.MustCompile(`^[a-z0-9][a-z0-9._\-]*$`)
 
 const observationFormat = `{"provider": "gcp", "scope": "<project, account/region, cluster, host>", "service": "cloud-scheduler",
  "command": "<the read-only command that produced it>",
+ "captured_at": "<optional original RFC3339 capture time>", "captured_by": "<optional original collector>",
  "resources": [{"name": "<full or short name>", "kind": "<schedule, function, table...>", "links": [{"relation": "targets", "target": "<name>"}]}]}`
 
 func recordObservation(o options, out io.Writer) error {
@@ -72,7 +73,12 @@ func recordObservation(o options, out io.Writer) error {
 	case len(ob.Resources) == 0:
 		return errors.New("resources lists at least one observed name")
 	}
-	values := []string{ob.Command, ob.Scope}
+	if ob.CapturedAt != "" {
+		if _, e := time.Parse(time.RFC3339, ob.CapturedAt); e != nil {
+			return errors.New("captured_at must be an RFC3339 timestamp")
+		}
+	}
+	values := []string{ob.Command, ob.Scope, ob.CapturedBy}
 	for _, r := range ob.Resources {
 		if strings.TrimSpace(r.Name) == "" {
 			return errors.New("every resource has a name")
@@ -88,7 +94,13 @@ func recordObservation(o options, out io.Writer) error {
 		}
 	}
 	sort.Slice(ob.Resources, func(i, j int) bool { return ob.Resources[i].Name < ob.Resources[j].Name })
-	ob.CapturedAt, ob.CapturedBy = time.Now().UTC().Format(time.RFC3339), "agent"
+	// Imported evidence keeps its provenance; omitted fields retain the live-capture defaults.
+	if ob.CapturedAt == "" {
+		ob.CapturedAt = time.Now().UTC().Format(time.RFC3339)
+	}
+	if ob.CapturedBy == "" {
+		ob.CapturedBy = "agent"
+	}
 	rel := filepath.Join(observedRel, ob.Provider+"-"+strings.Trim(unsafeFile.ReplaceAllString(strings.ToLower(ob.Scope), "-"), "-")+"-"+ob.Service+".json")
 	p := filepath.Join(o.vault, rel)
 	if e := os.MkdirAll(filepath.Dir(p), 0o755); e != nil {

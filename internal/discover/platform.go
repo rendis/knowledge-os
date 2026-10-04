@@ -2,6 +2,7 @@ package discover
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -72,12 +73,22 @@ func captureKinds(snap platformSnapshot, fns map[string]kindCapture, order []str
 	size := func() int { return len(snap.Topics) + len(snap.Subscriptions) + len(snap.Resources) }
 	for i, k := range order {
 		before := size()
+		topics, subscriptions, resources := len(snap.Topics), len(snap.Subscriptions), len(snap.Resources)
 		msg, e := fns[k](&snap)
+		if e == nil && (slices.ContainsFunc(snap.Topics[topics:], func(name string) bool { return strings.TrimSpace(name) == "" }) ||
+			slices.ContainsFunc(snap.Subscriptions[subscriptions:], func(s platformSubscription) bool { return strings.TrimSpace(s.Name) == "" }) ||
+			slices.ContainsFunc(snap.Resources[resources:], func(r platformResource) bool { return strings.TrimSpace(r.Name) == "" })) {
+			msg = "unreadable " + k + " inventory: a resource has no name"
+			e = errors.New(msg)
+		}
 		if e == nil {
 			snap.Kinds[k] = "ok"
 			listed = listed || size() > before
 			continue
 		}
+		// A failed kind is incomplete evidence. Keep other completed kinds, but prevent
+		// these rows from entering the confirmation index as a completed capture.
+		snap.Topics, snap.Subscriptions, snap.Resources = snap.Topics[:topics], snap.Subscriptions[:subscriptions], snap.Resources[:resources]
 		status := snap.failed(msg).Status
 		low := strings.ToLower(msg)
 		for _, m := range notEnabled {
@@ -146,12 +157,22 @@ func ProviderNames() []string {
 // runCLI runs a provider's own command-line tool, so the developer's existing login and permissions
 // apply. Tests replace it.
 var runCLI = func(name string, args ...string) ([]byte, string, error) {
-	cmd := exec.Command(name, args...)
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	return runCLIContext(ctx, name, args...)
+}
+
+func runCLIContext(ctx context.Context, name string, args ...string) ([]byte, string, error) {
+	cmd := exec.CommandContext(ctx, name, args...)
+	cmd.WaitDelay = time.Second
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	b, e := cmd.Output()
 	if errors.Is(e, exec.ErrNotFound) {
 		return nil, name + " is not installed or not on PATH", e
+	}
+	if ctx.Err() != nil {
+		return nil, name + " read timed out or was cancelled", ctx.Err()
 	}
 	return b, strings.TrimSpace(stderr.String()), e
 }
@@ -188,7 +209,7 @@ func (s platformSnapshot) failed(stderr string) platformSnapshot {
 	return s
 }
 
-// jsonCLI runs a provider command and decodes its JSON output; empty output decodes as nothing.
+// jsonCLI requires observed JSON output. Empty stdout and null do not prove an empty listing.
 func jsonCLI(v any, name string, args ...string) (string, error) {
 	b, stderr, e := runCLI(name, args...)
 	if e != nil {
@@ -197,8 +218,8 @@ func jsonCLI(v any, name string, args ...string) (string, error) {
 		}
 		return stderr, e
 	}
-	if len(bytes.TrimSpace(b)) == 0 {
-		return "", nil
+	if trimmed := bytes.TrimSpace(b); len(trimmed) == 0 || bytes.Equal(trimmed, []byte("null")) {
+		return "missing JSON output of " + name, errors.New("provider returned no observable JSON result")
 	}
 	if e := json.Unmarshal(b, v); e != nil {
 		return "unreadable output of " + name + " " + strings.Join(args[:min(len(args), 3)], " "), e
@@ -349,6 +370,17 @@ func (ix platformIndex) objectsNamed(v string) []objectRef {
 func buildPlatformIndex(snaps []platformSnapshot) platformIndex {
 	ix := platformIndex{topics: map[string][]string{}, subs: map[string][]platformSubscription{}, scopes: map[string]platformSnapshot{}, objects: map[string][]objectRef{}}
 	for _, s := range snaps {
+		if len(s.RefreshFailed) != 0 {
+			// Retained rows describe the last successful capture, not the failed current read.
+			// Keep the historical snapshot on disk, but exclude its resource confirmations.
+			s.Status = "refresh-failed"
+			s.Detail = s.RefreshFailed["status"] + ": " + s.RefreshFailed["detail"]
+			if confirm := s.RefreshFailed["confirm_with"]; confirm != "" {
+				s.Confirm = confirm
+			}
+			ix.scopes[s.key()] = s
+			continue
+		}
 		ix.scopes[s.key()] = s
 		for _, r := range s.Resources {
 			ref := objectRef{scope: s.key(), res: r}

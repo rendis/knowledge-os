@@ -347,27 +347,72 @@ func Written(p Plan) []string {
 }
 
 func Apply(vault string, p Plan) error {
+	return apply(vault, p, writeFile)
+}
+
+func apply(vault string, p Plan, write func(string, []byte) error) (err error) {
+	vault = filepath.Clean(vault)
+	// Validate auxiliary targets and parse cell settings before replacing or retiring any kernel file.
+	for _, rel := range Written(p) {
+		if rel == updateDir || strings.HasPrefix(rel, updateDir+"/") {
+			return fmt.Errorf("reserved kernel update path: %s", rel)
+		}
+		if e := safePath(vault, rel); e != nil {
+			return e
+		}
+		st, e := os.Lstat(filepath.Join(vault, filepath.FromSlash(rel)))
+		if os.IsNotExist(e) {
+			continue
+		}
+		if e != nil {
+			return e
+		}
+		if contains(bases, rel) {
+			continue // existing Bases are cell-owned and never replaced
+		}
+		if rel == ".claude/skills" && st.Mode()&os.ModeSymlink != 0 {
+			continue
+		}
+		if !st.Mode().IsRegular() || rel == ".claude/skills" {
+			return fmt.Errorf("%s is not a safe kernel update target", rel)
+		}
+	}
+	ignores, e := prepareIgnores(vault)
+	if e != nil {
+		return e
+	}
+	tx, e := beginUpdate(vault, Written(p))
+	if e != nil {
+		return e
+	}
+	defer func() {
+		state := "kernel update applied"
+		if err != nil {
+			if e := tx.rollback(); e != nil {
+				err = errors.Join(err, fmt.Errorf("kernel rollback failed; recovery files kept at %s: %w", tx.dir, e))
+				return
+			}
+			err = fmt.Errorf("kernel update failed; previous state restored: %w", err)
+			state = "previous kernel state restored"
+		}
+		err = errors.Join(err, tx.cleanup(state))
+	}()
 	for _, c := range p.Changes {
 		target := filepath.Join(vault, filepath.FromSlash(c.Path))
 		if c.Action == "remove" {
 			if e := os.Remove(target); e != nil && !os.IsNotExist(e) {
 				return e
 			}
-			for dir := filepath.Dir(target); dir != vault && strings.HasPrefix(dir, vault); dir = filepath.Dir(dir) {
-				if entries, e := os.ReadDir(dir); e != nil || len(entries) > 0 || os.Remove(dir) != nil {
-					break
-				}
-			}
 			continue
 		}
-		if e := writeFile(target, p.sources[c.Path]); e != nil {
+		if e := write(target, p.sources[c.Path]); e != nil {
 			return e
 		}
 	}
 	for _, base := range bases {
-		if _, e := os.Stat(filepath.Join(vault, base)); os.IsNotExist(e) {
+		if _, e := os.Lstat(filepath.Join(vault, base)); os.IsNotExist(e) {
 			b, _ := fs.ReadFile(knowledgeos.Payload, "kernel/"+base)
-			if e := writeFile(filepath.Join(vault, base), b); e != nil {
+			if e := write(filepath.Join(vault, base), b); e != nil {
 				return e
 			}
 		}
@@ -375,33 +420,78 @@ func Apply(vault string, p Plan) error {
 	if e := claudeSkillsLink(vault); e != nil {
 		return e
 	}
-	if e := ensureIgnores(vault); e != nil {
-		return e
-	}
-	hashes := map[string]string{}
-	for rel := range p.sources {
-		if b, exists, e := readRegular(filepath.Join(vault, filepath.FromSlash(rel))); e == nil && exists {
-			hashes[rel] = digest(b)
-		}
-	}
-	lock := Lock{KernelVersion: Version(), Revision: Revision, Dirty: Dirty != "false", Adapters: p.adapters, Hashes: hashes}
-	return writeFile(filepath.Join(vault, LockName), []byte(lock.dump()))
-}
-
-func writeFile(target string, b []byte) error {
-	if e := os.MkdirAll(filepath.Dir(target), 0o755); e != nil {
-		return e
-	}
-	if st, e := os.Lstat(target); e == nil && st.Mode()&os.ModeSymlink != 0 {
-		if e := os.Remove(target); e != nil {
+	for _, f := range ignores {
+		if e := write(f.path, f.contents); e != nil {
 			return e
 		}
 	}
-	tmp := target + ".kos-tmp"
-	if e := os.WriteFile(tmp, b, 0o644); e != nil {
+	hashes := map[string]string{}
+	for rel := range p.sources {
+		b, exists, e := readRegular(filepath.Join(vault, filepath.FromSlash(rel)))
+		if e != nil {
+			return e
+		}
+		if !exists {
+			return fmt.Errorf("managed file missing after kernel update: %s", rel)
+		}
+		hashes[rel] = digest(b)
+	}
+	lock := Lock{KernelVersion: Version(), Revision: Revision, Dirty: Dirty != "false", Adapters: p.adapters, Hashes: hashes}
+	if e := write(filepath.Join(vault, LockName), []byte(lock.dump())); e != nil {
 		return e
 	}
-	return os.Rename(tmp, target)
+	// Keep retired directories until the update succeeds, so rollback needs no new allocation there.
+	for _, c := range p.Changes {
+		if c.Action != "remove" {
+			continue
+		}
+		for dir := filepath.Dir(filepath.Join(vault, filepath.FromSlash(c.Path))); dir != vault; dir = filepath.Dir(dir) {
+			if entries, e := os.ReadDir(dir); e != nil || len(entries) > 0 || os.Remove(dir) != nil {
+				break
+			}
+		}
+	}
+	return nil
+}
+
+func writeFile(target string, b []byte) error {
+	mode := os.FileMode(0o644)
+	if st, e := os.Lstat(target); e == nil {
+		mode = st.Mode().Perm()
+	} else if !os.IsNotExist(e) {
+		return e
+	}
+	return writeFileMode(target, b, mode)
+}
+
+func writeFileMode(target string, b []byte, mode os.FileMode) error {
+	if e := os.MkdirAll(filepath.Dir(target), 0o755); e != nil {
+		return e
+	}
+	if st, e := os.Lstat(target); e == nil && !st.Mode().IsRegular() {
+		return fmt.Errorf("%s is not a regular file", target)
+	} else if e != nil && !os.IsNotExist(e) {
+		return e
+	}
+	f, e := os.CreateTemp(filepath.Dir(target), ".kos-kernel-*")
+	if e != nil {
+		return e
+	}
+	defer os.Remove(f.Name())
+	defer f.Close()
+	if e := f.Chmod(mode); e != nil {
+		return e
+	}
+	if _, e := f.Write(b); e != nil {
+		return e
+	}
+	if e := f.Sync(); e != nil {
+		return e
+	}
+	if e := f.Close(); e != nil {
+		return e
+	}
+	return os.Rename(f.Name(), target)
 }
 
 // claudeSkillsLink points .claude/skills at the shared skills so Claude Code finds them.
@@ -427,10 +517,20 @@ func claudeSkillsLink(vault string) error {
 var ignored = []string{"/AGENTS.personal.md", "/.investigations/", "/.investigations-private/", "/.operations/",
 	"/.knowledge-os-config.yaml", "/.knowledge-os-config.*.tmp", "/.agents/state/discovery/", "/.plan/", "/.scratch/", "/.venv/"}
 
-// ensureIgnores keeps local stores out of Git and out of Obsidian's graph.
-func ensureIgnores(vault string) error {
+type auxiliaryFile struct {
+	path     string
+	contents []byte
+}
+
+// prepareIgnores computes local ignore rules before the transaction starts, so invalid settings are
+// refused without writing. The transaction restores the previous files on a later write failure.
+func prepareIgnores(vault string) ([]auxiliaryFile, error) {
+	writes := []auxiliaryFile{}
 	p := filepath.Join(vault, ".gitignore")
-	b, _ := os.ReadFile(p)
+	b, _, e := readRegular(p)
+	if e != nil {
+		return nil, e
+	}
 	lines := strings.Split(strings.TrimRight(string(b), "\n"), "\n")
 	if len(b) == 0 {
 		lines = nil
@@ -452,15 +552,20 @@ func ensureIgnores(vault string) error {
 		}
 	}
 	if changed {
-		if e := os.WriteFile(p, []byte(strings.Join(lines, "\n")+"\n"), 0o644); e != nil {
-			return e
-		}
+		writes = append(writes, auxiliaryFile{p, []byte(strings.Join(lines, "\n") + "\n")})
 	}
 	app := filepath.Join(vault, ".obsidian", "app.json")
 	payload := map[string]any{}
-	if b, e := os.ReadFile(app); e == nil {
+	b, exists, e := readRegular(app)
+	if e != nil {
+		return nil, e
+	}
+	if exists {
 		if e := json.Unmarshal(b, &payload); e != nil {
-			return fmt.Errorf("%s: %w", app, e)
+			return nil, fmt.Errorf("%s: %w", app, e)
+		}
+		if payload == nil {
+			return nil, fmt.Errorf("%s: expected a JSON object", app)
 		}
 	}
 	filters, dropped := []string{}, false
@@ -480,14 +585,12 @@ func ensureIgnores(vault string) error {
 			filters = append(filters, want)
 		}
 	}
-	if len(filters) == before && !dropped {
-		if _, e := os.Stat(app); e == nil {
-			return nil
-		}
+	if len(filters) == before && !dropped && exists {
+		return writes, nil
 	}
 	payload["userIgnoreFilters"] = filters
 	out, _ := json.MarshalIndent(payload, "", "  ")
-	return writeFile(app, append(out, '\n'))
+	return append(writes, auxiliaryFile{app, append(out, '\n')}), nil
 }
 
 func contains(list []string, s string) bool {
@@ -553,6 +656,11 @@ const Help = `kernel COMMAND --vault PATH
                              nothing is written until it is kept in a cell-owned file or --force
                              restores the distribution version. A cell file the kernel never installed,
                              at a path it now ships, is never replaced, even with --force: rename it.
+                             Files are backed up before writing. A write error restores the previous
+                             files, permissions, links and lock. If restoration cannot finish, the
+                             error names the recovery directory; another update keeps it intact.
+                             A cleanup error reports whether the update was applied or restored and
+                             names the finished backup directory to remove before retrying.
                              Commit the result as one change.
   update --all [--dry-run] [--commit]
                              every vault this machine remembers (kos vaults) whose kernel is older:

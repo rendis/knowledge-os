@@ -425,10 +425,10 @@ func TestDataServicesAreCapturedAndLinked(t *testing.T) {
 func TestAnEmptyListingDoesNotProveAccess(t *testing.T) {
 	denied := "ERROR: PERMISSION_DENIED: caller does not have permission"
 	fakeCLI(t, map[string]string{"bq ls": ``}, map[string]string{"gcloud": denied})
-	if s := providers["gcp"].capture("acme-orders-prd"); s.Status != "denied" || s.Kinds["warehouse"] != "ok" {
+	if s := providers["gcp"].capture("acme-orders-prd"); s.Status != "denied" || s.Kinds["warehouse"] != "error" {
 		t.Fatalf("an empty success beside denied services is not access: %s %v", s.Status, s.Kinds)
 	}
-	fakeCLI(t, map[string]string{"gcloud": `[]`, "bq ls": ``}, nil)
+	fakeCLI(t, map[string]string{"gcloud": `[]`, "bq ls": `[]`}, nil)
 	if s := providers["gcp"].capture("acme-orders-prd"); s.Status != "ok" {
 		t.Fatalf("an empty scope everyone can read is ok: %s %v", s.Status, s.Kinds)
 	}

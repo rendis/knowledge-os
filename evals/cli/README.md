@@ -21,15 +21,13 @@ a fresh complete release and fail rather than skip when artifacts are stale.
 ```sh
 docker build -t kos-test-ubuntu:24.04 - < evals/cli/Dockerfile.ubuntu
 docker build -t kos-test-fedora:44 - < evals/cli/Dockerfile.fedora
-GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go test -c -o dist/retrieval.test ./internal/retrieval
-docker run --rm --network none -v "$PWD/dist:/tests:ro" kos-test-ubuntu:24.04 /tests/retrieval.test -test.v
+GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go test -c -o dist/config.test ./internal/config
+docker run --rm --network none -v "$PWD/dist:/tests:ro" kos-test-ubuntu:24.04 /tests/config.test -test.v
 ```
 
 Repeat for Fedora and each internal package. Tests with repository fixtures
 need the source checkout mounted read-only at its compile-time absolute path
-and the working directory set to the package directory. A Python differential
-oracle may skip if its optional Python dependency is absent; native execution
-and oracle coverage must be reported separately. Testing two ARM64 distributions
+and the working directory set to the package directory. Testing two ARM64 distributions
 does not certify every distribution or AMD64 execution.
 
 ## Windows without a compiler
@@ -37,7 +35,7 @@ does not certify every distribution or AMD64 execution.
 Crosscompile on the development host:
 
 ```sh
-GOOS=windows GOARCH=arm64 CGO_ENABLED=0 go test -c -o dist/retrieval-tests.exe ./internal/retrieval
+GOOS=windows GOARCH=arm64 CGO_ENABLED=0 go test -c -o dist/config-tests.exe ./internal/config
 GOOS=windows GOARCH=arm64 CGO_ENABLED=0 go build -o dist/platformcheck.exe ./tools/platformcheck
 ```
 
@@ -57,5 +55,6 @@ from native AMD64 hardware.
 Execution evidence on 2026-09-24: the user ran the platform runner in the
 Windows ARM VM and supplied screenshots showing **13/13 passed** for both
 native ARM64 and emulated AMD64, with the external-tool PATH empty. This
-covers the core operations listed above. Windows Git-dependent workflows,
+covers that historical runner. The current runner has six checks; the older
+13/13 result does not verify the current version. Windows Git-dependent workflows,
 the distribution installer and native AMD64 hardware remain unverified.

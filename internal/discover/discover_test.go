@@ -621,6 +621,10 @@ func TestPartialRunKeepsOtherRepositoriesFacts(t *testing.T) {
 	if all := storedFacts(v, fresh, map[string]bool{"repo-a": true}); len(all) != 1 {
 		t.Fatalf("a repository no longer tracked is left out: %+v", all)
 	}
+	caseFresh := []repoFacts{{Repo: "REPO-A", Note: "20-Repos/repo-a.md", Commit: "new"}}
+	if all := storedFacts(v, caseFresh, map[string]bool{"repo-A": true, "REPO-B": true}); len(all) != 2 || all[0].Commit != "new" || all[1].Repo != "repo-b" {
+		t.Fatalf("case changes must preserve unscanned facts and must not duplicate fresh ones: %+v", all)
+	}
 }
 
 func TestLibraryDependenciesListEveryImportingFile(t *testing.T) {
