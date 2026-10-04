@@ -42,6 +42,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - runner: ubuntu-24.04-arm
+            target: linux/arm64
+            python_arch: arm64
+          - runner: macos-15
+            target: darwin/arm64
+            python_arch: arm64
           - runner: macos-15-intel
             target: darwin/amd64
             python_arch: x64
