@@ -87,13 +87,21 @@ class InstallerTests(unittest.TestCase):
         self.bin = self.root / "bin"
         self.env = {**os.environ, "KOS_DOWNLOAD_URL": self.mirror.url, "KOS_INSTALL_DIR": str(self.bin),
                     "HOME": str(self.root), "XDG_CACHE_HOME": str(self.root / "cache"), "CI": ""}
+        if os.name == "nt":
+            self.env.update(USERPROFILE=str(self.root), LOCALAPPDATA=str(self.root / "cache"),
+                            APPDATA=str(self.root / "config"))
+        self.installed_binary = self.bin / ("kos.exe" if os.name == "nt" else "kos")
         self.env.pop("KOS_NO_UPDATE_CHECK", None)
 
     def install(self) -> subprocess.CompletedProcess:
-        return subprocess.run(["sh", str(DIST / "scripts/install-kos.sh")], env=self.env, capture_output=True, text=True, timeout=60)
+        if os.name == "nt":
+            command = ["pwsh", "-NoProfile", "-File", str(DIST / "scripts/install-kos.ps1")]
+        else:
+            command = ["sh", str(DIST / "scripts/install-kos.sh")]
+        return subprocess.run(command, env=self.env, capture_output=True, text=True, timeout=60)
 
     def kos(self, *args: str, cwd: Path | None = None) -> subprocess.CompletedProcess:
-        return subprocess.run([str(self.bin / "kos"), *args], env=self.env, capture_output=True, text=True, cwd=cwd, timeout=60)
+        return subprocess.run([str(self.installed_binary), *args], env=self.env, capture_output=True, text=True, cwd=cwd, timeout=60)
 
     def test_install_verify_and_update_in_place(self):
         installed = self.install()
@@ -120,18 +128,18 @@ class InstallerTests(unittest.TestCase):
     def test_vault_without_binaries_is_operated_from_its_directory(self):
         self.assertEqual(self.install().returncode, 0)
         vault = self.root / "vault"
-        init = subprocess.run([str(self.bin / "kos"), "init", "--vault", str(vault), "--yes", "--cell-name", "C",
+        init = subprocess.run([str(self.installed_binary), "init", "--vault", str(vault), "--yes", "--cell-name", "C",
                                "--purpose", "P", "--system", "Orders"], capture_output=True, text=True, timeout=120,
                               env={**self.env, "KOS_NO_UPDATE_CHECK": "1"})
         self.assertEqual(init.returncode, 0, init.stderr)
         self.assertFalse((vault / ".agents" / "bin").exists())
         self.assertEqual(list(vault.rglob("*.py")), [])
         env = {**self.env, "KOS_NO_UPDATE_CHECK": "1"}
-        status = subprocess.run([str(self.bin / "kos"), "kernel", "status"], env=env, cwd=vault / "10-Sistemas",
+        status = subprocess.run([str(self.installed_binary), "kernel", "status"], env=env, cwd=vault / "10-Sistemas",
                                 capture_output=True, text=True, timeout=60)
         self.assertEqual(status.returncode, 0, status.stderr)
         self.assertTrue(json.loads(status.stdout)["current"])
-        audit = subprocess.run([str(self.bin / "kos"), "audit"], env=env, cwd=vault, capture_output=True, text=True, timeout=60)
+        audit = subprocess.run([str(self.installed_binary), "audit"], env=env, cwd=vault, capture_output=True, text=True, timeout=60)
         self.assertEqual(audit.returncode, 0, audit.stderr)
 
 
