@@ -1,8 +1,10 @@
 package gitsync
 
 import (
+	"archive/tar"
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -51,6 +53,9 @@ func call(t *testing.T, args ...string) (map[string]any, error) {
 	t.Helper()
 	var out bytes.Buffer
 	e := Run(args, &out)
+	if e != nil && out.Len() == 0 {
+		t.Logf("sync failed before emitting a result: %v", e)
+	}
 	m := map[string]any{}
 	_ = json.Unmarshal(out.Bytes(), &m)
 	return m, e
@@ -442,5 +447,59 @@ func TestPushRangeUsesTheReviewedBase(t *testing.T) {
 	}
 	if res, e := call(t, "verify", "--vault", v, "--base", pushed, "--allow-no-change"); e != nil || res["ok"] != true {
 		t.Fatalf("a review of the whole range covers it: %v %v", e, res)
+	}
+}
+
+func TestBaseTreeReportsAnInvalidRevision(t *testing.T) {
+	v := vault(t)
+	dir, cleanup, err := baseTree(v, "missing-revision")
+	if err == nil || !strings.Contains(err.Error(), "git archive:") || !strings.Contains(err.Error(), "missing-revision") {
+		t.Fatalf("an invalid revision must report the archive failure: %v", err)
+	}
+	if dir != "" || cleanup != nil {
+		t.Fatal("a failed snapshot must not expose a partial tree")
+	}
+}
+
+func TestExtractTreeRejectsEscapingArchivePaths(t *testing.T) {
+	for _, link := range []bool{false, true} {
+		t.Run(fmt.Sprint(link), func(t *testing.T) {
+			base := t.TempDir()
+			dir := filepath.Join(base, "tree")
+			if err := os.Mkdir(dir, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			path := filepath.Join(base, "archive.tar")
+			file, err := os.Create(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			archive := tar.NewWriter(file)
+			name := "../escaped"
+			if link {
+				if err := archive.WriteHeader(&tar.Header{Name: "outside", Typeflag: tar.TypeSymlink, Linkname: ".."}); err != nil {
+					t.Fatal(err)
+				}
+				name = "outside/escaped"
+			}
+			if err := archive.WriteHeader(&tar.Header{Name: name, Typeflag: tar.TypeReg, Mode: 0o644, Size: 1}); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := archive.Write([]byte("x")); err != nil {
+				t.Fatal(err)
+			}
+			if err := archive.Close(); err != nil {
+				t.Fatal(err)
+			}
+			if err := file.Close(); err != nil {
+				t.Fatal(err)
+			}
+			if err := extractTree(path, dir); err == nil {
+				t.Fatal("archive extraction must reject writing outside its tree")
+			}
+			if _, err := os.Stat(filepath.Join(base, "escaped")); !os.IsNotExist(err) {
+				t.Fatalf("archive escaped its tree: %v", err)
+			}
+		})
 	}
 }

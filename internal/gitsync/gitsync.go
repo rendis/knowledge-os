@@ -4,7 +4,9 @@
 package gitsync
 
 import (
+	"archive/tar"
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -544,31 +546,88 @@ func baseTree(vault, rev string) (string, func(), error) {
 		return "", nil, e
 	}
 	cleanup := func() { _ = os.RemoveAll(dir) }
-	archive := exec.Command("git", "-C", vault, "archive", rev)
-	untar := exec.Command("tar", "-x", "-f", "-", "-C", dir)
-	pipe, e := archive.StdoutPipe()
+	// Git for Windows can block when its archive is piped into tar. Keep the archive outside the
+	// extracted tree, then read it as a regular file on every host.
+	file, e := os.CreateTemp("", "vault-archive-*.tar")
 	if e != nil {
 		cleanup()
 		return "", nil, e
 	}
-	untar.Stdin = pipe
-	var archiveErr, untarErr bytes.Buffer
-	archive.Stderr, untar.Stderr = &archiveErr, &untarErr
-	if e := untar.Start(); e != nil {
+	archivePath := file.Name()
+	defer os.Remove(archivePath)
+	if e := file.Close(); e != nil {
 		cleanup()
 		return "", nil, e
 	}
-	archiveFailure := archive.Run()
-	untarFailure := untar.Wait()
-	if archiveFailure != nil {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	archive := exec.CommandContext(ctx, "git", "-C", vault, "archive", "--format=tar", "--output="+archivePath, rev)
+	archive.WaitDelay = 5 * time.Second
+	if b, e := archive.CombinedOutput(); e != nil {
 		cleanup()
-		return "", nil, fmt.Errorf("git archive: %w: %s", archiveFailure, strings.TrimSpace(archiveErr.String()))
+		return "", nil, fmt.Errorf("git archive: %w: %s", errors.Join(e, ctx.Err()), strings.TrimSpace(string(b)))
 	}
-	if untarFailure != nil {
+	if e := extractTree(archivePath, dir); e != nil {
 		cleanup()
-		return "", nil, fmt.Errorf("extract Git archive: %w: %s", untarFailure, strings.TrimSpace(untarErr.String()))
+		return "", nil, fmt.Errorf("extract Git archive: %w", e)
 	}
 	return dir, cleanup, nil
+}
+
+// extractTree uses the host filesystem through Go, so Windows does not depend on a Unix tar executable.
+func extractTree(archivePath, dir string) error {
+	file, err := os.Open(archivePath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		return err
+	}
+	defer root.Close()
+	reader := tar.NewReader(file)
+	for {
+		header, err := reader.Next()
+		if err == io.EOF {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		if header.Typeflag == tar.TypeXGlobalHeader {
+			continue
+		}
+		name := filepath.FromSlash(header.Name)
+		if !filepath.IsLocal(name) {
+			return fmt.Errorf("non-local archive path %q", header.Name)
+		}
+		if err := root.MkdirAll(filepath.Dir(name), 0o755); err != nil {
+			return err
+		}
+		switch header.Typeflag {
+		case tar.TypeDir:
+			if err := root.MkdirAll(name, header.FileInfo().Mode().Perm()); err != nil {
+				return err
+			}
+		case tar.TypeReg, tar.TypeRegA:
+			out, err := root.OpenFile(name, os.O_CREATE|os.O_EXCL|os.O_WRONLY, header.FileInfo().Mode().Perm())
+			if err != nil {
+				return err
+			}
+			_, copyErr := io.Copy(out, reader)
+			closeErr := out.Close()
+			if err := errors.Join(copyErr, closeErr); err != nil {
+				return err
+			}
+		case tar.TypeSymlink:
+			if err := root.Symlink(header.Linkname, name); err != nil {
+				return err
+			}
+		default:
+			return fmt.Errorf("unsupported Git archive entry %q (type %d)", header.Name, header.Typeflag)
+		}
+	}
 }
 
 var (
