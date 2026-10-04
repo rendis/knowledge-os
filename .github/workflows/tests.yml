@@ -3,7 +3,7 @@ name: distribution-tests
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, 'issue/release-validation-*']
   workflow_dispatch:
 
 permissions:
@@ -33,3 +33,45 @@ jobs:
         run: make release
       - name: Check the fresh release and installers
         run: make test-installer
+
+  native:
+    name: native-${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15-intel
+            target: darwin/amd64
+            python_arch: x64
+          - runner: windows-latest
+            target: windows/amd64
+            python_arch: x64
+          - runner: windows-11-arm
+            target: windows/arm64
+            python_arch: arm64
+    env:
+      KOS_NO_UPDATE_CHECK: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Isolate the vault catalog
+        shell: bash
+        run: echo "KOS_VAULTS_FILE=$RUNNER_TEMP/kos-tests/vaults.json" >> "$GITHUB_ENV"
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+          architecture: ${{ matrix.python_arch }}
+      - name: Check native Go behavior
+        shell: bash
+        run: |
+          go vet ./...
+          go test ./...
+      - name: Build the fresh release
+        run: go run ./tools/release
+      - name: Check native installer and CLI lifecycle
+        run: python -B evals/bootstrap/test_native_installation.py
