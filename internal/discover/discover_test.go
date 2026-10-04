@@ -288,7 +288,7 @@ func TestNoteGates(t *testing.T) {
 		write(t, vault, m, "x\n")
 	}
 	write(t, vault, "instance.yaml", "version: 1\ncell:\n  name: \"C\"\n  purpose: \"p\"\nsystems:\n  - id: \"s\"\n    name: \"S\"\nsources:\n  repo_prefixes: [\"SVC\"]\n")
-	write(t, vault, ".knowledge-os-config.yaml", "version: 1\nworkspace:\n  repository_roots:\n    - \""+filepath.Join(dir, "repos")+"\"\n")
+	write(t, vault, ".knowledge-os-config.yaml", "version: 1\nworkspace:\n  repository_roots:\n    - \""+filepath.ToSlash(filepath.Join(dir, "repos"))+"\"\n")
 	st := &store{Dependencies: map[string]judgment{"go:cloud.google.com/go/pubsub": {Choice: "messaging", Confidence: 1}}, ConfigKeys: map[string]judgment{}, ConfigValues: map[string]judgment{}}
 	s := scan(t, "SVC-orders", repo)
 	for _, e := range s.entries {
@@ -462,7 +462,7 @@ func TestLibraryContextResolvesSelectedRepository(t *testing.T) {
 	})
 	vault := t.TempDir()
 	write(t, vault, "instance.yaml", "version: 1\ncell:\n  name: \"C\"\n  purpose: \"p\"\nsystems:\n  - id: \"s\"\n    name: \"S\"\nsources:\n  repo_prefixes: [\"SVC\"]\n")
-	write(t, vault, ".knowledge-os-config.yaml", "version: 1\nworkspace:\n  repository_roots:\n    - \""+repos+"\"\n")
+	write(t, vault, ".knowledge-os-config.yaml", "version: 1\nworkspace:\n  repository_roots:\n    - \""+filepath.ToSlash(repos)+"\"\n")
 	s := scan(t, "SVC-orders", svc)
 	libs := libraryContext(vault, []*repoScan{s})
 	if len(libs) != 1 || libs[0].in.Name != "SVC-common" {
@@ -491,7 +491,7 @@ func TestStaleNeighboursAfterSync(t *testing.T) {
 	head, _ := resolveCommit(repo, "HEAD")
 	vault := t.TempDir()
 	write(t, vault, "instance.yaml", "version: 1\ncell:\n  name: \"C\"\n  purpose: \"p\"\nsystems:\n  - id: \"s\"\n    name: \"S\"\nsources:\n  repo_prefixes: [\"SVC\"]\n")
-	write(t, vault, ".knowledge-os-config.yaml", "version: 1\nworkspace:\n  repository_roots:\n    - \""+repos+"\"\n")
+	write(t, vault, ".knowledge-os-config.yaml", "version: 1\nworkspace:\n  repository_roots:\n    - \""+filepath.ToSlash(repos)+"\"\n")
 	link := func(sha, file string) string {
 		return "https://github.com/acme/SVC-orders/blob/" + sha + "/" + file + "#L2"
 	}

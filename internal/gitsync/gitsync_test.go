@@ -39,6 +39,9 @@ func vault(t *testing.T) string {
 	write(t, v, "instance.yaml", "version: 1\ncell:\n  name: \"C\"\n  purpose: \"p\"\nsystems:\n  - id: \"sales\"\n    name: \"Sales\"\n")
 	write(t, v, "10-Sistemas/Sales.md", "---\ntipo: sistema\n---\n# Sales\n\nSistema de ventas.\n")
 	run(t, v, "init", "-q", "-b", "main")
+	run(t, v, "config", "user.name", "t")
+	run(t, v, "config", "user.email", "t@t")
+	run(t, v, "config", "core.autocrlf", "false")
 	run(t, v, "add", "-A")
 	run(t, v, "commit", "-q", "-m", "base")
 	return v

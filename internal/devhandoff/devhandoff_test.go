@@ -47,7 +47,7 @@ func setup(t *testing.T) fixture {
 		write(t, f.vault, m, "x\n")
 	}
 	write(t, f.vault, "instance.yaml", "version: 1\ncell:\n  name: \"C\"\n  purpose: \"p\"\nsystems:\n  - id: \"s\"\n    name: \"S\"\n")
-	write(t, f.vault, ".knowledge-os-config.yaml", "version: 1\nworkspace:\n  repository_roots:\n    - \""+filepath.Join(dir, "repos")+"\"\nskills:\n  manage-development-handoff:\n    worktree_root: \""+f.root+"\"\n")
+	write(t, f.vault, ".knowledge-os-config.yaml", "version: 1\nworkspace:\n  repository_roots:\n    - \""+filepath.ToSlash(filepath.Join(dir, "repos"))+"\"\nskills:\n  manage-development-handoff:\n    worktree_root: \""+filepath.ToSlash(f.root)+"\"\n")
 	if e := os.MkdirAll(f.root, 0o755); e != nil {
 		t.Fatal(e)
 	}

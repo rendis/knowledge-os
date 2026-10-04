@@ -545,24 +545,28 @@ func baseTree(vault, rev string) (string, func(), error) {
 	}
 	cleanup := func() { _ = os.RemoveAll(dir) }
 	archive := exec.Command("git", "-C", vault, "archive", rev)
-	untar := exec.Command("tar", "-x", "-C", dir)
+	untar := exec.Command("tar", "-x", "-f", "-", "-C", dir)
 	pipe, e := archive.StdoutPipe()
 	if e != nil {
 		cleanup()
 		return "", nil, e
 	}
 	untar.Stdin = pipe
+	var archiveErr, untarErr bytes.Buffer
+	archive.Stderr, untar.Stderr = &archiveErr, &untarErr
 	if e := untar.Start(); e != nil {
 		cleanup()
 		return "", nil, e
 	}
-	if e := archive.Run(); e != nil {
+	archiveFailure := archive.Run()
+	untarFailure := untar.Wait()
+	if archiveFailure != nil {
 		cleanup()
-		return "", nil, e
+		return "", nil, fmt.Errorf("git archive: %w: %s", archiveFailure, strings.TrimSpace(archiveErr.String()))
 	}
-	if e := untar.Wait(); e != nil {
+	if untarFailure != nil {
 		cleanup()
-		return "", nil, e
+		return "", nil, fmt.Errorf("extract Git archive: %w: %s", untarFailure, strings.TrimSpace(untarErr.String()))
 	}
 	return dir, cleanup, nil
 }

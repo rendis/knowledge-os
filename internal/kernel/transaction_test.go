@@ -26,7 +26,7 @@ func TestRecoveryFilesStayOutOfGit(t *testing.T) {
 	}
 	git := func(t *testing.T, args ...string) string {
 		t.Helper()
-		cmd := exec.Command("git", append([]string{"-c", "core.excludesFile=" + os.DevNull, "-C", v}, args...)...)
+		cmd := exec.Command("git", append([]string{"-c", "core.excludesFile=" + filepath.Join(t.TempDir(), "absent-excludes"), "-C", v}, args...)...)
 		b, e := cmd.CombinedOutput()
 		if e != nil {
 			t.Fatalf("git %v: %s %v", args, b, e)
