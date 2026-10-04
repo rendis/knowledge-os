@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -39,7 +40,7 @@ func TestUpdateVerifiesAndReplacesInPlace(t *testing.T) {
 	if b, _ := os.ReadFile(self); string(b) != string(next) {
 		t.Fatalf("replaced in place: %q", b)
 	}
-	if st, _ := os.Stat(self); st.Mode().Perm()&0o100 == 0 {
+	if st, _ := os.Stat(self); runtime.GOOS != "windows" && st.Mode().Perm()&0o100 == 0 {
 		t.Fatal("the new kos is executable")
 	}
 	if res, _ := Update(context.Background(), "0.16.0", "", self); res["status"] != "current" {

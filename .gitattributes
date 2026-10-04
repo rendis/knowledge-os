@@ -1,0 +1,2 @@
+# Keep embedded payloads and release fingerprints identical across checkouts.
+* text=auto eol=lf

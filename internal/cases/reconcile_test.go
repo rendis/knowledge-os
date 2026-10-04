@@ -20,7 +20,7 @@ func TestReconcileImportsHandoffProgressDeterministically(t *testing.T) {
 	git(t, repo, "commit", "-q", "-m", "init")
 	git(t, repo, "remote", "add", "origin", "https://github.com/acme/svc-orders.git")
 	os.MkdirAll(root, 0o755)
-	write(t, v, ".knowledge-os-config.yaml", "version: 1\nworkspace:\n  repository_roots:\n    - \""+filepath.Join(dir, "repos")+"\"\nskills:\n  manage-development-handoff:\n    worktree_root: \""+root+"\"\n")
+	write(t, v, ".knowledge-os-config.yaml", "version: 1\nworkspace:\n  repository_roots:\n    - \""+filepath.ToSlash(filepath.Join(dir, "repos"))+"\"\nskills:\n  manage-development-handoff:\n    worktree_root: \""+filepath.ToSlash(root)+"\"\n")
 
 	res, _ := run(t, "new", "--vault", v, "--title", "Órdenes idempotentes", "--type", "development", "--objective", "Evitar publicaciones duplicadas.", "--date", "2026-09-25")
 	id := res["id"].(string)
