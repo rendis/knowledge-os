@@ -60,3 +60,44 @@ func TestKernelVersionNoticesAndGates(t *testing.T) {
 		t.Fatalf("reads only warn: %s", errs.String())
 	}
 }
+
+func TestReadOnlyDiscoveryDoesNotRegisterTheVault(t *testing.T) {
+	for _, option := range []string{"--read-only"} {
+		t.Run(option, func(t *testing.T) {
+			v := vaultWithKernel(t, kernel.Version())
+			registry := filepath.Join(t.TempDir(), "vaults.json")
+			t.Setenv("KOS_VAULTS_FILE", registry)
+			t.Setenv("KOS_NO_UPDATE_CHECK", "1")
+			t.Setenv("CI", "")
+			// Make this fixture eligible for registration instead of the default temporary-directory exclusion.
+			t.Setenv("TMPDIR", filepath.Join(v, "another-temp-root"))
+			os.WriteFile(filepath.Join(v, ".knowledge-os-config.yaml"), []byte("version: 1\nworkspace:\n  repository_roots: []\n"), 0o644)
+			os.MkdirAll(filepath.Join(v, "90-Meta"), 0o755)
+			os.WriteFile(filepath.Join(v, "90-Meta", "Convenciones.md"), []byte("# Conventions\n"), 0o644)
+			os.WriteFile(filepath.Join(v, "90-Meta", "Auditoria - Framework.md"), []byte("# Audit\n"), 0o644)
+			var out, errs bytes.Buffer
+			if e := run(context.Background(), []string{"discover", "run", "--vault", v, option}, &out, &errs); e != nil {
+				t.Fatal(e, errs.String())
+			}
+			if _, e := os.Stat(registry); !os.IsNotExist(e) {
+				t.Fatalf("a read-only question must not write the machine's vault catalog: %v", e)
+			}
+		})
+	}
+}
+
+func TestReadOnlyConfigDoesNotRegisterTheVault(t *testing.T) {
+	v := vaultWithKernel(t, kernel.Version())
+	registry := filepath.Join(t.TempDir(), "vaults.json")
+	t.Setenv("KOS_VAULTS_FILE", registry)
+	t.Setenv("KOS_NO_UPDATE_CHECK", "1")
+	t.Setenv("CI", "")
+	t.Setenv("TMPDIR", filepath.Join(v, "another-temp-root"))
+	var out, errs bytes.Buffer
+	if e := run(context.Background(), []string{"config", "status", "--vault", v, "--read-only"}, &out, &errs); e != nil {
+		t.Fatal(e, errs.String())
+	}
+	if _, e := os.Stat(registry); !os.IsNotExist(e) {
+		t.Fatalf("read-only config must not register the vault: %v", e)
+	}
+}

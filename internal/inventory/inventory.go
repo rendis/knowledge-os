@@ -359,6 +359,10 @@ func rejectDuplicateJSON(b []byte) error {
 const query = `query($org:String!,$cursor:String){organization(login:$org){repositories(first:100,after:$cursor){nodes{name isArchived isFork url defaultBranchRef{name} main:ref(qualifiedName:"refs/heads/main"){name target{oid}} master:ref(qualifiedName:"refs/heads/master"){name target{oid}}} pageInfo{hasNextPage endCursor}}}}`
 
 func remoteRepos(ctx context.Context, s scope, org string, g github) ([]object, error) {
+	configuredBranches, e := config.ReferenceBranches(s.instance)
+	if e != nil {
+		return nil, e
+	}
 	out := []object{}
 	cursor := ""
 	seen := map[string]bool{}
@@ -384,7 +388,7 @@ func remoteRepos(ctx context.Context, s scope, org string, g github) ([]object, 
 			}
 			branches := config.ReferenceBranchOrder(s.instance)
 			refs := map[string]any{"main": r["main"], "master": r["master"]}
-			if configured := str(obj(obj(s.instance["sources"])["reference_branches"])[name]); configured != "" {
+			if configured := configuredBranches[strings.ToLower(name)]; configured != "" {
 				branches = []string{configured}
 			}
 			for _, b := range branches {

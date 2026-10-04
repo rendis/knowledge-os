@@ -167,10 +167,24 @@ func minInt(a, b int) int {
 
 // CheckNoteIntroduced gates a repository note. With base content (a neighbour touched without a new
 // commit-analizado) only errors absent from the base version fail; pre-existing debt is reported but does
-// not block re-anchoring. Without base content every error fails.
+// not block re-anchoring. Without base content every error fails. Unresolved source anchors or coverage
+// always block publication: unavailable validation is not pre-existing factual debt.
 func CheckNoteIntroduced(vault, note string, base []byte) (bool, []string, int, error) {
-	r, e := checkNote(vault, note, "")
-	if e != nil || r.OK {
+	r, e := checkNoteMode(vault, note, "", false)
+	if e != nil {
+		return false, nil, 0, e
+	}
+	unresolved := []string{}
+	for _, issue := range r.Issues {
+		if issue.Severity == "pending" && (issue.Gate == "G1-anchor" || issue.Gate == "G2-coverage") {
+			unresolved = append(unresolved, issue.Gate+"|"+issue.Where+"|"+issue.Detail)
+		}
+	}
+	if len(unresolved) != 0 {
+		sort.Strings(unresolved)
+		return false, unresolved, 0, nil
+	}
+	if r.OK {
 		return r.OK, nil, 0, e
 	}
 	keys := func(c noteCheck) map[string]bool {
@@ -199,7 +213,7 @@ func CheckNoteIntroduced(vault, note string, base []byte) (bool, []string, int, 
 		return false, nil, 0, e
 	}
 	defer os.Remove(tmp)
-	rb, e := checkNote(vault, tmp, "")
+	rb, e := checkNoteMode(vault, tmp, "", false)
 	if e != nil {
 		return false, nil, 0, e
 	}

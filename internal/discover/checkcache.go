@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strconv"
+	"strings"
 )
 
 // A note check depends only on the note, the kos build, the vault's discovery store and platform
@@ -20,7 +21,12 @@ import (
 //
 // Duplicated paragraphs depend on every other note, so they are computed on each call, outside the stored result.
 func checkNote(vault, notePath, repoOverride string) (noteCheck, error) {
-	r, e := checkNoteCached(vault, notePath, repoOverride)
+	return checkNoteMode(vault, notePath, repoOverride, true)
+}
+
+// Read-only reviews recheck source evidence without reading or writing the result cache.
+func checkNoteMode(vault, notePath, repoOverride string, useCache bool) (noteCheck, error) {
+	r, e := checkNoteCached(vault, notePath, repoOverride, useCache)
 	if e != nil {
 		return r, e
 	}
@@ -31,13 +37,16 @@ func checkNote(vault, notePath, repoOverride string) (noteCheck, error) {
 	if text, e := os.ReadFile(full); e == nil {
 		if dups := duplicateParagraphs(vault, full, text); len(dups) > 0 {
 			r.Issues = append(r.Issues, dups...)
-			r.OK = false
+			r.OK, r.Verified = false, false
 		}
 	}
 	return r, nil
 }
 
-func checkNoteCached(vault, notePath, repoOverride string) (noteCheck, error) {
+func checkNoteCached(vault, notePath, repoOverride string, useCache bool) (noteCheck, error) {
+	if !useCache {
+		return checkNoteFresh(vault, notePath, repoOverride)
+	}
 	full := notePath
 	if !filepath.IsAbs(full) {
 		full = filepath.Join(vault, notePath)
@@ -63,8 +72,8 @@ func checkNoteCached(vault, notePath, repoOverride string) (noteCheck, error) {
 	if e != nil {
 		return r, e
 	}
-	if b, e := json.Marshal(r); e == nil && os.MkdirAll(dir, 0o755) == nil {
-		_ = os.WriteFile(path, b, 0o644)
+	if b, e := json.Marshal(r); e == nil && os.MkdirAll(dir, 0o700) == nil {
+		_ = os.WriteFile(path, b, 0o600)
 	}
 	return r, nil
 }
@@ -134,32 +143,62 @@ func checkFingerprint(vault string) string {
 			return nil
 		})
 	}
-	// Every checkout under the workspace roots, by its refs on disk: a fetch or a new commit changes them.
-	// Reading the files avoids hundreds of git processes per check.
-	if w, e := config.Workspace(vault); e == nil {
-		sc, _ := w["source_context"].(config.Object)
-		for _, r := range asList(sc["roots"]) {
-			root, _ := asMap(r)["path"].(string)
-			entries, _ := os.ReadDir(root)
-			for _, d := range entries {
-				gitDir := filepath.Join(root, d.Name(), ".git")
-				if st, e := os.Stat(gitDir); e != nil || !st.IsDir() {
+	// Git worktrees keep their refs in the common directory. The .git indirection,
+	// common-dir marker, remote config and shallow boundary also affect source binding.
+	visited := map[string]bool{}
+	if paths, e := config.Checkouts(vault); e == nil {
+		for _, checkout := range paths {
+			add(checkout)
+			gitPath := filepath.Join(checkout, ".git")
+			gitDir := gitPath
+			if st, e := os.Stat(gitPath); e == nil && !st.IsDir() {
+				b, _ := os.ReadFile(gitPath)
+				add(gitPath, string(b))
+				if target, ok := strings.CutPrefix(strings.TrimSpace(string(b)), "gitdir: "); ok {
+					gitDir = target
+					if !filepath.IsAbs(gitDir) {
+						gitDir = filepath.Join(checkout, gitDir)
+					}
+				}
+			}
+			if canonical, e := filepath.EvalSymlinks(gitDir); e == nil {
+				gitDir = canonical
+			}
+			common := gitDir
+			if b, e := os.ReadFile(filepath.Join(gitDir, "commondir")); e == nil {
+				add("commondir", string(b))
+				common = strings.TrimSpace(string(b))
+				if !filepath.IsAbs(common) {
+					common = filepath.Join(gitDir, common)
+				}
+			}
+			dirs := []string{gitDir}
+			if filepath.Clean(common) != gitDir {
+				dirs = append(dirs, filepath.Clean(common))
+			}
+			for _, dir := range dirs {
+				if canonical, e := filepath.EvalSymlinks(dir); e == nil {
+					dir = canonical
+				}
+				if visited[dir] {
 					continue
 				}
-				add(d.Name())
-				for _, f := range []string{"HEAD", "packed-refs"} {
-					b, _ := os.ReadFile(filepath.Join(gitDir, f))
-					add(f, string(b))
+				visited[dir] = true
+				for _, f := range []string{"HEAD", "packed-refs", "config", "config.worktree", "shallow", "FETCH_HEAD"} {
+					b, e := os.ReadFile(filepath.Join(dir, f))
+					add(dir, f, string(b), fmt.Sprint(e))
 				}
-				_ = filepath.WalkDir(filepath.Join(gitDir, "refs"), func(p string, d fs.DirEntry, err error) error {
+				_ = filepath.WalkDir(filepath.Join(dir, "refs"), func(p string, d fs.DirEntry, err error) error {
 					if err == nil && !d.IsDir() {
-						b, _ := os.ReadFile(p)
-						add(p, string(b))
+						b, e := os.ReadFile(p)
+						add(p, string(b), fmt.Sprint(e))
 					}
 					return nil
 				})
 			}
 		}
+	} else {
+		add("checkout resolution", e.Error())
 	}
 	fp = hex.EncodeToString(h.Sum(nil))
 	memoMu.Lock()

@@ -121,14 +121,16 @@ func discoverRepositories(vault string, only map[string]bool) ([]repoInput, erro
 	if e != nil {
 		return nil, e
 	}
-	w, e := config.Workspace(vault)
+	paths, e := config.Checkouts(vault)
 	if e != nil {
 		return nil, e
 	}
 	prefixes := []string{}
-	branches := map[string]any{}
+	branches, e := config.ReferenceBranches(inst)
+	if e != nil {
+		return nil, e
+	}
 	if src, ok := inst["sources"].(map[string]any); ok {
-		branches = asMap(src["reference_branches"])
 		for _, p := range asList(src["repo_prefixes"]) {
 			if s, ok := p.(string); ok && s != "" {
 				prefixes = append(prefixes, strings.TrimRight(s, "-")+"-")
@@ -142,52 +144,46 @@ func discoverRepositories(vault string, only map[string]bool) ([]repoInput, erro
 	vaultID, _ := config.RemoteIdentity(gitRemoteOf(vault))
 	vaultPath, _ := filepath.EvalSymlinks(vault)
 	seen := map[string]bool{vaultPath: true} // the vault is never one of its own sources
+	bound := map[string]string{}
 	out := []repoInput{}
-	sc, _ := w["source_context"].(config.Object)
-	for _, r := range asList(sc["roots"]) {
-		root, _ := asMap(r)["path"].(string)
-		entries, e := os.ReadDir(root)
-		if e != nil {
+	for _, p := range paths {
+		if seen[p] {
 			continue
 		}
-		for _, d := range entries {
-			if !d.IsDir() && d.Type()&os.ModeSymlink == 0 {
-				continue
+		seen[p] = true
+		remote := gitRemoteOf(p)
+		id, _ := config.RemoteIdentity(remote)
+		if id != "" && id == vaultID {
+			continue
+		}
+		name := filepath.Base(p)
+		if id != "" { // identity is lower-cased; keep the remote's own spelling
+			r := strings.TrimSuffix(strings.TrimRight(remote, "/"), ".git")
+			name = r[strings.LastIndexAny(r, "/:")+1:]
+		}
+		key := strings.ToLower(name)
+		tracked := notes[key] != ""
+		for _, pre := range prefixes {
+			tracked = tracked || strings.HasPrefix(strings.ToLower(name), strings.ToLower(pre))
+		}
+		if len(only) > 0 {
+			tracked = false
+			for requested := range only {
+				tracked = tracked || strings.EqualFold(requested, name)
 			}
-			p, e := filepath.EvalSymlinks(filepath.Join(root, d.Name()))
-			if e != nil || seen[p] {
-				continue
+		}
+		if tracked {
+			if previous, exists := bound[key]; exists {
+				return nil, fmt.Errorf("ambiguous checkout for repository %s: %s and %s; configure one source checkout", name, previous, p)
 			}
-			if _, e := os.Stat(filepath.Join(p, ".git")); e != nil {
-				continue
+			bound[key] = p
+			in := repoInput{Name: name, Remote: remote, Path: p, Note: notes[key]}
+			configured := branches[key]
+			var e error
+			if in.Ref, in.RefNote, e = referenceRef(p, configured, config.ReferenceBranchOrder(inst)); e != nil {
+				in.RefErr = e.Error()
 			}
-			seen[p] = true
-			remote := gitRemoteOf(p)
-			id, _ := config.RemoteIdentity(remote)
-			if id != "" && id == vaultID {
-				continue
-			}
-			name := d.Name()
-			if id != "" { // identity is lower-cased; keep the remote's own spelling
-				r := strings.TrimSuffix(strings.TrimRight(remote, "/"), ".git")
-				name = r[strings.LastIndexAny(r, "/:")+1:]
-			}
-			tracked := notes[name] != ""
-			for _, pre := range prefixes {
-				tracked = tracked || strings.HasPrefix(name, pre)
-			}
-			if len(only) > 0 {
-				tracked = only[name]
-			}
-			if tracked {
-				in := repoInput{Name: name, Remote: remote, Path: p, Note: notes[name]}
-				configured, _ := branches[name].(string)
-				var e error
-				if in.Ref, in.RefNote, e = referenceRef(p, configured, config.ReferenceBranchOrder(inst)); e != nil {
-					in.RefErr = e.Error()
-				}
-				out = append(out, in)
-			}
+			out = append(out, in)
 		}
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
@@ -202,6 +198,7 @@ var (
 	libMemo         = map[string][]libCandidate{}
 	scanMemo        = map[string]*repoScan{}
 	fingerprintMemo = map[string]string{}
+	checkoutMemo    = map[string]map[string]string{}
 )
 
 func gitRemoteOf(p string) string {
@@ -253,9 +250,11 @@ func repoNotes(vault string) (map[string]string, error) {
 			}
 		}
 		for _, n := range names {
-			if out[n] == "" {
-				out[n] = filepath.ToSlash(rel)
+			key, note := strings.ToLower(n), filepath.ToSlash(rel)
+			if previous, exists := out[key]; exists && previous != note {
+				return fmt.Errorf("ambiguous repository note for %s: %s and %s", n, previous, note)
 			}
+			out[key] = note
 		}
 		return nil
 	})
@@ -1211,4 +1210,35 @@ func libraryCandidates(vault string) []libCandidate {
 	libMemo[vault] = cands
 	memoMu.Unlock()
 	return cands
+}
+
+// sourceCheckouts binds all configured checkout identities once per CLI process. A duplicate
+// remote remains ambiguous; selecting the first matching directory would invent source identity.
+func sourceCheckouts(vault string) map[string]string {
+	memoMu.Lock()
+	cached, ok := checkoutMemo[vault]
+	memoMu.Unlock()
+	if ok && os.Getenv("KOS_NO_CACHE") == "" {
+		return cached
+	}
+	out := map[string]string{}
+	paths, err := config.Checkouts(vault)
+	if err != nil {
+		return out
+	}
+	for _, p := range paths {
+		id, err := config.RemoteIdentity(gitRemoteOf(p))
+		if err != nil {
+			continue
+		}
+		if _, duplicate := out[id]; duplicate {
+			out[id] = ""
+		} else {
+			out[id] = p
+		}
+	}
+	memoMu.Lock()
+	checkoutMemo[vault] = out
+	memoMu.Unlock()
+	return out
 }

@@ -18,17 +18,26 @@ DEFAULTS = {"claude": ("opus", "medium"), "codex": ("gpt-5.5", "medium"), "curso
 
 
 def isolated_env(harness):
-    """Environment with the vault's instructions only: no personal memories, global instructions, hooks or
-    plugins of the person running the benchmark. Codex gets a private home that links only its auth file;
-    Claude skips user settings via --setting-sources. Cursor exposes no equivalent (a recorded limit)."""
+    """Isolate user-home configuration where the harness supports it. Codex gets a private home seeded
+    only with an auth-file link; its runtime may still install bundled plugins or tools there. Claude
+    skips user settings via --setting-sources. Cursor exposes no equivalent (a recorded limit). Record
+    effective harness capabilities separately; a private home does not prove tool or network isolation."""
     env = dict(os.environ)
+    if os.environ.get("BENCH_TOOL_PATH"):
+        env["PATH"] = os.environ["BENCH_TOOL_PATH"]
     if harness == "codex":
         real = pathlib.Path(os.environ.get("CODEX_HOME", pathlib.Path.home() / ".codex"))
         home = pathlib.Path(os.environ.get("BENCH_CODEX_HOME", pathlib.Path(tempfile.gettempdir()) / "vault-bench-codex-home"))
         home.mkdir(parents=True, exist_ok=True)
         link = home / "auth.json"
         if not link.exists() and (real / "auth.json").exists():
-            link.symlink_to(real / "auth.json")
+            try:
+                link.symlink_to(real / "auth.json")
+            except FileExistsError:
+                # Parallel fresh sessions can create the same link between the check and
+                # creation. Accept only the intended auth link, never another file.
+                if not link.is_symlink() or link.resolve() != (real / "auth.json").resolve():
+                    raise
         env["CODEX_HOME"] = str(home)
     return env
 
@@ -38,10 +47,19 @@ def command(harness, prompt, out_file, model, effort, write=False):
         return ["claude", "-p", prompt, "--model", model, "--effort", effort, "--output-format", "json", "--permission-mode", "bypassPermissions", "--setting-sources", "project,local"]
     if harness == "codex":
         sandbox = "danger-full-access" if write else "read-only"  # workspace-write keeps .git read-only
-        return ["codex", "exec", "--skip-git-repo-check", "-m", model, "-c", f'model_reasoning_effort="{effort}"', "-s", sandbox, "--json", "--output-last-message", str(out_file), prompt]
+        pinned = []
+        if os.environ.get("BENCH_TOOL_PATH"):
+            # A login shell can reset PATH to Apple's Git launcher, which needs writes
+            # that the read-only sandbox denies. Pin the same toolchain in every arm.
+            pinned = ["-c", "allow_login_shell=false", "-c", "shell_environment_policy.set.PATH=" + json.dumps(os.environ["BENCH_TOOL_PATH"])]
+        return ["codex", "exec", "--skip-git-repo-check", "-m", model, "-c", f'model_reasoning_effort="{effort}"', *pinned, "-s", sandbox, "--json", "--output-last-message", str(out_file), prompt]
     if harness == "cursor":
         return ["cursor-agent", "-p", "--output-format", "json", "--force"] + (["--model", model] if model else []) + [prompt]
     raise SystemExit("unknown harness")
+
+
+def counts_available(value, keys):
+    return isinstance(value, dict) and all(type(value.get(k)) is int and value[k] >= 0 for k in keys)
 
 
 def normalize_usage(harness, j):
@@ -49,29 +67,39 @@ def normalize_usage(harness, j):
     if harness == "claude":
         mu = j.get("modelUsage") or {}
         if mu:
+            if not isinstance(mu, dict) or not all(counts_available(v, ("inputTokens", "cacheReadInputTokens", "cacheCreationInputTokens", "outputTokens")) for v in mu.values()):
+                return None
             cached = sum(v.get("cacheReadInputTokens", 0) for v in mu.values())
             total = sum(v.get("inputTokens", 0) + v.get("cacheReadInputTokens", 0) + v.get("cacheCreationInputTokens", 0) for v in mu.values())
             return {"input_total": total, "input_cached": cached, "output": sum(v.get("outputTokens", 0) for v in mu.values())}
         u = j.get("usage") or {}
+        if not counts_available(u, ("input_tokens", "cache_read_input_tokens", "cache_creation_input_tokens", "output_tokens")):
+            return None
         total = u.get("input_tokens", 0) + u.get("cache_read_input_tokens", 0) + u.get("cache_creation_input_tokens", 0)
         return {"input_total": total, "input_cached": u.get("cache_read_input_tokens", 0), "output": u.get("output_tokens", 0)}
     if harness == "cursor":
         u = j.get("usage") or {}
+        if not counts_available(u, ("inputTokens", "cacheReadTokens", "cacheWriteTokens", "outputTokens")):
+            return None
         total = u.get("inputTokens", 0) + u.get("cacheReadTokens", 0) + u.get("cacheWriteTokens", 0)
         return {"input_total": total, "input_cached": u.get("cacheReadTokens", 0), "output": u.get("outputTokens", 0)}
-    return {"input_total": j.get("input_tokens", 0), "input_cached": j.get("cached_input_tokens", 0), "output": j.get("output_tokens", 0)}
+    if not counts_available(j, ("input_tokens", "cached_input_tokens", "output_tokens")):
+        return None
+    return {"input_total": j["input_tokens"], "input_cached": j["cached_input_tokens"], "output": j["output_tokens"]}
 
 
 def execute(harness, prompt, cwd, model, effort, out_file, write=False, timeout=1500):
     """Run one fresh headless session and return its answer, normalized usage, cost and duration."""
     out_file = pathlib.Path(out_file)
-    start = time.time()
+    start = time.monotonic()
+    if harness == "codex":
+        out_file.unlink(missing_ok=True)
     try:
         r = subprocess.run(command(harness, prompt, out_file, model, effort, write), cwd=cwd, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=timeout, env=isolated_env(harness))
         stdout, rc = r.stdout, r.returncode
     except subprocess.TimeoutExpired as e:
         stdout, rc = (e.stdout or b"").decode() if isinstance(e.stdout, bytes) else (e.stdout or ""), "timeout"
-    rec = {"harness": harness, "model": model, "effort": effort, "seconds": round(time.time() - start, 1), "returncode": rc}
+    rec = {"harness": harness, "model": model, "effort": effort, "seconds": round(time.monotonic() - start, 1), "returncode": rc}
     if harness in ("claude", "cursor"):
         try:
             j = json.loads(stdout)
@@ -84,18 +112,23 @@ def execute(harness, prompt, cwd, model, effort, out_file, write=False, timeout=
     else:
         rec["answer"] = out_file.read_text() if out_file.exists() else stdout[-8000:]
         raw = {"input_tokens": 0, "cached_input_tokens": 0, "output_tokens": 0}
-        commands = 0
+        commands, completed_turns, missing_usage = 0, 0, False
         for line in stdout.splitlines():
             try:
                 ev = json.loads(line)
             except ValueError:
                 continue
             if ev.get("type") == "turn.completed":
-                for k in raw:
-                    raw[k] += ev.get("usage", {}).get(k, 0)
+                completed_turns += 1
+                usage = ev.get("usage")
+                if not counts_available(usage, raw):
+                    missing_usage = True
+                else:
+                    for k in raw:
+                        raw[k] += usage[k]
             if ev.get("type") == "item.completed" and ev.get("item", {}).get("type") == "command_execution":
                 commands += 1
-        rec["usage"], rec["commands"] = normalize_usage("codex", raw), commands
+        rec["usage"], rec["commands"] = normalize_usage("codex", raw) if completed_turns and not missing_usage else None, commands
     return rec
 
 

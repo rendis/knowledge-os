@@ -110,6 +110,39 @@ func TestUpdateKeepsCellSkills(t *testing.T) {
 	}
 }
 
+func TestUpdateRejectsInvalidSettingsBeforeChangingFiles(t *testing.T) {
+	for _, settings := range []string{"invalid JSON", "null"} {
+		t.Run(settings, func(t *testing.T) {
+			v := install(t)
+			if e := os.WriteFile(filepath.Join(v, "AGENTS.md"), []byte("local router edit\n"), 0o644); e != nil {
+				t.Fatal(e)
+			}
+			if e := os.WriteFile(filepath.Join(v, ".gitignore"), []byte("local-ignore\n"), 0o644); e != nil {
+				t.Fatal(e)
+			}
+			if e := os.WriteFile(filepath.Join(v, ".obsidian", "app.json"), []byte(settings), 0o644); e != nil {
+				t.Fatal(e)
+			}
+			before := map[string][]byte{}
+			for _, rel := range []string{"AGENTS.md", ".gitignore", ".obsidian/app.json", LockName} {
+				b, e := os.ReadFile(filepath.Join(v, filepath.FromSlash(rel)))
+				if e != nil {
+					t.Fatal(e)
+				}
+				before[rel] = b
+			}
+			if _, e := Update(v, Options{Force: true}); e == nil || !strings.Contains(e.Error(), "app.json") {
+				t.Fatalf("invalid settings must stop the update: %v", e)
+			}
+			for rel, want := range before {
+				if got, _ := os.ReadFile(filepath.Join(v, filepath.FromSlash(rel))); !bytes.Equal(got, want) {
+					t.Errorf("a refused update changed %s", rel)
+				}
+			}
+		})
+	}
+}
+
 func TestSourcesIncludeSelectedAdaptersOnly(t *testing.T) {
 	plain, e := Sources(nil)
 	if e != nil {

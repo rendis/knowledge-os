@@ -1,8 +1,17 @@
 package discover
 
 import (
+	"errors"
 	"strings"
 )
+
+// Validate the observed identifier before adding its namespace prefix or using it in a child read.
+func requirePlatformName(name string) error {
+	if strings.TrimSpace(name) == "" {
+		return errors.New("unreadable platform inventory: a resource identifier is missing")
+	}
+	return nil
+}
 
 // Data services of each provider: document and relational databases, object storage and the
 // warehouse. Names and relations only; no command reads data.
@@ -27,6 +36,9 @@ func gcpFirestore(snap *platformSnapshot, project string) (string, error) {
 		return msg, e
 	}
 	for _, db := range dbs {
+		if e := requirePlatformName(db.Name); e != nil {
+			return e.Error(), e
+		}
 		id := db.Name[strings.LastIndex(db.Name, "/")+1:]
 		snap.add("document_db", "database", db.Name, id)
 		groups := map[string]bool{}
@@ -62,6 +74,9 @@ func gcpCloudSQL(snap *platformSnapshot, project string) (string, error) {
 		return msg, e
 	}
 	for _, in := range instances {
+		if e := requirePlatformName(in.Name); e != nil {
+			return e.Error(), e
+		}
 		snap.add("sql_db", "instance", in.ConnectionName, in.Name)
 		snap.Resources[len(snap.Resources)-1].State = in.State
 		var dbs []struct{ Name string }
@@ -84,6 +99,9 @@ func gcpStorage(snap *platformSnapshot, project string) (string, error) {
 		return msg, e
 	}
 	for _, b := range buckets {
+		if e := requirePlatformName(b.Name); e != nil {
+			return e.Error(), e
+		}
 		snap.add("object_storage", "bucket", "gs://"+b.Name, b.Name)
 	}
 	return "", nil
@@ -99,6 +117,9 @@ func gcpBigQuery(snap *platformSnapshot, project string) (string, error) {
 	}
 	for i, d := range datasets {
 		ds := d.DatasetReference.DatasetID
+		if e := requirePlatformName(ds); e != nil {
+			return e.Error(), e
+		}
 		snap.add("warehouse", "dataset", project+":"+ds, ds)
 		if i >= 200 {
 			continue // tables of the first 200 datasets; the rest are listed by name only
@@ -111,6 +132,9 @@ func gcpBigQuery(snap *platformSnapshot, project string) (string, error) {
 			continue
 		}
 		for _, t := range tables {
+			if e := requirePlatformName(t.TableReference.TableID); e != nil {
+				return e.Error(), e
+			}
 			snap.add("warehouse", strings.ToLower(t.Type), project+":"+ds+"."+t.TableReference.TableID, ds+"."+t.TableReference.TableID, t.TableReference.TableID)
 		}
 	}
@@ -126,6 +150,9 @@ func awsDynamoDB(snap *platformSnapshot, r []string) (string, error) {
 	}
 	account, region, _ := strings.Cut(snap.Scope, "/")
 	for _, t := range out.TableNames {
+		if e := requirePlatformName(t); e != nil {
+			return e.Error(), e
+		}
 		snap.add("document_db", "table", "arn:aws:dynamodb:"+region+":"+account+":table/"+t, t)
 	}
 	return "", nil
@@ -173,6 +200,9 @@ func awsS3(snap *platformSnapshot) (string, error) {
 		return msg, e
 	}
 	for _, b := range out.Buckets {
+		if e := requirePlatformName(b.Name); e != nil {
+			return e.Error(), e
+		}
 		snap.add("object_storage", "bucket", "arn:aws:s3:::"+b.Name, b.Name, "s3://"+b.Name)
 	}
 	return "", nil

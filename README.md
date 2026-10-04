@@ -25,6 +25,13 @@
 
 The vault is the map, not the boundary. When a note is missing or stale, the agent follows the trail to the repositories at their reference branch, the cloud snapshots, databases and trackers the cell configured. Every resource an answer names is confirmed in the notes, discovery facts or cloud snapshots; new conclusions get independent review.
 
+For an ordinary read-only question, fresh evidence can be returned without storing it:
+`kos discover run --vault <vault> --read-only` and
+`kos discover platform --vault <vault> --provider <provider> --scope <scope> --read-only`.
+Reuse the user's applicable read permission; storing snapshots, discovery state or notes requires write authority.
+Batch note checks with repeated `--note` and add `--read-only` to prevent cache writes.
+
+
 ## How it works
 
 <p align="center">

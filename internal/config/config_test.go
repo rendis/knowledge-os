@@ -390,3 +390,50 @@ func TestLocateRepositoryByName(t *testing.T) {
 		t.Fatal("--repo and --remote together must be refused")
 	}
 }
+
+func TestReadOnlyConfigCommandsAndWriteRefusal(t *testing.T) {
+	root := fixture(t)
+	for _, path := range markers {
+		if path != "instance.yaml" {
+			write(t, root, path, "marker")
+		}
+	}
+	if _, e := UpdateWorkspace(root, WorkspaceUpdate{Roots: []string{t.TempDir()}}); e != nil {
+		t.Fatal(e)
+	}
+	for _, args := range [][]string{
+		{"status"}, {"resolve"}, {"workspace"}, {"database-targets"}, {"database-target", "--target", "unknown"},
+		{"proxy-port", "--environment", "prod"}, {"locate", "--repo", "unknown"},
+	} {
+		t.Run(args[0], func(t *testing.T) {
+			var out bytes.Buffer
+			if e := Run(append(args, "--vault", root, "--read-only"), &out); e != nil {
+				t.Fatal(e)
+			}
+		})
+	}
+	for _, args := range [][]string{
+		{"bind", "--capability", "read-db", "--procedure", "Inspect DB"},
+		{"workspace-update", "--proxy-port", "prod=5443"},
+		{"workspace-init", "--proxy-port", "prod=5443"},
+	} {
+		t.Run(args[0], func(t *testing.T) {
+			files := []string{"instance.yaml", ".knowledge-os-config.yaml"}
+			before := make([][]byte, len(files))
+			for i, name := range files {
+				before[i], _ = os.ReadFile(filepath.Join(root, name))
+			}
+			var out bytes.Buffer
+			e := Run(append(args, "--vault", root, "--read-only"), &out)
+			if e == nil || !strings.Contains(e.Error(), "--read-only refuses") {
+				t.Fatalf("a read-only invocation must refuse a writing command: %v", e)
+			}
+			for i, name := range files {
+				after, _ := os.ReadFile(filepath.Join(root, name))
+				if !bytes.Equal(before[i], after) {
+					t.Fatalf("read-only command changed %s", name)
+				}
+			}
+		})
+	}
+}

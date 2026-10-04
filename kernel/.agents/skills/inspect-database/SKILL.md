@@ -30,11 +30,11 @@ For cells without a matching target, the `database-inspection` capability is the
 
 Complete when the requested target or capability route is unambiguous, and available evidence sources and their limitations are identified.
 
-## 3. Inspect the minimum evidence
+## 3. Inspect the relevant evidence
 
 Use static evidence when it answers the question. For live evidence, resolve connection requirements from the runbook. Retrieve a local port through `<CLI> config proxy-port --vault "<VAULT_ROOT>" --environment "<KEY>"` only when that executor requires one, using the target's `port_key` or the capability procedure's key. Direct connections, sockets and API executors do not require a proxy port. The port is a local preference, not destination identity.
 
-Follow the resolved procedure's executor contract. Confirm environment, instance, database, schemas, read-only identity, credential mechanism and query scope. Use minimum metadata or rows; preserve timestamps and distinguish current snapshots from historical evidence. An absent executor, invalid destination, unavailable read-only enforcement or missing authorization blocks only dependent live work. Never replace these with an improvised connection or a different target.
+Follow the resolved procedure's executor contract. Confirm environment, instance, database, schemas, read-only identity, credential mechanism and query scope. Cover every material part of the question with bounded, read-only queries: relevant schemas, conditions, periods and result pages. Prefer projected columns, indexed predicates and aggregates to broad row dumps. A sample supports only a sampled observation; verify full coverage before claiming absence or totals. Reuse still-applicable read authorization from user decisions and the procedure; configuration alone grants none. Preserve timestamps and distinguish current snapshots from historical evidence. An absent executor, invalid destination, unavailable read-only enforcement or missing authorization blocks only dependent live work. Never replace these with an improvised connection or a different target.
 
 Complete when each live operation has observed target/read-only checks and a bounded query, or an exact access gap is recorded.
 

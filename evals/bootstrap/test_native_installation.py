@@ -40,7 +40,10 @@ class Mirror:
         self.url = f"http://127.0.0.1:{self.server.server_address[1]}"
 
     def close(self):
-        self.server.shutdown()
+        try:
+            self.server.shutdown()
+        finally:
+            self.server.server_close()
 
 
 class ReleaseTests(unittest.TestCase):

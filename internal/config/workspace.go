@@ -136,7 +136,7 @@ func LocateRepository(root, remote string) (Object, error) {
 	if e != nil {
 		return nil, e
 	}
-	paths, e := checkouts(root)
+	paths, e := Checkouts(root)
 	if e != nil {
 		return nil, e
 	}
@@ -157,9 +157,9 @@ func LocateRepository(root, remote string) (Object, error) {
 	}
 }
 
-// checkouts are the Git checkouts the workspace roots expose: a root that is itself a checkout, otherwise its
+// Checkouts are the Git checkouts the workspace roots expose: a root that is itself a checkout, otherwise its
 // immediate children. There is no recursive scan.
-func checkouts(root string) ([]string, error) {
+func Checkouts(root string) ([]string, error) {
 	w, e := Workspace(root)
 	if e != nil {
 		return nil, e
@@ -248,7 +248,7 @@ func LocateRepositoryByName(root, name string) (Object, error) {
 		}
 		return nil
 	})
-	paths, e := checkouts(root)
+	paths, e := Checkouts(root)
 	if e != nil {
 		return nil, e
 	}
@@ -291,8 +291,12 @@ func LocateRepositoryByName(root, name string) (Object, error) {
 	if e != nil {
 		return nil, e
 	}
+	branches, e := ReferenceBranches(inst)
+	if e != nil {
+		return nil, e
+	}
 	candidates := ReferenceBranchOrder(inst)
-	if configured := str(obj(obj(inst["sources"])["reference_branches"])[m.repo]); configured != "" {
+	if configured := branches[strings.ToLower(m.repo)]; configured != "" {
 		candidates = []string{configured}
 	}
 	for _, b := range candidates {

@@ -1,6 +1,9 @@
 package cases
 
 import (
+	"bytes"
+	"context"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"io"
@@ -12,6 +15,8 @@ import (
 	"strings"
 	"time"
 	"unicode/utf8"
+
+	"github.com/gofrs/flock"
 
 	"knowledge-os/internal/config"
 	"knowledge-os/internal/devhandoff"
@@ -319,8 +324,101 @@ func requireRefs(text, flag, value string, prefixes ...string) ([]string, error)
 	return ids, nil
 }
 
-// mutate applies one change to a case: the change is computed in memory, gated, logged and written.
+// caseLock serializes commands for one ID, even if the case moves from unpublished to published.
+// Locks stay in the ignored local store; removing a lock file would let waiting writers lock different inodes.
+func caseLock(vault, id string) (*flock.Flock, error) {
+	parent := vault
+	for _, dir := range []string{".investigations", ".locks"} {
+		parent = filepath.Join(parent, dir)
+		if e := os.Mkdir(parent, 0o755); e != nil && !os.IsExist(e) {
+			return nil, e
+		}
+		if st, e := os.Lstat(parent); e != nil {
+			return nil, e
+		} else if !st.IsDir() {
+			return nil, errors.New("case lock directory must be a directory, not a symbolic link")
+		}
+	}
+	name := filepath.Join(parent, fmt.Sprintf("%x.lock", sha256.Sum256([]byte(id))))
+	if st, e := os.Lstat(name); e == nil && !st.Mode().IsRegular() {
+		return nil, errors.New("case lock must be a regular file")
+	} else if e != nil && !os.IsNotExist(e) {
+		return nil, e
+	}
+	lock := flock.New(name)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	ok, e := lock.TryLockContext(ctx, 20*time.Millisecond)
+	if e != nil || !ok {
+		_ = lock.Close()
+		if e != nil {
+			return nil, e
+		}
+		return nil, errors.New("case is locked; try again")
+	}
+	return lock, nil
+}
+
+// replaceCase keeps the old file intact until a complete replacement is ready. Manual edits do not
+// take our lock, so compare the original bytes again immediately before replacing the file.
+func replaceCase(full string, previous, next []byte) error {
+	st, e := os.Lstat(full)
+	if e != nil {
+		return e
+	}
+	if !st.Mode().IsRegular() {
+		return errors.New("case target must be a regular file")
+	}
+	f, e := os.CreateTemp(filepath.Dir(full), ".kos-case-*")
+	if e != nil {
+		return e
+	}
+	defer os.Remove(f.Name())
+	defer f.Close()
+	if e := f.Chmod(st.Mode().Perm()); e != nil {
+		return e
+	}
+	if _, e := f.Write(next); e != nil {
+		return e
+	}
+	if e := f.Sync(); e != nil {
+		return e
+	}
+	if e := f.Close(); e != nil {
+		return e
+	}
+	if st, e := os.Lstat(full); e != nil {
+		return e
+	} else if !st.Mode().IsRegular() {
+		return errors.New("case target must be a regular file")
+	}
+	current, e := os.ReadFile(full)
+	if e != nil {
+		return e
+	}
+	if !bytes.Equal(current, previous) {
+		return errors.New("case changed during update; try again")
+	}
+	return os.Rename(f.Name(), full)
+}
+
+// mutate locks the case before reading it, then computes, gates, logs and atomically writes the change.
 func mutate(o options, out io.Writer, change func(c Case, text, locale string) (string, []string, map[string]any, error), after func(c Case) error) error {
+	if o.id == "" {
+		return errors.New("--id is required")
+	}
+	root, e := config.CanonicalRoot(o.vault)
+	if e != nil {
+		return e
+	}
+	o.vault = root
+	if !o.dryRun {
+		lock, e := caseLock(o.vault, o.id)
+		if e != nil {
+			return e
+		}
+		defer lock.Close()
+	}
 	c, e := findCase(o.vault, o.id)
 	if e != nil {
 		return e
@@ -368,7 +466,7 @@ func mutate(o options, out io.Writer, change func(c Case, text, locale string) (
 			return e
 		}
 	}
-	if e := os.WriteFile(full, []byte(next), 0o644); e != nil {
+	if e := replaceCase(full, b, []byte(next)); e != nil {
 		return e
 	}
 	if res == nil {

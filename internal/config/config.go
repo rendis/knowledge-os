@@ -584,6 +584,20 @@ func PlatformProviders(inst Object) []string {
 	return out
 }
 
+// ReferenceBranches indexes explicit branch policies by repository identity spelling and rejects
+// conflicting case variants instead of choosing an arbitrary policy.
+func ReferenceBranches(inst Object) (map[string]string, error) {
+	out := map[string]string{}
+	for name, raw := range obj(obj(inst["sources"])["reference_branches"]) {
+		key, branch := strings.ToLower(name), str(raw)
+		if previous, exists := out[key]; exists && previous != branch {
+			return nil, fmt.Errorf("ambiguous reference branch for repository %s", name)
+		}
+		out[key] = branch
+	}
+	return out, nil
+}
+
 // ReferenceBranchOrder is the cell's ordered branch preference for repositories without an explicit
 // reference branch (default main, then master).
 func ReferenceBranchOrder(inst Object) []string {

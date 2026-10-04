@@ -1,4 +1,4 @@
-.PHONY: build test test-race release publish test-installer test-platform demo
+.PHONY: build test test-race test-evals release publish test-installer test-platform demo
 
 build:
 	CGO_ENABLED=0 go build -trimpath -o dist/kos ./cmd/kos
@@ -9,6 +9,10 @@ test:
 
 test-race:
 	go test -race ./...
+
+# Synthetic evaluator protocol checks; no agent sessions or consumer vaults.
+test-evals:
+	python3 -B -m unittest discover -s evals/benchmark -p 'test_*.py'
 
 release:
 	go run ./tools/release

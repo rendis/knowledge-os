@@ -16,17 +16,22 @@ Fairness comes from holding everything except the setting constant:
    change and benchmark every setting again.
 2. **Same inputs.** Every setting gets the same prompts in fresh headless sessions whose working directory is
    the fixture vault (a fresh copy per flow run). Nothing in the prompt names or favors a model.
-3. **Blind, fixed grading.** Answers are graded by one fixed judge (`evals/regression/judge.py` `JUDGE`)
-   that sees only the question, the expected facts, the forbidden claims and the answer text. Flow branches are
+3. **Fixed grading.** Answers are graded by one fixed judge (`evals/regression/judge.py` `JUDGE`)
+   that sees the question, expected facts, forbidden claims, answer text and optional independently captured
+   source packet. The setting label is withheld; answer text may reveal it, so do not claim perfect blinding. Flow branches are
    reviewed by the same fixed reviewer with the same review prompt and the deterministic gate output. A judge
-   from the family under test grades its own family too; report that when it applies.
+   from the family under test grades its own family too; report that when it applies. Calibrate the judge
+   with both source-supported and demonstrably defective controls. Adjudicate material model findings
+   against primary sources: expected-fact coverage and a successful reviewer verdict alone do not certify
+   every delivered claim. Record corrections to control labels without replacing historical inputs.
 4. **Repetitions.** Questions run three times per setting by default; report mean and range, never a single
    run. Treat differences inside the observed range as noise.
 5. **Same accounting.** Usage is normalized to total input tokens (cached included), cached input and output
    tokens; dollars are reported only where the harness reports them.
 6. **Safety.** Fixtures and flow copies push nowhere (push URL disabled); sources are read-only by prompt,
-   and every flow run compares each source checkout's HEAD and working tree before and after
-   (`sources_unchanged`).
+   and every flow run compares each source checkout's HEAD, reference targets, Git configuration,
+   working-tree diff and untracked bytes (including ignored files) before and after (`sources_unchanged`).
+   A permitted fetch that changes these inputs invalidates the frozen comparison; it is not a permission violation.
 
 ## Suite (cell-owned)
 
@@ -116,17 +121,36 @@ python3 -B evals/benchmark/bench.py qa --suite SUITE.json --work WORK --setting 
 
 ## Metrics
 
-- Questions: judge score (share of expected facts stated), violations (forbidden claims asserted without
-  reserve), time, tokens, cost; the score per vault and the lost points by kind (`omitted`, `abstained`,
+- Questions: source-backed delivery first (model source-audit passes in `verified_answers`, unavailable verification and uncited
+  claims), then judge score (share of expected facts stated), violations (forbidden claims asserted without
+  reserve), unsupported claims, grading/execution errors and clean answers (complete score with none of
+  those failures), agent time, tokens, cost; the score per vault and the lost points by kind (`omitted`, `abstained`,
   `wrong`, `direction`, `path`, `imprecise`), which say what to fix: `direction` points at missing typed
   relations in the notes, `path` at a flow the notes do not assemble, `abstained` at a trail the agent did not
   follow.
-- Flows: the author runs the scenario prompt; deterministic gates (`sync verify`: note gates, stale neighbour
-  notes, structural issues) and the fixed reviewer judge the branch. A `revise` verdict or a failing gate gets a
+  Adjudicate flags and passing answers against actual sources before claiming improved reliability; model
+  verdicts and coverage scores alone cannot establish it.
+- Flows: the author runs the scenario prompt; deterministic gates (`sync verify`: note and case gates,
+  stale neighbour notes, copied paragraphs, structural issues and every other verification problem) and the
+  fixed reviewer judge the branch. Only the missing review record is replaced by this reviewer's verdict;
+  failed commands and invalid or incomplete gate output cannot pass. The released CLI must match the current
+  source fingerprint and checksum. A `revise` verdict or a failing gate gets a
   focused repair from the same setting and a new review, up to `--repairs` (default 2), as the sync protocol
   prescribes. Reported: accepted on the first pass, accepted after repairs, repairs, material findings on the
   first pass, stale neighbours left on the first pass, source integrity, and author time, tokens and cost
-  summed over every round.
+  summed over every round, plus reviewer and total agent time, tokens and cost. The recorded wall time
+  includes gates and reviews. Unknown cost or usage stays unavailable, including partially reported runs.
+  Judge time and cost are reported separately. A failed, missing or malformed grade cannot be a clean answer;
+  answers above 128 KiB fail grading without a judge request. A failed or malformed reviewer cannot accept
+  a flow. Source integrity streams untracked regular files and rejects special files without opening them.
+
+`clean_answers` is complete expected-fact coverage with no flagged issues, not proof of verified delivery.
+Only a valid source packet and a passing claim audit count toward `verified_answers`; see
+[`evals/regression`](../regression/README.md#source-backed-delivery). Unsupported flags without a source
+packet remain allegations. For a CLI/kernel comparison, hold the toolchain and frozen knowledge constant
+and separate baseline, changed CLI with baseline kernel, and changed CLI with changed kernel. Rotate their
+execution order across repetitions. Exclude sandbox/toolchain failures from speed conclusions, not from
+the recorded artifacts. Accept evidence quality before coverage, consistency and time.
 
 `report` writes `report.md` and `report.json` in the work directory. Publish only the anonymized table
 (settings and numbers) in `execution-profiles.md`; raw outputs contain cell material.

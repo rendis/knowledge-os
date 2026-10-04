@@ -140,3 +140,16 @@ func TestMissingExplicitReferenceNeverFallsBack(t *testing.T) {
 		t.Fatal(repos, e)
 	}
 }
+
+func TestCaseVariantReferencePolicyMatchesDiscovery(t *testing.T) {
+	fakeGHPath(t)
+	s := scope{prefixes: []string{"team-"}, instance: object{"sources": object{"reference_branches": object{"TEAM-READER": "release/stable"}}}}
+	repos, e := remoteRepos(context.Background(), s, "example", github{token: "stored-token"})
+	if e != nil || len(repos) != 1 || repos[0]["branch"] != "release/stable" {
+		t.Fatalf("repository spelling must not change its authoritative branch: %v %v", repos, e)
+	}
+	s.instance = object{"sources": object{"reference_branches": object{"TEAM-READER": "release/stable", "team-reader": "main"}}}
+	if _, e := remoteRepos(context.Background(), s, "example", github{token: "stored-token"}); e == nil {
+		t.Fatal("conflicting case variants must not select an arbitrary branch")
+	}
+}

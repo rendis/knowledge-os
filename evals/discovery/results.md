@@ -1,5 +1,8 @@
 # Discovery regression — first field run (2026-09-25)
 
+These are historical results from that distribution snapshot. The current CLI no longer uses Jev or the
+semantic citation check; see [ADR 0003](../../docs/adr/0003-kos-builds-and-checks-the-map.md).
+
 `run_real.py` on sandbox clones of three installed cells (124 repositories in Go, Java, TypeScript,
 JavaScript and Python; Kubernetes/Kustomize, Cloud Functions and Terraform configuration), with
 stored judgments and read-only Pub/Sub snapshots of the readable projects. Cell-specific names stay
@@ -18,5 +21,5 @@ Note gates over all repository notes (`discover check`): 4,741 source anchors, 9
 remaining errors are citation defects (identifiers claimed from a file that does not contain them,
 line ranges past the end of the file, files absent at the cited commit). Notes written before
 permalinks were required (one cell) have no mechanically verifiable anchors and fail coverage until
-their next sync. The semantic citation check (Jev) is noisy on paragraphs that group several facts
-and references, and is kept as a review aid.
+their next sync. At that time, the semantic citation check (Jev) was noisy on paragraphs that grouped several
+facts and references, and was kept as a review aid.

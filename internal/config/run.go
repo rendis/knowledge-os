@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-const Help = `config --vault PATH COMMAND [options]
+const Help = `config --vault PATH COMMAND [--read-only] [options]
   status                         Identity, orientation and configured capabilities
   resolve                        Validate explicit vault markers and Git identity
   capability --capability ID     Resolve operational procedures
@@ -32,12 +32,13 @@ const Help = `config --vault PATH COMMAND [options]
   areas | reports                List operational catalog entries
   operation --basename NAME | --report-id ID
 All output is JSON. No configured procedure is executed.
+--read-only skips machine catalog/update-cache writes and refuses bind and workspace writes.
 `
 
 func Run(args []string, out io.Writer) error {
 	opts := map[string][]string{}
 	cmd := ""
-	bools := map[string]bool{"--disable-managed-clone": true, "--disable-development-worktree-root": true}
+	bools := map[string]bool{"--read-only": true, "--disable-managed-clone": true, "--disable-development-worktree-root": true}
 	values := map[string]bool{}
 	for _, n := range strings.Fields("--vault --capability --procedure --target --repository-root --managed-clone-root --development-worktree-root --proxy-port --expected-hash --remote --repo --environment --basename --report-id") {
 		values[n] = true
@@ -90,8 +91,14 @@ func Run(args []string, out io.Writer) error {
 	if !known {
 		return fmt.Errorf("unknown config command %s", cmd)
 	}
+	if _, readOnly := opts["--read-only"]; readOnly {
+		switch cmd {
+		case "bind", "workspace-init", "workspace-update":
+			return fmt.Errorf("--read-only refuses writing config command %s", cmd)
+		}
+	}
 	for flag := range opts {
-		if flag != "--vault" && !strings.Contains(" "+allowedFlags+" ", " "+flag+" ") {
+		if flag != "--vault" && flag != "--read-only" && !strings.Contains(" "+allowedFlags+" ", " "+flag+" ") {
 			return fmt.Errorf("%s is not supported for %s", flag, cmd)
 		}
 	}

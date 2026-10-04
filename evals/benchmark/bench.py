@@ -9,13 +9,15 @@ A setting is harness:model:effort (Cursor carries effort in its model id: cursor
 Every setting answers the same frozen fixture with the same prompts, fresh sessions and the same
 fixed judge/reviewer, which never learn who wrote the output. See README.md for the protocol.
 """
-import argparse, concurrent.futures as cf, datetime, hashlib, json, os, pathlib, platform, re, shutil, subprocess, sys
+import argparse, concurrent.futures as cf, datetime, hashlib, json, os, pathlib, re, shutil, stat, subprocess, sys, tempfile, time
 
 HERE = pathlib.Path(__file__).resolve().parent
 DIST = HERE.parent.parent
 sys.path.insert(0, str(HERE.parent / "regression"))
 import run as runner  # noqa: E402
 import judge  # noqa: E402
+sys.path.insert(0, str(HERE.parent / "bootstrap"))
+import _kos  # noqa: E402
 
 REVIEWER = judge.JUDGE  # the flow reviewer is the same fixed grader family and setting as the QA judge
 IDENTITY = {"GIT_AUTHOR_NAME": "benchmark", "GIT_AUTHOR_EMAIL": "benchmark@invalid", "GIT_COMMITTER_NAME": "benchmark", "GIT_COMMITTER_EMAIL": "benchmark@invalid"}
@@ -25,18 +27,16 @@ Gate results: {gates}
 Reply ONLY with a JSON object: {{"verdict": "accept|revise", "findings": [{{"file": "...", "claim": "exact sentence", "evidence": "file:line at the commit that contradicts it", "severity": "material|minor"}}]}}"""
 
 
-def sh(args, cwd=None, env=None, check=True):
-    r = subprocess.run(args, cwd=cwd, capture_output=True, text=True, env={**os.environ, **(env or {})})
+def sh(args, cwd=None, env=None, check=True, strip=True):
+    r = subprocess.run(args, cwd=cwd, capture_output=True, text=True, env={**os.environ, "GIT_OPTIONAL_LOCKS": "0", **(env or {})})
     if check and r.returncode != 0:
         raise SystemExit(f"{' '.join(map(str, args))}: {r.stderr.strip()}")
-    return r.stdout.strip()
+    return r.stdout.strip() if strip else r.stdout
 
 
 def cli():
     """The kos of the current release (make release): its kernel is the one under test."""
-    arch = {"arm64": "arm64", "aarch64": "arm64"}.get(platform.machine(), "amd64")
-    osname = {"Darwin": "darwin", "Linux": "linux", "Windows": "windows"}[platform.system()]
-    return str(DIST / "dist" / f"kos-{osname}-{arch}{'.exe' if osname == 'windows' else ''}")
+    return str(_kos.binary(DIST))
 
 
 def sha256(path):
@@ -60,17 +60,70 @@ def tag(setting):
     return re.sub(r"[^A-Za-z0-9.-]+", "_", "-".join(x for x in setting if x))
 
 
+def stream_git_diff(root, digest, base="HEAD"):
+    """Hash the tracked patch in bounded memory, including binary changes and deletions."""
+    command = ["git", "-C", str(root), "diff", "--no-ext-diff", "--no-textconv", "--binary"]
+    if base is not None:
+        command.append(base)
+    with tempfile.TemporaryFile() as errors, subprocess.Popen(command, stdout=subprocess.PIPE, stderr=errors) as process:
+        with process.stdout as output:
+            for chunk in iter(lambda: output.read(1024 * 1024), b""):
+                digest.update(chunk)
+        if process.wait() != 0:
+            errors.seek(0)
+            raise RuntimeError(f"source diff failed for {root}: {errors.read(4096).decode('utf-8', errors='replace').strip()}")
+
+
 def source_state(vault):
     """HEAD and working-tree status of every source checkout the vault resolves; must not change."""
-    cfg = pathlib.Path(vault) / ".knowledge-os-config.yaml"
-    roots = re.findall(r'^\s*-\s*"?([^"\n]+?)"?\s*$', cfg.read_text(), re.M) if cfg.exists() else []
+    workspace = json.loads(sh([cli(), "config", "workspace", "--vault", str(vault), "--read-only"]))
+    roots = [r["path"] for r in workspace.get("source_context", {}).get("roots", [])]
     state = {}
-    for root in {r for r in roots if os.path.isdir(r)}:
-        for d in sorted(pathlib.Path(root).iterdir()):
-            if (d / ".git").exists():
-                head = sh(["git", "-C", str(d), "rev-parse", "HEAD"], check=False)
-                status = sh(["git", "-C", str(d), "status", "--porcelain"], check=False)
-                state[d.name] = head + ":" + hashlib.sha256(status.encode()).hexdigest()[:12]
+    for root in sorted(set(roots)):
+        base = pathlib.Path(root)
+        if not base.is_dir():
+            continue
+        candidates = [base] if (base / ".git").exists() else sorted(base.iterdir())
+        for d in candidates:
+            if not (d / ".git").exists():
+                continue
+            d = d.resolve()
+            head = sh(["git", "-C", str(d), "rev-parse", "--verify", "--quiet", "HEAD^{commit}"], check=False)
+            unborn = not head
+            if unborn:
+                branch = sh(["git", "-C", str(d), "symbolic-ref", "--quiet", "HEAD"], check=False)
+                refs_for_branch = sh(["git", "-C", str(d), "for-each-ref", "--format=%(refname)", branch]) if branch else ""
+                if not branch or branch in refs_for_branch.splitlines():
+                    raise RuntimeError(f"invalid source HEAD for {d}")
+                head = f"unborn:{branch}"
+            status = sh(["git", "-C", str(d), "status", "--porcelain", "--untracked-files=all"])
+            digest = hashlib.sha256((status + "\0").encode())
+            refs = sh(["git", "-C", str(d), "for-each-ref", "--format=%(refname) %(objectname)"])
+            settings = sh(["git", "-C", str(d), "config", "--null", "--list"], strip=False)
+            digest.update((refs + "\0" + settings + "\0").encode())
+            if unborn:
+                # With no commit, diff reads the working tree against the index. Hash
+                # the staged blob identities too, so neither half can change unnoticed.
+                digest.update(sh(["git", "-C", str(d), "ls-files", "--stage", "-z"], strip=False).encode())
+                stream_git_diff(d, digest, base=None)
+            else:
+                stream_git_diff(d, digest)
+            untracked = sh(["git", "-C", str(d), "ls-files", "--others", "-z"], strip=False)
+            for name in filter(None, untracked.split("\0")):
+                path = d / name
+                digest.update(name.encode() + b"\0")
+                metadata = path.lstat()
+                mode = metadata.st_mode
+                digest.update(f"{stat.S_IFMT(mode)}:{stat.S_IMODE(mode)}:{metadata.st_size}\0".encode())
+                if stat.S_ISLNK(mode):
+                    digest.update(os.readlink(path).encode())
+                elif stat.S_ISREG(mode):
+                    with path.open("rb") as source:
+                        for chunk in iter(lambda: source.read(1024 * 1024), b""):
+                            digest.update(chunk)
+                else:
+                    raise RuntimeError(f"unsupported source entry for integrity check: {path}")
+            state[str(d)] = head + ":" + digest.hexdigest()
     return state
 
 
@@ -142,36 +195,75 @@ Gate state: {gates}
 Correct only the flagged claims and the failing gates, against the evidence and without reopening the analysis. Commit on the same branch, run `discover check` on the repository notes you touched and `sync verify`. Do not record a review, do not run `sync finish`, do not push. Source repositories are read-only (git fetch allowed, nothing else). End with the commits and the gate results."""
 
 
+PENDING_REVIEW = "no review recorded; run `sync review` after the reviewer's verdict"
+GATE_FIELDS = ("note_gates", "case_gates", "stale_neighbours", "structural_issues_introduced", "copied_paragraphs", "gate_problems")
+
+
+def verify_gates(dst, timeout):
+    """Keep every deterministic failure; the fixed reviewer replaces only a missing review record."""
+    gates = {field: [] for field in GATE_FIELDS}
+    try:
+        result = subprocess.run([cli(), "sync", "verify", "--vault", str(dst)], capture_output=True, text=True, timeout=timeout)
+        value = json.loads(result.stdout)
+        arrays = ("changed", "note_gates", "case_gates", "stale_neighbours", "new_structural_issues", "copied_paragraphs", "problems")
+        if not isinstance(value, dict) or type(value.get("ok")) is not bool or not all(isinstance(value.get(k), list) for k in arrays):
+            raise ValueError("incomplete sync verify result")
+        if not all(isinstance(p, str) for p in value["problems"]) or not all(
+                isinstance(g, dict) and type(g.get("ok")) is bool for k in ("note_gates", "case_gates") for g in value[k]):
+            raise ValueError("invalid sync verify gate result")
+        if value["ok"] != (not value["problems"]) or result.returncode != (0 if value["ok"] else 1):
+            raise ValueError(f"inconsistent sync verify status (exit {result.returncode})")
+        for field in GATE_FIELDS[:-1]:
+            gates[field] = value["new_structural_issues" if field == "structural_issues_introduced" else field]
+        gates["gate_problems"] = [p for p in value["problems"] if p != PENDING_REVIEW]
+        if not value["changed"]:
+            gates["gate_problems"].append("no knowledge change verified")
+    except (ValueError, OSError, subprocess.TimeoutExpired) as error:
+        gates["gate_problems"] = [f"sync verify could not be validated: {error}"]
+    return gates
+
+
 def evaluate(dst, base, out_prefix, timeout):
     """Deterministic gates plus the fixed reviewer's verdict for the branch currently checked out."""
     ev = {"branch": sh(["git", "-C", str(dst), "branch", "--show-current"], check=False)}
     on_branch = ev["branch"].startswith("sync/")
     ev["changed"] = sh(["git", "-c", "core.quotePath=false", "-C", str(dst), "diff", "--name-only", f"{base}...HEAD"], check=False).splitlines() if on_branch else []
     ev["uncommitted"] = bool(sh(["git", "-C", str(dst), "status", "--porcelain", "--", ".", ":!.agents/state"], check=False))
-    ev["note_gates"], ev["stale_neighbours"], ev["structural_issues_introduced"] = [], [], []
+    ev.update({field: [] for field in GATE_FIELDS})
     if on_branch:
-        v = subprocess.run([cli(), "sync", "verify", "--vault", str(dst)], capture_output=True, text=True).stdout
-        try:
-            vj = json.loads(v[v.index("{", 1):] if v.startswith('{"error') else v)
-            ev["note_gates"], ev["stale_neighbours"] = vj.get("note_gates", []), vj.get("stale_neighbours", [])
-            ev["structural_issues_introduced"] = vj.get("new_structural_issues", [])
-        except ValueError:
-            ev["structural_issues_introduced"] = ["unparsed sync verify output"]
-    ev["gates_ok"] = bool(ev["changed"]) and not ev["uncommitted"] and all(g.get("ok") for g in ev["note_gates"]) and not ev["stale_neighbours"] and not ev["structural_issues_introduced"]
+        ev.update(verify_gates(dst, timeout))
+    ev["gates_ok"] = on_branch and bool(ev["changed"]) and not ev["uncommitted"] and all(
+        g["ok"] for k in ("note_gates", "case_gates") for g in ev[k]) and not any(
+        ev[k] for k in ("stale_neighbours", "structural_issues_introduced", "copied_paragraphs", "gate_problems"))
     ev["review"] = {"verdict": "none", "findings": []}
     if ev["changed"]:
-        gates = {"note_gates": ev["note_gates"], "stale_neighbours": ev["stale_neighbours"], "structural_issues_introduced": ev["structural_issues_introduced"]}
+        gates = {field: ev[field] for field in GATE_FIELDS}
         prompt = REVIEW_PROMPT.format(branch=ev["branch"], base=base, cli=cli(), gates=json.dumps(gates, ensure_ascii=False))
         rv = runner.execute(REVIEWER["harness"], prompt, dst, REVIEWER["model"], REVIEWER["effort"], f"{out_prefix}.review.txt", timeout=timeout)
         m = re.search(r"\{.*\}", rv.get("answer", ""), re.S)
         try:
             verdict = json.loads(m.group(0)) if m else {}
+            if not isinstance(verdict, dict):
+                verdict = {}
         except ValueError:
             verdict = {}
-        ev["review"] = {"verdict": verdict.get("verdict", "error"), "findings": verdict.get("findings", []), "seconds": rv["seconds"], "usage": rv.get("usage")}
+        valid_review = (rv.get("returncode") == 0 and verdict.get("verdict") in ("accept", "revise")
+                        and isinstance(verdict.get("findings"), list)
+                        and all(isinstance(f, dict) and f.get("severity") in ("material", "minor")
+                                and all(isinstance(f.get(k), str) and f[k].strip() for k in ("file", "claim", "evidence")) for f in verdict["findings"]))
+        if not valid_review:
+            verdict = {"verdict": "error", "findings": []}
+        ev["review"] = {"verdict": verdict.get("verdict", "error"), "findings": verdict.get("findings", []), "seconds": rv["seconds"], "usage": rv.get("usage"), "cost_usd": rv.get("cost_usd")}
     ev["material"] = len([x for x in ev["review"]["findings"] if x.get("severity") == "material"])
     ev["accepted"] = ev["gates_ok"] and ev["review"]["verdict"] == "accept" and ev["material"] == 0
     return ev
+
+
+def enforce_source_integrity(evaluation, before, after):
+    evaluation["sources_unchanged"] = before == after
+    if before != after:
+        evaluation["accepted"] = False
+        evaluation["gate_problems"].append("configured source checkouts changed during the flow")
 
 
 def flow(a):
@@ -190,28 +282,32 @@ def flow(a):
             before = source_state(dst)
             prefix = dst.parent / f"run{i}"
             rec = {"flow": f["id"], "run": i, "setting": setting, "rounds": []}
+            started = time.monotonic()
             author = runner.execute(setting[0], f["prompt"], dst, setting[1], setting[2], f"{prefix}.author0.txt", write=True, timeout=a.timeout)
             ev = evaluate(dst, base, f"{prefix}.r0", a.timeout)
+            enforce_source_integrity(ev, before, source_state(dst))
             rec["rounds"].append({"author": author, **ev})
             # Protocol: a revise verdict or failing gate gets a focused repair and a new review, bounded.
             for n in range(1, a.repairs + 1):
-                if ev["accepted"] or not ev["changed"]:
+                if ev["accepted"] or not ev["changed"] or not ev["sources_unchanged"]:
                     break
                 prompt = REPAIR_PROMPT.format(branch=ev["branch"], findings=json.dumps(ev["review"]["findings"], ensure_ascii=False, indent=1),
-                                              gates=json.dumps({"gates_ok": ev["gates_ok"], "note_gates": ev["note_gates"], "stale_neighbours": ev["stale_neighbours"]}, ensure_ascii=False))
+                                              gates=json.dumps({"gates_ok": ev["gates_ok"], **{field: ev[field] for field in GATE_FIELDS}}, ensure_ascii=False))
                 author = runner.execute(setting[0], prompt, dst, setting[1], setting[2], f"{prefix}.author{n}.txt", write=True, timeout=a.timeout)
                 ev = evaluate(dst, base, f"{prefix}.r{n}", a.timeout)
+                enforce_source_integrity(ev, before, source_state(dst))
                 rec["rounds"].append({"author": author, **ev})
             first, last = rec["rounds"][0], rec["rounds"][-1]
             after = source_state(dst)
             rec.update({"changed": last["changed"], "first_pass_accepted": first["accepted"], "accepted": last["accepted"], "repairs": len(rec["rounds"]) - 1,
                         "first_pass_material": first["material"], "final_material": last["material"], "gates_ok": last["gates_ok"],
-                        "stale_neighbours": last["stale_neighbours"], "sources_unchanged": before == after,
+                        "stale_neighbours": last["stale_neighbours"], "sources_unchanged": before == after and all(r["sources_unchanged"] for r in rec["rounds"]),
                         "sources_changed": sorted(k for k in set(before) | set(after) if before.get(k) != after.get(k)),
                         "author_seconds": sum(r["author"]["seconds"] for r in rec["rounds"]),
-                        "author_cost_usd": sum(r["author"].get("cost_usd") or 0 for r in rec["rounds"]) or None,
-                        "author_input_tokens": sum((r["author"].get("usage") or {}).get("input_total", 0) for r in rec["rounds"]),
-                        "author_output_tokens": sum((r["author"].get("usage") or {}).get("output", 0) for r in rec["rounds"])})
+                        "author_cost_usd": judge.known_sum([r["author"].get("cost_usd") for r in rec["rounds"]]),
+                        "author_input_tokens": judge.known_sum([(r["author"].get("usage") or {}).get("input_total") for r in rec["rounds"]]),
+                        "author_output_tokens": judge.known_sum([(r["author"].get("usage") or {}).get("output") for r in rec["rounds"]]),
+                        "flow_seconds": round(time.monotonic() - started, 1), **flow_usage(rec)})
             (dst.parent / f"run{i}.json").write_text(json.dumps(rec, ensure_ascii=False, indent=1))
             print(f["id"], tag(setting), f"run{i}", "first_pass_accepted=%s" % rec["first_pass_accepted"], "accepted=%s" % rec["accepted"], "repairs=%d" % rec["repairs"],
                   "material=%d->%d" % (rec["first_pass_material"], rec["final_material"]), "sources_unchanged=%s" % rec["sources_unchanged"], flush=True)
@@ -220,6 +316,22 @@ def flow(a):
 def mean(xs):
     xs = [x for x in xs if x is not None]
     return sum(xs) / len(xs) if xs else None
+
+
+def flow_usage(rec):
+    authors = [r["author"] for r in rec["rounds"]]
+    reviewers = [r["review"] for r in rec["rounds"] if r["review"].get("seconds") is not None]
+    phases = authors + reviewers
+    return {"reviewer_seconds": sum(r["seconds"] for r in reviewers),
+            "total_agent_seconds": sum(r["seconds"] for r in phases),
+            "total_cost_usd": judge.known_sum([r.get("cost_usd") for r in phases]),
+            "total_input_tokens": judge.known_sum([(r.get("usage") or {}).get("input_total") for r in phases]),
+            "total_output_tokens": judge.known_sum([(r.get("usage") or {}).get("output") for r in phases])}
+
+
+def known_mean(values):
+    total = judge.known_sum(values)
+    return total / len(values) if total is not None else None
 
 
 def report(a):
@@ -231,17 +343,30 @@ def report(a):
         for r in sorted(d.glob("run*")):
             g = json.loads((r / "grades.json").read_text()) if (r / "grades.json").exists() else None
             recs = [json.loads(f.read_text()) for f in r.glob("*.json") if f.name != "grades.json"]
-            if not g or not recs:
+            if not recs:
                 continue
+            g = g or {}
             s = judge.summary(recs, g)
-            runs.append({"score": mean([x["score"] for x in g.values()]), "violations": sum(len(x.get("violations", [])) for x in g.values()),
+            metrics = s["by_vault"].values()
+            runs.append({"score": mean([(g.get(x["id"]) or {}).get("score", 0) for x in recs]), "violations": sum(v["violations"] for v in metrics),
+                         "unsupported": sum(v["unsupported_claims"] for v in metrics), "grading_errors": sum(v["grading_errors"] for v in metrics),
+                         "execution_errors": sum(v["execution_errors"] for v in metrics), "clean_answers": sum(v["clean_answers"] for v in metrics),
+                         "verified_answers": sum(v["verified_answers"] for v in metrics), "evidence_unavailable": sum(v["evidence_unavailable"] for v in metrics),
+                         "uncited_claims": sum(v["uncited_claims"] for v in metrics),
                          "by_vault": {k: v["score"] for k, v in s["by_vault"].items()}, "losses": s["losses"],
-                         "seconds": sum(x["seconds"] for x in recs), "input": sum((x.get("usage") or {}).get("input_total", 0) for x in recs),
-                         "output": sum((x.get("usage") or {}).get("output", 0) for x in recs), "cost": sum(x.get("cost_usd") or 0 for x in recs) or None, "n": len(recs)})
+                         "seconds": sum(x["seconds"] for x in recs), "input": judge.known_sum([(x.get("usage") or {}).get("input_total") for x in recs]),
+                         "output": judge.known_sum([(x.get("usage") or {}).get("output") for x in recs]), "cost": judge.known_sum([x.get("cost_usd") for x in recs]), "n": len(recs),
+                         "judge_seconds": judge.known_sum([(g.get(x["id"]) or {}).get("judge_seconds") for x in recs]),
+                         "judge_cost": judge.known_sum([(g.get(x["id"]) or {}).get("judge_cost_usd") for x in recs])})
         if runs:
             rows.append({"setting": d.name, "runs": len(runs), "score_mean": mean([r["score"] for r in runs]), "score_min": min(r["score"] for r in runs),
                          "score_max": max(r["score"] for r in runs), "violations_per_run": mean([r["violations"] for r in runs]), "answers_per_run": runs[0]["n"],
-                         "seconds": mean([r["seconds"] for r in runs]), "input_tokens": mean([r["input"] for r in runs]), "output_tokens": mean([r["output"] for r in runs]), "cost_usd": mean([r["cost"] for r in runs]),
+                         "unsupported_per_run": mean([r["unsupported"] for r in runs]), "grading_errors_per_run": mean([r["grading_errors"] for r in runs]),
+                         "execution_errors_per_run": mean([r["execution_errors"] for r in runs]), "clean_answers_per_run": mean([r["clean_answers"] for r in runs]),
+                         "verified_answers_per_run": mean([r["verified_answers"] for r in runs]), "evidence_unavailable_per_run": mean([r["evidence_unavailable"] for r in runs]),
+                         "uncited_claims_per_run": mean([r["uncited_claims"] for r in runs]),
+                         "judge_seconds": known_mean([r["judge_seconds"] for r in runs]), "judge_cost_usd": known_mean([r["judge_cost"] for r in runs]),
+                         "seconds": mean([r["seconds"] for r in runs]), "input_tokens": known_mean([r["input"] for r in runs]), "output_tokens": known_mean([r["output"] for r in runs]), "cost_usd": known_mean([r["cost"] for r in runs]),
                          "by_vault": {k: mean([r["by_vault"].get(k) for r in runs]) for k in sorted({k for r in runs for k in r["by_vault"]})},
                          "losses": {k: mean([r["losses"].get(k, 0) for r in runs]) for k in sorted({k for r in runs for k in r["losses"]})}})
     for d in sorted((work / "flows").glob("*")) if (work / "flows").exists() else []:
@@ -249,23 +374,26 @@ def report(a):
         recs = [r for r in recs if "rounds" in r]
         if not recs:
             continue
-        frows.append({"setting": d.name, "runs": len(recs), "first_pass_accepted": sum(r["first_pass_accepted"] for r in recs), "accepted": sum(r["accepted"] for r in recs),
+        usage = [flow_usage(r) for r in recs]
+        frows.append({"setting": d.name, "runs": len(recs), "first_pass_accepted": sum(r["first_pass_accepted"] and r["sources_unchanged"] for r in recs), "accepted": sum(r["accepted"] and r["sources_unchanged"] for r in recs),
                       "repairs": mean([r["repairs"] for r in recs]), "first_pass_material": mean([r["first_pass_material"] for r in recs]),
                       "stale_neighbours_first_pass": mean([len(r["rounds"][0]["stale_neighbours"]) for r in recs]),
-                      "sources_unchanged": all(r["sources_unchanged"] for r in recs), "seconds": mean([r["author_seconds"] for r in recs]),
-                      "input_tokens": mean([r["author_input_tokens"] for r in recs]), "output_tokens": mean([r["author_output_tokens"] for r in recs]), "cost_usd": mean([r["author_cost_usd"] for r in recs])})
+                      "sources_unchanged": all(r["sources_unchanged"] for r in recs), "seconds": mean([r["total_agent_seconds"] for r in usage]),
+                      "wall_seconds": mean([r.get("flow_seconds") for r in recs]), "author_seconds": mean([r["author_seconds"] for r in recs]),
+                      "reviewer_seconds": mean([r["reviewer_seconds"] for r in usage]),
+                      "input_tokens": known_mean([r["total_input_tokens"] for r in usage]), "output_tokens": known_mean([r["total_output_tokens"] for r in usage]), "cost_usd": known_mean([r["total_cost_usd"] for r in usage])})
     out = {"fingerprint": fp, "qa": rows, "flows": frows}
     (work / "report.json").write_text(json.dumps(out, indent=1))
     f = lambda x, p=2: "—" if x is None else (f"{x:.{p}f}" if isinstance(x, float) else str(x))
     md = [f"# Benchmark report", "", f"Distribution `{fp.get('distribution')}` (kernel {fp.get('kernel')}), suite `{fp.get('suite')}`, questions `{fp.get('questions')}`, judge/reviewer `{fp.get('judge')}`, prepared {fp.get('prepared_at')}.", ""]
     if rows:
-        md += ["## Questions", "", "| Setting | Runs | Score mean (min–max) | Violations / run | Time / run (s) | Input tokens / run | Output tokens / run | USD / run |", "|---|---|---|---|---|---|---|---|"]
-        md += [f"| {r['setting']} | {r['runs']} | {f(r['score_mean'], 3)} ({f(r['score_min'], 3)}–{f(r['score_max'], 3)}) | {f(r['violations_per_run'], 1)} of {r['answers_per_run']} | {f(r['seconds'], 0)} | {f(r['input_tokens'], 0)} | {f(r['output_tokens'], 0)} | {f(r['cost_usd'])} |" for r in rows]
+        md += ["## Questions", "", "Coverage and source audits are model verdicts. Adjudicate claims against the sources before drawing a reliability conclusion; an audit pass is not independent confirmation.", "", "| Setting | Runs | Coverage mean (min–max) | Violations / run | Unsupported flags / run | Grading errors / run | Complete answers / run | Model audit passes / run | Evidence unavailable / run | Uncited claims / run | Agent time / run (s) | Input tokens / run | Output tokens / run | USD / run |", "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
+        md += [f"| {r['setting']} | {r['runs']} | {f(r['score_mean'], 3)} ({f(r['score_min'], 3)}–{f(r['score_max'], 3)}) | {f(r['violations_per_run'], 1)} | {f(r['unsupported_per_run'], 1)} | {f(r['grading_errors_per_run'], 1)} | {f(r['clean_answers_per_run'], 1)} of {r['answers_per_run']} | {f(r['verified_answers_per_run'], 1)} | {f(r['evidence_unavailable_per_run'], 1)} | {f(r['uncited_claims_per_run'], 1)} | {f(r['seconds'], 0)} | {f(r['input_tokens'], 0)} | {f(r['output_tokens'], 0)} | {f(r['cost_usd'])} |" for r in rows]
         md += ["", "Where the points go: mean score per vault and lost points per run by kind (see `evals/regression/judge.py`).", "", "| Setting | Score by vault | Lost points by kind |", "|---|---|---|"]
         md += [f"| {r['setting']} | {', '.join(f'{k} {f(v, 3)}' for k, v in r['by_vault'].items()) or '—'} | {', '.join(f'{k} {f(v, 1)}' for k, v in sorted(r['losses'].items(), key=lambda x: -x[1])) or '—'} |" for r in rows]
     if frows:
-        md += ["", "## Publication flows (author until accepted, bounded repairs)", "", "| Setting | Runs | Accepted first pass | Accepted after repairs | Repairs / run | Material findings first pass | Stale neighbours first pass | Sources unchanged | Author time (s) | Author input tokens | Author USD |", "|---|---|---|---|---|---|---|---|---|---|---|"]
-        md += [f"| {r['setting']} | {r['runs']} | {r['first_pass_accepted']} | {r['accepted']} | {f(r['repairs'], 1)} | {f(r['first_pass_material'], 1)} | {f(r['stale_neighbours_first_pass'], 1)} | {r['sources_unchanged']} | {f(r['seconds'], 0)} | {f(r['input_tokens'], 0)} | {f(r['cost_usd'])} |" for r in frows]
+        md += ["", "## Publication flows (author and reviewer, all rounds)", "", "| Setting | Runs | Accepted first pass | Accepted after repairs | Repairs / run | Material findings first pass | Stale neighbours first pass | Sources unchanged | Total agent time (s) | Total input tokens | Total output tokens | Total USD |", "|---|---|---|---|---|---|---|---|---|---|---|---|"]
+        md += [f"| {r['setting']} | {r['runs']} | {r['first_pass_accepted']} | {r['accepted']} | {f(r['repairs'], 1)} | {f(r['first_pass_material'], 1)} | {f(r['stale_neighbours_first_pass'], 1)} | {r['sources_unchanged']} | {f(r['seconds'], 0)} | {f(r['input_tokens'], 0)} | {f(r['output_tokens'], 0)} | {f(r['cost_usd'])} |" for r in frows]
     (work / "report.md").write_text("\n".join(md) + "\n")
     print("\n".join(md))
 
