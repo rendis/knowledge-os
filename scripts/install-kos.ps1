@@ -30,7 +30,7 @@ try {
       $tag = @()
       if ($version -ne 'latest') { $tag = @("v$version") }
       gh release download @tag --repo $repo --pattern $asset --pattern SHA256SUMS --dir $work --clobber
-      if ($LASTEXITCODE -ne 0) { throw "gh could not read $repo: log in with an account that can read it" }
+      if ($LASTEXITCODE -ne 0) { throw "gh could not read ${repo}: log in with an account that can read it" }
     }
   }
   $expected = (Get-Content (Join-Path $work 'SHA256SUMS') | Where-Object { ($_ -split '\s+')[1] -eq $asset } | ForEach-Object { ($_ -split '\s+')[0] })
