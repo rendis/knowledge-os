@@ -11,7 +11,7 @@ from run import execute  # noqa: E402
 HERE = pathlib.Path(__file__).parent
 # Fixed judge for every graded run, so settings are compared under the same grader. The judge sees only
 # the question, expected facts, answer and optional source packet, never the author's setting.
-JUDGE = {"harness": "codex", "model": "gpt-6-sol", "effort": "medium"}
+JUDGE = {"harness": "codex", "model": "gpt-6.1-sol", "effort": "medium"}
 CLAIM_SCHEMA = ', "claims": [{"claim": "exact claim or faithful atomic paraphrase", "kind": "fact|inference|boundary", "status": "supported|contradicted|unverified", "sources": ["source IDs"], "cited": true|false}]'
 PROMPT = """You are a strict grader. Compare the ANSWER with the EXPECTED FACTS and the FORBIDDEN CLAIMS. The question, facts and answer may be in any language.
 Question: {question}
