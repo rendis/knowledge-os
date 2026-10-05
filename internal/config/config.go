@@ -22,7 +22,6 @@ import (
 type Object = map[string]any
 
 var kebab = regexp.MustCompile(`^[a-z0-9]+(?:-[a-z0-9]+)*$`)
-var runnerLabel = regexp.MustCompile(`^[A-Za-z0-9_][A-Za-z0-9_.-]*$`)
 var markers = []string{"AGENTS.md", "00-Home.md", "instance.yaml", "90-Meta/Convenciones.md", "90-Meta/Auditoria - Framework.md"}
 var defaultTypes = []string{"sistema", "servicio", "componente", "recurso-runtime", "repositorio", "topic", "evento", "flujo", "integracion-externa", "glosario", "operacional", "aprendizaje", "indice"}
 
@@ -199,9 +198,6 @@ func ValidateInstance(m Object) error {
 			}
 			seen[str(b)] = true
 		}
-	}
-	if v, exists := obj(m["ci"])["runner"]; exists && v != nil && !runnerLabel.MatchString(str(v)) {
-		return errors.New("ci.runner must be one runner label (letters, digits, '.', '_' or '-')")
 	}
 	if v, exists := obj(m["platform"])["providers"]; exists && v != nil {
 		names, ok := v.([]any)

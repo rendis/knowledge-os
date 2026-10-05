@@ -10,4 +10,3 @@ VERSION
 .codex/agents/
 .claude/agents/
 .cursor/agents/
-.github/workflows/knowledge-gates.yml

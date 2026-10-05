@@ -66,11 +66,6 @@ fields:
       - aws
       - azure
     description: Clouds the cell's systems run on, one or more. `discover platform` captures their messaging resources read-only with each cloud's own CLI and the developer's login; scopes are gcp project ids, aws <account>/<region>, azure subscription ids. Asked during onboarding.
-  ci.runner:
-    type: string
-    optional: true
-    default: ubuntu-latest
-    description: Runner label the managed knowledge-gates workflow runs on (`runs-on`). A GitHub-hosted label by default; set the organization's self-hosted runner (for example a corporate runner group) when hosted runners are not available. `kos kernel update --vault <vault>` writes it into the workflow.
   database_targets:
     type: list
     optional: true

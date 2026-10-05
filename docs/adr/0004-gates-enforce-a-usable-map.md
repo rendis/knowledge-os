@@ -1,6 +1,7 @@
 # The gates enforce a usable map, and the remote enforces the gates
 
-**Status**: accepted (v0.22.0–v0.22.3)
+**Status**: accepted (v0.22.0–v0.22.3); the remote gate (`knowledge-gates.yml`) is superseded by
+[ADR 0006](0006-ci-stays-agnostic.md) in v0.22.24
 
 **Context**: after ADR 0003 agents answer from the notes with their own tools, so answer quality depends on the
 notes working as a map. A review of three development vaults found notes that passed G1–G3 and still misled:

@@ -280,24 +280,38 @@ func TestSourcesIncludeSelectedAdaptersOnly(t *testing.T) {
 	}
 }
 
-func TestGatesWorkflowRunsOnTheCellRunner(t *testing.T) {
+func TestUpdateRetiresTheGatesWorkflow(t *testing.T) {
 	v := install(t)
-	wf := filepath.Join(v, ".github", "workflows", "knowledge-gates.yml")
-	if b, _ := os.ReadFile(wf); !strings.Contains(string(b), "runs-on: ubuntu-latest") {
-		t.Fatalf("the default runner is GitHub-hosted: %s", b)
+	if _, e := os.Stat(filepath.Join(v, ".github")); !os.IsNotExist(e) {
+		t.Fatalf("the kernel ships no CI workflow: %v", e)
 	}
-	if b, _ := os.ReadFile(wf); !strings.Contains(string(b), "ref: ${{ github.event.pull_request.head.sha || github.sha }}") {
-		t.Fatalf("a pull request verifies the branch head, not GitHub's temporary merge: %s", b)
+	// A cell installed before 0.22.24 has the workflow, rendered on its own runner, and still names ci.runner.
+	const wf = ".github/workflows/knowledge-gates.yml"
+	old := []byte("name: knowledge-gates\njobs:\n  verify:\n    runs-on: corp-runner\n")
+	if e := os.MkdirAll(filepath.Join(v, ".github", "workflows"), 0o755); e != nil {
+		t.Fatal(e)
 	}
-	os.WriteFile(filepath.Join(v, "instance.yaml"), []byte("version: 1\ncell:\n  name: C\n  purpose: p\nsystems:\n  - id: s\n    name: S\nadapters: []\nci:\n  runner: corp-runner\n"), 0o644)
-	if res, e := run(t, "update", "--vault", v); e != nil {
-		t.Fatalf("update after changing ci.runner: %v %v", e, res)
+	if e := os.WriteFile(filepath.Join(v, filepath.FromSlash(wf)), old, 0o644); e != nil {
+		t.Fatal(e)
 	}
-	b, _ := os.ReadFile(wf)
-	if !strings.Contains(string(b), "    runs-on: corp-runner\n") || strings.Contains(string(b), "ubuntu-latest\n") {
-		t.Fatalf("the workflow runs on the cell's runner: %s", b)
+	lock, e := ReadLock(v)
+	if e != nil {
+		t.Fatal(e)
 	}
-	if res, _ := run(t, "status", "--vault", v); res["current"] != true {
-		t.Fatalf("the rendered workflow is the kernel's content, not a local edit: %v", res)
+	lock.Hashes[wf] = digest(old)
+	if e := os.WriteFile(filepath.Join(v, LockName), []byte(lock.dump()), 0o644); e != nil {
+		t.Fatal(e)
+	}
+	if e := os.WriteFile(filepath.Join(v, "instance.yaml"), []byte("version: 1\ncell:\n  name: C\n  purpose: p\nsystems:\n  - id: s\n    name: S\nadapters: []\nci:\n  runner: corp-runner\n"), 0o644); e != nil {
+		t.Fatal(e)
+	}
+	if res, e := Update(v, Options{}); e != nil || res["status"] != "updated" {
+		t.Fatalf("an update retires the workflow without conflicts: %v %v", res, e)
+	}
+	if _, e := os.Stat(filepath.Join(v, ".github")); !os.IsNotExist(e) {
+		t.Fatalf("the retired workflow and its empty directories are removed: %v", e)
+	}
+	if lock, _ := ReadLock(v); lock.Hashes[wf] != "" {
+		t.Fatal("the lock no longer records the workflow")
 	}
 }

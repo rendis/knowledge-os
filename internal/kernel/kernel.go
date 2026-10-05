@@ -204,28 +204,6 @@ func adaptersOf(vault string) ([]string, error) {
 	return out, nil
 }
 
-// gatesWorkflow runs on the runner the cell names in instance.yaml ci.runner; the kernel ships the default.
-const gatesWorkflow = ".github/workflows/knowledge-gates.yml"
-
-func renderRunner(vault string, src map[string][]byte) error {
-	inst, e := config.LoadInstance(vault)
-	if e != nil {
-		return e
-	}
-	ci, _ := inst["ci"].(map[string]any)
-	runner, _ := ci["runner"].(string)
-	b, ok := src[gatesWorkflow]
-	if !ok || runner == "" || runner == "ubuntu-latest" {
-		return nil
-	}
-	const line = "    runs-on: ubuntu-latest\n"
-	if !bytes.Contains(b, []byte(line)) {
-		return fmt.Errorf("%s has no default runner to replace", gatesWorkflow)
-	}
-	src[gatesWorkflow] = bytes.Replace(b, []byte(line), []byte("    runs-on: "+runner+"\n"), 1)
-	return nil
-}
-
 func readRegular(p string) ([]byte, bool, error) {
 	st, e := os.Lstat(p)
 	if os.IsNotExist(e) {
@@ -258,9 +236,6 @@ func Preview(vault string) (Plan, error) {
 	}
 	src, e := Sources(adapters)
 	if e != nil {
-		return Plan{}, e
-	}
-	if e := renderRunner(vault, src); e != nil {
 		return Plan{}, e
 	}
 	p := Plan{From: lock.KernelVersion, To: Version(), Changes: []Change{}, Conflicts: []string{}, sources: src, adapters: adapters}
