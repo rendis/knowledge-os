@@ -63,6 +63,7 @@ func TestMutationRefusesToOverwriteAnExternalEdit(t *testing.T) {
 	}
 	full := filepath.Join(v, res["path"].(string))
 	var manual string
+	var copied bool
 	var out bytes.Buffer
 	e = mutate(options{vault: v, id: res["id"].(string)}, &out, func(c Case, text, loc string) (string, []string, map[string]any, error) {
 		manual = text + "\nManual edit made during the command.\n"
@@ -70,9 +71,15 @@ func TestMutationRefusesToOverwriteAnExternalEdit(t *testing.T) {
 			return "", nil, nil, e
 		}
 		return replaceSection(text, "state", loc, "Updated by the command."), nil, nil, nil
-	}, nil)
+	}, func(Case) error {
+		copied = true
+		return nil
+	})
 	if e == nil || !strings.Contains(e.Error(), "changed") {
 		t.Fatalf("an external edit must stop the replacement: %v", e)
+	}
+	if copied {
+		t.Fatal("attached files must not be copied for a case that will not be replaced")
 	}
 	if b, _ := os.ReadFile(full); string(b) != manual {
 		t.Fatal("the external edit was overwritten")

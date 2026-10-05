@@ -359,8 +359,27 @@ func caseLock(vault, id string) (*flock.Flock, error) {
 	return lock, nil
 }
 
-// replaceCase keeps the old file intact until a complete replacement is ready. Manual edits do not
-// take our lock, so compare the original bytes again immediately before replacing the file.
+// caseUnchanged refuses to continue when the case was edited since it was read: manual edits do not
+// take our lock.
+func caseUnchanged(full string, previous []byte) error {
+	if st, e := os.Lstat(full); e != nil {
+		return e
+	} else if !st.Mode().IsRegular() {
+		return errors.New("case target must be a regular file")
+	}
+	current, e := os.ReadFile(full)
+	if e != nil {
+		return e
+	}
+	if !bytes.Equal(current, previous) {
+		return errors.New("case changed during update; try again")
+	}
+	return nil
+}
+
+// replaceCase keeps the old file intact until a complete replacement is ready, and checks the case
+// again immediately before replacing it. The case lock makes the fixed temporary name safe; the next
+// command reuses one left by an interrupted write.
 func replaceCase(full string, previous, next []byte) error {
 	st, e := os.Lstat(full)
 	if e != nil {
@@ -369,11 +388,15 @@ func replaceCase(full string, previous, next []byte) error {
 	if !st.Mode().IsRegular() {
 		return errors.New("case target must be a regular file")
 	}
-	f, e := os.CreateTemp(filepath.Dir(full), ".kos-case-*")
+	tmp := full + ".kos-tmp"
+	if e := os.Remove(tmp); e != nil && !os.IsNotExist(e) {
+		return e
+	}
+	f, e := os.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_EXCL, st.Mode().Perm())
 	if e != nil {
 		return e
 	}
-	defer os.Remove(f.Name())
+	defer os.Remove(tmp)
 	defer f.Close()
 	if e := f.Chmod(st.Mode().Perm()); e != nil {
 		return e
@@ -387,19 +410,10 @@ func replaceCase(full string, previous, next []byte) error {
 	if e := f.Close(); e != nil {
 		return e
 	}
-	if st, e := os.Lstat(full); e != nil {
-		return e
-	} else if !st.Mode().IsRegular() {
-		return errors.New("case target must be a regular file")
-	}
-	current, e := os.ReadFile(full)
-	if e != nil {
+	if e := caseUnchanged(full, previous); e != nil {
 		return e
 	}
-	if !bytes.Equal(current, previous) {
-		return errors.New("case changed during update; try again")
-	}
-	return os.Rename(f.Name(), full)
+	return os.Rename(tmp, full)
 }
 
 // mutate locks the case before reading it, then computes, gates, logs and atomically writes the change.
@@ -462,6 +476,10 @@ func mutate(o options, out io.Writer, change func(c Case, text, locale string) (
 		return emit(out, res)
 	}
 	if after != nil {
+		// Attached files are copied only for a case that can still be replaced.
+		if e := caseUnchanged(full, b); e != nil {
+			return e
+		}
 		if e := after(c); e != nil {
 			return e
 		}
