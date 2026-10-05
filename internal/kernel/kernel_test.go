@@ -195,6 +195,15 @@ func TestUpdateKeepsPermissionsAndCellOwnedBaseLinks(t *testing.T) {
 	if e := os.Chmod(agents, 0o640); e != nil {
 		t.Fatal(e)
 	}
+	// Compare with the mode the filesystem applied: Windows keeps only the read-only bit.
+	modes := map[string]os.FileMode{}
+	for _, full := range []string{ignore, agents} {
+		st, e := os.Stat(full)
+		if e != nil {
+			t.Fatal(e)
+		}
+		modes[full] = st.Mode().Perm()
+	}
 	base := filepath.Join(v, bases[0])
 	if e := os.Remove(base); e != nil {
 		t.Fatal(e)
@@ -205,7 +214,7 @@ func TestUpdateKeepsPermissionsAndCellOwnedBaseLinks(t *testing.T) {
 	if _, e := Update(v, Options{Force: true}); e != nil {
 		t.Fatal(e)
 	}
-	for full, want := range map[string]os.FileMode{ignore: 0o600, agents: 0o640} {
+	for full, want := range modes {
 		if st, e := os.Stat(full); e != nil || st.Mode().Perm() != want {
 			t.Errorf("%s must keep mode %04o: %v %v", filepath.Base(full), want, st, e)
 		}
