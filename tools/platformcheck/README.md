@@ -19,6 +19,6 @@ Place the platform-matching runner beside `kos` (`kos.exe` on Windows) and launc
 .\platformcheck.exe --cli C:\path\to\kos.exe
 ```
 
-A successful run prints `PASS 13/13 checks` and exits zero. It checks version output, configuration status and resolution, structural audit, links, one Base, SQLite/FTS5 indexing, accent handling, unchanged fingerprints, an edited note, stale content removal, a deleted note and zero results. It rejects nonzero exits, unexpected stderr and mismatched result fields.
+A successful run prints `PASS 6/6 checks` and exits zero. It checks version output, configuration status, configuration resolution without Git, structural audit, links and one Base. It rejects nonzero exits, unexpected stderr and mismatched result fields.
 
 This is executable smoke coverage. It does not replace package tests, installer tests, fault-injection tests, benchmarks or Git-dependent handoff/synchronization tests. Cross-compiling the runner is not evidence that it ran in the target OS.
