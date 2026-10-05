@@ -38,8 +38,7 @@ Onboarding has two levels.
 
 - `kos kernel status` and `kos kernel update --dry-run` show how a vault's kernel differs from the one kos carries; `kos kernel update` applies it.
 - An update refuses kernel files changed locally until `--force`, removes the managed files the distribution no longer ships (as recorded in the lock), and never rewrites cell-owned files.
-- Before writing, the update saves the previous files in a private directory inside the vault. Recovery files have their own ignore rule and stay out of Git even if the cell's ignore rules are restored. If a write fails, it restores modified and retired files, permissions, links and the lock, and removes files and empty directories created by the failed update. The lock is written last. If restoration itself fails, the error identifies the recovery directory; its backups are retained and another update refuses to overwrite them.
-- Atomic replacements keep an existing file's permissions. If cleanup fails after an update or restoration, the error reports which state is installed and names the finished backup directory to remove before retrying. Remove only the directory named by a cleanup error; backups from an interrupted update or failed restoration are still needed for recovery.
+- Each file is replaced atomically, keeping its permissions, and the lock is written last: if an update is interrupted or fails, fix the cause and run it again with the same options to finish it. Linked ignore rules and Obsidian settings are updated where the links point.
 - A vault whose kernel is newer than kos refuses to publish until `kos update`.
 
 ## Vaults on a machine

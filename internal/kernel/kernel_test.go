@@ -143,6 +143,117 @@ func TestUpdateRejectsInvalidSettingsBeforeChangingFiles(t *testing.T) {
 	}
 }
 
+func TestRunningAnInterruptedUpdateAgainFinishesIt(t *testing.T) {
+	v := install(t)
+	lock, e := ReadLock(v)
+	if e != nil {
+		t.Fatal(e)
+	}
+	var other string
+	for rel := range lock.Hashes {
+		if rel != "AGENTS.md" {
+			other = rel
+			break
+		}
+	}
+	// The previous kernel shipped other contents; the interrupted update replaced AGENTS.md only.
+	lock.KernelVersion = "0.0.1"
+	lock.Hashes["AGENTS.md"] = digest([]byte("previous router\n"))
+	lock.Hashes[other] = digest([]byte("previous file\n"))
+	if e := os.WriteFile(filepath.Join(v, filepath.FromSlash(other)), []byte("previous file\n"), 0o644); e != nil {
+		t.Fatal(e)
+	}
+	if e := os.WriteFile(filepath.Join(v, LockName), []byte(lock.dump()), 0o644); e != nil {
+		t.Fatal(e)
+	}
+	leftover := filepath.Join(v, filepath.FromSlash(other)) + ".kos-tmp"
+	if e := os.WriteFile(leftover, []byte("partial"), 0o644); e != nil {
+		t.Fatal(e)
+	}
+	res, e := Update(v, Options{})
+	if e != nil || res["status"] != "updated" {
+		t.Fatalf("running the update again must finish it without conflicts: %v %v", res, e)
+	}
+	if _, e := os.Lstat(leftover); !os.IsNotExist(e) {
+		t.Fatalf("the interrupted write's temporary file must be removed: %v", e)
+	}
+	if res, _ := run(t, "status", "--vault", v); res["current"] != true {
+		t.Fatalf("current after finishing the update: %v", res)
+	}
+}
+
+func TestUpdateKeepsPermissionsAndCellOwnedBaseLinks(t *testing.T) {
+	v := install(t)
+	ignore := filepath.Join(v, ".gitignore")
+	if e := os.WriteFile(ignore, []byte("cell-owned-rule\n"), 0o600); e != nil {
+		t.Fatal(e)
+	}
+	if e := os.Chmod(ignore, 0o600); e != nil {
+		t.Fatal(e)
+	}
+	agents := filepath.Join(v, "AGENTS.md")
+	if e := os.Chmod(agents, 0o640); e != nil {
+		t.Fatal(e)
+	}
+	base := filepath.Join(v, bases[0])
+	if e := os.Remove(base); e != nil {
+		t.Fatal(e)
+	}
+	if e := os.Symlink("missing-cell-owned-base", base); e != nil {
+		t.Fatal(e)
+	}
+	if _, e := Update(v, Options{Force: true}); e != nil {
+		t.Fatal(e)
+	}
+	for full, want := range map[string]os.FileMode{ignore: 0o600, agents: 0o640} {
+		if st, e := os.Stat(full); e != nil || st.Mode().Perm() != want {
+			t.Errorf("%s must keep mode %04o: %v %v", filepath.Base(full), want, st, e)
+		}
+	}
+	if b, _ := os.ReadFile(ignore); !strings.Contains(string(b), "cell-owned-rule\n") || !strings.Contains(string(b), "/.investigations/\n") {
+		t.Fatalf("update must keep local rules and add kernel rules: %s", b)
+	}
+	if link, e := os.Readlink(base); e != nil || link != "missing-cell-owned-base" {
+		t.Fatalf("an existing cell-owned Base link must be kept: %q %v", link, e)
+	}
+}
+
+func TestUpdateWritesLinkedSettingsWhereTheyLive(t *testing.T) {
+	v := install(t)
+	shared := t.TempDir()
+	if e := os.Rename(filepath.Join(v, ".obsidian"), filepath.Join(shared, "obsidian")); e != nil {
+		t.Fatal(e)
+	}
+	if e := os.WriteFile(filepath.Join(shared, "obsidian", "app.json"), []byte("{}\n"), 0o644); e != nil {
+		t.Fatal(e)
+	}
+	if e := os.WriteFile(filepath.Join(shared, "gitignore"), []byte("cell-owned-rule\n"), 0o644); e != nil {
+		t.Fatal(e)
+	}
+	for link, target := range map[string]string{".obsidian": "obsidian", ".gitignore": "gitignore"} {
+		if e := os.Remove(filepath.Join(v, link)); e != nil && !os.IsNotExist(e) {
+			t.Fatal(e)
+		}
+		if e := os.Symlink(filepath.Join(shared, target), filepath.Join(v, link)); e != nil {
+			t.Fatal(e)
+		}
+	}
+	if _, e := Update(v, Options{}); e != nil {
+		t.Fatal(e)
+	}
+	for _, link := range []string{".obsidian", ".gitignore"} {
+		if st, e := os.Lstat(filepath.Join(v, link)); e != nil || st.Mode()&os.ModeSymlink == 0 {
+			t.Fatalf("%s must stay a link: %v", link, e)
+		}
+	}
+	if b, _ := os.ReadFile(filepath.Join(shared, "gitignore")); !strings.Contains(string(b), "/.investigations/\n") {
+		t.Fatalf("linked ignore rules must be updated in place: %s", b)
+	}
+	if b, _ := os.ReadFile(filepath.Join(shared, "obsidian", "app.json")); !strings.Contains(string(b), "userIgnoreFilters") {
+		t.Fatalf("linked Obsidian settings must be updated in place: %s", b)
+	}
+}
+
 func TestSourcesIncludeSelectedAdaptersOnly(t *testing.T) {
 	plain, e := Sources(nil)
 	if e != nil {
