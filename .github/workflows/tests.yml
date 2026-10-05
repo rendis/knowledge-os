@@ -20,7 +20,7 @@ jobs:
     env:
       KOS_NO_UPDATE_CHECK: "1"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Isolate the vault catalog
         run: echo "KOS_VAULTS_FILE=$RUNNER_TEMP/kos-tests/vaults.json" >> "$GITHUB_ENV"
       - uses: actions/setup-go@v7
@@ -60,7 +60,7 @@ jobs:
     env:
       KOS_NO_UPDATE_CHECK: "1"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Isolate the vault catalog
         shell: bash
         run: echo "KOS_VAULTS_FILE=$RUNNER_TEMP/kos-tests/vaults.json" >> "$GITHUB_ENV"
