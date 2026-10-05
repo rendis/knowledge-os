@@ -2,6 +2,7 @@ package discover
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -714,5 +715,79 @@ func TestNoNodeAcknowledgementAtItsCommitOwnsNoGaps(t *testing.T) {
 	facts[0].Commit = "fff000"
 	if g, _ := cellGaps(v, facts); len(g) != 1 {
 		t.Fatalf("a later commit needs a new decision: %v", g)
+	}
+}
+
+func TestFactsAreDeterministic(t *testing.T) {
+	dir := t.TempDir()
+	svc := gitRepo(t, filepath.Join(dir, "SVC-orders"), map[string]string{
+		"main.go": "package main\nconst a, b, ev = \"orders.audit-sub\", \"orders.retry-sub\", \"orderConfirmed\"\n",
+	})
+	// More IaC blocks than a resource keeps evidence for, so which blocks are kept depends on order.
+	files := map[string]string{}
+	for i := range 20 {
+		files[fmt.Sprintf("pubsub/subs-%02d.tf", i)] = fmt.Sprintf("module \"s%02d\" {\n  name_subscription = \"orders.audit-sub\"\n  dead_letter_subscription = \"orders.retry-sub\"\n  microservice = \"svc-orders\"\n}\n", i)
+	}
+	iac := gitRepo(t, filepath.Join(dir, "IAC-platform"), files)
+	st := &store{ConfigKeys: map[string]judgment{}, ConfigValues: map[string]judgment{}}
+	scans := []*repoScan{scan(t, "SVC-orders", svc), scan(t, "IAC-platform", iac)}
+	for _, s := range scans {
+		for _, e := range s.entries {
+			st.ConfigKeys[keySignature(e)] = judgment{Choice: "other", Confidence: 0.9}
+			if strings.HasSuffix(e.Key, "_subscription") {
+				st.ConfigKeys[keySignature(e)] = judgment{Choice: "message_subscription", Confidence: 0.95}
+				st.ConfigValues[entryID(e)] = judgment{Choice: "message_subscription", Confidence: 0.9}
+			}
+		}
+	}
+	var first []byte
+	for range 20 {
+		// The same event filtered on two topics: which topic the event gets must not depend on order.
+		snap := platformSnapshot{Provider: "gcp", Scope: "p-prd", Status: "ok", Subscriptions: []platformSubscription{
+			{Name: "projects/p-prd/subscriptions/orders-a", Topic: "projects/p-prd/topics/orders", Attributes: filterAttributes(`attributes.eventType="orderConfirmed"`)},
+			{Name: "projects/p-prd/subscriptions/orders-b", Topic: "projects/p-prd/topics/orders-deadletter", Attributes: filterAttributes(`attributes.eventType="orderConfirmed"`)}}}
+		a := &assembly{scans: scans, st: st, platform: buildPlatformIndex([]platformSnapshot{snap})}
+		b, e := json.Marshal(a.facts())
+		if e != nil {
+			t.Fatal(e)
+		}
+		if first == nil {
+			first = b
+		} else if !bytes.Equal(b, first) {
+			t.Fatalf("the same inputs produced different facts:\n%s\n%s", first, b)
+		}
+	}
+	if !bytes.Contains(first, []byte("orders.audit-sub")) || !bytes.Contains(first, []byte("subs-00.tf")) || !bytes.Contains(first, []byte("orderConfirmed")) {
+		t.Fatalf("the fixture must attribute the IaC blocks to the service: %s", first)
+	}
+}
+
+func TestDependencyOriginIsStable(t *testing.T) {
+	dir := t.TempDir()
+	lib := gitRepo(t, filepath.Join(dir, "LIB-common"), map[string]string{
+		"go.mod":           "module example.com/common\n",
+		"publisher/pub.go": "package publisher\nimport \"cloud.google.com/go/pubsub\"\n",
+	})
+	// The service reaches pubsub directly and through the library: the origin must not depend on order.
+	svc := gitRepo(t, filepath.Join(dir, "SVC-orders"), map[string]string{
+		"go.mod":        "module example.com/orders\n\nrequire example.com/common v0.1.0\n",
+		"cmd/direct.go": "package main\nimport \"cloud.google.com/go/pubsub\"\n",
+		"cmd/main.go":   "package main\nimport \"example.com/common/publisher\"\n",
+		"cmd/worker.go": "package main\nimport \"example.com/common/publisher\"\n",
+	})
+	var first string
+	for range 20 {
+		s := scan(t, "SVC-orders", svc)
+		resolveLibraries([]*repoScan{s, scan(t, "LIB-common", lib)})
+		d := s.deps["go:cloud.google.com/go/pubsub"]
+		if d == nil {
+			t.Fatal("pubsub dependency missing")
+		}
+		got := fmt.Sprintf("%s|%s|%s", d.Origin, d.Via, strings.Join(d.Files, ","))
+		if first == "" {
+			first = got
+		} else if got != first {
+			t.Fatalf("the same scan produced different dependency origins: %s vs %s", first, got)
+		}
 	}
 }

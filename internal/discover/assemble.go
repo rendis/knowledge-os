@@ -3,6 +3,7 @@ package discover
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
 	"path"
 	"path/filepath"
@@ -381,7 +382,9 @@ func resolveLibraries(scans []*repoScan) {
 					lib, sub = goMods[best], strings.Trim(strings.TrimPrefix(r.Spec, best), "/")
 				} else if best != "" && via != "" {
 					// Inside a library only imported packages are expanded, so follow its own packages.
-					for id, dep := range pkgDeps(owner, strings.Trim(strings.TrimPrefix(r.Spec, best), "/"), stack) {
+					deps := pkgDeps(owner, strings.Trim(strings.TrimPrefix(r.Spec, best), "/"), stack)
+					for _, id := range slices.Sorted(maps.Keys(deps)) {
+						dep := deps[id]
 						if d := into[id]; d == nil {
 							cp := *dep
 							cp.Files, cp.Paths = append([]string{}, dep.Files...), append([]string{}, dep.Paths...)
@@ -412,7 +415,9 @@ func resolveLibraries(scans []*repoScan) {
 				d.Files = appendUnique(d.Files, file)
 				// Every file that imports the library carries what the library uses, so the result does not
 				// depend on which importing file the map iteration reaches first.
-				for id, dep := range pkgDeps(lib, sub, stack) {
+				deps := pkgDeps(lib, sub, stack)
+				for _, id := range slices.Sorted(maps.Keys(deps)) {
+					dep := deps[id]
 					if d := into[id]; d == nil {
 						cp := *dep
 						cp.Origin, cp.Via, cp.Files = "library", lib.in.Name, []string{file}
@@ -447,7 +452,8 @@ func resolveLibraries(scans []*repoScan) {
 		stack[k] = true
 		defer delete(stack, k)
 		out := map[string]*dependency{}
-		for f, refs := range lib.code.Files {
+		for _, f := range slices.Sorted(maps.Keys(lib.code.Files)) {
+			refs := lib.code.Files[f]
 			d := path.Dir(f)
 			if d == "." {
 				d = ""
@@ -461,8 +467,9 @@ func resolveLibraries(scans []*repoScan) {
 	}
 	for _, s := range scans {
 		all := map[string]*dependency{}
-		for f, refs := range s.code.Files {
-			expand(s, f, refs, map[key]bool{}, all, "")
+		// Files are expanded in name order: the first file to reach a dependency decides its origin.
+		for _, f := range slices.Sorted(maps.Keys(s.code.Files)) {
+			expand(s, f, s.code.Files[f], map[key]bool{}, all, "")
 		}
 		for _, d := range all {
 			sort.Strings(d.Files)
@@ -747,16 +754,18 @@ func (a *assembly) facts() []repoFacts {
 			}
 		}
 		// An IaC block that names another service assigns its resources to that service.
-		for _, bes := range blocks {
-			targets := map[*repoScan]bool{}
+		for _, block := range slices.Sorted(maps.Keys(blocks)) {
+			bes := blocks[block]
+			targets := []*repoScan{}
 			for _, e := range bes {
 				for _, o := range owners[strings.ToLower(e.Value)] {
-					if o != s {
-						targets[o] = true
+					if o != s && !slices.Contains(targets, o) {
+						targets = append(targets, o)
 					}
 				}
 			}
-			for o := range targets {
+			slices.SortFunc(targets, func(x, y *repoScan) int { return strings.Compare(x.in.Name, y.in.Name) })
+			for _, o := range targets {
 				for _, e := range bes {
 					if t := a.typed(e); t != "" {
 						add(o, t, e.Value, evidence{Kind: "iac", Repo: s.in.Name, Commit: s.in.Commit, File: e.File, Key: e.KeyPath})
@@ -767,15 +776,16 @@ func (a *assembly) facts() []repoFacts {
 	}
 	// Code literals equal to a typed resource name (specific names only).
 	known := map[string]string{}
-	for _, m := range res {
-		for _, r := range m {
-			if len(r.Name) >= 8 && strings.ContainsAny(r.Name, "-._/:") {
+	for _, s := range a.scans {
+		for _, k := range slices.Sorted(maps.Keys(res[s])) {
+			if r := res[s][k]; len(r.Name) >= 8 && strings.ContainsAny(r.Name, "-._/:") && known[r.Name] == "" {
 				known[r.Name] = r.Type
 			}
 		}
 	}
 	for _, s := range a.scans {
-		for lit, files := range s.code.Literals {
+		for _, lit := range slices.Sorted(maps.Keys(s.code.Literals)) {
+			files := s.code.Literals[lit]
 			if t := known[lit]; t != "" {
 				add(s, t, lit, evidence{Kind: "code", Repo: s.in.Name, Commit: s.in.Commit, File: files[0], Value: lit})
 			}
@@ -785,7 +795,8 @@ func (a *assembly) facts() []repoFacts {
 	// in a repository whose dependencies use that kind of service.
 	for _, s := range a.scans {
 		uses := a.categories(s)
-		for lit, files := range s.code.Literals {
+		for _, lit := range slices.Sorted(maps.Keys(s.code.Literals)) {
+			files := s.code.Literals[lit]
 			objs := []objectRef{}
 			for _, o := range a.platform.objectsNamed(lit) {
 				if uses[o.res.Kind] {
@@ -833,7 +844,8 @@ func (a *assembly) facts() []repoFacts {
 			}
 		}
 		sort.Slice(f.Dependencies, func(i, j int) bool { return f.Dependencies[i].ID < f.Dependencies[j].ID })
-		for _, r := range res[s] {
+		for _, k := range slices.Sorted(maps.Keys(res[s])) {
+			r := res[s][k]
 			if isMessaging(r.Type) {
 				channels["messaging"] = true
 			}
@@ -846,7 +858,8 @@ func (a *assembly) facts() []repoFacts {
 				f.Events = append(f.Events, eventFact{Name: ev, Topic: r.Topic, Role: "consume", Evidence: []evidence{{Kind: "platform", Value: r.Name}}})
 			}
 		}
-		for name, topic := range events {
+		for _, name := range slices.Sorted(maps.Keys(events)) {
+			topic := events[name]
 			if files, ok := s.code.Literals[name]; ok {
 				f.Events = append(f.Events, eventFact{Name: name, Topic: topic, Role: "publish-candidate", Evidence: []evidence{{Kind: "code", Repo: s.in.Name, Commit: s.in.Commit, File: files[0], Value: name}}})
 			}
@@ -1006,11 +1019,11 @@ func scopeFamily(p string) string {
 
 func (a *assembly) platformEvents() map[string]string {
 	out := map[string]string{}
-	for _, subs := range a.platform.subs {
-		for _, s := range subs {
+	for _, name := range slices.Sorted(maps.Keys(a.platform.subs)) {
+		for _, s := range a.platform.subs[name] {
 			for _, at := range s.Attributes {
-				if strings.EqualFold(at[0], "eventType") {
-					out[at[1]] = s.Topic
+				if _, seen := out[at[1]]; strings.EqualFold(at[0], "eventType") && !seen {
+					out[at[1]] = s.Topic // an event filtered on several topics keeps the first by subscription name
 				}
 			}
 		}
