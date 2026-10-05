@@ -115,8 +115,27 @@ func keySignature(e entry) string {
 
 func entryID(e entry) string { return keySignature(e) + "||" + e.Value }
 
-// discoverRepositories lists local checkouts from the configured roots and keeps tracked ones.
-func discoverRepositories(vault string, only map[string]bool) ([]repoInput, error) {
+// repositoryIndex is what repository discovery reads from the vault and its source roots: the cell's
+// branch policy, its repository notes and every checkout that is not the vault itself.
+type repositoryIndex struct {
+	branches  map[string]string
+	order     []string
+	prefixes  []string
+	notes     map[string]string
+	checkouts []indexedCheckout
+}
+
+type indexedCheckout struct{ name, remote, path string }
+
+// loadRepositoryIndex reads the index once per process and vault: checking every note of a vault
+// binds each one to its checkout, and none of these inputs change while a command runs.
+func loadRepositoryIndex(vault string) (*repositoryIndex, error) {
+	memoMu.Lock()
+	ix, ok := indexMemo[vault]
+	memoMu.Unlock()
+	if ok {
+		return ix, nil
+	}
 	inst, e := config.LoadInstance(vault)
 	if e != nil {
 		return nil, e
@@ -125,27 +144,23 @@ func discoverRepositories(vault string, only map[string]bool) ([]repoInput, erro
 	if e != nil {
 		return nil, e
 	}
-	prefixes := []string{}
-	branches, e := config.ReferenceBranches(inst)
-	if e != nil {
+	ix = &repositoryIndex{order: config.ReferenceBranchOrder(inst)}
+	if ix.branches, e = config.ReferenceBranches(inst); e != nil {
 		return nil, e
 	}
 	if src, ok := inst["sources"].(map[string]any); ok {
 		for _, p := range asList(src["repo_prefixes"]) {
 			if s, ok := p.(string); ok && s != "" {
-				prefixes = append(prefixes, strings.TrimRight(s, "-")+"-")
+				ix.prefixes = append(ix.prefixes, strings.TrimRight(s, "-")+"-")
 			}
 		}
 	}
-	notes, e := repoNotes(vault)
-	if e != nil {
+	if ix.notes, e = repoNotes(vault); e != nil {
 		return nil, e
 	}
 	vaultID, _ := config.RemoteIdentity(gitRemoteOf(vault))
 	vaultPath, _ := filepath.EvalSymlinks(vault)
 	seen := map[string]bool{vaultPath: true} // the vault is never one of its own sources
-	bound := map[string]string{}
-	out := []repoInput{}
 	for _, p := range paths {
 		if seen[p] {
 			continue
@@ -161,33 +176,66 @@ func discoverRepositories(vault string, only map[string]bool) ([]repoInput, erro
 			r := strings.TrimSuffix(strings.TrimRight(remote, "/"), ".git")
 			name = r[strings.LastIndexAny(r, "/:")+1:]
 		}
-		key := strings.ToLower(name)
-		tracked := notes[key] != ""
-		for _, pre := range prefixes {
-			tracked = tracked || strings.HasPrefix(strings.ToLower(name), strings.ToLower(pre))
+		ix.checkouts = append(ix.checkouts, indexedCheckout{name, remote, p})
+	}
+	memoMu.Lock()
+	indexMemo[vault] = ix
+	memoMu.Unlock()
+	return ix, nil
+}
+
+// discoverRepositories lists local checkouts from the configured roots and keeps tracked ones.
+func discoverRepositories(vault string, only map[string]bool) ([]repoInput, error) {
+	ix, e := loadRepositoryIndex(vault)
+	if e != nil {
+		return nil, e
+	}
+	bound := map[string]string{}
+	out := []repoInput{}
+	for _, c := range ix.checkouts {
+		key := strings.ToLower(c.name)
+		tracked := ix.notes[key] != ""
+		for _, pre := range ix.prefixes {
+			tracked = tracked || strings.HasPrefix(key, strings.ToLower(pre))
 		}
 		if len(only) > 0 {
 			tracked = false
 			for requested := range only {
-				tracked = tracked || strings.EqualFold(requested, name)
+				tracked = tracked || strings.EqualFold(requested, c.name)
 			}
 		}
 		if tracked {
 			if previous, exists := bound[key]; exists {
-				return nil, fmt.Errorf("ambiguous checkout for repository %s: %s and %s; configure one source checkout", name, previous, p)
+				return nil, fmt.Errorf("ambiguous checkout for repository %s: %s and %s; configure one source checkout", c.name, previous, c.path)
 			}
-			bound[key] = p
-			in := repoInput{Name: name, Remote: remote, Path: p, Note: notes[key]}
-			configured := branches[key]
-			var e error
-			if in.Ref, in.RefNote, e = referenceRef(p, configured, config.ReferenceBranchOrder(inst)); e != nil {
-				in.RefErr = e.Error()
-			}
+			bound[key] = c.path
+			in := repoInput{Name: c.name, Remote: c.remote, Path: c.path, Note: ix.notes[key]}
+			in.Ref, in.RefNote, in.RefErr = memoReferenceRef(c.path, ix.branches[key], ix.order)
 			out = append(out, in)
 		}
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 	return out, nil
+}
+
+// memoReferenceRef resolves a checkout's reference branch once per process. It caches the ref name,
+// not its commit, so commits made while a command runs are still seen.
+func memoReferenceRef(path, configured string, order []string) (ref, note, refErr string) {
+	key := path + "\x00" + configured + "\x00" + strings.Join(order, "\x00")
+	memoMu.Lock()
+	r, ok := refMemo[key]
+	memoMu.Unlock()
+	if ok {
+		return r[0], r[1], r[2]
+	}
+	ref, note, e := referenceRef(path, configured, order)
+	if e != nil {
+		refErr = e.Error()
+	}
+	memoMu.Lock()
+	refMemo[key] = [3]string{ref, note, refErr}
+	memoMu.Unlock()
+	return ref, note, refErr
 }
 
 // Within one process (a sync verify checks many notes) the same lookups repeat for every note: the
@@ -199,6 +247,8 @@ var (
 	scanMemo        = map[string]*repoScan{}
 	fingerprintMemo = map[string]string{}
 	checkoutMemo    = map[string]map[string]string{}
+	indexMemo       = map[string]*repositoryIndex{}
+	refMemo         = map[string][3]string{}
 )
 
 func gitRemoteOf(p string) string {
