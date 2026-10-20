@@ -84,9 +84,21 @@ func visible(text string) string {
 	return fence.ReplaceAllString(comment.ReplaceAllString(text, ""), "")
 }
 
+// definitionLines excludes the current state, where IDs cite records rather than define them.
+// Keep line positions so callers that annotate a definition can still edit the original text.
+func definitionLines(text string) []string {
+	lines := strings.Split(text, "\n")
+	if start, end := sectionSpan(lines, "state"); start >= 0 {
+		for i := start; i < end; i++ {
+			lines[i] = ""
+		}
+	}
+	return lines
+}
+
 func definedRecords(text string) map[string]bool {
 	out := map[string]bool{}
-	for _, l := range strings.Split(visible(text), "\n") {
+	for _, l := range definitionLines(visible(text)) {
 		if m := recordDef.FindStringSubmatch(l); m != nil {
 			out[m[1]] = true
 		}
@@ -230,7 +242,7 @@ func replaceSection(text, key, locale, body string) string {
 func annotate(text, id, note string) string {
 	lines := strings.Split(text, "\n")
 	inComment := false
-	for i, l := range lines {
+	for i, l := range definitionLines(text) {
 		if strings.Contains(l, "<!--") {
 			inComment = true
 		}

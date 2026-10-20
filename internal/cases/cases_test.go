@@ -234,6 +234,84 @@ func TestCaseChangesGoThroughTheCLI(t *testing.T) {
 	}
 }
 
+func TestStateTreatsLeadingRecordIDsAsReferences(t *testing.T) {
+	for _, locale := range []string{"es", "en"} {
+		t.Run(locale, func(t *testing.T) {
+			v := vault(t)
+			if locale == "en" {
+				p := filepath.Join(v, "instance.yaml")
+				b, err := os.ReadFile(p)
+				if err != nil {
+					t.Fatal(err)
+				}
+				write(t, v, "instance.yaml", strings.Replace(string(b), "notes: es", "notes: en", 1))
+			}
+			res, err := run(t, "new", "--vault", v, "--title", "Quantity validation", "--type", "development", "--objective", "Reject negative quantities while preserving zero.")
+			if err != nil {
+				t.Fatal(err)
+			}
+			id, path := res["id"].(string), res["path"].(string)
+			must := func(args ...string) map[string]any {
+				t.Helper()
+				m, err := run(t, append([]string{args[0], "--vault", v, "--id", id}, args[1:]...)...)
+				if err != nil {
+					t.Fatalf("%v: %v %v", args, err, m)
+				}
+				return m
+			}
+			must("add", "--kind", "evidence", "--text", "The normalizer accepts negatives.", "--source", "quantity.py@abc1234", "--level", "demonstrated")
+			must("add", "--kind", "finding", "--text", "The normalizer needs sign validation.", "--level", "inferred", "--from", "E-001")
+			must("add", "--kind", "requirement", "--text", "Zero remains accepted.", "--origin", "HT-814")
+			const headingSummary = "### R-001\nPreserve zero using E-001 and F-001. Next: implement validation."
+			for _, summary := range []string{
+				"R-001 preserves zero. Next: implement validation using F-001.",
+				"E-001 shows the gap; F-001 explains it. Next: implement R-001.",
+				"F-001 identifies the change backed by E-001. Next: implement R-001.",
+				"- **R-001** preserves zero.\n- E-001 shows the gap.\n- F-001 needs implementation next.",
+				headingSummary,
+			} {
+				must("state", "--text", summary)
+				b, err := os.ReadFile(filepath.Join(v, path))
+				if err != nil || !strings.Contains(string(b), summary) {
+					t.Fatalf("state was not persisted: %v\n%s", err, b)
+				}
+				r, err := Check(v, path)
+				if err != nil || !r.OK || r.Records["E"] != 1 || r.Records["F"] != 1 || r.Records["R"] != 1 {
+					t.Fatalf("state references must not add definitions: %+v %v", r, err)
+				}
+			}
+			before, err := os.ReadFile(filepath.Join(v, path))
+			if err != nil {
+				t.Fatal(err)
+			}
+			m, err := run(t, "state", "--vault", v, "--id", id, "--text", "R-999 must be implemented next.")
+			if err == nil || !strings.Contains(toJSON(m), "R-999|referenced but not defined") {
+				t.Fatalf("an unknown state reference must be rejected: %v %v", m, err)
+			}
+			after, err := os.ReadFile(filepath.Join(v, path))
+			if err != nil || !bytes.Equal(before, after) {
+				t.Fatalf("rejected state changed the case: %v", err)
+			}
+			if got := must("add", "--kind", "requirement", "--text", "Zero and positive quantities remain accepted.", "--origin", "HT-814", "--supersedes", "R-001")["record"]; got != "R-002" {
+				t.Fatalf("state references changed ID allocation: %v", got)
+			}
+			b, err := os.ReadFile(filepath.Join(v, path))
+			if err != nil || !strings.Contains(string(b), headingSummary) {
+				t.Fatalf("superseding a record changed its state reference: %v\n%s", err, b)
+			}
+			annotated := false
+			for _, line := range strings.Split(string(b), "\n") {
+				if strings.HasPrefix(line, "- **R-001**") && strings.Contains(line, labels[locale]["superseded"]+" R-002") {
+					annotated = true
+				}
+			}
+			if !annotated {
+				t.Fatal("superseding must annotate the definition, not the state reference")
+			}
+		})
+	}
+}
+
 func TestPublishedCasesChangeOnlyOnSyncBranches(t *testing.T) {
 	v := vault(t)
 	write(t, v, "investigations/20260925-100000-ordenes/investigation.md", caseText("")+"\n## Bitácora\n")

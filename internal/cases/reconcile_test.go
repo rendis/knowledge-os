@@ -33,6 +33,9 @@ func TestReconcileImportsHandoffProgressDeterministically(t *testing.T) {
 	if _, e := run(t, "add", "--vault", v, "--id", id, "--kind", "handoff", "--package", "handoffs/DH-001.md"); e != nil {
 		t.Fatal(e)
 	}
+	if _, e := run(t, "state", "--vault", v, "--id", id, "--text", "DH-001 implements R-001. Next: reconcile its progress."); e != nil {
+		t.Fatal(e)
+	}
 	var b bytes.Buffer
 	if e := devhandoff.Run([]string{"start", "--vault", v, "--package", filepath.Join(caseDir, "handoffs", "DH-001.md"), "--apply"}, &b); e != nil {
 		t.Fatal(e, b.String())

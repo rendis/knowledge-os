@@ -48,14 +48,14 @@ Cell identity lives in `instance.yaml` and `00-Home.md`; scope exceptions in `90
 
 ## Route the request
 
-Select one primary skill; an auxiliary skill supplies a method and the primary keeps ownership. Reclassify follow-ups that ask for new methods or presentation. Answer without a persistent record by default; recommend an investigation when preserving evidence, decisions or open questions would help continuation, and open it when the user asks or accepts.
+Select one primary skill; an auxiliary skill supplies a method and the primary keeps ownership. Reclassify follow-ups that ask for new methods or presentation. Taking on a development work item (ticket, story or HT) starts through `manage-investigation` before requirements analysis or implementation. For other requests, answer without a persistent record by default; recommend an investigation when preserving evidence, decisions or open questions would help continuation, and open it when the user asks or accepts.
 
 - [evidence-driven-analysis](.agents/skills/evidence-driven-analysis/SKILL.md) — the method when one decisive source cannot settle the answer: diagnosing a failure, auditing a claim or guarantee, tracing variants of a confirmed cause.
 - [map-ecosystem](.agents/skills/map-ecosystem/SKILL.md) — questions about the vault, knowledge publication, related-vault catalog, mapping completion; orientation when bootstrap is incomplete.
 - [synchronize-ecosystem](.agents/skills/synchronize-ecosystem/SKILL.md) — inventory, repository map synchronization and manual or scheduled refresh cycles; the publication path for every technical note.
 - [onboard-cell](.agents/skills/onboard-cell/SKILL.md) — create or adopt the vault, or change the cell's shared setup: identity, systems, sources, reference branches, clouds, trackers, database targets and procedures; first reading.
 - [onboard-developer](.agents/skills/onboard-developer/SKILL.md) — this person's machine: repository clones, worktrees, cloud logins, database ports; sole writer of `.knowledge-os-config.yaml`.
-- [manage-investigation](.agents/skills/manage-investigation/SKILL.md) — investigation cases through the CLI: open, record, resume, close, publish, absorb and retire.
+- [manage-investigation](.agents/skills/manage-investigation/SKILL.md) — take on a development work item by finding and resuming or opening its case; open, record, resume, close, publish, absorb and retire investigation cases through the CLI.
 - [manage-investigation-derived-learning](.agents/skills/manage-investigation-derived-learning/SKILL.md) — assess and publish `70-Aprendizajes/` notes.
 - [work-in-repository](.agents/skills/work-in-repository/SKILL.md) — implementation in a source repository from this session.
 - [manage-development-handoff](.agents/skills/manage-development-handoff/SKILL.md) — prepare a repository worktree for atomic development tasks, read their progress, reconcile their deltas into the investigation.

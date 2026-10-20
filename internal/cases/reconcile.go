@@ -36,7 +36,7 @@ func deltaNumber(id string) int {
 
 // lastMark returns the commit and delta number a handoff record was last reconciled through.
 func lastMark(text, dh string) (string, int) {
-	for _, l := range strings.Split(visible(text), "\n") {
+	for _, l := range definitionLines(visible(text)) {
 		if m := recordDef.FindStringSubmatch(l); m != nil && m[1] == dh {
 			all := reconcileMark.FindAllStringSubmatch(l, -1)
 			if len(all) == 0 {

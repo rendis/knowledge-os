@@ -268,7 +268,7 @@ func absorb(o options, out io.Writer) error {
 		if e != nil {
 			return "", nil, nil, e
 		}
-		lines := strings.Split(visible(text), "\n")
+		lines := definitionLines(visible(text))
 		for _, id := range ids {
 			target := ""
 			for _, l := range lines {

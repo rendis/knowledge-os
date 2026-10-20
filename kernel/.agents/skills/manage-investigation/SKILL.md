@@ -1,6 +1,6 @@
 ---
 name: manage-investigation
-description: Keep the thread of an investigation or a new development in one case, written through the CLI. Use to open a case from a request, record evidence, conclusions, questions, decisions and requirements, resume, close, publish, absorb into the vault or retire; to understand what happened, how something works or why it fails; or to gather what a development needs before handing it off.
+description: Take on a development work item (ticket, story or HT) by finding and resuming or opening its case. Keep an investigation's evidence, conclusions, questions, decisions and requirements through the CLI; resume, close, publish, absorb into the vault or retire; gather what a development needs before handing it off.
 ---
 
 # Manage investigations
@@ -16,7 +16,9 @@ Bind the vault through [use-vault-cli](../use-vault-cli/SKILL.md#bind-the-execut
 
 ## When a case is worth it
 
-Answering a question does not need a case. Recommend one when the work will continue in another session or with another person or agent, depends on an external answer or access still pending, produces decisions that feed stories or handoffs, or yields a conclusion meant for the vault that still lacks production evidence. Open it when the user asks or accepts.
+Taking on a development work item (ticket, story or HT) requires a case before substantive requirements analysis or implementation. Follow **Open** to find and resume its existing case or open one of type `development`. The request authorizes these local case records without a separate confirmation; publication and source changes retain their own authorization. An explicit read-only or no-record instruction limits this to inspecting existing cases and reporting the recording constraint.
+
+Other questions do not need a case. Recommend one when the work will continue in another session or with another person or agent, depends on an external answer or access still pending, produces decisions that feed stories or handoffs, or yields a conclusion meant for the vault that still lacks production evidence. Open it when the user asks or accepts.
 
 ## What goes where
 
@@ -38,7 +40,7 @@ Write at **events**, not at turns: opening, each confirmed fact, a changed concl
 
 ## Open
 
-1. `<CLI> investigation list --vault "<root>"`; resume a case with the same subject instead of opening a duplicate.
+1. `<CLI> investigation list --vault "<root>"`; match the work-item reference and subject against existing cases and resume the matching case instead of opening a duplicate. Read its current state and cited records through **Resume** before continuing; record new requirements and decisions in that case.
 2. Formalize the request: what is needed and for what, the expected result, what is in and out of scope. Ask only for what blocks the objective ([questioning-protocol](references/questioning-protocol.md)).
 3. `<CLI> investigation new --vault "<root>" --title "<title>" --type understanding|development --objective "<formalized request>" [--source-ref "<ticket, message or document>"]`.
 

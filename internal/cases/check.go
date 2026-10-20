@@ -181,7 +181,7 @@ func checkContent(vault, full, raw string, ix vaultIndex) Result {
 
 	// Records: unique definitions, references resolve, evidence cites its source.
 	defs := map[string]bool{}
-	lines := strings.Split(body, "\n")
+	lines := definitionLines(body)
 	for i, l := range lines {
 		m := recordDef.FindStringSubmatch(l)
 		if m == nil {

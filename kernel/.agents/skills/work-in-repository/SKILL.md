@@ -13,7 +13,9 @@ Resolve the vault through [use-vault-cli](../use-vault-cli/SKILL.md) and [vault 
 
 For evidence-source discovery, use the configured config locate contract. For implementation, use the **Development destinations** contract in vault resolution: bind the exact checkout or worktree selected by the user or already established for this task, its Git root, remote identity, branch and working changes. A source discovered for consultation is not an implementation destination until the user's requested change selects that exact checkout. Resolve ambiguity before editing; existing authorization needs no repeated approval.
 
-Keep the user's selected existing checkout. Create a branch or worktree only when requested or required by applicable repository instructions; persistent work-item worktrees and handoffs belong to [manage-development-handoff](../manage-development-handoff/SKILL.md). Ordinary repository work does not require an investigation, tracker item, or handoff.
+For a development work item, first apply the case entry rule in [manage-investigation](../manage-investigation/SKILL.md#when-a-case-is-worth-it), then continue implementation here with that case as its record.
+
+Keep the user's selected existing checkout. Create a branch or worktree only when requested or required by applicable repository instructions; persistent work-item worktrees and handoffs belong to [manage-development-handoff](../manage-development-handoff/SKILL.md). Ordinary repository work outside a development work item does not require an investigation, tracker item, or handoff.
 
 **Handoff worktree.** A destination holding `.handoff/` is implemented from a session rooted in that worktree, where the repository's own instructions, skills, MCP servers and hooks load natively. From a vault session, stop before the first edit: give the worktree path, recommend opening that session and explain why. Edit from the vault only when the user answers that recommendation by choosing to continue here; the request to implement comes before the recommendation, so it is not that answer.
 
