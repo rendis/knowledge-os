@@ -44,8 +44,7 @@ const Help = `sync COMMAND --vault PATH [options]
                                         (the CI gate on pushes, e.g. a kernel update).
   acknowledge --repo NAME --commit SHA --decision D [--branch main] [--date YYYY-MM-DD]
                                         Record a reviewed repository commit that needs no note change
-                                        (D: no-documentation-change | no-durable-node |
-                                        review-rejected | inspection-limited).
+                                        (D: no-documentation-change | no-durable-node).
   finish  [--base BRANCH]               verify, then fast-forward the base and delete the branch.
   pull    [--base BRANCH]               Fetch; fast-forward the base when possible. On divergence or
                                         on a sync/ branch whose base moved, list the knowledge files
@@ -61,7 +60,7 @@ var (
 	knowledgePath = regexp.MustCompile(`^([1-7]\d-[^/]+/.+\.md|00-Home\.md|[^/]+\.base|90-Meta/\.sync-acknowledgements\.json|investigations/[^/]+/.+)$`)
 	slugRE        = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{1,80}$`)
 	sha12         = regexp.MustCompile(`^[0-9a-f]{12,40}$`)
-	decisions     = map[string]bool{"no-documentation-change": true, "no-durable-node": true, "review-rejected": true, "inspection-limited": true}
+	decisions     = map[string]bool{"no-documentation-change": true, "no-durable-node": true}
 )
 
 type opts struct {
@@ -848,8 +847,11 @@ type ackEntry struct {
 }
 
 func acknowledge(o opts, out io.Writer) error {
+	if o.decision == "review-rejected" || o.decision == "inspection-limited" {
+		return fmt.Errorf("%s is an unsuccessful attempt, not an acknowledgement; no synchronization cursor was written", o.decision)
+	}
 	if !decisions[o.decision] {
-		return errors.New("--decision must be no-documentation-change, no-durable-node, review-rejected or inspection-limited")
+		return errors.New("--decision must be no-documentation-change or no-durable-node")
 	}
 	if !sha12.MatchString(o.commit) || o.repo == "" || !config.ValidBranch(o.branch) {
 		return errors.New("--repo, a hexadecimal --commit (12+ chars) and a valid --branch are required")

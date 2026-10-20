@@ -134,6 +134,59 @@ func TestAcknowledgementKeepsSchema(t *testing.T) {
 	}
 }
 
+func TestAcknowledgementRejectsUnsuccessfulAttemptsWithoutWriting(t *testing.T) {
+	for _, decision := range []string{"review-rejected", "inspection-limited"} {
+		for _, existing := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/existing=%t", decision, existing), func(t *testing.T) {
+				v := vault(t)
+				const prior = `{"repositories":[{"analysis_date":"2026-08-11","analyzed_sha":"123456789abc","branch":"main","decision":"review-rejected","repository":"SVC-a"}],"version":1}` + "\n"
+				if existing {
+					write(t, v, ackRel, prior)
+				}
+				_, err := call(t, "acknowledge", "--vault", v, "--repo", "SVC-a", "--commit", "fedcba987654", "--decision", decision)
+				if err == nil || !strings.Contains(err.Error(), "unsuccessful") {
+					t.Fatalf("unsuccessful attempt must not create an acknowledgement: %v", err)
+				}
+				b, err := os.ReadFile(filepath.Join(v, ackRel))
+				if existing {
+					if err != nil || string(b) != prior {
+						t.Fatalf("failed write changed historical state: %s, %v", b, err)
+					}
+				} else if !os.IsNotExist(err) {
+					t.Fatalf("failed write created state: %s, %v", b, err)
+				}
+			})
+		}
+	}
+}
+
+func TestAcknowledgementPreservesOtherHistoricalAttempts(t *testing.T) {
+	v := vault(t)
+	legacy := ackEntry{"2026-08-11", "123456789abc", "main", "review-rejected", "SVC-a"}
+	b, err := json.Marshal(map[string]any{"version": 1, "repositories": []ackEntry{legacy}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	write(t, v, ackRel, string(b)+"\n")
+	if _, err := call(t, "acknowledge", "--vault", v, "--repo", "SVC-b", "--commit", "fedcba987654", "--decision", "no-durable-node"); err != nil {
+		t.Fatal(err)
+	}
+	b, err = os.ReadFile(filepath.Join(v, ackRel))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var doc struct {
+		Version      int        `json:"version"`
+		Repositories []ackEntry `json:"repositories"`
+	}
+	if err := json.Unmarshal(b, &doc); err != nil {
+		t.Fatal(err)
+	}
+	if doc.Version != 1 || len(doc.Repositories) != 2 || doc.Repositories[0] != legacy || doc.Repositories[1].Decision != "no-durable-node" {
+		t.Fatalf("accepted acknowledgement lost historical records: %s", b)
+	}
+}
+
 func toStrings(v any) []string {
 	out := []string{}
 	for _, x := range asList(v) {

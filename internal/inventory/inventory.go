@@ -442,11 +442,11 @@ func classify(s scope, notes, acks, repos []object) ([]object, error) {
 		name := str(a["repository"])
 		byAck[name] = a
 		n := byNote[name]
-		if n != nil && (a["decision"] == "no-durable-node" || (a["decision"] != "no-documentation-change" && n["recorded_branch"] == a["branch"] && n["recorded_sha"] == a["analyzed_sha"])) {
-			return nil, errors.New("incompatible note and acknowledgement")
+		if n != nil && a["decision"] == "no-durable-node" {
+			return nil, fmt.Errorf("repository %s: incompatible note %s and no-durable-node acknowledgement in 90-Meta/.sync-acknowledgements.json", name, n["path"])
 		}
 		if n == nil && a["decision"] == "no-documentation-change" {
-			return nil, errors.New("no-change acknowledgement requires a note")
+			return nil, fmt.Errorf("repository %s: no-documentation-change acknowledgement in 90-Meta/.sync-acknowledgements.json requires a note", name)
 		}
 	}
 	out := []object{}
@@ -459,7 +459,7 @@ func classify(s scope, notes, acks, repos []object) ([]object, error) {
 		if n != nil {
 			note = n["note"]
 			recorded = n["recorded_sha"]
-		} else if a != nil {
+		} else if a != nil && !historicalAttempt(a) {
 			recorded = a["analyzed_sha"]
 		}
 		containerNote := filepath.Join(s.root, "90-Meta/Repositorio del vault.md")
@@ -479,6 +479,9 @@ func classify(s scope, notes, acks, repos []object) ([]object, error) {
 			recorded = nil
 		case a != nil && a["branch"] == r["branch"] && a["analyzed_sha"] == r["sha"]:
 			status, details = decisions[str(a["decision"])], "explicit synchronization outcome at observed branch SHA"
+			if historicalAttempt(a) {
+				details = "unresolved historical " + str(a["decision"]) + " attempt; not a successful synchronization cursor; reconcile through review"
+			}
 		case n != nil && n["recorded_sha"] == r["sha"] && n["recorded_branch"] == r["branch"]:
 			status, details = "current", "recorded SHA matches reference branch"
 		case n != nil:
@@ -500,13 +503,24 @@ func classify(s scope, notes, acks, repos []object) ([]object, error) {
 		if byRepo[str(a["repository"])] {
 			continue
 		}
-		out = append(out, object{"note": nil, "repo": a["repository"], "status": "missing-candidate", "branch": a["branch"], "recorded_sha": a["analyzed_sha"], "remote_sha": nil, "details": "repository absent from organization inventory"})
+		var recorded any
+		if !historicalAttempt(a) {
+			recorded = a["analyzed_sha"]
+		}
+		out = append(out, object{"note": nil, "repo": a["repository"], "status": "missing-candidate", "branch": a["branch"], "recorded_sha": recorded, "remote_sha": nil, "details": "repository absent from organization inventory"})
 	}
 	sort.Slice(out, func(i, j int) bool {
 		return str(out[i]["repo"])+str(out[i]["note"]) < str(out[j]["repo"])+str(out[j]["note"])
 	})
 	return out, nil
 }
+
+// Historical unsuccessful attempts remain readable, but never advance a successful
+// synchronization cursor. Keep their existing status names for inventory consumers.
+func historicalAttempt(a object) bool {
+	return a["decision"] == "review-rejected" || a["decision"] == "inspection-limited"
+}
+
 func Run(args []string, out io.Writer) error {
 	f := flag.NewFlagSet("inventory", flag.ContinueOnError)
 	f.SetOutput(io.Discard)
