@@ -20,6 +20,10 @@ Taking on a development work item (ticket, story or HT) requires a case before s
 
 Other questions do not need a case. Recommend one when the work will continue in another session or with another person or agent, depends on an external answer or access still pending, produces decisions that feed stories or handoffs, or yields a conclusion meant for the vault that still lacks production evidence. Open it when the user asks or accepts.
 
+## From requirements to development
+
+While defining a development work item, keep follow-up clarifications, narrowed scope and accepted designs in its requirements and current state. They settle **what** to build; source edits require a request to implement and a bound development destination. Once the task is sufficiently defined, use [manage-development-handoff](../manage-development-handoff/SKILL.md) to package it and propose the worktree and development session. That transition applies even when no package or `.handoff/` exists yet. Preserve an explicit user choice to implement in an exact existing checkout through that skill's direct-implementation exception.
+
 ## What goes where
 
 | The information | Goes to |
@@ -53,6 +57,8 @@ Write at **events**, not at turns: opening, each confirmed fact, a changed concl
 - **question** — `--resolve-by` (source, access or person). A request to search something is a question; evidence, findings and decisions close it with `--resolves Q-…`.
 - **decision** — `--by <role>`, with the reason in the text.
 - **requirement** (`--origin`) and **handoff** (`--package handoffs/DH-NNN.md`, once it passes its gate) — development cases; what changes where and how it is accepted lives in the package ([manage-development-handoff](../manage-development-handoff/SKILL.md)). Acceptance criteria agreed before a package exists are requirements whose text says so; the package takes them over.
+
+Attribute only the requester's actual choices to the requester. Record an agent's inference or proposal as such; a case record cannot create implementation authority that the conversation did not grant.
 
 `--file <path>` (repeatable) attaches files to an evidence or finding record as `artifacts/<ID>-<name>` and refuses credentials. A materially different claim is a new record with `--supersedes <ID>`; records are never renumbered or edited in place, so a file a record relies on and lacks comes with a record that supersedes it (`--supersedes <ID> --file <path>`). An identifier of a kind cases no longer define (an earlier version's attachment `` `A-001` ``, export `` `S-004` `` or acceptance criterion `` `AC-002` ``) is written as inline code; bare, the gate reads it as a reference. Current kinds (E, F, Q, D, R, DH) are always checked, in code or not. `state --text "<what is known, what is missing, next step>"` rewrites the current state, citing the records it summarizes. Every write returns `gate_review` reminders that do not block: a component the vault documents named without its `[[note]]` (reference the note once `discover check` shows it fresh for the claim and it describes the branch or revision the record relies on, instead of restating it) and relations discovery contradicts. `<CLI> investigation check --id <id>` runs the same gate over the whole case, including its handoff packages. Handoff progress comes back through `handoff reconcile`.
 

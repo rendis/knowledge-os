@@ -13,7 +13,7 @@ Resolve the vault through [use-vault-cli](../use-vault-cli/SKILL.md) and [vault 
 
 For evidence-source discovery, use the configured config locate contract. For implementation, use the **Development destinations** contract in vault resolution: bind the exact checkout or worktree selected by the user or already established for this task, its Git root, remote identity, branch and working changes. A source discovered for consultation is not an implementation destination until the user's requested change selects that exact checkout. Resolve ambiguity before editing; existing authorization needs no repeated approval.
 
-For a development work item, first apply the case entry rule in [manage-investigation](../manage-investigation/SKILL.md#when-a-case-is-worth-it), then continue implementation here with that case as its record.
+For a development work item, apply the case entry rule in [manage-investigation](../manage-investigation/SKILL.md#when-a-case-is-worth-it), then use [manage-development-handoff](../manage-development-handoff/SKILL.md#choose-the-development-destination) for the transition from requirements to a development destination, including its explicit direct-implementation exception. An existing case alone is not a transition to implementation.
 
 Keep the user's selected existing checkout. Create a branch or worktree only when requested or required by applicable repository instructions; persistent work-item worktrees and handoffs belong to [manage-development-handoff](../manage-development-handoff/SKILL.md). Ordinary repository work outside a development work item does not require an investigation, tracker item, or handoff.
 
@@ -38,5 +38,7 @@ When the target has `.handoff/`, follow the development-handoff section of its `
 Run repository commands with the bound target as their working directory and use explicit paths for file operations. Put source and tests in their repository locations; the vault's .scratch/ is for vault-local helpers, not the implementation destination.
 
 Apply the requested change while preserving unrelated working changes. Use relevant repository skills, its package manager and required checks. For Git or remote publication effects, apply [manage-git-workflow](../manage-git-workflow/SKILL.md) with the exact target and existing authority. Implementing a change does not imply commit, push, pull request, merge or deployment authority.
+
+For a development work item's testable behavior changes, use red–green–refactor: run a focused new or extended test before changing production code, confirm it fails for the intended missing behavior, implement to green, then refactor and run applicable checks. Report the failing assertion, command and passing result; keep required handoff evidence in `.handoff/deltas.md`. If an executable behavior test does not apply, explain why and use the appropriate verification. Report any departure from TDD accurately.
 
 Complete when the scoped change and applicable checks have been inspected, required handoff records are current, and the result identifies the repository, changed behavior, verification and remaining blockers. Report source changes as implementation evidence; production knowledge and case updates remain with their respective vault workflows.

@@ -1,6 +1,6 @@
 ---
 name: manage-development-handoff
-description: Prepare a repository worktree for atomic development tasks from a development investigation, so an agent working there knows exactly what to do without further context; read their progress; and reconcile what was implemented back into the investigation. Use to prepare, refresh, check or reconcile a handoff.
+description: Move a development investigation from agreed requirements to a task package and repository worktree, recommend its development session, read progress and reconcile results. Own the transition even before a package or worktree exists.
 ---
 
 # Manage development handoffs
@@ -13,6 +13,12 @@ A handoff turns the part of a development investigation that belongs to one repo
 - **Progress** — the branch itself (commits, tests, pull request) plus `deltas.md`: changes to the definition, decisions, deviations, questions and verification results.
 
 Bind the vault through [use-vault-cli](../use-vault-cli/SKILL.md#bind-the-executable-and-vault). `<CLI> handoff --help` lists the commands; all output is JSON.
+
+## Choose the development destination
+
+For a development work item being defined in a vault session, finish the requirements and package, then propose preparing its worktree. Reuse existing authorization to prepare it; otherwise present the plan and request the missing authorization. A clarification of desired behavior keeps this workflow in preparation. A request to implement starts this transition, rather than selecting the evidence-source checkout by implication.
+
+**Direct-implementation exception.** When the user explicitly selects an exact existing checkout and asks to implement there, use [work-in-repository](../work-in-repository/SKILL.md) with that destination and the existing case. This choice needs no redundant handoff approval. A source lookup, a clean `main`, or an agreed requirement alone does not select that destination. An existing handoff worktree follows the session recommendation below.
 
 ## Write the package
 
@@ -43,11 +49,13 @@ Write the headings in the case's language; `investigation check` accepts them in
 
 Keep it atomic: one repository, one task, the smallest context that answers the implementation questions. Split a milestone into tasks that can each be verified alone; a task that needs another's result names it in `depends-on` (a task of the same worktree starts after it; a task in another repository is a prerequisite whose needed result the package states). The implementing agent has no vault: write the fact or cite a permalink instead of a `[[note]]` link. Before preparing, run the [implementation-sufficiency](../manage-investigation/references/implementation-sufficiency.md) questions against the package and fill what is missing from the case. `<CLI> investigation check` gates packages too (required sections, dependencies that exist and form no cycle, no vault links, no credential or local path, atomic size). Record each package with `<CLI> investigation add --id <case> --kind handoff --package handoffs/DH-NNN.md`.
 
+**TDD acceptance.** For testable behavior changes, put the red–green–refactor method in the package's acceptance criteria: add or extend a focused test, run it against unchanged production code and observe failure for the missing behavior; implement the minimum change, rerun to green, then refactor and run the applicable checks. Require verification evidence with commands, the relevant failing assertion and passing result in `.handoff/deltas.md`. A baseline passing suite or tests added after implementation does not demonstrate TDD. For a task without an executable behavior test, state the reason and the appropriate verification instead. Keep this instruction self-contained in the package because the implementing session has no vault skills.
+
 ## Prepare
 
 1. `<CLI> handoff start --vault "<root>" --package <case>/handoffs/DH-NNN.md` shows the effects: worktree and branch to create from the base (the remote-tracking base when present), or the existing worktree reused when it is already on that branch; the task copy; the local exclusion; the managed segment added or updated in `AGENTS.md`.
 2. Present the effects to the user and apply with `--apply` once authorized. Start the tasks of a milestone in dependency order; each one joins the same worktree, and a later task can be added while earlier ones are in progress.
-3. Hand over the worktree path and recommend implementing in a new agent session rooted there rather than in this vault session: only a session rooted in the worktree loads the repository's own instructions, skills, MCP servers and hooks natively; from the vault they are files to read, not an active environment. Preparing a handoff does not authorize implementing it.
+3. Hand over the worktree path and recommend implementing in a new agent session rooted there: only that session loads the repository's own instructions, skills, MCP servers and hooks natively. Finish preparation with the package, gate result, worktree status and next action; source code and tests remain unchanged. Create the session when the user explicitly requests it and the harness supports it; otherwise give the path and recommendation. Implement from the vault only after the user chooses to continue here in response to that recommendation; preparation and an earlier implementation request are not that choice.
 
 The command never commits, pushes, fetches or changes other branches. The segment change in `AGENTS.md` is a tracked file change: the repository's normal workflow commits it (once per repository, since it is identical everywhere).
 

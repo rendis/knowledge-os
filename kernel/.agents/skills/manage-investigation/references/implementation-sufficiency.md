@@ -8,7 +8,7 @@
    - Which inputs and outputs are required, where do they come from, and how are they interpreted?
    - What already exists, what must be reused, and which dependency contracts and compatibility requirements apply?
    - What happens in the relevant boundary and failure cases, with which expected results?
-   - How will acceptance be verified, and what evidence or test data is needed?
+   - How will acceptance be verified, what focused test can fail before production changes and pass afterward, and what evidence or test data is needed? For tasks without executable behavior tests, what verification applies and why?
    - What remains unresolved, and why does it block implementation or not?
 2. Answer each applicable question using only the task package (`handoffs/DH-NNN.md`: its sections and the permalinks it cites), as the recipient sees it. Identify the document section or referenced path/symbol supporting each substantive answer. Conversation, memory, and facts known only from the source investigation cannot supply a missing answer. A heading or a bare link is not an answer; verify that a referenced source is accessible and supports it.
 3. Compare those answers with the source-derived requirements. Missing, ambiguous, contradictory, or unsupported answers are concrete gaps even when structural validation succeeds. Carry agreed behavior and essential exceptions in the package itself; use references for supporting technical detail. Include implementation-relevant physical details when they affect correctness, without copying whole repositories or unrelated history. Justify non-applicability; leave legitimate implementation choices open rather than treating every unspecified design detail as a blocker.

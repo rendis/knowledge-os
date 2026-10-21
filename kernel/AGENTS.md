@@ -48,7 +48,7 @@ Cell identity lives in `instance.yaml` and `00-Home.md`; scope exceptions in `90
 
 ## Route the request
 
-Select one primary skill; an auxiliary skill supplies a method and the primary keeps ownership. Reclassify follow-ups that ask for new methods or presentation. Taking on a development work item (ticket, story or HT) starts through `manage-investigation` before requirements analysis or implementation. For other requests, answer without a persistent record by default; recommend an investigation when preserving evidence, decisions or open questions would help continuation, and open it when the user asks or accepts.
+Select one primary skill; an auxiliary skill supplies a method and the primary keeps ownership. Reclassify follow-ups that ask for new methods or presentation. Taking on a development work item (ticket, story or HT) starts through `manage-investigation`; requirements lead to `manage-development-handoff`, which owns the transition to a development session even before a worktree exists. For other requests, answer without a persistent record by default; recommend an investigation when preserving evidence, decisions or open questions would help continuation, and open it when the user asks or accepts.
 
 - [evidence-driven-analysis](.agents/skills/evidence-driven-analysis/SKILL.md) — the method when one decisive source cannot settle the answer: diagnosing a failure, auditing a claim or guarantee, tracing variants of a confirmed cause.
 - [map-ecosystem](.agents/skills/map-ecosystem/SKILL.md) — questions about the vault, knowledge publication, related-vault catalog, mapping completion; orientation when bootstrap is incomplete.
