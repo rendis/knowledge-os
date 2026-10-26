@@ -75,6 +75,7 @@ Stay with the current agent unless a subtask is bounded, independently checkable
 ## Guardrails
 
 - Technical writes follow `90-Meta/evidence-policy.md`; cell identity and capability bindings come from onboarding.
+- Keep the vault in its existing checkout; do not create vault worktrees or replacement clones to isolate sync, publication, investigations or kernel updates. Handoff worktrees belong to development repositories. Preserve existing vault worktrees and their pending work until the user authorizes their disposition; resolve competing vault work through the sync workflow.
 - Execute an operation only after its deterministic checks pass; correct the input and recheck, or report the blocker.
 - Secrets stay out of every file. A credential versioned in a source (`credentials_in_sources` of `discover run`) is reported to the user by repository, file and key, never copied; the source belongs to its owners.
 - Wikilinks target note basenames; persist one relationship direction and read the inverse from backlinks; messaging goes producer → topic/event → consumer.
