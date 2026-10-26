@@ -70,7 +70,7 @@ Provider-specific skills are installed by the developer; resolve access through 
 
 ## Delegate
 
-Stay with the current agent unless a subtask is bounded, independently checkable and cheaper than coordination; then use the cheapest capable executor. Specialists: `evidence-investigator` for a bounded evidence question, `evidence-reviewer` for the review above; give them the question, scope, sources, restrictions and expected result. A specialist's answer is evidence for the coordinator, never permission. Keep operational classifications and shared-state writes with the coordinator. See [specialists](90-Meta/specialists.md); load [execution profiles](90-Meta/execution-profiles.md) only when dispatching or reconsidering a subagent.
+Stay with the current agent unless a subtask is bounded, independently checkable and cheaper than coordination; then use the cheapest capable executor. Specialists: `evidence-investigator` for a bounded evidence question, `evidence-reviewer` for the review above; give them the question, scope, sources, restrictions and expected result. A specialist's answer is evidence for the coordinator, never permission. Keep operational classifications and shared-state writes with the coordinator. See [specialists](90-Meta/specialists.md). Load [execution profiles](90-Meta/execution-profiles.md) only when dispatching or reconsidering a subagent, or preparing an independent development session. In both cases, explicitly select the least costly model and effort that can reliably meet the task criteria; reconsider that selection when the task or observed quality changes.
 
 ## Guardrails
 

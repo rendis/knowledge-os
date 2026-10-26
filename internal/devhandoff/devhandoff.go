@@ -294,7 +294,7 @@ func start(o options, out io.Writer) error {
 			}
 		}
 	}
-	res["next"] = "implement in a new agent session rooted at " + dest + " rather than the vault session, so its own instructions, skills, MCP servers and hooks load; record " + p.Handoff + " in the case"
+	res["next"] = "prepare an authorized independent agent session rooted at " + dest + "; follow manage-development-handoff and execution profiles to select model/effort, verify repository instructions, skills, MCP servers, hooks and local configuration, and return session access and readiness before implementation; record " + p.Handoff + " in the case"
 	return emit(out, res)
 }
 

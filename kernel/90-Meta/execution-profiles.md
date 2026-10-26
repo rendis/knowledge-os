@@ -1,17 +1,25 @@
 # Execution profiles
 
-Load this file when dispatching or reconsidering a subagent, not for ordinary tool calls or inlined work.
+Load this file before dispatching or reconsidering a subagent or opening an independent development session, not for ordinary tool calls or inlined work.
 
 These are starting recommendations, not measured model equivalences or proof of account access. Codex behavior is evaluated separately; other harnesses remain untested candidates.
 
 ## Policy
 
-1. Stay with the current agent unless a subtask is bounded, independently checkable, and cheaper than preparing context, reviewing, and likely repairs.
-2. For that subtask, use the cheapest capable executor the active harness exposes. Simple, specified work does not inherit the coordinator's model or effort.
+1. Delegate bounded, independently checkable subtasks when their benefit exceeds context preparation, review and likely repairs. Use the handoff workflow to decide when development needs an independent session.
+2. For every subagent and independent development session, explicitly select the least costly model and effort the active harness exposes that can reliably meet the acceptance criteria. Consider complexity, uncertainty, risk and verification needs; explain the selection briefly. The coordinator's configuration is not an automatic default.
 3. Run deterministic checks as tools. Do not start another model for a command whose contract already decides the result.
 4. Keep operational status, eligibility, enablement, and failure-cause classification with the coordinating agent (or a same-class reviewer). Do not send those decisions to a weaker executor.
 
-Small or tightly coupled work stays inline. Personal executor preferences in the optional root `AGENTS.personal.md` override these defaults and the measured baseline below; they select strategy only. Permissions, evidence gates, source authority, and workflow ownership still apply. A preference can prohibit delegation or require a specific executor.
+Within an assigned phase, small or tightly coupled work stays inline. Personal executor preferences in the optional root `AGENTS.personal.md` override these defaults and the measured baseline below; they select strategy only. Permissions, evidence gates, source authority, and workflow ownership still apply. A preference can prohibit delegation or require a specific executor.
+
+## Execution roles
+
+A subagent handles a bounded assignment and returns evidence to its coordinator. Its inherited instructions and capabilities depend on the harness; a worktree path in its prompt does not establish that it loaded that repository's environment.
+
+An independent development session owns continuity for a repository task. Start it with the worktree as its root so the harness can discover the repository's instructions, skills, MCP servers, hooks and local configuration. Verify the required context and capabilities before implementation. The user can continue that session directly or authorize the coordinator to direct and monitor it. It may delegate bounded tasks to subagents under this same selection policy. A vault subagent is not an automatic substitute for that session.
+
+The coordinator retains shared decisions and final verification. Use `manage-development-handoff` (routed by the root `AGENTS.md`) to prepare development sessions and transfer control.
 
 ## Availability
 

@@ -22,7 +22,7 @@ Other questions do not need a case. Recommend one when the work will continue in
 
 ## From requirements to development
 
-While defining a development work item, keep follow-up clarifications, narrowed scope and accepted designs in its requirements and current state. They settle **what** to build; source edits require a request to implement and a bound development destination. Once the task is sufficiently defined, use [manage-development-handoff](../manage-development-handoff/SKILL.md) to package it and propose the worktree and development session. That transition applies even when no package or `.handoff/` exists yet. Preserve an explicit user choice to implement in an exact existing checkout through that skill's direct-implementation exception.
+While defining a development work item, keep follow-up clarifications, narrowed scope and accepted designs in its requirements and current state. They settle **what** to build; source edits require a request to implement and a bound development destination. Once the task is sufficiently defined, use [manage-development-handoff](../manage-development-handoff/SKILL.md) to evaluate its need for a handoff and, when warranted, prepare the package and propose the worktree and development session without waiting for a reminder. If the user asks to begin development before that evaluation, perform it before editing source code. Explain the benefit for this task, or why the small-change exception fits. That skill owns the proportional criteria and preserves an explicit choice of an exact existing checkout; neither an absent package nor an absent `.handoff/` skips the evaluation.
 
 ## What goes where
 
