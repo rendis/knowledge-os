@@ -452,6 +452,46 @@ func TestTrailerOnlyReviewsStillCoverAFastForward(t *testing.T) {
 	}
 }
 
+func TestCumulativeReviewsSurviveMerge(t *testing.T) {
+	v := vault(t)
+	base, _ := git(v, "rev-parse", "HEAD")
+	file := "10-Sistemas/Sales.md"
+	initial := blobAt(v, base, file)
+	run(t, v, "switch", "-qc", "sync/checkpoints")
+	write(t, v, file, "---\ntipo: sistema\n---\n# Sales\n\nSistema de ventas y devoluciones.\n")
+	run(t, v, "commit", "-qam", "docs: first checkpoint")
+	checkpoint, _ := git(v, "rev-parse", "HEAD")
+	write(t, v, file, "---\ntipo: sistema\n---\n# Sales\n\nSistema de ventas, devoluciones y cambios.\n")
+	run(t, v, "commit", "-qam", "docs: final checkpoint")
+	final, _ := git(v, "rev-parse", "HEAD")
+	// Both accepted checkpoints cover the same base, as repeated `sync review`
+	// calls do. The first record is a valid path that does not reach the final blob.
+	for i, revision := range []string{checkpoint, final} {
+		record := reviewFile{
+			Verdict: "accept", Reviewer: "fresh-session", Base: base,
+			Digest: digestAt(v, revision, []string{file}),
+			Files:  map[string]blobChange{file: {From: initial, To: blobAt(v, revision, file)}},
+		}
+		body, err := json.Marshal(record)
+		if err != nil {
+			t.Fatal(err)
+		}
+		write(t, v, fmt.Sprintf("%s/checkpoint-%d.json", reviewsDir, i), string(body))
+	}
+	run(t, v, "add", "-A")
+	run(t, v, "commit", "-qm", "chore(sync): keep accepted checkpoints")
+	run(t, v, "switch", "-q", "main")
+	run(t, v, "merge", "-q", "--no-ff", "-m", "Merge reviewed checkpoints", "sync/checkpoints")
+	if res, err := call(t, "verify", "--vault", v, "--base", base, "--allow-no-change"); err != nil || res["ok"] != true {
+		t.Fatalf("the accepted final checkpoint must cover the merge despite an earlier dead end: %v %v", err, res)
+	}
+	write(t, v, file, "---\ntipo: sistema\n---\n# Sales\n\nCambio posterior sin revisión.\n")
+	run(t, v, "commit", "-qam", "docs: unreviewed edit")
+	if res, err := call(t, "verify", "--vault", v, "--base", base, "--allow-no-change"); err == nil || !strings.Contains(strings.Join(toStrings(res["problems"]), " "), "no accepted review covers") {
+		t.Fatalf("searching accepted checkpoints must still reject an unreviewed final blob: %v %v", err, res)
+	}
+}
+
 func TestRecoverAReviewLostByARebaseMerge(t *testing.T) {
 	v := vault(t)
 	pushed, _ := git(v, "rev-parse", "HEAD")

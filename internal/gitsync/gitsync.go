@@ -392,20 +392,27 @@ func reviewedContent(vault, base string) ([]string, bool) {
 	problems := []string{}
 	for _, f := range knowledgeChanges(vault, base, "HEAD") {
 		cur, want := blobAt(vault, base, f), blobAt(vault, "HEAD", f)
-		for step := 0; cur != want && step < len(recs); step++ {
-			next := cur
-			for _, r := range recs {
-				if c, ok := r.Files[f]; ok && c.From == cur && c.To != cur {
-					next = c.To
-					break
+		// Cumulative reviews can share a base. Explore every accepted path:
+		// choosing the first checkpoint can strand an otherwise covered range.
+		next := map[string][]string{}
+		for _, r := range recs {
+			if c, ok := r.Files[f]; ok {
+				next[c.From] = append(next[c.From], c.To)
+			}
+		}
+		reachable := map[string]bool{cur: true}
+		pending := []string{cur}
+		for len(pending) > 0 && !reachable[want] {
+			from := pending[0]
+			pending = pending[1:]
+			for _, to := range next[from] {
+				if !reachable[to] {
+					reachable[to] = true
+					pending = append(pending, to)
 				}
 			}
-			if next == cur {
-				break
-			}
-			cur = next
 		}
-		if cur != want {
+		if !reachable[want] {
 			problems = append(problems, fmt.Sprintf("%s changes knowledge that no accepted review covers; publish knowledge through a reviewed sync/ branch", f))
 		}
 	}
