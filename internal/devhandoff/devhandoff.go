@@ -408,6 +408,7 @@ type task struct {
 	Case         string   `json:"case"`
 	Package      string   `json:"package"`
 	PackageStale bool     `json:"package_changed,omitempty"`
+	PackageError string   `json:"package_error,omitempty"`
 	BaseCommit   string   `json:"base_commit"`
 	Started      string   `json:"started"`
 	DependsOn    []string `json:"depends_on,omitempty"`
@@ -465,14 +466,11 @@ func worktreeStatus(vault, dir string) map[string]any {
 			continue
 		}
 		t := task{Handoff: p.Handoff, Title: p.Title, Case: p.Case, Package: p.Fields["package"], BaseCommit: p.Fields["base-commit"], Started: p.Fields["started"], DependsOn: p.DependsOn}
-		if t.Package != "" {
-			src := t.Package
-			if !filepath.IsAbs(src) {
-				src = filepath.Join(vault, src)
-			}
-			if b, e := os.ReadFile(src); e == nil && digest(b) != p.Fields["package-sha256"] {
-				t.PackageStale = true
-			}
+		if source, err := resolvePackage(vault, p); err == nil {
+			t.Package = relOrAbs(vault, source.Path)
+			t.PackageStale = source.SHA256 != p.Fields["package-sha256"]
+		} else {
+			t.PackageError = err.Error()
 		}
 		if base == "" {
 			base = t.BaseCommit
@@ -573,6 +571,40 @@ func status(o options, out io.Writer) error {
 	return emit(out, map[string]any{"worktree_root": root, "worktrees": found, "count": len(found)})
 }
 
+// resolvePackage follows the supported unpublished-to-published case move only when
+// the recorded source is missing. Existing paths and other read errors stay authoritative.
+func resolvePackage(vault string, cur Package) (Package, error) {
+	src := cur.Fields["package"]
+	if src == "" {
+		return Package{}, errors.New("the task does not record its package")
+	}
+	if !filepath.IsAbs(src) {
+		src = filepath.Join(vault, src)
+	}
+	src = filepath.Clean(src)
+	p, err := ReadPackage(src)
+	if errors.Is(err, os.ErrNotExist) && cur.Case != "" && filepath.Base(cur.Case) == cur.Case && cur.Case != "." && cur.Case != ".." && handoffID.MatchString(cur.Handoff) {
+		suffix := string(filepath.Separator) + filepath.Join(".investigations", cur.Case, "handoffs", cur.Handoff+".md")
+		if strings.HasSuffix(src, suffix) {
+			recordedVault, rootErr := os.Stat(strings.TrimSuffix(src, suffix))
+			currentVault, vaultErr := os.Stat(vault)
+			if rootErr == nil && vaultErr == nil && os.SameFile(recordedVault, currentVault) {
+				p, err = ReadPackage(filepath.Join(vault, "investigations", cur.Case, "handoffs", cur.Handoff+".md"))
+			}
+		}
+	}
+	if err != nil {
+		return Package{}, err
+	}
+	if p.Case != cur.Case || p.Handoff != cur.Handoff {
+		return Package{}, errors.New("the package now names another case or handoff")
+	}
+	if p.Branch != cur.Branch || p.Repository != cur.Repository {
+		return Package{}, errors.New("the package now names another repository or branch: start a new handoff instead")
+	}
+	return p, nil
+}
+
 func refresh(o options, out io.Writer) error {
 	if o.worktree == "" || o.handoffID == "" {
 		return errors.New("--worktree and --handoff are required")
@@ -582,14 +614,11 @@ func refresh(o options, out io.Writer) error {
 	if e != nil {
 		return fmt.Errorf("no task %s in %s", o.handoffID, o.worktree)
 	}
-	src := cur.Fields["package"]
-	if src == "" {
-		return errors.New("the task does not record its package")
+	source, e := resolvePackage(o.vault, cur)
+	if e != nil {
+		return e
 	}
-	if !filepath.IsAbs(src) {
-		src = filepath.Join(o.vault, src)
-	}
-	p, issues, e := CheckPackage(src)
+	p, issues, e := CheckPackage(source.Path)
 	if e != nil {
 		return e
 	}
@@ -597,7 +626,7 @@ func refresh(o options, out io.Writer) error {
 		return e
 	}
 	res := map[string]any{"handoff": o.handoffID, "worktree": o.worktree, "applied": o.apply}
-	if p.SHA256 == cur.Fields["package-sha256"] {
+	if p.SHA256 == cur.Fields["package-sha256"] && cur.Fields["package"] == relOrAbs(o.vault, p.Path) {
 		res["effects"] = []effect{{"unchanged", taskPath, "package unchanged"}}
 		return emit(out, res)
 	}

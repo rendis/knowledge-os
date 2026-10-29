@@ -29,3 +29,4 @@ Design decisions are recorded in `docs/adr/`.
 - `kos kernel update` refuses kernel files that changed locally (the lock records installed hashes; `git diff` shows the change) until `--force`; cell-specific logic lives in cell-owned files, never in managed ones.
 - `make publish` pushes `main`, moves the version tag and creates the GitHub release: run it only when asked. `kos update` replaces the machine's kos binary; it never touches a cell.
 - `AGENTS.md` is the instruction file for this repo and installed cells; a cell-owned `CLAUDE.md` is preserved.
+- Handoff sources move from `.investigations/` to `investigations/` when published; status and refresh must resolve that move within the bound vault and preserve task identity, execution metadata and deltas.

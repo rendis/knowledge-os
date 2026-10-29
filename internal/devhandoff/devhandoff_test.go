@@ -3,6 +3,7 @@ package devhandoff
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -140,6 +141,155 @@ func TestStartStatusRefresh(t *testing.T) {
 	deltas, _ := os.ReadFile(filepath.Join(dest, ".handoff", "deltas.md"))
 	if !strings.Contains(string(task), "integración") || !strings.Contains(string(deltas), "DELTA-001") {
 		t.Fatal("refresh updates the task and keeps the deltas")
+	}
+}
+
+// Publishing moves the case, but existing worktree copies still record its old path.
+func TestRefreshAfterCasePublication(t *testing.T) {
+	for _, absolute := range []bool{false, true} {
+		for _, changed := range []bool{false, true} {
+			t.Run(fmt.Sprintf("absolute=%t/changed=%t", absolute, changed), func(t *testing.T) {
+				f := setup(t)
+				oldDir := ".investigations/20260925-100000-ordenes"
+				newDir := "investigations/20260925-100000-ordenes"
+				rel := oldDir + "/handoffs/DH-001.md"
+				write(t, f.vault, rel, pkg)
+				source := rel
+				if absolute {
+					source = filepath.Join(f.vault, rel)
+				}
+				if _, err := run(t, "start", "--vault", f.vault, "--package", source, "--apply"); err != nil {
+					t.Fatal(err)
+				}
+				dest := filepath.Join(f.root, "svc-orders", "idempotent-orders")
+				taskPath := filepath.Join(dest, ".handoff", "DH-001.md")
+				recorded, err := ReadPackage(taskPath)
+				if err != nil {
+					t.Fatal(err)
+				}
+				// Exercise both persisted path forms, regardless of temp-directory symlinks.
+				write(t, dest, ".handoff/DH-001.md", strings.Replace(recorded.Text, "package: "+recorded.Fields["package"], "package: "+source, 1))
+				before, err := ReadPackage(taskPath)
+				if err != nil {
+					t.Fatal(err)
+				}
+				deltas := deltasHeader + "\nRetained implementation evidence.\n"
+				write(t, dest, ".handoff/deltas.md", deltas)
+				if err := os.MkdirAll(filepath.Join(f.vault, "investigations"), 0o755); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.Rename(filepath.Join(f.vault, oldDir), filepath.Join(f.vault, newDir)); err != nil {
+					t.Fatal(err)
+				}
+				next := pkg
+				if changed {
+					next = strings.Replace(pkg, "(test unitario)", "(test unitario y de integración)", 1)
+				}
+				newRel := newDir + "/handoffs/DH-001.md"
+				write(t, f.vault, newRel, next)
+				status, err := run(t, "status", "--vault", f.vault, "--worktree", dest)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if changed && !strings.Contains(toJSON(status["handoffs"]), `"package_changed":true`) {
+					t.Errorf("status must detect edits after publication: %v", status)
+				}
+				preview, err := run(t, "refresh", "--vault", f.vault, "--worktree", dest, "--handoff", "DH-001")
+				if err != nil {
+					t.Fatalf("refresh must resolve the published package: %v", err)
+				}
+				if !strings.Contains(toJSON(preview["effects"]), "replace") {
+					t.Fatalf("relocated metadata needs refresh: %v", preview)
+				}
+				unchanged, _ := os.ReadFile(taskPath)
+				if string(unchanged) != before.Text {
+					t.Fatal("preview changed the worktree task")
+				}
+				if _, err := run(t, "refresh", "--vault", f.vault, "--worktree", dest, "--handoff", "DH-001", "--apply"); err != nil {
+					t.Fatal(err)
+				}
+				after, err := ReadPackage(taskPath)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if after.Fields["package"] != newRel || after.Fields["package-sha256"] != digest([]byte(next)) || after.Fields["base-commit"] != before.Fields["base-commit"] || after.Fields["started"] != before.Fields["started"] {
+					t.Fatalf("refresh must retain execution metadata and point to the published revision: %v", after.Fields)
+				}
+				gotDeltas, _ := os.ReadFile(filepath.Join(dest, ".handoff/deltas.md"))
+				if string(gotDeltas) != deltas {
+					t.Fatal("refresh changed the deltas")
+				}
+				again, err := run(t, "refresh", "--vault", f.vault, "--worktree", dest, "--handoff", "DH-001", "--apply")
+				if err != nil || !strings.Contains(toJSON(again["effects"]), "unchanged") {
+					t.Fatalf("repeat refresh must be a no-op: %v %v", again, err)
+				}
+				if err := os.Remove(filepath.Join(f.vault, newRel)); err != nil {
+					t.Fatal(err)
+				}
+				missing, err := run(t, "status", "--vault", f.vault, "--worktree", dest)
+				if err != nil || !strings.Contains(toJSON(missing["handoffs"]), `"package_error":`) {
+					t.Fatalf("a missing package must be reported explicitly: %v %v", missing, err)
+				}
+			})
+		}
+	}
+}
+
+func TestPublishedPackageResolutionBoundaries(t *testing.T) {
+	const oldRel = ".investigations/20260925-100000-ordenes/handoffs/DH-001.md"
+	const newRel = "investigations/20260925-100000-ordenes/handoffs/DH-001.md"
+	for _, field := range []string{"case", "handoff", "repository", "branch"} {
+		t.Run("different-"+field, func(t *testing.T) {
+			vault := t.TempDir()
+			write(t, vault, oldRel, pkg)
+			cur, err := ReadPackage(filepath.Join(vault, oldRel))
+			if err != nil {
+				t.Fatal(err)
+			}
+			cur.Fields["package"] = oldRel
+			if err := os.Remove(cur.Path); err != nil {
+				t.Fatal(err)
+			}
+			write(t, vault, newRel, strings.Replace(pkg, field+": "+cur.Fields[field], field+": different", 1))
+			if _, err := resolvePackage(vault, cur); err == nil {
+				t.Fatal("must reject a different " + field)
+			}
+		})
+	}
+	t.Run("recorded-source-wins", func(t *testing.T) {
+		vault := t.TempDir()
+		write(t, vault, oldRel, pkg)
+		write(t, vault, newRel, strings.Replace(pkg, "(test unitario)", "(new test)", 1))
+		cur, _ := ReadPackage(filepath.Join(vault, oldRel))
+		cur.Fields["package"] = oldRel
+		got, err := resolvePackage(vault, cur)
+		if err != nil || got.SHA256 != cur.SHA256 {
+			t.Fatalf("an existing recorded source remains authoritative: %v", err)
+		}
+	})
+	for _, mode := range []string{"custom-path", "other-vault", "directory", "missing-published"} {
+		t.Run(mode, func(t *testing.T) {
+			vault := t.TempDir()
+			write(t, vault, "task.md", pkg)
+			cur, _ := ReadPackage(filepath.Join(vault, "task.md"))
+			cur.Fields["package"] = oldRel
+			if mode != "missing-published" {
+				write(t, vault, newRel, pkg)
+			}
+			switch mode {
+			case "custom-path":
+				cur.Fields["package"] = "custom/DH-001.md"
+			case "other-vault":
+				cur.Fields["package"] = filepath.Join(t.TempDir(), oldRel)
+			case "directory":
+				if err := os.MkdirAll(filepath.Join(vault, oldRel), 0o755); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if _, err := resolvePackage(vault, cur); err == nil {
+				t.Fatal("must not silently substitute a package: " + mode)
+			}
+		})
 	}
 }
 
