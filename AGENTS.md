@@ -30,3 +30,5 @@ Design decisions are recorded in `docs/adr/`.
 - `make publish` pushes `main`, moves the version tag and creates the GitHub release: run it only when asked. `kos update` replaces the machine's kos binary; it never touches a cell.
 - `AGENTS.md` is the instruction file for this repo and installed cells; a cell-owned `CLAUDE.md` is preserved.
 - Handoff sources move from `.investigations/` to `investigations/` when published; status and refresh must resolve that move within the bound vault and preserve task identity, execution metadata and deltas.
+- Investigation writes use case directories for isolation and keep the vault checkout and branch unchanged, including published cases; publication authority and evidence gates remain separate.
+- Git change gates parse NUL-delimited porcelain without trimming status columns; preserve rename endpoints and reject unrelated staged content before a scoped publication transition.

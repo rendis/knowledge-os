@@ -257,12 +257,11 @@ func add(o options, out io.Writer) error {
 	}, func(Case) error { return copyFiles(target, o.vault, files) })
 }
 
-// absorb marks a finding meant for the vault as absorbed, once the note that holds it is changed on the
-// same sync branch.
+// absorb marks a finding meant for the vault as absorbed after its destination note is updated.
 func absorb(o options, out io.Writer) error {
 	return mutate(o, out, func(c Case, text, loc string) (string, []string, map[string]any, error) {
 		if c.Visibility != "published" {
-			return "", nil, nil, errors.New("absorption happens when the case is published: move it to investigations/ on the sync branch first")
+			return "", nil, nil, errors.New("absorption requires a published case: publish it through the authorized publication workflow first")
 		}
 		ids, e := requireRefs(text, "--finding", o.finding, "F")
 		if e != nil {

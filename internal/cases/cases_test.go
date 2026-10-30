@@ -312,15 +312,81 @@ func TestStateTreatsLeadingRecordIDsAsReferences(t *testing.T) {
 	}
 }
 
-func TestPublishedCasesChangeOnlyOnSyncBranches(t *testing.T) {
-	v := vault(t)
-	write(t, v, "investigations/20260925-100000-ordenes/investigation.md", caseText("")+"\n## Bitácora\n")
-	if _, e := run(t, "add", "--vault", v, "--id", "20260925-100000-ordenes", "--kind", "question", "--text", "¿Y en CO?", "--resolve-by", "snapshot"); e == nil || !strings.Contains(e.Error(), "sync branch") {
-		t.Fatalf("a published case must not change outside a sync branch: %v", e)
-	}
-	git(t, v, "checkout", "-q", "-b", "sync/case-ordenes")
-	if _, e := run(t, "add", "--vault", v, "--id", "20260925-100000-ordenes", "--kind", "question", "--text", "¿Y en CO?", "--resolve-by", "snapshot"); e != nil {
-		t.Fatal(e)
+func TestCaseWritesPreserveCheckout(t *testing.T) {
+	for _, branch := range []string{"main", "develop", "sync/existing-work"} {
+		t.Run(branch, func(t *testing.T) {
+			v := vault(t)
+			if branch != "main" {
+				git(t, v, "switch", "-c", branch)
+			}
+			query := func(args ...string) string {
+				t.Helper()
+				out, err := exec.Command("git", append([]string{"-C", v}, args...)...).CombinedOutput()
+				if err != nil {
+					t.Fatalf("git %v: %s", args, out)
+				}
+				return string(out)
+			}
+			refs := query("show-ref")
+			worktrees := query("worktree", "list", "--porcelain")
+			head := query("rev-parse", "HEAD")
+			write(t, v, "unrelated.txt", "Keep the user's pending work.\n")
+			opened, err := run(t, "new", "--vault", v, "--title", "Local case lifecycle", "--type", "development", "--objective", "Record and resume work without Git isolation.")
+			if err != nil {
+				t.Fatal(err)
+			}
+			id := opened["id"].(string)
+			must := func(args ...string) {
+				t.Helper()
+				m, err := run(t, append([]string{args[0], "--vault", v, "--id", id}, args[1:]...)...)
+				if err != nil {
+					t.Fatalf("%v: %v %v", args, m, err)
+				}
+			}
+			must("add", "--kind", "question", "--text", "Which runtime result confirms this?", "--resolve-by", "local test")
+			// Publication changes the case directory, not the local mutation contract.
+			oldDir := filepath.Dir(filepath.Join(v, opened["path"].(string)))
+			newDir := filepath.Join(v, "investigations", id)
+			if err := os.MkdirAll(filepath.Dir(newDir), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Rename(oldDir, newDir); err != nil {
+				t.Fatal(err)
+			}
+			listed, err := run(t, "list", "--vault", v, "--id", id)
+			if err != nil || !strings.Contains(toJSON(listed), "published") {
+				t.Fatalf("resume published case: %v %v", listed, err)
+			}
+			must("add", "--kind", "question", "--text", "Which retry result confirms this?", "--resolve-by", "local test")
+			must("state", "--text", "Q-001 and Q-002 await local results. Next: run the focused tests.")
+			casePath := filepath.Join(newDir, "investigation.md")
+			before, err := os.ReadFile(casePath)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := run(t, "state", "--vault", v, "--id", id, "--text", "Q-999 is still pending."); err == nil {
+				t.Fatal("the evidence gate must still reject undefined references")
+			}
+			after, err := os.ReadFile(casePath)
+			if err != nil || !bytes.Equal(before, after) {
+				t.Fatal("a rejected write changed the case")
+			}
+			must("close", "--outcome", "abandoned", "--reason", "The requester deferred the work.")
+			must("reopen", "--reason", "The requester resumed the local checks.")
+			if result, err := Check(v, filepath.Join("investigations", id, "investigation.md")); err != nil || !result.OK {
+				t.Fatalf("case gate: %+v %v", result, err)
+			}
+			if query("rev-parse", "--abbrev-ref", "HEAD") != branch+"\n" || query("rev-parse", "HEAD") != head || query("show-ref") != refs || query("worktree", "list", "--porcelain") != worktrees {
+				t.Fatal("investigation commands changed Git branches, commits or worktrees")
+			}
+			if query("diff", "--cached", "--name-only") != "" {
+				t.Fatal("investigation commands staged files")
+			}
+			pending, err := os.ReadFile(filepath.Join(v, "unrelated.txt"))
+			if err != nil || string(pending) != "Keep the user's pending work.\n" {
+				t.Fatal("unrelated pending work changed")
+			}
+		})
 	}
 }
 

@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"knowledge-os/internal/cases"
 )
 
 func write(t *testing.T, root, rel, content string) {
@@ -100,6 +102,198 @@ func TestBranchReviewVerifyFinish(t *testing.T) {
 	b, _ := os.ReadFile(filepath.Join(v, "10-Sistemas/Sales.md"))
 	if !strings.Contains(string(b), "cambios") || current(v) != "main" {
 		t.Fatal("base must contain the reviewed content")
+	}
+}
+
+func localPublishedCase(t *testing.T, v string) string {
+	t.Helper()
+	const id = "20260925-100000-local-case"
+	var out bytes.Buffer
+	if err := cases.Run([]string{"new", "--vault", v, "--id", id, "--date", "2026-09-25", "--title", "Local case", "--type", "understanding", "--objective", "Keep an auditable local case."}, &out); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(v, "investigations"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(filepath.Join(v, ".investigations", id), filepath.Join(v, "investigations", id)); err != nil {
+		t.Fatal(err)
+	}
+	run(t, v, "add", "-A")
+	run(t, v, "commit", "-qm", "published baseline")
+	proof := filepath.Join(t.TempDir(), "proof.txt")
+	if err := os.WriteFile(proof, []byte("Local proof.\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out.Reset()
+	if err := cases.Run([]string{"add", "--vault", v, "--id", id, "--kind", "evidence", "--text", "The local check returned one result.", "--source", "query: local fixture", "--level", "demonstrated", "--file", proof}, &out); err != nil {
+		t.Fatal(err)
+	}
+	return id
+}
+
+func TestPublishPendingCaseWithReviewGates(t *testing.T) {
+	for _, base := range []string{"main", "develop"} {
+		t.Run(base, func(t *testing.T) {
+			v := vault(t)
+			if base != "main" {
+				run(t, v, "branch", "-m", base)
+			}
+			write(t, v, "scratch.txt", "Original user content.\n")
+			id := localPublishedCase(t, v)
+			caseDir := filepath.Join("investigations", id)
+			run(t, v, "add", "--", caseDir) // retain an already staged case update
+			var state bytes.Buffer
+			if err := cases.Run([]string{"state", "--vault", v, "--id", id, "--text", "E-001 records the local result. Next: publish the reviewed case."}, &state); err != nil {
+				t.Fatal(err)
+			}
+			body, err := os.ReadFile(filepath.Join(v, caseDir, "investigation.md"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			write(t, v, "scratch.txt", "Unrelated pending work.\n")
+			before, _ := git(v, "rev-parse", "HEAD")
+			index, _ := git(v, "diff", "--cached", "--binary")
+			wt, _ := git(v, "worktree", "list", "--porcelain")
+			if _, err := call(t, "start", "--vault", v, "--name", "publish-case"); err == nil {
+				t.Fatal("ordinary sync start must still require clean knowledge")
+			}
+			if _, err := call(t, "start", "--vault", v, "--name", "publish-case", "--case", id); err != nil {
+				t.Fatalf("explicit case publication must carry the pending case: %v", err)
+			}
+			if got, _ := git(v, "rev-parse", "HEAD"); got != before {
+				t.Fatal("transition committed work")
+			}
+			if got, _ := git(v, "diff", "--cached", "--binary"); got != index {
+				t.Fatal("transition changed staged content")
+			}
+			afterBody, err := os.ReadFile(filepath.Join(v, caseDir, "investigation.md"))
+			if err != nil || !bytes.Equal(body, afterBody) {
+				t.Fatal("transition changed unstaged case content")
+			}
+			if current(v) != "sync/publish-case" {
+				t.Fatal("publication did not enter its authorized branch")
+			}
+			if got, _ := git(v, "worktree", "list", "--porcelain"); strings.Count(got, "worktree ") != strings.Count(wt, "worktree ") {
+				t.Fatal("transition created a worktree")
+			}
+			if res, err := call(t, "verify", "--vault", v); err == nil || res["ok"] != false {
+				t.Fatal("pending content passed verify")
+			}
+			run(t, v, "add", "--", caseDir)
+			run(t, v, "commit", "-qm", "docs: case evidence")
+			if res, err := call(t, "verify", "--vault", v); err == nil || !strings.Contains(fmt.Sprint(res), "no review recorded") {
+				t.Fatalf("unreviewed publication passed: %v %v", res, err)
+			}
+			if _, err := call(t, "review", "--vault", v, "--verdict", "accept", "--reviewer", "fresh-reviewer"); err != nil {
+				t.Fatal(err)
+			}
+			if res, err := call(t, "verify", "--vault", v); err != nil || res["ok"] != true {
+				t.Fatalf("accepted case did not verify: %v %v", res, err)
+			}
+			write(t, v, filepath.Join(caseDir, "investigation.md"), "invalid case\n")
+			run(t, v, "add", "--", caseDir)
+			run(t, v, "commit", "-qm", "invalid late edit")
+			if _, err := call(t, "finish", "--vault", v); err == nil {
+				t.Fatal("finish accepted invalid/unreviewed content")
+			}
+			if head, _ := git(v, "rev-parse", base); head != before {
+				t.Fatal("failed finish moved the base")
+			}
+			run(t, v, "revert", "--no-edit", "HEAD")
+			var out bytes.Buffer
+			if err := cases.Run([]string{"state", "--vault", v, "--id", id, "--text", "E-001 records the local result. Next: validate the release candidate."}, &out); err != nil {
+				t.Fatal(err)
+			}
+			run(t, v, "add", "--", caseDir)
+			run(t, v, "commit", "-qm", "docs: corrected case state")
+			if _, err := call(t, "review", "--vault", v, "--verdict", "accept", "--reviewer", "fresh-reviewer"); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := call(t, "finish", "--vault", v); err != nil {
+				t.Fatal(err)
+			}
+			pending, err := os.ReadFile(filepath.Join(v, "scratch.txt"))
+			if err != nil || string(pending) != "Unrelated pending work.\n" || current(v) != base {
+				t.Fatal("publication lost unrelated work or finished on another base")
+			}
+		})
+	}
+}
+
+func TestPendingCasePublicationRefusesOutOfScopeChanges(t *testing.T) {
+	for _, mode := range []string{"other-knowledge", "staged-unrelated", "another-base", "rename-other-case", "rename-user-file", "missing-case", "unpublished-case", "existing-sync", "no-case-changes", "other-command", "empty-case"} {
+		t.Run(mode, func(t *testing.T) {
+			v := vault(t)
+			write(t, v, "investigations/another-case/artifacts/proof.txt", "Other case evidence.\n")
+			write(t, v, "user-file.txt", "User content.\n")
+			id := localPublishedCase(t, v)
+			args := []string{"start", "--vault", v, "--name", "publish-case", "--case", id}
+			switch mode {
+			case "other-knowledge":
+				write(t, v, "10-Sistemas/Sales.md", "Unrelated note edit.\n")
+			case "staged-unrelated":
+				write(t, v, "scratch.txt", "Staged user file.\n")
+				run(t, v, "add", "scratch.txt")
+			case "another-base":
+				run(t, v, "branch", "other")
+				args = append(args, "--base", "other")
+			case "rename-other-case":
+				run(t, v, "mv", "investigations/another-case/artifacts/proof.txt", "investigations/"+id+"/artifacts/renamed.txt")
+			case "rename-user-file":
+				run(t, v, "mv", "user-file.txt", "investigations/"+id+"/artifacts/renamed.txt")
+			case "missing-case":
+				args[len(args)-1] = "20260925-100000-missing"
+			case "unpublished-case":
+				var out bytes.Buffer
+				if err := cases.Run([]string{"new", "--vault", v, "--id", "20260925-100000-private-case", "--date", "2026-09-25", "--title", "Private case", "--type", "understanding", "--objective", "Keep this case private."}, &out); err != nil {
+					t.Fatal(err)
+				}
+				args[len(args)-1] = "20260925-100000-private-case"
+			case "existing-sync":
+				run(t, v, "switch", "-c", "sync/existing")
+			case "no-case-changes":
+				run(t, v, "add", "--", "investigations/"+id)
+				run(t, v, "commit", "-qm", "local case checkpoint")
+			case "other-command":
+				args[0] = "status"
+			case "empty-case":
+				args[len(args)-1] = ""
+			}
+			refs, _ := git(v, "show-ref")
+			branch := current(v)
+			index, _ := git(v, "diff", "--cached", "--binary")
+			body, err := os.ReadFile(filepath.Join(v, "investigations", id, "investigation.md"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := call(t, args...); err == nil {
+				t.Fatal("transition accepted an invalid scope")
+			}
+			afterRefs, _ := git(v, "show-ref")
+			afterIndex, _ := git(v, "diff", "--cached", "--binary")
+			afterBody, _ := os.ReadFile(filepath.Join(v, "investigations", id, "investigation.md"))
+			if refs != afterRefs || branch != current(v) || index != afterIndex || !bytes.Equal(body, afterBody) {
+				t.Fatal("a refused transition changed branches, index or case content")
+			}
+		})
+	}
+}
+
+func TestStartRejectsSinglePendingKnowledgeFile(t *testing.T) {
+	for _, path := range []string{"10-Sistemas/Sales.md", "investigations/local-case/artifacts/proof with spaces.txt"} {
+		t.Run(filepath.Base(path), func(t *testing.T) {
+			v := vault(t)
+			write(t, v, path, "Original content.\n")
+			run(t, v, "add", "--", path)
+			run(t, v, "commit", "-qm", "baseline proof")
+			write(t, v, path, "Pending content.\n")
+			if _, err := call(t, "start", "--vault", v, "--name", "unexpected"); err == nil {
+				t.Fatal("the first tracked status entry must not escape the clean-knowledge gate")
+			}
+			if current(v) != "main" {
+				t.Fatal("a refused start switched branches")
+			}
+		})
 	}
 }
 

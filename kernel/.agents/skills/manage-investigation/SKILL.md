@@ -14,6 +14,8 @@ Two types, chosen when opening:
 
 Bind the vault through [use-vault-cli](../use-vault-cli/SKILL.md#bind-the-executable-and-vault). Every change goes through `<CLI> investigation`; `--help` lists the commands and the fields each record requires. The CLI assigns record IDs, logs each change, and refuses a write that would introduce a gate error (evidence without a source, an undefined reference, a broken link, a copied vault paragraph, a credential or a local path). Read the case file freely; write it only through the CLI.
 
+Case directories provide investigation isolation. Open, resume and update cases in the existing vault checkout under the router's branch and checkout rules, including published cases and handoff records. A local edit to a published case needs its case gate, not a sync run; review and publication remain separate steps.
+
 ## When a case is worth it
 
 Taking on a development work item (ticket, story or HT) requires a case before substantive requirements analysis or implementation. Follow **Open** to find and resume its existing case or open one of type `development`. The request authorizes these local case records without a separate confirmation; publication and source changes retain their own authorization. An explicit read-only or no-record instruction limits this to inspecting existing cases and reporting the recording constraint.
@@ -68,7 +70,7 @@ Story drafts: [export-contract](references/export-contract.md); sufficiency of a
 
 `<CLI> investigation list --vault "<root>" --id <id>` returns the path, visibility, status and the private directory. Read the current state first, then the records it cites; the log gives the sequence, and `git log -p investigations/<id>/` the history of a published case. Report status, what is known, what is missing and the next action; answer a narrow question about a case without changing it.
 
-A case that `investigation check` rejects because it predates the current format is **recreated**, not patched: copy it whole to `.investigations-private/<id>/earlier/`, remove it from its store (a published one on a sync branch), then `investigation new --id <id> --date <opened>` and record its content through `add` with `--as <ID>`, so each record keeps its ID (a dropped record leaves a gap), and `--date <day it was first added>`, from the opening day on; a fact's own date belongs in its source, never in `--date`. Every fact keeps its source; files the records rely on are attached with `--file`; scratch stays in the private directory. A published case is published again on that branch, with review.
+A case that `investigation check` rejects because it predates the current format is **recreated**, not patched: copy it whole to `.investigations-private/<id>/earlier/`, remove it from its store in the existing checkout, then `investigation new --id <id> --date <opened>` and record its content through `add` with `--as <ID>`, so each record keeps its ID (a dropped record leaves a gap), and `--date <day it was first added>`, from the opening day on; a fact's own date belongs in its source, never in `--date`. Every fact keeps its source; files the records rely on are attached with `--file`; scratch stays in the private directory. Restore a previously published case to `investigations/<id>/` after its gate passes; publication of that change still needs review and authorization.
 
 ## Close
 
@@ -78,20 +80,20 @@ A case that `investigation check` rejects because it predates the current format
 
 | Store | Holds |
 | --- | --- |
-| `.investigations/<id>/` (unpublished, ignored by Git) or `investigations/<id>/` (published; changes only on a sync branch) | `investigation.md`, `artifacts/`, `handoffs/`, `exports/` |
+| `.investigations/<id>/` (unpublished, ignored by Git) or `investigations/<id>/` (published, versioned) | `investigation.md`, `artifacts/`, `handoffs/`, `exports/` |
 | `.investigations-private/<id>/` | What the case needs but never shares |
 
-Parallel cases do not interfere; one agent writes a case at a time.
+Each case has its own directory; one agent writes a case at a time. Serialize shared vault writes and preserve other cases' pending work.
 
 ## Publish, absorb and retire
 
-These change versioned knowledge, so they run on a sync branch with its gates and independent review ([synchronize-ecosystem](../synchronize-ecosystem/SKILL.md)):
+Publication, absorption and retirement require separate applicable authority and use the canonical sync gates and independent review ([synchronize-ecosystem](../synchronize-ecosystem/SKILL.md)). Local case updates alone do not trigger this workflow. An authorized publication that needs this recipe is a concrete workflow reason for a sync branch under the router's exception rule.
 
-1. `<CLI> sync start --vault "<root>" --name case-<id>`.
-2. **Publish** (on explicit request): review every file for shareability and language, move `.investigations/<id>/` to `investigations/<id>/` and commit. There is no unpublish.
+1. Confirm publication authority and inspect `sync status`, the current branch and pending work. Reuse an applicable sync run; otherwise explain the branch effects and reuse applicable authority. For pending edits in an already-published case, use `<CLI> sync start --vault "<root>" --name case-<id> --case <id>` under [synchronize-ecosystem's published-case transition](../synchronize-ecosystem/SKILL.md#pending-published-case-edits). It branches from the current base and preserves pending content and the index; it refuses pending knowledge outside that case, unrelated staged files and a different base. It does not commit, stash, discard or create a worktree. For an unpublished ignored case, use normal `sync start` with its clean-knowledge precondition. Request only missing authority and preserve unrelated work; any checkout exception still needs its own concrete reason under the router's rule.
+2. **Publish** (on explicit request): review every file for shareability and language. Move an unpublished case from `.investigations/<id>/` to `investigations/<id>/`; an already-published case stays in place. After the transition, stage and commit only the selected case files, preserving unrelated pending work. There is no unpublish.
 3. **Absorb** the findings marked for the vault: edit their notes under `10/`–`70/` following the note workflow, then `investigation absorb --id <id> --finding F-NNN`. Investigation-derived lessons go through [manage-investigation-derived-learning](../manage-investigation-derived-learning/SKILL.md); corrections of an existing map through [map-correction](references/map-correction.md).
 4. **Retire** a closed case whose useful knowledge is absorbed: `git rm -r investigations/<id>` in a commit whose message carries `Retired-Case: <id>` and the destinations. `investigation list` keeps resolving retired IDs from history.
-5. Review, `sync verify` (runs the case gate on every changed case: errors introduced on the branch block), `sync finish`.
+5. Complete the canonical sync review and run `sync verify`, which includes the case gate on every changed case (introduced errors block) and requires review coverage of the final content. Only after it passes, `sync finish` completes the local run. Verify remote publication separately when authorized.
 
 ## Guardrails
 

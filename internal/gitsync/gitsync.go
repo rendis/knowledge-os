@@ -29,7 +29,12 @@ import (
 )
 
 const Help = `sync COMMAND --vault PATH [options]
-  start   --name SLUG [--base BRANCH]   Create and switch to branch sync/SLUG from the base.
+  start   --name SLUG [--base BRANCH] [--case ID]
+                                        Create and switch to branch sync/SLUG from the base.
+                                        --case explicitly carries pending changes of one published
+                                        case from the currently checked-out base. Other pending
+                                        knowledge and unrelated staged files are refused. Content
+                                        and index stay unchanged; no commit or worktree is created.
   status                                Branch, base, changed knowledge files and review state.
   review  --verdict accept|revise --reviewer NAME [--summary TEXT]
                                         Record the reviewer's verdict on the committed content
@@ -57,18 +62,18 @@ const (
 )
 
 var (
-	knowledgePath = regexp.MustCompile(`^([1-7]\d-[^/]+/.+\.md|00-Home\.md|[^/]+\.base|90-Meta/\.sync-acknowledgements\.json|investigations/[^/]+/.+)$`)
+	knowledgePath = regexp.MustCompile(`(?s)^([1-7]\d-[^/]+/.+\.md|00-Home\.md|[^/]+\.base|90-Meta/\.sync-acknowledgements\.json|investigations/[^/]+/.+)$`)
 	slugRE        = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{1,80}$`)
 	sha12         = regexp.MustCompile(`^[0-9a-f]{12,40}$`)
 	decisions     = map[string]bool{"no-documentation-change": true, "no-durable-node": true}
 )
 
 type opts struct {
-	vault, name, base, verdict, reviewer, summary, repo, commit, decision, branch, date string
-	allowNoChange                                                                       bool
+	vault, name, base, verdict, reviewer, summary, repo, commit, decision, branch, date, caseID string
+	allowNoChange                                                                               bool
 }
 
-func git(dir string, args ...string) (string, error) {
+func gitOutput(dir string, args ...string) (string, error) {
 	cmd := exec.Command("git", append([]string{"-c", "core.quotePath=false", "-C", dir}, args...)...)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
@@ -76,7 +81,12 @@ func git(dir string, args ...string) (string, error) {
 	if e != nil {
 		return "", fmt.Errorf("git %s: %s", strings.Join(args, " "), strings.TrimSpace(stderr.String()))
 	}
-	return strings.TrimSpace(string(b)), nil
+	return string(b), nil
+}
+
+func git(dir string, args ...string) (string, error) {
+	out, err := gitOutput(dir, args...)
+	return strings.TrimSpace(out), err
 }
 
 func emit(out io.Writer, v any) error {
@@ -95,7 +105,7 @@ func Run(args []string, out io.Writer) error {
 	cmd := args[0]
 	o := opts{branch: "main"}
 	fields := map[string]*string{"--vault": &o.vault, "--name": &o.name, "--base": &o.base, "--verdict": &o.verdict, "--reviewer": &o.reviewer,
-		"--summary": &o.summary, "--repo": &o.repo, "--commit": &o.commit, "--decision": &o.decision, "--branch": &o.branch, "--date": &o.date}
+		"--summary": &o.summary, "--repo": &o.repo, "--commit": &o.commit, "--decision": &o.decision, "--branch": &o.branch, "--date": &o.date, "--case": &o.caseID}
 	for i := 1; i < len(args); i++ {
 		if args[i] == "--allow-no-change" {
 			o.allowNoChange = true
@@ -107,6 +117,9 @@ func Run(args []string, out io.Writer) error {
 		}
 		i++
 		*p = args[i]
+		if args[i-1] == "--case" && (cmd != "start" || strings.TrimSpace(o.caseID) == "") {
+			return errors.New("--case requires a case ID and is only supported by sync start")
+		}
 	}
 	if o.vault == "" {
 		return errors.New("--vault is required")
@@ -174,25 +187,93 @@ func current(vault string) string {
 	return b
 }
 
-func dirty(vault string) ([]string, error) {
-	s, e := git(vault, "status", "--porcelain", "--untracked-files=all")
-	if e != nil {
-		return nil, e
+type pendingFile struct {
+	path   string
+	staged bool
+}
+
+func pendingFiles(vault string) ([]pendingFile, error) {
+	// Preserve porcelain's leading index column and use NUL paths so whitespace and
+	// rename endpoints cannot hide unrelated changes from the publication boundary.
+	out, err := gitOutput(vault, "status", "--porcelain=v1", "-z", "--no-renames", "--untracked-files=all")
+	if err != nil {
+		return nil, err
 	}
-	out := []string{}
-	for _, l := range strings.Split(s, "\n") {
-		if len(l) > 3 && knowledgePath.MatchString(strings.Trim(l[3:], `"`)) {
-			out = append(out, strings.Trim(l[3:], `"`))
+	files := []pendingFile{}
+	for _, entry := range strings.Split(out, "\x00") {
+		if entry == "" {
+			continue
+		}
+		if len(entry) < 4 {
+			return nil, errors.New("invalid Git status entry")
+		}
+		files = append(files, pendingFile{path: entry[3:], staged: entry[0] != ' ' && entry[:2] != "??"})
+	}
+	return files, nil
+}
+
+func dirty(vault string) ([]string, error) {
+	files, err := pendingFiles(vault)
+	if err != nil {
+		return nil, err
+	}
+	paths := []string{}
+	for _, file := range files {
+		if knowledgePath.MatchString(file.path) {
+			paths = append(paths, file.path)
 		}
 	}
-	return out, nil
+	return paths, nil
+}
+
+func checkPendingCase(o opts) error {
+	branch := current(o.vault)
+	if branch == "" || branch == "HEAD" || strings.HasPrefix(branch, "sync/") || branch != o.base {
+		return errors.New("--case requires the currently checked-out base branch; resume an existing sync instead of switching pending work")
+	}
+	all, err := cases.List(o.vault)
+	if err != nil {
+		return err
+	}
+	matches := []cases.Case{}
+	for _, c := range all {
+		if c.ID == o.caseID {
+			matches = append(matches, c)
+		}
+	}
+	if len(matches) != 1 || matches[0].Visibility != "published" {
+		return errors.New("--case must identify one existing published investigation")
+	}
+	prefix := filepath.ToSlash(filepath.Dir(matches[0].Path)) + "/"
+	files, err := pendingFiles(o.vault)
+	if err != nil {
+		return err
+	}
+	selected := false
+	for _, file := range files {
+		if strings.HasPrefix(file.path, prefix) {
+			selected = true
+			continue
+		}
+		if knowledgePath.MatchString(file.path) || file.staged {
+			return fmt.Errorf("--case refuses pending knowledge or staged files outside %s: %s", o.caseID, file.path)
+		}
+	}
+	if !selected {
+		return fmt.Errorf("case %s has no pending changes to publish", o.caseID)
+	}
+	return nil
 }
 
 func start(o opts, out io.Writer) error {
 	if !slugRE.MatchString(o.name) {
 		return errors.New("--name must be a lowercase slug")
 	}
-	if d, e := dirty(o.vault); e != nil || len(d) > 0 {
+	if o.caseID != "" {
+		if err := checkPendingCase(o); err != nil {
+			return err
+		}
+	} else if d, e := dirty(o.vault); e != nil || len(d) > 0 {
 		return fmt.Errorf("uncommitted knowledge changes %v: commit or set them aside before starting", d)
 	}
 	branch := "sync/" + o.name

@@ -47,12 +47,14 @@ change that would introduce a gate error is refused. All output is JSON.
            text when written as inline code; current kinds are always checked references.
   state    --id ID --text TEXT   Rewrite the current state; it cites the records it summarizes.
   absorb   --id ID --finding F-NNN   Mark a finding for the vault as absorbed (published case,
-           on the sync branch that changes its note).
+           after updating its destination note through the publication workflow).
   close    --id ID --outcome completed|abandoned|superseded-by:ID --reason TEXT
   reopen   --id ID --reason TEXT
-A published case changes only on a sync branch; publish, absorb and retire follow
-synchronize-ecosystem, and sync verify runs check. Handoff progress comes in with
-handoff reconcile.`
+Local writes to unpublished and published cases keep the existing checkout and branch;
+case directories isolate investigations. No branch or worktree is created or switched.
+Publication requires separate authority, gates and review through synchronize-ecosystem;
+use a branch or worktree only for a justified workflow need. Handoff progress comes in
+with handoff reconcile.`
 
 var (
 	idPattern  = regexp.MustCompile(`^\d{8}-\d{6}-[a-z0-9]+(?:-[a-z0-9]+)*(?:-\d{2})?$`)

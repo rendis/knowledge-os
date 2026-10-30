@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -51,8 +50,8 @@ func today(o options) string {
 	return time.Now().Format("2006-01-02")
 }
 
-// findCase resolves a writable case. A published case is versioned knowledge: it changes only on a
-// sync branch, where sync verify gates it before it reaches the default branch.
+// findCase resolves a writable case in either store. Local writes are gated by mutate,
+// independently of the current branch; publication retains its separate review workflow.
 func findCase(vault, id string) (Case, error) {
 	if id == "" {
 		return Case{}, errors.New("--id is required")
@@ -67,12 +66,6 @@ func findCase(vault, id string) (Case, error) {
 		}
 		if c.Path == "" {
 			return c, fmt.Errorf("case %s is %s and has no file to change", id, c.Status)
-		}
-		if c.Visibility == "published" {
-			branch, _ := exec.Command("git", "-C", vault, "rev-parse", "--abbrev-ref", "HEAD").Output()
-			if !strings.HasPrefix(strings.TrimSpace(string(branch)), "sync/") {
-				return c, fmt.Errorf("case %s is published: change it on a sync branch (sync start --name case-%s)", id, id)
-			}
 		}
 		return c, nil
 	}

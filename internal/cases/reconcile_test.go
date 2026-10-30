@@ -11,6 +11,12 @@ import (
 )
 
 func TestReconcileImportsHandoffProgressDeterministically(t *testing.T) {
+	for _, visibility := range []string{"unpublished", "published"} {
+		t.Run(visibility, func(t *testing.T) { testReconcileImportsHandoffProgress(t, visibility) })
+	}
+}
+
+func testReconcileImportsHandoffProgress(t *testing.T, visibility string) {
 	v := vault(t)
 	dir := t.TempDir()
 	repo, root := filepath.Join(dir, "repos", "svc-orders"), filepath.Join(dir, "worktrees")
@@ -35,6 +41,17 @@ func TestReconcileImportsHandoffProgressDeterministically(t *testing.T) {
 	}
 	if _, e := run(t, "state", "--vault", v, "--id", id, "--text", "DH-001 implements R-001. Next: reconcile its progress."); e != nil {
 		t.Fatal(e)
+	}
+	if visibility == "published" {
+		publishedDir := filepath.Join(v, "investigations", id)
+		if err := os.MkdirAll(filepath.Dir(publishedDir), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Rename(caseDir, publishedDir); err != nil {
+			t.Fatal(err)
+		}
+		caseDir = publishedDir
+		res["path"] = filepath.Join("investigations", id, "investigation.md")
 	}
 	var b bytes.Buffer
 	if e := devhandoff.Run([]string{"start", "--vault", v, "--package", filepath.Join(caseDir, "handoffs", "DH-001.md"), "--apply"}, &b); e != nil {

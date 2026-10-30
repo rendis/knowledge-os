@@ -14,6 +14,8 @@ A handoff turns the part of a development investigation that belongs to one repo
 
 Bind the vault through [use-vault-cli](../use-vault-cli/SKILL.md#bind-the-executable-and-vault). `<CLI> handoff --help` lists the commands; all output is JSON.
 
+Prepare and update packages, refresh their task copies and reconcile results in the vault's existing checkout under the router's branch and checkout rules. The case directory isolates this work, including published cases; it does not require sync or a vault branch or worktree. The development-repository branches and worktrees below are separate destinations and follow their normal authorization and workflow.
+
 ## Choose the development destination
 
 When requirements are sufficiently defined, evaluate the development destination without waiting for the user to request a handoff. A request to begin development triggers this evaluation before source edits if it has not happened yet.
