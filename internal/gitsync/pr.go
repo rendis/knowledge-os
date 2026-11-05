@@ -582,12 +582,20 @@ func exportCommit(vault, revision, dir string) error {
 		case "100644":
 		case "100755":
 			mode = 0o755
+		case "120000":
+			mode = fs.ModeSymlink
 		default:
-			return fmt.Errorf("PR sync snapshot requires regular files: %s has Git mode %s", path, fields[0])
+			return fmt.Errorf("unsupported Git mode %s for PR snapshot path %s", fields[0], path)
 		}
 		entries = append(entries, entry{path, fields[2], mode})
 		fmt.Fprintln(&input, fields[2])
 	}
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		return err
+	}
+	defer root.Close()
+	var links []snapshotLink
 	cmd := exec.Command("git", "-C", vault, "cat-file", "--batch")
 	cmd.Stdin = strings.NewReader(input.String())
 	pipe, err := cmd.StdoutPipe()
@@ -612,17 +620,29 @@ func exportCommit(vault, revision, dir string) error {
 			if err != nil || size < 0 {
 				return fmt.Errorf("invalid Git blob size for %s", e.path)
 			}
-			path := filepath.Join(dir, filepath.FromSlash(e.path))
-			if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			path := filepath.FromSlash(e.path)
+			if err := root.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 				return err
 			}
-			f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, e.mode)
-			if err != nil {
-				return err
-			}
-			_, err = io.CopyN(f, reader, size)
-			if err := errors.Join(err, f.Close()); err != nil {
-				return err
+			if e.mode == fs.ModeSymlink {
+				// A Git blob can be much larger than a filesystem link target.
+				if size > 64<<10 {
+					return fmt.Errorf("PR snapshot symlink %s has an oversized target", e.path)
+				}
+				target := make([]byte, int(size))
+				if _, err := io.ReadFull(reader, target); err != nil {
+					return err
+				}
+				links = append(links, snapshotLink{path: path, target: string(target)})
+			} else {
+				f, err := root.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, e.mode)
+				if err != nil {
+					return err
+				}
+				_, err = io.CopyN(f, reader, size)
+				if err := errors.Join(err, f.Close()); err != nil {
+					return err
+				}
 			}
 			if sep, err := reader.ReadByte(); err != nil || sep != '\n' {
 				return fmt.Errorf("incomplete Git blob for %s", e.path)
@@ -634,5 +654,47 @@ func exportCommit(vault, revision, dir string) error {
 	if extractErr != nil {
 		_ = cmd.Process.Kill()
 	}
-	return errors.Join(extractErr, cmd.Wait())
+	if err := errors.Join(extractErr, cmd.Wait()); err != nil {
+		return err
+	}
+	return installSnapshotLinks(root, links)
+}
+
+type snapshotLink struct {
+	path, target string
+}
+
+func installSnapshotLinks(root *os.Root, links []snapshotLink) error {
+	// Resolve targets after the regular tree exists. Defer chains until their targets
+	// are in place, so directory links are also created correctly on Windows.
+	for len(links) > 0 {
+		pending := links[:0]
+		var missing error
+		for _, link := range links {
+			if link.target == "" || os.IsPathSeparator(link.target[0]) || filepath.VolumeName(link.target) != "" || strings.ContainsRune(link.target, 0) {
+				return fmt.Errorf("PR snapshot symlink %s must have a relative target", link.path)
+			}
+			// Keep parent components for os.Root to resolve with symlink awareness.
+			dest := filepath.Dir(link.path) + string(filepath.Separator) + link.target
+			if _, err := root.Stat(dest); err != nil {
+				problem := fmt.Errorf("PR snapshot symlink %s must resolve inside the snapshot: %w", link.path, err)
+				if !errors.Is(err, fs.ErrNotExist) {
+					return problem
+				}
+				pending = append(pending, link)
+				if missing == nil {
+					missing = problem
+				}
+				continue
+			}
+			if err := root.Symlink(link.target, link.path); err != nil {
+				return fmt.Errorf("create PR snapshot symlink %s: %w", link.path, err)
+			}
+		}
+		if len(pending) == len(links) {
+			return missing
+		}
+		links = pending
+	}
+	return nil
 }

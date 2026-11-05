@@ -18,6 +18,91 @@ func withOrigin(t *testing.T, v string) string {
 	return origin
 }
 
+func TestPreparePRPreservesSkillsSymlink(t *testing.T) {
+	v := vault(t)
+	const link = ".claude/skills"
+	const skill = "example/SKILL.md"
+	const note = "10-Sistemas/Sales.md"
+	const pending = "investigations/other/artifacts/pending.txt"
+	target := filepath.Join("..", ".agents", "skills")
+	write(t, v, ".agents/skills/"+skill, "# Published skill\n")
+	if err := os.MkdirAll(filepath.Join(v, ".claude"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(target, filepath.Join(v, link)); err != nil {
+		t.Fatal(err)
+	}
+	run(t, v, "add", "--", link, ".agents/skills")
+	run(t, v, "commit", "-qm", "publish kernel skills link")
+	withOrigin(t, v)
+	write(t, v, pending, "Unrelated investigation draft.\n")
+
+	named := func(command string, args ...string) map[string]any {
+		t.Helper()
+		res, err := call(t, append([]string{command, "--vault", v, "--name", "skills-link"}, args...)...)
+		if err != nil {
+			t.Fatalf("sync %s: %v (%v)", command, err, res)
+		}
+		return res
+	}
+	draft := named("start")["draft"].(string)
+	if got, err := os.Readlink(filepath.Join(draft, link)); err != nil || got != target {
+		t.Fatalf("draft must preserve the relative skills link: got %q, %v", got, err)
+	}
+	if b, err := os.ReadFile(filepath.Join(draft, link, skill)); err != nil || string(b) != "# Published skill\n" {
+		t.Fatalf("skills link must resolve inside the draft: %q, %v", b, err)
+	}
+	if _, err := os.Lstat(filepath.Join(draft, pending)); !os.IsNotExist(err) {
+		t.Fatalf("draft contains unrelated investigation work: %v", err)
+	}
+
+	write(t, draft, note, "---\ntipo: sistema\n---\n# Sales\n\nSistema de ventas y devoluciones.\n")
+	head := named("commit", "--path", note, "--message", "docs: update sales")["head"].(string)
+	named("review", "--head", head, "--verdict", "accept", "--reviewer", "tester")
+	finished := named("finish")
+	if finished["ready_for_pr"] != true || current(v) != "main" {
+		t.Fatalf("candidate must be ready with the vault still on main: %v", finished)
+	}
+	baseEntry, err := git(v, "ls-tree", "origin/main", "--", link)
+	if err != nil || !strings.HasPrefix(baseEntry, "120000 ") {
+		t.Fatalf("fixture did not commit a symlink: %q, %v", baseEntry, err)
+	}
+	if candidateEntry, err := git(v, "ls-tree", finished["head"].(string), "--", link); err != nil || candidateEntry != baseEntry {
+		t.Fatalf("candidate must keep the published link unchanged: %q, %v", candidateEntry, err)
+	}
+}
+
+func TestPreparePRRejectsEscapingSymlink(t *testing.T) {
+	v := vault(t)
+	const link = ".claude/skills"
+	const sentinel = ".git/kos-sync/outside.txt"
+	if err := os.MkdirAll(filepath.Join(v, ".claude"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// This target exists outside the draft when resolved from draft/.claude.
+	write(t, v, sentinel, "Outside snapshot.\n")
+	target := filepath.Join("..", "..", "..", "outside.txt")
+	if err := os.Symlink(target, filepath.Join(v, link)); err != nil {
+		t.Fatal(err)
+	}
+	run(t, v, "add", "--", link)
+	run(t, v, "commit", "-qm", "publish escaping link")
+	withOrigin(t, v)
+
+	if _, err := call(t, "start", "--vault", v, "--name", "unsafe-link"); err == nil || !strings.Contains(err.Error(), "must resolve inside the snapshot") {
+		t.Fatalf("a link outside the snapshot must be rejected: %v", err)
+	}
+	if refs, err := git(v, "for-each-ref", "refs/heads/sync/unsafe-link"); err != nil || refs != "" {
+		t.Fatalf("a failed export must not create a candidate branch: %q, %v", refs, err)
+	}
+	if _, err := os.Lstat(filepath.Join(v, ".git/kos-sync/unsafe-link")); !os.IsNotExist(err) {
+		t.Fatalf("a failed export must clean up its draft: %v", err)
+	}
+	if b, err := os.ReadFile(filepath.Join(v, sentinel)); err != nil || string(b) != "Outside snapshot.\n" {
+		t.Fatalf("failed export touched a file outside its draft: %q, %v", b, err)
+	}
+}
+
 func TestPreparePRLeavesCheckoutIntact(t *testing.T) {
 	v := vault(t)
 	const firstCase = "investigations/case-one/investigation.md"
