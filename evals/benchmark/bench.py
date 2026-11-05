@@ -139,8 +139,9 @@ def prepare(a):
             shutil.rmtree(dst)
         sh(["git", "clone", "-q", "--no-local", v["source"], str(dst)])
         sh(["git", "-C", str(dst), "checkout", "-q", "-B", v["branch"], v["commit"]])
-        # Keep the vault's declared identity (its real origin) for fetches; pushes are disabled.
-        sh(["git", "-C", str(dst), "remote", "set-url", "origin", sh(["git", "-C", v["source"], "remote", "get-url", "origin"])])
+        # Preserve the declared identity, but resolve fetches to the frozen fixture.
+        origin = sh(["git", "-C", v["source"], "config", "--get", "remote.origin.url"])
+        sh(["git", "-C", str(dst), "remote", "set-url", "origin", origin])
         sh(["git", "-C", str(dst), "remote", "set-url", "--push", "origin", "DISABLED-benchmark"])
         for k, val in IDENTITY.items():
             if k.startswith("GIT_AUTHOR"):
@@ -151,6 +152,12 @@ def prepare(a):
         sh([cli(), "kernel", "update", "--vault", str(dst)])
         sh(["git", "-C", str(dst), "add", "-A"])
         sh(["git", "-C", str(dst), "commit", "-q", "--allow-empty", "-m", "chore(benchmark): fixture"], env=IDENTITY)
+        frozen = (work / "origins" / f"{key}.git").resolve()
+        frozen.parent.mkdir(parents=True, exist_ok=True)
+        if frozen.exists():
+            shutil.rmtree(frozen)
+        sh(["git", "clone", "-q", "--bare", str(dst), str(frozen)])
+        sh(["git", "-C", str(dst), "config", f"url.{frozen.as_uri()}.insteadOf", origin])
         sh([cli(), "discover", "run", "--vault", str(dst)])
         facts = sorted((dst / ".agents/state/discovery/facts").glob("*.json"))
         fp["vaults"][key] = {"source_commit": v["commit"], "fixture": sh(["git", "-C", str(dst), "rev-parse", "--short=12", "HEAD"]),
@@ -192,18 +199,21 @@ def qa(a):
 REPAIR_PROMPT = """In this vault, the branch `{branch}` received an independent review with verdict revise and these findings:
 {findings}
 Gate state: {gates}
-Correct only the flagged claims and the failing gates, against the evidence and without reopening the analysis. Commit on the same branch, run `discover check` on the repository notes you touched and `sync verify`. Do not record a review, do not run `sync finish`, do not push. Source repositories are read-only (git fetch allowed, nothing else). End with the commits and the gate results."""
+Correct only the flagged claims and the failing gates, against the evidence and without reopening the analysis. {checkpoint} Then run sync verify for that run. Do not record a review, do not run `sync finish`, do not push. Source repositories are read-only (git fetch allowed, nothing else). End with the commits and the gate results."""
 
 
 PENDING_REVIEW = "no review recorded; run `sync review` after the reviewer's verdict"
 GATE_FIELDS = ("note_gates", "case_gates", "stale_neighbours", "structural_issues_introduced", "copied_paragraphs", "gate_problems")
 
 
-def verify_gates(dst, timeout):
+def verify_gates(dst, timeout, run=None):
     """Keep every deterministic failure; the fixed reviewer replaces only a missing review record."""
     gates = {field: [] for field in GATE_FIELDS}
     try:
-        result = subprocess.run([cli(), "sync", "verify", "--vault", str(dst)], capture_output=True, text=True, timeout=timeout)
+        args = [cli(), "sync", "verify", "--vault", str(dst)]
+        if run:
+            args += ["--name", run]
+        result = subprocess.run(args, capture_output=True, text=True, timeout=timeout)
         value = json.loads(result.stdout)
         arrays = ("changed", "note_gates", "case_gates", "stale_neighbours", "new_structural_issues", "copied_paragraphs", "problems")
         if not isinstance(value, dict) or type(value.get("ok")) is not bool or not all(isinstance(value.get(k), list) for k in arrays):
@@ -224,21 +234,35 @@ def verify_gates(dst, timeout):
 
 
 def evaluate(dst, base, out_prefix, timeout):
-    """Deterministic gates plus the fixed reviewer's verdict for the branch currently checked out."""
-    ev = {"branch": sh(["git", "-C", str(dst), "branch", "--show-current"], check=False)}
+    """Deterministic gates plus the fixed reviewer's verdict for the candidate."""
+    checkout = sh(["git", "-C", str(dst), "branch", "--show-current"], check=False)
+    ev = {"branch": checkout, "sync_run": None}
+    target = "HEAD"
+    if checkout == base:
+        names = sh(["git", "-C", str(dst), "for-each-ref", "--format=%(refname:short)", "refs/heads/sync"], check=False).splitlines()
+        if len(names) == 1:
+            name = names[0].removeprefix("sync/")
+            result = sh([cli(), "sync", "status", "--vault", str(dst), "--name", name], check=False)
+            try:
+                candidate = json.loads(result)
+            except ValueError:
+                candidate = {}
+            if isinstance(candidate, dict) and candidate.get("head") and candidate.get("base_commit"):
+                ev.update(branch=names[0], sync_run=name)
+                target, base = candidate["head"], candidate["base_commit"]
     on_branch = ev["branch"].startswith("sync/")
-    ev["changed"] = sh(["git", "-c", "core.quotePath=false", "-C", str(dst), "diff", "--name-only", f"{base}...HEAD"], check=False).splitlines() if on_branch else []
+    ev["changed"] = sh(["git", "-c", "core.quotePath=false", "-C", str(dst), "diff", "--name-only", f"{base}...{target}"], check=False).splitlines() if on_branch else []
     ev["uncommitted"] = bool(sh(["git", "-C", str(dst), "status", "--porcelain", "--", ".", ":!.agents/state"], check=False))
     ev.update({field: [] for field in GATE_FIELDS})
     if on_branch:
-        ev.update(verify_gates(dst, timeout))
+        ev.update(verify_gates(dst, timeout, ev["sync_run"]))
     ev["gates_ok"] = on_branch and bool(ev["changed"]) and not ev["uncommitted"] and all(
         g["ok"] for k in ("note_gates", "case_gates") for g in ev[k]) and not any(
         ev[k] for k in ("stale_neighbours", "structural_issues_introduced", "copied_paragraphs", "gate_problems"))
     ev["review"] = {"verdict": "none", "findings": []}
     if ev["changed"]:
         gates = {field: ev[field] for field in GATE_FIELDS}
-        prompt = REVIEW_PROMPT.format(branch=ev["branch"], base=base, cli=cli(), gates=json.dumps(gates, ensure_ascii=False))
+        prompt = REVIEW_PROMPT.format(branch=target if ev["sync_run"] else ev["branch"], base=base, cli=cli(), gates=json.dumps(gates, ensure_ascii=False))
         rv = runner.execute(REVIEWER["harness"], prompt, dst, REVIEWER["model"], REVIEWER["effort"], f"{out_prefix}.review.txt", timeout=timeout)
         m = re.search(r"\{.*\}", rv.get("answer", ""), re.S)
         try:
@@ -291,7 +315,9 @@ def flow(a):
             for n in range(1, a.repairs + 1):
                 if ev["accepted"] or not ev["changed"] or not ev["sources_unchanged"]:
                     break
-                prompt = REPAIR_PROMPT.format(branch=ev["branch"], findings=json.dumps(ev["review"]["findings"], ensure_ascii=False, indent=1),
+                checkpoint = (f'Edit the named draft from sync status --name {ev["sync_run"]} and checkpoint the intended paths with sync commit --name {ev["sync_run"]}.'
+                              if ev["sync_run"] else 'Commit on the same checked-out sync branch.')
+                prompt = REPAIR_PROMPT.format(branch=ev["branch"], checkpoint=checkpoint, findings=json.dumps(ev["review"]["findings"], ensure_ascii=False, indent=1),
                                               gates=json.dumps({"gates_ok": ev["gates_ok"], **{field: ev[field] for field in GATE_FIELDS}}, ensure_ascii=False))
                 author = runner.execute(setting[0], prompt, dst, setting[1], setting[2], f"{prefix}.author{n}.txt", write=True, timeout=a.timeout)
                 ev = evaluate(dst, base, f"{prefix}.r{n}", a.timeout)

@@ -1,6 +1,4 @@
-// Package gitsync publishes knowledge through Git: a local branch is the synchronization run,
-// commits are its checkpoints, a review commit binds the accepted content by digest and records
-// it in the tree (90-Meta/sync-reviews/), and a fast-forward merge publishes it. No other run state exists.
+// Package gitsync prepares reviewed knowledge changes for publication through Git.
 package gitsync
 
 import (
@@ -30,27 +28,22 @@ import (
 
 const Help = `sync COMMAND --vault PATH [options]
   start   --name SLUG [--base BRANCH] [--case ID]
-                                        Create and switch to branch sync/SLUG from the base.
-                                        --case explicitly carries pending changes of one published
-                                        case from the currently checked-out base. Other pending
-                                        knowledge and unrelated staged files are refused. Content
-                                        and index stay unchanged; no commit or worktree is created.
-  status                                Branch, base, changed knowledge files and review state.
-  review  --verdict accept|revise --reviewer NAME [--summary TEXT]
-                                        Record the reviewer's verdict on the committed content
-                                        as a commit whose trailers bind it by digest and that adds a
-                                        record under 90-Meta/sync-reviews/ (it survives rebase and
-                                        squash merges).
-  verify  [--base REV] [--allow-no-change]
-                                        Gates for the branch: every changed repository note passes
-                                        discover check, no new audit/link/Bases issue versus the
-                                        base, clean tree, and an accepted review of the final content.
-                                        --allow-no-change accepts a range without knowledge changes
-                                        (the CI gate on pushes, e.g. a kernel update).
-  acknowledge --repo NAME --commit SHA --decision D [--branch main] [--date YYYY-MM-DD]
-                                        Record a reviewed repository commit that needs no note change
-                                        (D: no-documentation-change | no-durable-node).
-  finish  [--base BRANCH]               verify, then fast-forward the base and delete the branch.
+                                        With origin: prepare a PR run from origin/main (or
+                                        origin/BRANCH) and return an isolated draft directory.
+                                        --case imports pending files of one published case.
+                                        Without origin: start a local-only sync branch.
+  commit  --name SLUG --path FILE [--path FILE ...] --message TEXT
+                                        Checkpoint only these draft files, including deletions.
+  status  [--name SLUG]                 Run status, candidate head, changed files and review.
+  review  [--name SLUG --head SHA] --verdict accept|revise --reviewer NAME [--summary TEXT]
+                                        Record the verdict on the exact committed candidate.
+  verify  [--name SLUG] [--base REV] [--allow-no-change]
+                                        Validate the committed candidate (named PR run) or
+                                        the checked-out range (local or published history).
+  acknowledge [--name SLUG] --repo NAME --commit SHA --decision D [--branch main] [--date YYYY-MM-DD]
+                                        Record no-documentation-change or no-durable-node.
+  finish  [--name SLUG]                 Verify and report the exact PR head to push (named run).
+                                        Local-only runs fast-forward their base.
   pull    [--base BRANCH]               Fetch; fast-forward the base when possible. On divergence or
                                         on a sync/ branch whose base moved, list the knowledge files
                                         changed on both sides (they need the merged meaning reviewed).
@@ -71,6 +64,8 @@ var (
 type opts struct {
 	vault, name, base, verdict, reviewer, summary, repo, commit, decision, branch, date, caseID string
 	allowNoChange                                                                               bool
+	head, tree, treeBase, message                                                               string
+	paths                                                                                       []string
 }
 
 func gitOutput(dir string, args ...string) (string, error) {
@@ -105,10 +100,15 @@ func Run(args []string, out io.Writer) error {
 	cmd := args[0]
 	o := opts{branch: "main"}
 	fields := map[string]*string{"--vault": &o.vault, "--name": &o.name, "--base": &o.base, "--verdict": &o.verdict, "--reviewer": &o.reviewer,
-		"--summary": &o.summary, "--repo": &o.repo, "--commit": &o.commit, "--decision": &o.decision, "--branch": &o.branch, "--date": &o.date, "--case": &o.caseID}
+		"--summary": &o.summary, "--repo": &o.repo, "--commit": &o.commit, "--decision": &o.decision, "--branch": &o.branch, "--date": &o.date, "--case": &o.caseID, "--head": &o.head, "--message": &o.message}
 	for i := 1; i < len(args); i++ {
 		if args[i] == "--allow-no-change" {
 			o.allowNoChange = true
+			continue
+		}
+		if args[i] == "--path" && cmd == "commit" && i+1 < len(args) {
+			i++
+			o.paths = append(o.paths, args[i])
 			continue
 		}
 		p, ok := fields[args[i]]
@@ -129,6 +129,17 @@ func Run(args []string, out io.Writer) error {
 		return e
 	}
 	o.vault, _ = r["vault_root"].(string)
+	if cmd == "start" {
+		if _, err := git(o.vault, "remote", "get-url", "origin"); err == nil {
+			return startPR(o, out)
+		}
+	}
+	if o.name != "" && cmd != "start" {
+		return runPR(cmd, o, out)
+	}
+	if o.head != "" || o.message != "" || cmd == "commit" {
+		return errors.New("use --name to select a PR run")
+	}
 	if o.base == "" {
 		o.base = defaultBase(o.vault, cmd == "start")
 	}
@@ -195,7 +206,7 @@ type pendingFile struct {
 func pendingFiles(vault string) ([]pendingFile, error) {
 	// Preserve porcelain's leading index column and use NUL paths so whitespace and
 	// rename endpoints cannot hide unrelated changes from the publication boundary.
-	out, err := gitOutput(vault, "status", "--porcelain=v1", "-z", "--no-renames", "--untracked-files=all")
+	out, err := gitOutput(vault, "--no-optional-locks", "status", "--porcelain=v1", "-z", "--no-renames", "--untracked-files=all")
 	if err != nil {
 		return nil, err
 	}
@@ -286,19 +297,26 @@ func start(o opts, out io.Writer) error {
 	return emit(out, map[string]any{"branch": branch, "base": o.base, "next": "write the notes, commit, run `discover check`, record the review with `sync review`, then `sync verify` and `sync finish`"})
 }
 
-// changed lists knowledge files that differ between the merge base and HEAD.
+func (o opts) revision() string {
+	if o.head != "" {
+		return o.head
+	}
+	return "HEAD"
+}
+
+// changed lists knowledge files that differ between the merge base and the candidate.
 func changed(o opts) ([]string, string, error) {
-	mb, e := git(o.vault, "merge-base", o.base, "HEAD")
+	mb, e := git(o.vault, "merge-base", o.base, o.revision())
 	if e != nil {
 		return nil, "", e
 	}
-	d, e := git(o.vault, "diff", "--name-only", "--no-renames", mb, "HEAD")
+	d, e := diffPaths(o.vault, mb, o.revision())
 	if e != nil {
 		return nil, "", e
 	}
 	files := []string{}
-	for _, f := range strings.Split(d, "\n") {
-		if f != "" && knowledgePath.MatchString(f) {
+	for _, f := range d {
+		if knowledgePath.MatchString(f) {
 			files = append(files, f)
 		}
 	}
@@ -306,31 +324,26 @@ func changed(o opts) ([]string, string, error) {
 	return files, mb, nil
 }
 
-// stateOnly reports whether the branch changes only the versioned discovery state.
-func stateOnly(vault, mb string) bool {
-	d, e := git(vault, "diff", "--name-only", "--no-renames", mb, "HEAD")
-	if e != nil || d == "" {
+func diffPaths(vault, from, to string) ([]string, error) {
+	d, err := gitOutput(vault, "diff", "--name-only", "--no-renames", "-z", from, to, "--")
+	if err != nil || d == "" {
+		return nil, err
+	}
+	return strings.Split(strings.TrimSuffix(d, "\x00"), "\x00"), nil
+}
+
+// stateOnly reports whether the candidate changes only versioned discovery state.
+func stateOnly(vault, mb, head string) bool {
+	paths, err := diffPaths(vault, mb, head)
+	if err != nil || len(paths) == 0 {
 		return false
 	}
-	for _, f := range strings.Split(d, "\n") {
+	for _, f := range paths {
 		if !strings.HasPrefix(f, "90-Meta/discovery/") {
 			return false
 		}
 	}
 	return true
-}
-
-// digest binds the exact content of the changed files at HEAD (deletions included).
-func digest(vault string, files []string) string {
-	h := sha256.New()
-	for _, f := range files {
-		blob, e := git(vault, "rev-parse", "--verify", "--quiet", "HEAD:"+f)
-		if e != nil {
-			blob = "deleted"
-		}
-		fmt.Fprintf(h, "%s\x00%s\n", f, blob)
-	}
-	return hex.EncodeToString(h.Sum(nil))
 }
 
 // digestAt is digest over the files' content at rev.
@@ -347,13 +360,13 @@ func digestAt(vault, rev string, files []string) string {
 }
 
 func knowledgeChanges(vault, from, to string) []string {
-	d, e := git(vault, "diff", "--name-only", "--no-renames", from, to)
+	d, e := diffPaths(vault, from, to)
 	if e != nil {
 		return nil
 	}
 	out := []string{}
-	for _, f := range strings.Split(d, "\n") {
-		if f != "" && knowledgePath.MatchString(f) {
+	for _, f := range d {
+		if knowledgePath.MatchString(f) {
 			out = append(out, f)
 		}
 	}
@@ -455,12 +468,12 @@ func blobAt(vault, rev, f string) string {
 // records the range adds. An edit no review saw breaks the chain. It returns the problems and whether the
 // range adds any record.
 func reviewedContent(vault, base string) ([]string, bool) {
-	added, e := git(vault, "diff", "--name-only", "--no-renames", "--diff-filter=A", base, "HEAD", "--", reviewsDir)
+	added, e := gitOutput(vault, "diff", "--name-only", "--no-renames", "--diff-filter=A", "-z", base, "HEAD", "--", reviewsDir)
 	if e != nil {
 		return []string{"cannot list the review records: " + e.Error()}, false
 	}
 	recs := []reviewFile{}
-	for _, p := range strings.Split(added, "\n") {
+	for _, p := range strings.Split(added, "\x00") {
 		if !strings.HasSuffix(p, ".json") {
 			continue
 		}
@@ -505,7 +518,7 @@ type reviewRecord struct {
 }
 
 func lastReview(o opts, mb string) *reviewRecord {
-	logs, e := git(o.vault, "log", "--format=%H%x1f%B%x1e", mb+"..HEAD")
+	logs, e := git(o.vault, "log", "--format=%H%x1f%B%x1e", mb+".."+o.revision())
 	if e != nil {
 		return nil
 	}
@@ -540,57 +553,68 @@ func status(o opts) (map[string]any, error) {
 	if e != nil {
 		return nil, e
 	}
-	d := digest(o.vault, files)
-	pending, _ := dirty(o.vault)
+	d := digestAt(o.vault, o.revision(), files)
+	var pending []string
+	if o.head == "" {
+		pending, _ = dirty(o.vault)
+	}
 	s := map[string]any{"branch": current(o.vault), "base": o.base, "changed": files, "uncommitted": pending, "content_digest": d, "review": nil}
 	if rr := lastReview(o, mb); rr != nil {
-		s["review"] = map[string]any{"verdict": rr.Verdict, "reviewer": rr.Reviewer, "commit": rr.Commit[:12], "covers_current_content": rr.Digest == d}
+		s["review"] = map[string]any{"verdict": rr.Verdict, "reviewer": rr.Reviewer, "commit": rr.Commit[:12], "covers_current_content": rr.Digest == d && (o.head == "" || rr.Commit == o.head)}
 	}
 	return s, nil
 }
 
 func review(o opts, out io.Writer) error {
-	if o.verdict != "accept" && o.verdict != "revise" {
-		return errors.New("--verdict must be accept or revise")
-	}
-	if strings.TrimSpace(o.reviewer) == "" {
-		return errors.New("--reviewer is required (who reviewed: a fresh agent session or a person)")
-	}
 	if !strings.HasPrefix(current(o.vault), "sync/") {
 		return errors.New("record reviews on a sync/ branch")
 	}
 	if d, _ := dirty(o.vault); len(d) > 0 {
 		return fmt.Errorf("commit the reviewed content first: %v", d)
 	}
-	files, mb, e := changed(o)
+	msg, result, rel, body, e := reviewCommit(o)
 	if e != nil {
 		return e
 	}
-	if len(files) == 0 {
-		return errors.New("nothing to review: no knowledge change on this branch")
-	}
-	d := digest(o.vault, files)
-	rec := reviewFile{Verdict: o.verdict, Reviewer: o.reviewer, Summary: strings.TrimSpace(o.summary), Base: mb, Digest: d, Files: map[string]blobChange{}}
-	for _, f := range files {
-		rec.Files[f] = blobChange{From: blobAt(o.vault, mb, f), To: blobAt(o.vault, "HEAD", f)}
-	}
-	// The record is content, not only history: a rebase merge drops empty commits and a squash may drop trailers.
-	rel := fmt.Sprintf("%s/%s-%s-%s.json", reviewsDir, time.Now().UTC().Format("20060102T150405Z"), o.verdict, d[:12])
-	b, _ := json.MarshalIndent(rec, "", "  ")
 	if e := os.MkdirAll(filepath.Join(o.vault, reviewsDir), 0o755); e != nil {
 		return e
 	}
-	if e := os.WriteFile(filepath.Join(o.vault, rel), append(b, '\n'), 0o644); e != nil {
+	if e := os.WriteFile(filepath.Join(o.vault, rel), body, 0o644); e != nil {
 		return e
 	}
 	if _, e := git(o.vault, "add", "--", rel); e != nil {
 		return e
 	}
-	msg := fmt.Sprintf("chore(sync): record review %s\n\n%s\n\nKnowledge-Review: %s\nKnowledge-Reviewer: %s\nKnowledge-Digest: %s\nKnowledge-Base: %s\n", o.verdict, strings.TrimSpace(o.summary), o.verdict, o.reviewer, d, mb)
 	if _, e := git(o.vault, "commit", "-q", "-m", msg); e != nil {
 		return e
 	}
-	return emit(out, map[string]any{"recorded": o.verdict, "files": files, "digest": d, "record": rel})
+	return emit(out, result)
+}
+
+func reviewCommit(o opts) (string, map[string]any, string, []byte, error) {
+	if o.verdict != "accept" && o.verdict != "revise" {
+		return "", nil, "", nil, errors.New("--verdict must be accept or revise")
+	}
+	if strings.TrimSpace(o.reviewer) == "" {
+		return "", nil, "", nil, errors.New("--reviewer is required (who reviewed: a fresh agent session or a person)")
+	}
+	files, mb, e := changed(o)
+	if e != nil {
+		return "", nil, "", nil, e
+	}
+	if len(files) == 0 {
+		return "", nil, "", nil, errors.New("nothing to review: no knowledge change on this branch")
+	}
+	d := digestAt(o.vault, o.revision(), files)
+	rec := reviewFile{Verdict: o.verdict, Reviewer: o.reviewer, Summary: strings.TrimSpace(o.summary), Base: mb, Digest: d, Files: map[string]blobChange{}}
+	for _, f := range files {
+		rec.Files[f] = blobChange{From: blobAt(o.vault, mb, f), To: blobAt(o.vault, o.revision(), f)}
+	}
+	// The record is content, not only history: a rebase merge drops empty commits and a squash may drop trailers.
+	rel := fmt.Sprintf("%s/%s-%s-%s.json", reviewsDir, time.Now().UTC().Format("20060102T150405Z"), o.verdict, d[:12])
+	b, _ := json.MarshalIndent(rec, "", "  ")
+	msg := fmt.Sprintf("chore(sync): record review %s\n\n%s\n\nKnowledge-Review: %s\nKnowledge-Reviewer: %s\nKnowledge-Digest: %s\nKnowledge-Base: %s\n", o.verdict, strings.TrimSpace(o.summary), o.verdict, o.reviewer, d, mb)
+	return msg, map[string]any{"recorded": o.verdict, "files": files, "digest": d, "record": rel}, rel, append(b, '\n'), nil
 }
 
 // structural returns audit, link and Bases issues of a vault tree as comparable strings.
@@ -725,8 +749,18 @@ var (
 func verify(o opts) (map[string]any, error) {
 	res := map[string]any{"branch": current(o.vault), "base": o.base}
 	problems := []string{}
-	if d, _ := dirty(o.vault); len(d) > 0 {
-		problems = append(problems, fmt.Sprintf("uncommitted knowledge changes: %v", d))
+	tree := o.tree
+	if tree == "" {
+		tree = o.vault
+		d, err := dirty(o.vault)
+		if err != nil {
+			return nil, err
+		}
+		if len(d) > 0 {
+			problems = append(problems, fmt.Sprintf("uncommitted knowledge changes: %v", d))
+		}
+	} else {
+		res["branch"], res["head"] = "sync/"+o.name, o.head
 	}
 	files, mb, e := changed(o)
 	if e != nil {
@@ -738,23 +772,23 @@ func verify(o opts) (map[string]any, error) {
 		if !strings.HasPrefix(f, "20-Repos/") {
 			continue
 		}
-		if _, e := os.Stat(filepath.Join(o.vault, f)); e != nil {
+		if _, e := os.Stat(filepath.Join(tree, f)); e != nil {
 			continue
 		}
 		// The synced note (new, or with a new commit-analizado) passes every gate; a neighbour touched
 		// to re-anchor may keep pre-existing errors but must not add any.
 		var base []byte
 		if old, e := git(o.vault, "show", mb+":"+f); e == nil {
-			cur, _ := os.ReadFile(filepath.Join(o.vault, f))
+			cur, _ := os.ReadFile(filepath.Join(tree, f))
 			if analyzed.FindString(old) == analyzed.FindString(string(cur)) {
 				base = []byte(old + "\n")
 			}
 		}
-		ok, introduced, preexisting, e := discover.CheckNoteIntroduced(o.vault, f, base)
+		ok, introduced, preexisting, e := discover.CheckNoteIntroduced(tree, f, base)
 		if e != nil {
 			return nil, e
 		}
-		entry := map[string]any{"note": f, "ok": ok, "synced": base == nil}
+		entry := map[string]any{"note": f, "ok": ok, "synced": base == nil, "introduced": introduced}
 		if preexisting > 0 {
 			entry["preexisting_errors"] = preexisting
 		}
@@ -772,14 +806,14 @@ func verify(o opts) (map[string]any, error) {
 		if !strings.HasSuffix(f, ".md") || top == "20-Repos" || !knowledgeFolder.MatchString(top) {
 			continue
 		}
-		if _, e := os.Stat(filepath.Join(o.vault, f)); e != nil {
+		if _, e := os.Stat(filepath.Join(tree, f)); e != nil {
 			continue
 		}
 		var base []byte
 		if old, e := git(o.vault, "show", mb+":"+f); e == nil {
 			base = []byte(old + "\n")
 		}
-		introduced, e := discover.CopiesIntroduced(o.vault, f, base)
+		introduced, e := discover.CopiesIntroduced(tree, f, base)
 		if e != nil {
 			return nil, e
 		}
@@ -790,22 +824,40 @@ func verify(o opts) (map[string]any, error) {
 	}
 	res["copied_paragraphs"] = copies
 	caseGates := []any{}
+	checkedCases := map[string]bool{}
 	for _, f := range files {
-		if !strings.HasPrefix(f, "investigations/") || filepath.Base(f) != "investigation.md" {
+		if !strings.HasPrefix(f, "investigations/") {
 			continue
 		}
-		if _, e := os.Stat(filepath.Join(o.vault, f)); e != nil {
-			continue // retired: removed on this branch
+		parts := strings.SplitN(f, "/", 3)
+		if o.head != "" {
+			f = strings.Join(parts[:2], "/") + "/investigation.md"
+		} else if filepath.Base(f) != "investigation.md" {
+			continue
+		}
+		if checkedCases[f] {
+			continue
+		}
+		checkedCases[f] = true
+		if _, e := os.Stat(filepath.Join(tree, f)); errors.Is(e, os.ErrNotExist) {
+			if o.head != "" {
+				if _, dirErr := os.Stat(filepath.Join(tree, filepath.Dir(f))); !errors.Is(dirErr, os.ErrNotExist) {
+					problems = append(problems, "case files remain without "+f)
+				}
+			}
+			continue
+		} else if e != nil {
+			return nil, e
 		}
 		var base []byte
 		if old, e := git(o.vault, "show", mb+":"+f); e == nil {
 			base = []byte(old + "\n")
 		}
-		ok, introduced, preexisting, e := cases.CheckIntroduced(o.vault, f, base)
+		ok, introduced, preexisting, e := cases.CheckIntroduced(tree, f, base)
 		if e != nil {
 			return nil, e
 		}
-		entry := map[string]any{"case": f, "ok": ok}
+		entry := map[string]any{"case": f, "ok": ok, "introduced": introduced}
 		if preexisting > 0 {
 			entry["preexisting_errors"] = preexisting
 		}
@@ -819,7 +871,7 @@ func verify(o opts) (map[string]any, error) {
 	for _, n := range notes {
 		repoNotes = append(repoNotes, n.(map[string]any)["note"].(string))
 	}
-	stale, e := discover.StaleNeighbours(o.vault, repoNotes)
+	stale, e := discover.StaleNeighbours(tree, repoNotes)
 	if e != nil {
 		return nil, e
 	}
@@ -827,18 +879,23 @@ func verify(o opts) (map[string]any, error) {
 	if len(stale) > 0 {
 		problems = append(problems, fmt.Sprintf("%d note(s) still cite changed files of the synced repository at an older commit; update or re-anchor them", len(stale)))
 	}
-	now, e := structural(o.vault)
+	now, e := structural(tree)
 	if e != nil {
 		return nil, e
 	}
-	dir, cleanup, e := baseTree(o.vault, mb)
+	snapshot := baseTree
+	if o.tree != "" {
+		snapshot = committedTree
+	}
+	treeBase := mb
+	if o.treeBase != "" {
+		treeBase = o.treeBase
+	}
+	dir, cleanup, e := snapshot(o.vault, treeBase)
 	if e != nil {
 		return nil, e
 	}
 	defer cleanup()
-	if cfg, e := os.ReadFile(filepath.Join(o.vault, ".knowledge-os-config.yaml")); e == nil {
-		_ = os.WriteFile(filepath.Join(dir, ".knowledge-os-config.yaml"), cfg, 0o644)
-	}
 	before, e := structural(dir)
 	if e != nil {
 		return nil, e
@@ -858,12 +915,12 @@ func verify(o opts) (map[string]any, error) {
 	if len(introduced) > 0 {
 		problems = append(problems, fmt.Sprintf("%d structural issue(s) introduced versus the base", len(introduced)))
 	}
-	d := digest(o.vault, files)
+	d := digestAt(o.vault, o.revision(), files)
 	rr := lastReview(o, mb)
-	state := len(files) == 0 && stateOnly(o.vault, mb)
+	state := len(files) == 0 && stateOnly(o.vault, mb, o.revision())
 	switch {
 	case state:
-		if e := discover.ValidateState(o.vault); e != nil {
+		if e := discover.ValidateState(tree); e != nil {
 			problems = append(problems, "discovery state: "+e.Error())
 		}
 		res["discovery_state_only"] = true
@@ -888,11 +945,11 @@ func verify(o opts) (map[string]any, error) {
 		problems = append(problems, "no review recorded; run `sync review` after the reviewer's verdict")
 	case rr.Verdict != "accept":
 		problems = append(problems, "last review verdict is "+rr.Verdict)
-	case rr.Digest != d:
+	case rr.Digest != d || o.head != "" && rr.Commit != o.head:
 		problems = append(problems, "content changed after the accepted review; the reviewer must check the new changes")
 	}
 	if rr != nil {
-		res["review"] = map[string]any{"verdict": rr.Verdict, "reviewer": rr.Reviewer, "covers_current_content": rr.Digest == d}
+		res["review"] = map[string]any{"verdict": rr.Verdict, "reviewer": rr.Reviewer, "covers_current_content": rr.Digest == d && (o.head == "" || rr.Commit == o.head)}
 	}
 	res["problems"] = problems
 	res["ok"] = len(problems) == 0

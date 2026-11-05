@@ -39,14 +39,14 @@ KF.flow({
     "DRAFT": "BORRADOR",
   },
   steps: [
-    { label: 'Pull', cmds: ['kos sync pull'] },
+    { label: 'Pull', cmds: ['git fetch origin main'] },
     { label: 'Select', cmds: ['kos inventory', 'kos discover run'] },
     { label: 'Draft', cmds: ['kos sync start --name payments'] },
-    { label: 'Write', cmds: ['git commit', 'kos sync acknowledge'] },
-    { label: 'Gate', cmds: ['kos discover check --note …'] },
-    { label: 'Review', cmds: ['kos sync review --verdict accept'] },
-    { label: 'Verify', cmds: ['kos sync verify'] },
-    { label: 'Publish', cmds: ['kos sync finish', 'git push'] },
+    { label: 'Write', cmds: ['kos sync commit --name payments --path … --message …', 'kos sync acknowledge --name payments …'] },
+    { label: 'Gate', cmds: ['kos sync verify --name payments'] },
+    { label: 'Review', cmds: ['kos sync review --name payments --head … --verdict accept --reviewer …'] },
+    { label: 'Verify', cmds: ['kos sync verify --name payments'] },
+    { label: 'Publish', cmds: ['kos sync finish --name payments', 'git push origin <push_refspec>', 'Open PR to main'] },
   ],
 
   state: K => ({
@@ -132,7 +132,7 @@ KF.flow({
       T.say('3 REPOS TO SYNC', '<', 'B');
     });
 
-    // 3 DRAFT: an isolated workspace (the sync branch); nothing reaches the vault until verified
+    // 3 DRAFT: a named draft from the published base; nothing reaches the vault until verified
     T.step(2, t => {
       T.scene(t, 'C', 0);
       T.hide(s.repos[3], t, .3);
@@ -266,7 +266,7 @@ KF.flow({
         T.fly([x + 2, y + 2], T.vaultAt(news[k + 1].p), k === 1 ? 'G' : 'C', '<', 1.1, { shape: 'card', arc: 16, ...card });
         T.join(news[k + 1], '>');
       });
-      T.hide(s.draft, '>', .4); // finish fast-forwards main and deletes the sync branch
+      T.hide(s.draft, '>', .4); // the reviewed PR is merged into the published vault
       T.hide(s.ack, '<', .4, 'link');
       [0, 1, 2].forEach(i => T.hide(s.repos[i], '<', .4));
       T.face(m, 'happy', '<'); T.hop(m, '<');

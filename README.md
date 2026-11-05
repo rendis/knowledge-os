@@ -50,7 +50,7 @@ Batch note checks with repeated `--note` and add `--read-only` to prevent cache 
 | 3 | **Ask** | The agent answers from inspected sources with its own tools, grades each claim and checks the names it cites. | `kos discover check` |
 | 4 | **Investigate** | One case per line of work, written only through the CLI and gated on every write. | `kos investigation` |
 | 5 | **Hand off** | Atomic tasks in a repository worktree for any harness, reconciled back into the case. | `kos handoff` |
-| 6 | **Sync** | A `sync/<slug>` branch with gates, a review bound to the exact content and a fast-forward finish. | `kos sync` |
+| 6 | **Sync** | An isolated PR draft with gates and a review bound to the exact content. | `kos sync` |
 
 Click a flow to watch it step by step in [the flow guide](https://rendis.github.io/knowledge-os/) (source in [`docs/flows/`](docs/flows/), published on every push to `main`). In a vault, the agent opens the matching flow when you ask how one works.
 

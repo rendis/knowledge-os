@@ -32,3 +32,4 @@ Design decisions are recorded in `docs/adr/`.
 - Handoff sources move from `.investigations/` to `investigations/` when published; status and refresh must resolve that move within the bound vault and preserve task identity, execution metadata and deltas.
 - Investigation writes use case directories for isolation and keep the vault checkout and branch unchanged, including published cases; publication authority and evidence gates remain separate.
 - Git change gates parse NUL-delimited porcelain without trimming status columns; preserve rename endpoints and reject unrelated staged content before a scoped publication transition.
+- PR sync gates read the committed candidate and published base; checkpoints select files from the named draft, never the live index.
