@@ -36,6 +36,8 @@ type anchor struct {
 	From     int    `json:"from,omitempty"`
 	To       int    `json:"to,omitempty"`
 	Text     string `json:"text,omitempty"`
+	line     int
+	hasRange bool
 }
 
 type checkIssue struct {
@@ -157,14 +159,15 @@ func parseAnchors(note string) []anchor {
 	for _, m := range footnoteDef.FindAllStringSubmatchIndex(note, -1) {
 		defs[m[0]] = note[m[2]:m[3]]
 	}
-	for _, line := range strings.Split(note, "\n") {
+	for i, line := range strings.Split(note, "\n") {
 		id := ""
 		if m := footnoteDef.FindStringSubmatch(line); m != nil {
 			id = m[1]
 		}
 		for _, m := range permalink.FindAllStringSubmatchIndex(line, -1) {
-			a := anchor{Footnote: id, Repo: line[m[2]:m[3]] + "/" + line[m[4]:m[5]], Commit: line[m[6]:m[7]], Path: line[m[8]:m[9]]}
+			a := anchor{Footnote: id, Repo: line[m[2]:m[3]] + "/" + line[m[4]:m[5]], Commit: line[m[6]:m[7]], Path: line[m[8]:m[9]], line: i}
 			if m[10] >= 0 {
+				a.hasRange = true
 				a.From, _ = strconv.Atoi(line[m[10]:m[11]])
 				a.To = a.From
 			}

@@ -2,12 +2,18 @@ package discover
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
+
+	"go.yaml.in/yaml/v3"
+
+	"knowledge-os/internal/config"
 )
 
 var aliasList = regexp.MustCompile(`\[(.*)\]`)
@@ -30,9 +36,74 @@ func noteRepository(vault, full string, fm map[string]string) string {
 	return ""
 }
 
+var (
+	learningHeading       = regexp.MustCompile(`^(#{1,3})[ 	]+(.*)$`)
+	learningEvidenceEntry = regexp.MustCompile(`^EV-\d{3}\b`)
+	durableSourceLine     = regexp.MustCompile(`^-[ 	]+Fuentes durables:[ 	]+\S`)
+)
+
+// Each durable source in a learning evidence entry records what was inspected at the time.
+// Links in the rest of the note may support current claims and keep the normal freshness check.
+func learningEvidenceSourceLines(rel string, note []byte) map[int]bool {
+	if !strings.HasPrefix(rel, "70-Aprendizajes/") {
+		return nil
+	}
+	lines := strings.Split(strings.ReplaceAll(string(note), "\r\n", "\n"), "\n")
+	if strings.TrimSpace(lines[0]) != "---" {
+		return nil
+	}
+	end := slices.Index(lines[1:], "---") + 1
+	var metadata struct {
+		Type string `yaml:"tipo"`
+	}
+	if end == 0 || yaml.Unmarshal([]byte(strings.Join(lines[1:end], "\n")), &metadata) != nil || metadata.Type != "aprendizaje" {
+		return nil
+	}
+	sources := map[int]bool{}
+	inEvidence, inEntry := false, false
+	for i := end + 1; i < len(lines); i++ {
+		line := lines[i]
+		if heading := learningHeading.FindStringSubmatch(line); heading != nil {
+			if heading[1] == "###" {
+				inEntry = inEvidence && learningEvidenceEntry.MatchString(heading[2])
+			} else {
+				inEvidence = heading[1] == "##" && strings.TrimSpace(heading[2]) == "Evidencia acumulada"
+				inEntry = false
+			}
+		} else if inEntry && durableSourceLine.MatchString(line) {
+			sources[i] = true
+		}
+	}
+	return sources
+}
+
+func checkHistoricalAnchor(repo string, a anchor) error {
+	commit, err := resolveCommit(repo, a.Commit)
+	if err != nil || !strings.HasPrefix(commit, a.Commit) {
+		return fmt.Errorf("commit %s is not available", a.Commit)
+	}
+	path, err := url.PathUnescape(a.Path)
+	if err != nil {
+		return fmt.Errorf("invalid path in historical source %s", a.Path)
+	}
+	content, err := gitOutputRaw(repo, "cat-file", "blob", commit+":"+path)
+	if err != nil {
+		return fmt.Errorf("cannot read %s at commit %s", path, a.Commit)
+	}
+	lines := 0
+	if content != "" {
+		lines = strings.Count(strings.TrimSuffix(content, "\n"), "\n") + 1
+	}
+	if a.hasRange && (a.From < 1 || a.From > a.To || a.To > lines) {
+		return fmt.Errorf("lines L%d-L%d of %s do not exist at commit %s", a.From, a.To, path, a.Commit)
+	}
+	return nil
+}
+
 // StaleNeighbours lists knowledge notes that cite a synced repository at an older commit on files
 // that changed up to the repository note's new `commit-analizado`. A sync that updates the repository
 // note must update or re-anchor those neighbours too, or their claims silently describe old code.
+// A historical learning source must resolve at its original revision.
 func StaleNeighbours(vault string, repoNotes []string) ([]string, error) {
 	out := []string{}
 	for _, rel := range repoNotes {
@@ -52,6 +123,7 @@ func StaleNeighbours(vault string, repoNotes []string) ([]string, error) {
 			continue
 		}
 		path := inputs[0].Path
+		sourceID, _ := config.RemoteIdentity(inputs[0].Remote)
 		head, e := resolveCommit(path, commit)
 		if e != nil {
 			return nil, fmt.Errorf("%s: commit-analizado %s is not in %s", rel, commit, repo)
@@ -74,8 +146,18 @@ func StaleNeighbours(vault string, repoNotes []string) ([]string, error) {
 			}
 			nb, _ := os.ReadFile(p)
 			stale := map[string]bool{}
+			historicalLines := learningEvidenceSourceLines(r, nb)
 			for _, a := range parseAnchors(string(nb)) {
-				if !strings.EqualFold(strings.SplitN(a.Repo, "/", 2)[1], repo) || strings.HasPrefix(head, a.Commit) {
+				if !strings.EqualFold(strings.SplitN(a.Repo, "/", 2)[1], repo) {
+					continue
+				}
+				if historicalLines[a.line] && sourceID == "github.com/"+strings.ToLower(a.Repo) {
+					if err := checkHistoricalAnchor(path, a); err != nil {
+						return fmt.Errorf("%s: invalid historical source for %s: %w", r, a.Repo, err)
+					}
+					continue
+				}
+				if strings.HasPrefix(head, a.Commit) {
 					continue
 				}
 				old, e := resolveCommit(path, a.Commit)

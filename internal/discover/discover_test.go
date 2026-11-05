@@ -482,6 +482,9 @@ func TestStaleNeighboursAfterSync(t *testing.T) {
 	dir := t.TempDir()
 	repos := filepath.Join(dir, "repos")
 	repo := gitRepo(t, filepath.Join(repos, "SVC-orders"), map[string]string{"svc/save.go": "package svc\n// save then notify\n", "svc/other.go": "package svc\n"})
+	if _, err := gitOutput(repo, "remote", "add", "origin", "https://github.com/acme/SVC-orders.git"); err != nil {
+		t.Fatal(err)
+	}
 	old, _ := resolveCommit(repo, "HEAD")
 	write(t, repo, "svc/save.go", "package svc\n// exists, enrich, save, notify\n")
 	for _, args := range [][]string{{"add", "-A"}, {"-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "-m", "change"}} {
@@ -515,6 +518,42 @@ func TestStaleNeighboursAfterSync(t *testing.T) {
 	}
 	if len(stale) != 1 || !strings.HasPrefix(stale[0], "25-Topics/orders-out.md") || !strings.Contains(stale[0], "svc/save.go") || strings.Contains(stale[0], "other.go") {
 		t.Fatalf("only the neighbour citing a changed file at an older commit is stale: %v", stale)
+	}
+
+	learning := "70-Aprendizajes/Aprendizaje - orders.md"
+	learningNote := func(source, current string) {
+		t.Helper()
+		write(t, vault, learning, "---\ntipo: aprendizaje # validated evidence\n---\n# Orders\n\n"+
+			"##\tEvidencia acumulada\n\n###  EV-001 — Initial rollout\n\n-  Fuentes durables: [implementation]("+source+")\n\n"+
+			"##\tLimitaciones y revalidación\n\n"+current+"\n")
+	}
+	t.Run("preserves historical evidence", func(t *testing.T) {
+		learningNote(link(old, "svc/save.go"), "")
+		got, err := StaleNeighbours(vault, []string{"20-Repos/orders.md"})
+		if err != nil || len(got) != 1 || got[0] != stale[0] {
+			t.Fatalf("only the current topic claim should be stale: %v, %v", got, err)
+		}
+	})
+	t.Run("checks a current claim citing the same lines", func(t *testing.T) {
+		learningNote(link(old, "svc/save.go"), "- Fuentes durables: [current implementation]("+link(old, "svc/save.go")+")")
+		got, err := StaleNeighbours(vault, []string{"20-Repos/orders.md"})
+		if err != nil || len(got) != 2 || !strings.HasPrefix(got[1], learning) {
+			t.Fatalf("the current learning claim should still be stale: %v, %v", got, err)
+		}
+	})
+	for _, c := range []struct{ name, source string }{
+		{"commit", link("deadbeef", "svc/save.go")},
+		{"file", link(old, "svc/missing.go")},
+		{"range", strings.Replace(link(old, "svc/save.go"), "#L2", "#L99", 1)},
+		{"zero line", strings.Replace(link(old, "svc/save.go"), "#L2", "#L0-L1", 1)},
+	} {
+		t.Run("rejects unresolved historical "+c.name, func(t *testing.T) {
+			learningNote(c.source, "")
+			_, err := StaleNeighbours(vault, []string{"20-Repos/orders.md"})
+			if err == nil || !strings.Contains(err.Error(), learning) {
+				t.Fatalf("expected a historical source error for %s: %v", c.name, err)
+			}
+		})
 	}
 }
 
