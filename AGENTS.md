@@ -34,3 +34,4 @@ Design decisions are recorded in `docs/adr/`.
 - Git change gates parse NUL-delimited porcelain without trimming status columns; preserve rename endpoints and reject unrelated staged content before a scoped publication transition.
 - PR sync gates read the committed candidate and published base; checkpoints select files from the named draft, never the live index.
 - PR snapshots preserve the kernel's `.claude/skills` symlink and require links to resolve inside the snapshot.
+- PR snapshots use `filepath.FromSlash` on targets passed to `os.Root.Symlink` so Windows can follow the links.
