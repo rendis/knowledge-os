@@ -46,7 +46,7 @@ func TestPreparePRPreservesSkillsSymlink(t *testing.T) {
 		return res
 	}
 	draft := named("start")["draft"].(string)
-	if got, err := os.Readlink(filepath.Join(draft, link)); err != nil || got != target {
+	if got, err := os.Readlink(filepath.Join(draft, link)); err != nil || filepath.ToSlash(got) != filepath.ToSlash(target) {
 		t.Fatalf("draft must preserve the relative skills link: got %q, %v", got, err)
 	}
 	if b, err := os.ReadFile(filepath.Join(draft, link, skill)); err != nil || string(b) != "# Published skill\n" {
