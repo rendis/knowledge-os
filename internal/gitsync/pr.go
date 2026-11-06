@@ -687,7 +687,7 @@ func installSnapshotLinks(root *os.Root, links []snapshotLink) error {
 				}
 				continue
 			}
-			if err := root.Symlink(link.target, link.path); err != nil {
+			if err := root.Symlink(filepath.FromSlash(link.target), link.path); err != nil {
 				return fmt.Errorf("create PR snapshot symlink %s: %w", link.path, err)
 			}
 		}
