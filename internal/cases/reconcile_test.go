@@ -96,3 +96,73 @@ func testReconcileImportsHandoffProgress(t *testing.T, visibility string) {
 		t.Fatalf("only the new delta comes in: %v", last)
 	}
 }
+
+// Several handoffs share one branch: each mark must cover only what was imported, whichever task
+// HEAD belongs to, so later runs import no commit twice.
+func TestReconcileSharedBranchImportsEachCommitOnce(t *testing.T) {
+	v := vault(t)
+	dir := t.TempDir()
+	repo, root := filepath.Join(dir, "repos", "svc-orders"), filepath.Join(dir, "worktrees")
+	write(t, repo, "src/order.go", "package src\n")
+	git(t, repo, "init", "-q", "-b", "main")
+	git(t, repo, "add", "-A")
+	git(t, repo, "commit", "-q", "-m", "init")
+	git(t, repo, "remote", "add", "origin", "https://github.com/acme/svc-orders.git")
+	os.MkdirAll(root, 0o755)
+	write(t, v, ".knowledge-os-config.yaml", "version: 1\nworkspace:\n  repository_roots:\n    - \""+filepath.ToSlash(filepath.Join(dir, "repos"))+"\"\nskills:\n  manage-development-handoff:\n    worktree_root: \""+filepath.ToSlash(root)+"\"\n")
+
+	res, _ := run(t, "new", "--vault", v, "--title", "Órdenes idempotentes", "--type", "development", "--objective", "Evitar publicaciones duplicadas.", "--date", "2026-09-25")
+	id := res["id"].(string)
+	caseDir := filepath.Dir(filepath.Join(v, res["path"].(string)))
+	if _, e := run(t, "add", "--vault", v, "--id", id, "--kind", "requirement", "--text", "Un reintento no publica dos veces", "--origin", "solicitante 2026-09-25"); e != nil {
+		t.Fatal(e)
+	}
+	wt := filepath.Join(root, "svc-orders", "idempotent")
+	for _, dh := range []string{"DH-001", "DH-002"} {
+		pkg := "---\nhandoff: " + dh + "\ncase: " + id + "\nrepository: https://github.com/acme/svc-orders.git\nbase: main\nbranch: issue/idempotent\n---\n\n# Tarea " + dh + "\n\n## Tarea\n\nCumplir R-001.\n\n## Cambios\n\n- `src/order.go`: clave por ID.\n\n## Criterios de aceptación\n\n- Test unitario (R-001).\n"
+		write(t, caseDir, "handoffs/"+dh+".md", pkg)
+		if _, e := run(t, "add", "--vault", v, "--id", id, "--kind", "handoff", "--package", "handoffs/"+dh+".md"); e != nil {
+			t.Fatal(e)
+		}
+		var b bytes.Buffer
+		if e := devhandoff.Run([]string{"start", "--vault", v, "--package", filepath.Join(caseDir, "handoffs", dh+".md"), "--apply"}, &b); e != nil {
+			t.Fatal(e, b.String())
+		}
+	}
+	commit := func(file, msg string) {
+		write(t, wt, file, msg+"\n")
+		git(t, wt, "add", file)
+		git(t, wt, "commit", "-qm", msg)
+	}
+	commit("src/a.go", "feat: first task\n\nHandoff: DH-001")
+	commit("src/b.go", "feat: second task\n\nHandoff: DH-002")
+	git(t, wt, "commit", "-q", "--allow-empty", "-m", "chore: railguard checkpoint") // no trailer
+	reconcile := func() []any {
+		t.Helper()
+		r, e := run(t, "reconcile", "--vault", v, "--worktree", wt, "--apply")
+		if e != nil {
+			t.Fatal(e)
+		}
+		return r["records"].([]any)
+	}
+	if got := reconcile(); len(got) != 2 {
+		t.Fatalf("the first run imports one record per handoff: %v", got)
+	}
+	if got := reconcile(); len(got) != 0 {
+		t.Fatalf("a second run over the same worktree imports nothing: %v", got)
+	}
+	commit("src/a2.go", "fix: first task follow-up\n\nHandoff: DH-001")
+	git(t, wt, "commit", "-q", "--allow-empty", "-m", "chore: railguard checkpoint")
+	if got := reconcile(); len(got) != 1 {
+		t.Fatalf("only the new DH-001 commit comes in: %v", got)
+	}
+	text, _ := os.ReadFile(filepath.Join(v, res["path"].(string)))
+	for _, subject := range []string{"feat: first task", "feat: second task", "fix: first task follow-up"} {
+		if n := strings.Count(string(text), subject); n != 1 {
+			t.Fatalf("%q is imported %d times:\n%s", subject, n, text)
+		}
+	}
+	if got := reconcile(); len(got) != 0 {
+		t.Fatalf("nothing new after the follow-up: %v", got)
+	}
+}
