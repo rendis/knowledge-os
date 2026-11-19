@@ -106,8 +106,10 @@ func reconcile(o options, out io.Writer) error {
 			fresh := []string{}
 			for _, cm := range commits[p.Handoff] { // newest first
 				sha, _, _ := strings.Cut(cm, " ")
-				if markSHA != "" && (strings.HasPrefix(sha, markSHA) || strings.HasPrefix(markSHA, sha)) {
-					break
+				// The mark is the worktree's HEAD at that run, often a commit of another task on the
+				// same branch: everything it reaches was imported then.
+				if markSHA != "" && exec.Command("git", "-C", o.worktree, "merge-base", "--is-ancestor", sha, markSHA).Run() == nil {
+					continue
 				}
 				fresh = append([]string{cm}, fresh...)
 			}

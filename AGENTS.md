@@ -35,3 +35,4 @@ Design decisions are recorded in `docs/adr/`.
 - PR sync gates read the committed candidate and published base; checkpoints select files from the named draft, never the live index.
 - PR snapshots preserve the kernel's `.claude/skills` symlink and require links to resolve inside the snapshot.
 - PR snapshots use `filepath.FromSlash` on targets passed to `os.Root.Symlink` so Windows can follow the links.
+- Handoff reconcile marks record the worktree HEAD, which may belong to another task on the branch: a commit counts as imported when the mark reaches it (`merge-base --is-ancestor`), never by matching the task's own commits.
