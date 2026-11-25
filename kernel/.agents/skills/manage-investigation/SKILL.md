@@ -49,6 +49,7 @@ Write at **events**, not at turns: opening, each confirmed fact, a changed concl
 1. `<CLI> investigation list --vault "<root>"`; match the work-item reference and subject against existing cases and resume the matching case instead of opening a duplicate. Read its current state and cited records through **Resume** before continuing; record new requirements and decisions in that case.
 2. Formalize the request: what is needed and for what, the expected result, what is in and out of scope. The title and objective name the need, not an unverified premise about the current state (that data exists, a job ran, something must be migrated). Ask only for what blocks the objective ([questioning-protocol](references/questioning-protocol.md)).
 3. `<CLI> investigation new --vault "<root>" --title "<title>" --type understanding|development --objective "<formalized request>" [--source-ref "<ticket, message or document>"]`.
+4. Record the work item's premises: each thing it states or implies about the current state (data already loaded, a load or job that ran, a consumer or feature that exists, a deployment). Before writing any requirement, read the reachable source for each one (code at its reference branch, a configured database, log or platform read) and record the result as evidence; record what stays unchecked as a question whose `--resolve-by` names the check that settles it. A requirement or plan step that rests on an open premise says so and cites its question, and so does the answer to the requester.
 
 ## Record
 
