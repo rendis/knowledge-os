@@ -68,7 +68,7 @@ Keep it atomic: one repository, one task, the smallest context that answers the 
 
 Before directing a session, check its current activity and who has control. Keep one active execution per worktree; while the user drives it, the coordinator observes rather than starting competing work. Reuse the session on continuation. Implement from the vault only after the user chooses that alternative in response to the session recommendation; preparation and an earlier implementation request alone do not select it.
 
-The command never commits, pushes, fetches or changes other branches. The segment change in `AGENTS.md` is a tracked file change: the repository's normal workflow commits it (once per repository, since it is identical everywhere).
+The command never commits, pushes, fetches or changes other branches. The segment change in `AGENTS.md` is a tracked file change: it is committed only with commit authority, through `manage-git-workflow` (once per repository, since it is identical everywhere).
 
 ## Refresh
 

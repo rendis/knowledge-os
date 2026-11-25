@@ -31,7 +31,7 @@ While defining a development work item, keep follow-up clarifications, narrowed 
 | The information | Goes to |
 | --- | --- |
 | What the requester needs, the expected result, scope | the case objective, formalized when opening |
-| A fact the vault already documents, and `discover check` shows fresh for it | a `[[note]]` reference inside the record that relies on it; never copied |
+| A fact a vault note supports under the router's **Review by novelty** | a `[[note]]` reference inside the record that relies on it; never copied |
 | A fact the vault lacks, contradicts, or holds in a stale note | an evidence record, confirmed at the source |
 | A conclusion, decision, open question or pending search | its record |
 | Durable knowledge about how the system works, true beyond this case | a finding marked `--for-vault [[note]]`, absorbed into that note on publication |
@@ -42,12 +42,12 @@ While defining a development work item, keep follow-up clarifications, narrowed 
 
 Write at **events**, not at turns: opening, each confirmed fact, a changed conclusion, a decision, a question opened or resolved, a requester contribution (evidence or a request to search), a prepared handoff, closing. After a batch of records, rewrite the current state.
 
-**Language.** The case records what is needed and what is known in neutral, practical language. Formalize the requester's words into the need, the expected result and constraints; attribute requester input as a dated statement of fact or need. Frustration, emphasis, profanity and verbatim transcripts stay out, including in quoted text.
+**Language.** The case records what is needed and what is known in neutral, practical language. Formalize the requester's words into the need, the expected result and constraints; attribute requester input as a dated statement. A statement about the system's current state is evidence that it was said, written as such ("the ticket states…"); the state stays a question until its source confirms it. Frustration, emphasis, profanity and verbatim transcripts stay out, including in quoted text.
 
 ## Open
 
 1. `<CLI> investigation list --vault "<root>"`; match the work-item reference and subject against existing cases and resume the matching case instead of opening a duplicate. Read its current state and cited records through **Resume** before continuing; record new requirements and decisions in that case.
-2. Formalize the request: what is needed and for what, the expected result, what is in and out of scope. Ask only for what blocks the objective ([questioning-protocol](references/questioning-protocol.md)).
+2. Formalize the request: what is needed and for what, the expected result, what is in and out of scope. The title and objective name the need, not an unverified premise about the current state (that data exists, a job ran, something must be migrated). Ask only for what blocks the objective ([questioning-protocol](references/questioning-protocol.md)).
 3. `<CLI> investigation new --vault "<root>" --title "<title>" --type understanding|development --objective "<formalized request>" [--source-ref "<ticket, message or document>"]`.
 
 ## Record
@@ -62,7 +62,7 @@ Write at **events**, not at turns: opening, each confirmed fact, a changed concl
 
 Attribute only the requester's actual choices to the requester. Record an agent's inference or proposal as such; a case record cannot create implementation authority that the conversation did not grant.
 
-`--file <path>` (repeatable) attaches files to an evidence or finding record as `artifacts/<ID>-<name>` and refuses credentials. A materially different claim is a new record with `--supersedes <ID>`; records are never renumbered or edited in place, so a file a record relies on and lacks comes with a record that supersedes it (`--supersedes <ID> --file <path>`). An identifier of a kind cases no longer define (an earlier version's attachment `` `A-001` ``, export `` `S-004` `` or acceptance criterion `` `AC-002` ``) is written as inline code; bare, the gate reads it as a reference. Current kinds (E, F, Q, D, R, DH) are always checked, in code or not. `state --text "<what is known, what is missing, next step>"` rewrites the current state, citing the records it summarizes. Every write returns `gate_review` reminders that do not block: a component the vault documents named without its `[[note]]` (reference the note once `discover check` shows it fresh for the claim and it describes the branch or revision the record relies on, instead of restating it) and relations discovery contradicts. `<CLI> investigation check --id <id>` runs the same gate over the whole case, including its handoff packages. Handoff progress comes back through `handoff reconcile`.
+`--file <path>` (repeatable) attaches files to an evidence or finding record as `artifacts/<ID>-<name>` and refuses credentials. A materially different claim is a new record with `--supersedes <ID>`; records are never renumbered or edited in place, so a file a record relies on and lacks comes with a record that supersedes it (`--supersedes <ID> --file <path>`). An identifier of a kind cases no longer define (an earlier version's attachment `` `A-001` ``, export `` `S-004` `` or acceptance criterion `` `AC-002` ``) is written as inline code; bare, the gate reads it as a reference. Current kinds (E, F, Q, D, R, DH) are always checked, in code or not. `state --text "<what is known, what is missing, next step>"` rewrites the current state, citing the records it summarizes. Every write returns `gate_review` reminders that do not block: a component the vault documents named without its `[[note]]` (reference the note, instead of restating it, when **Review by novelty** lets you reuse it for the branch or revision the record relies on) and relations discovery contradicts. `<CLI> investigation check --id <id>` runs the same gate over the whole case, including its handoff packages. Handoff progress comes back through `handoff reconcile`.
 
 Story drafts: [export-contract](references/export-contract.md); sufficiency of a development package: [implementation-sufficiency](references/implementation-sufficiency.md); component progress and production handover: [components-and-release](references/components-and-release.md). Observation of a running system goes through `manage-operational-workflow`.
 

@@ -113,9 +113,9 @@ If it is not `initialized`, load `onboard-developer`. The observed gap opens dem
 
 **Vault resolution not `resolved`.** Follow [vault-resolution.md](../../../../90-Meta/vault-resolution.md): `invalid` means report the wrong path; `ambiguous` means present verified candidates and request a choice; `not_found` means request an explicit local path or separate authorization and destination to clone the vault.
 
-**CLI or gates unavailable.** Report the missing executable or exact failing gate. Restore the matching platform release through the distribution installer; rerun the affected checks. Do not replace a failed semantic review with a structural check.
+**CLI or gates unavailable.** Report the missing executable or exact failing gate. Reinstall `kos` as `use-vault-cli` describes; rerun the affected checks. Do not replace a failed semantic review with a structural check.
 
-**Git baseline.** This vault uses local `main` as its only baseline. A missing `refs/heads/main` blocks authoring, closure, and synchronization. A dirty working tree does not affect readiness: report changed/untracked paths as delivery context and preserve unrelated work.
+**Git baseline.** The vault's baseline is its configured primary branch (router, Guardrails). A missing local ref for it blocks authoring, closure, and synchronization. A dirty working tree does not affect readiness: report changed/untracked paths as delivery context and preserve unrelated work.
 
 **GitHub identity.** Suggest `--github-user <login>` for a stored account, a non-interactive `GH_TOKEN`/`GITHUB_TOKEN`, or authenticating `gh` and checking SSO authorization. Never persist or print tokens.
 
