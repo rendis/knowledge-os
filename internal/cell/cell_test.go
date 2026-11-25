@@ -163,6 +163,21 @@ func TestDoctorReportsDriftAndStrictFails(t *testing.T) {
 	if res["start_here"].([]any)[0] != "00-Home.md" || res["personal_instructions"].(map[string]any)["ignored"] != true {
 		t.Fatalf("orientation and personal file: %v", res)
 	}
+	if len(res["agents_md_shadowed_by"].([]any)) != 0 {
+		t.Fatalf("a fresh cell has no CLAUDE.md: %v", res)
+	}
+	os.WriteFile(filepath.Join(v, "CLAUDE.md"), []byte("@AGENTS.md\n"), 0o644)
+	if res, _, _ = run(t, "", "doctor", "--vault", v); len(res["agents_md_shadowed_by"].([]any)) != 0 {
+		t.Fatalf("a CLAUDE.md importing AGENTS.md delivers it: %v", res)
+	}
+	os.WriteFile(filepath.Join(v, "CLAUDE.md"), []byte("# rules\n"), 0o644)
+	if res, _, _ = run(t, "", "doctor", "--vault", v); len(res["agents_md_shadowed_by"].([]any)) != 1 {
+		t.Fatalf("a CLAUDE.md without the import hides AGENTS.md: %v", res)
+	}
+	if _, _, e = run(t, "", "doctor", "--vault", v, "--strict"); e == nil || !strings.Contains(e.Error(), "skip AGENTS.md") {
+		t.Fatalf("--strict fails on a shadowing CLAUDE.md: %v", e)
+	}
+	os.Remove(filepath.Join(v, "CLAUDE.md"))
 	os.WriteFile(filepath.Join(v, "AGENTS.md"), []byte("# edited\n"), 0o644)
 	res, _, e = run(t, "", "doctor", "--vault", v)
 	if e != nil || len(res["drift"].([]any)) != 1 {

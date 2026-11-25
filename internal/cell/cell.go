@@ -253,6 +253,8 @@ func Doctor(root string, strict bool) (map[string]any, error) {
 		topology = append(topology, ".claude/skills")
 	}
 	res["topology_drift"] = topology
+	shadow := claudeShadow(root)
+	res["agents_md_shadowed_by"] = shadow
 	if inst != nil {
 		orientation := config.Orientation(root, inst)
 		res["orientation"], res["start_here"] = orientation, orientation["start_here"]
@@ -264,6 +266,7 @@ func Doctor(root string, strict bool) (map[string]any, error) {
 		}{
 			{lock.Version != "5", "lock is not portable"}, {!reproducible, "kernel was installed from an unreproducible build"},
 			{len(drift) > 0, "kernel files changed locally"}, {len(topology) > 0, ".claude/skills is not linked to .agents/skills"},
+			{len(shadow) > 0, "a CLAUDE.md makes Claude Code skip AGENTS.md"},
 			{len(adapterDrift) > 0, "adapters differ from instance.yaml"}, {!current, "kernel differs from the one kos carries"},
 			{!ignored, personal + " is not ignored"}, {tracked, personal + " is tracked"},
 		} {
@@ -273,6 +276,40 @@ func Doctor(root string, strict bool) (map[string]any, error) {
 		}
 	}
 	return res, failure(problems, false)
+}
+
+// claudeShadow lists the files that make Claude Code skip the vault's AGENTS.md: by default it reads
+// AGENTS.md only when no CLAUDE.md, .claude/CLAUDE.md or CLAUDE.local.md exists in the working directory
+// or above it; the user's ~/.claude/CLAUDE.md does not count. In the vault root, one that links to or
+// imports AGENTS.md still delivers it.
+func claudeShadow(root string) []string {
+	shadow := []string{}
+	user := ""
+	if home, e := os.UserHomeDir(); e == nil {
+		user = filepath.Join(home, ".claude", "CLAUDE.md")
+	}
+	for dir := root; ; {
+		for _, name := range []string{"CLAUDE.md", filepath.Join(".claude", "CLAUDE.md"), "CLAUDE.local.md"} {
+			p := filepath.Join(dir, name)
+			if _, e := os.Stat(p); e != nil || p == user {
+				continue
+			}
+			if dir == root {
+				if t, e := os.Readlink(p); e == nil && filepath.Base(t) == "AGENTS.md" {
+					continue
+				}
+				if b, e := os.ReadFile(p); e == nil && strings.Contains(string(b), "@AGENTS.md") {
+					continue
+				}
+			}
+			shadow = append(shadow, p)
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return shadow
+		}
+		dir = parent
+	}
 }
 
 // failure turns the problems found into one error; notInstalled adds the strict failure of a vault

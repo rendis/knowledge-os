@@ -28,7 +28,7 @@ Design decisions are recorded in `docs/adr/`.
 - English for agent docs and skills in this repo. The notes' locale is chosen per cell at init.
 - `kos kernel update` refuses kernel files that changed locally (the lock records installed hashes; `git diff` shows the change) until `--force`; cell-specific logic lives in cell-owned files, never in managed ones.
 - `make publish` pushes `main`, moves the version tag and creates the GitHub release: run it only when asked. `kos update` replaces the machine's kos binary; it never touches a cell.
-- `AGENTS.md` is the instruction file for this repo and installed cells; a cell-owned `CLAUDE.md` is preserved.
+- `AGENTS.md` is the only instruction file for this repo and installed cells; never add a `CLAUDE.md`. Claude Code reads `AGENTS.md` natively but skips it when a `CLAUDE.md`, `.claude/CLAUDE.md` or `CLAUDE.local.md` is on the path, so `kos doctor` reports one in a cell and a cell-owned one is preserved, not edited. Handoff segments still reach a development repository's own `CLAUDE.md`, because that repository is not ours.
 - Handoff sources move from `.investigations/` to `investigations/` when published; status and refresh must resolve that move within the bound vault and preserve task identity, execution metadata and deltas.
 - Investigation writes use case directories for isolation and keep the vault checkout and branch unchanged, including published cases; publication authority and evidence gates remain separate.
 - Git change gates parse NUL-delimited porcelain without trimming status columns; preserve rename endpoints and reject unrelated staged content before a scoped publication transition.
